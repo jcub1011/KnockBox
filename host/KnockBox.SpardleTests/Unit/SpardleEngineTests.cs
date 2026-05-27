@@ -138,9 +138,9 @@ public class SpardleEngineTests
     public async Task StartAsync_EntersRoundIntroWithPhaseExpiry()
     {
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 2;
-        state.TransitionDuration = TimeSpan.FromSeconds(5);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.Settings = state.Settings with { TotalRounds = 2 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromSeconds(5) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
         state.CustomWordPool = ImmutableList.Create("apple", "brave");
 
         var start = DateTimeOffset.UtcNow;
@@ -170,9 +170,9 @@ public class SpardleEngineTests
     public async Task TransitionFromIntroToPlaying_FiresAfterDelay()
     {
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
         state.CustomWordPool = ["apple"];
 
         await _engine.StartAsync(host, state);
@@ -190,12 +190,12 @@ public class SpardleEngineTests
     public async Task SprinterWin_EntersRoundResultsThenNextRoundPlaying()
     {
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 2;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.WinCondition = WinConditionMode.Sprinter;
+        state.Settings = state.Settings with { TotalRounds = 2 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { WinCondition = WinConditionMode.Sprinter };
         state.CustomWordPool = ImmutableList.Create("apple", "brave");
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -221,9 +221,9 @@ public class SpardleEngineTests
     public async Task RoundTimerExpiry_MarksAllUnfinishedAsDnf()
     {
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(60);
-        state.RoundTimer = TimeSpan.FromMilliseconds(150);
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(60) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromMilliseconds(150) };
         state.CustomWordPool = ["apple"];
 
         await _engine.StartAsync(host, state);
@@ -245,12 +245,12 @@ public class SpardleEngineTests
     public async Task LastRound_TransitionsToGameOver()
     {
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(60);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.WinCondition = WinConditionMode.Sprinter;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(60) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { WinCondition = WinConditionMode.Sprinter };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -270,7 +270,7 @@ public class SpardleEngineTests
     public async Task StartAsync_HostSolo_CreatesHostPlayerState()
     {
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
+        state.Settings = state.Settings with { TotalRounds = 1 };
         state.CustomWordPool = ["apple"];
 
         await _engine.StartAsync(host, state);
@@ -283,7 +283,7 @@ public class SpardleEngineTests
     public async Task StartAsync_WithOtherPlayers_HostBecomesObserver()
     {
         var (state, host, players) = await CreateStateWithPlayersAsync(1);
-        state.TotalRounds = 1;
+        state.Settings = state.Settings with { TotalRounds = 1 };
         state.CustomWordPool = ["apple"];
 
         await _engine.StartAsync(host, state);
@@ -297,9 +297,9 @@ public class SpardleEngineTests
     public async Task StartAsync_WithOtherPlayersAndHostPlaysAlong_HostParticipates()
     {
         var (state, host, players) = await CreateStateWithPlayersAsync(1);
-        state.TotalRounds = 1;
+        state.Settings = state.Settings with { TotalRounds = 1 };
         state.CustomWordPool = ["apple"];
-        state.HostPlaysAlong = true;
+        state.Settings = state.Settings with { HostPlaysAlong = true };
 
         await _engine.StartAsync(host, state);
 
@@ -318,7 +318,7 @@ public class SpardleEngineTests
         var reg2 = state.RegisterPlayer(p2);
         Assert.IsTrue(reg1.TryGetSuccess(out var token1));
         Assert.IsTrue(reg2.IsSuccess);
-        state.TotalRounds = 1;
+        state.Settings = state.Settings with { TotalRounds = 1 };
         state.CustomWordPool = ["apple"];
 
         await _engine.StartAsync(host, state);
@@ -349,12 +349,12 @@ public class SpardleEngineTests
         Assert.IsTrue(state.RegisterPlayer(p1).IsSuccess);
         Assert.IsTrue(state.RegisterPlayer(p2).TryGetSuccess(out var token2));
 
-        state.TotalRounds = 2;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.WaitForAll = true;
+        state.Settings = state.Settings with { TotalRounds = 2 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { WaitForAll = true };
         state.CustomWordPool = ImmutableList.Create("apple", "brave");
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -379,13 +379,13 @@ public class SpardleEngineTests
         Assert.IsTrue(state.RegisterPlayer(p1).IsSuccess);
         Assert.IsTrue(state.RegisterPlayer(p2).TryGetSuccess(out var token2));
 
-        state.TotalRounds = 2;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.WaitForAll = false;
-        state.WinCondition = WinConditionMode.Sprinter;
+        state.Settings = state.Settings with { TotalRounds = 2 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { WaitForAll = false };
+        state.Settings = state.Settings with { WinCondition = WinConditionMode.Sprinter };
         state.CustomWordPool = ImmutableList.Create("apple", "brave");
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -407,11 +407,11 @@ public class SpardleEngineTests
     public async Task SubmitGuess_ObserverHost_ReturnsError()
     {
         var (state, host, _) = await CreateStateWithPlayersAsync(1);
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -428,12 +428,12 @@ public class SpardleEngineTests
     public async Task SubmitGuess_SoloHost_PlaysNormally()
     {
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.WinCondition = WinConditionMode.Sprinter;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { WinCondition = WinConditionMode.Sprinter };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -451,12 +451,12 @@ public class SpardleEngineTests
     public async Task BuildOutcomes_ObserverMode_ExcludesHost()
     {
         var (state, host, players) = await CreateStateWithPlayersAsync(1);
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.WinCondition = WinConditionMode.Sprinter;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { WinCondition = WinConditionMode.Sprinter };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -473,12 +473,12 @@ public class SpardleEngineTests
     public async Task CheckRoundEnd_ObserverMode_EndsOnParticipantCompletion()
     {
         var (state, host, players) = await CreateStateWithPlayersAsync(1);
-        state.TotalRounds = 2;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.WinCondition = WinConditionMode.Sprinter;
+        state.Settings = state.Settings with { TotalRounds = 2 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { WinCondition = WinConditionMode.Sprinter };
         state.CustomWordPool = ImmutableList.Create("apple", "brave");
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -492,9 +492,9 @@ public class SpardleEngineTests
     public async Task RoundTimerExpiry_ObserverMode_DoesNotDnfHost()
     {
         var (state, host, players) = await CreateStateWithPlayersAsync(1);
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(60);
-        state.RoundTimer = TimeSpan.FromMilliseconds(150);
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(60) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromMilliseconds(150) };
         state.CustomWordPool = ["apple"];
 
         await _engine.StartAsync(host, state);
@@ -514,9 +514,9 @@ public class SpardleEngineTests
     public async Task StartAsync_NytStandard_FillsQueueWithFiveLetterWordsFromService()
     {
         var (state, host) = await CreateStateAsync();
-        state.WordPoolMode = WordPoolMode.NytStandard;
-        state.WordOrderMode = WordOrderMode.ListOrder;
-        state.TotalRounds = 3;
+        state.Settings = state.Settings with { WordPoolMode = WordPoolMode.NytStandard };
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
+        state.Settings = state.Settings with { TotalRounds = 3 };
 
         await _engine.StartAsync(host, state);
 
@@ -530,11 +530,11 @@ public class SpardleEngineTests
     public async Task StartAsync_FullDictionaryConstantLength_UsesTargetLength()
     {
         var (state, host) = await CreateStateAsync();
-        state.WordPoolMode = WordPoolMode.FullDictionary;
-        state.ConstantWordLength = true;
-        state.TargetWordLength = 7;
-        state.WordOrderMode = WordOrderMode.ListOrder;
-        state.TotalRounds = 5;
+        state.Settings = state.Settings with { WordPoolMode = WordPoolMode.FullDictionary };
+        state.Settings = state.Settings with { ConstantWordLength = true };
+        state.Settings = state.Settings with { TargetWordLength = 7 };
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
+        state.Settings = state.Settings with { TotalRounds = 5 };
 
         await _engine.StartAsync(host, state);
 
@@ -547,12 +547,12 @@ public class SpardleEngineTests
     public async Task StartAsync_FullDictionaryRange_AllWordsWithinBounds()
     {
         var (state, host) = await CreateStateAsync();
-        state.WordPoolMode = WordPoolMode.FullDictionary;
-        state.ConstantWordLength = false;
-        state.MinWordLength = 5;
-        state.MaxWordLength = 7;
-        state.WordOrderMode = WordOrderMode.RandomNoRepeats;
-        state.TotalRounds = 20;
+        state.Settings = state.Settings with { WordPoolMode = WordPoolMode.FullDictionary };
+        state.Settings = state.Settings with { ConstantWordLength = false };
+        state.Settings = state.Settings with { MinWordLength = 5 };
+        state.Settings = state.Settings with { MaxWordLength = 7 };
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.RandomNoRepeats };
+        state.Settings = state.Settings with { TotalRounds = 20 };
 
         await _engine.StartAsync(host, state);
 
@@ -565,12 +565,12 @@ public class SpardleEngineTests
     public async Task StartAsync_FullDictionaryRange_ExcludesLengthsOutsideBounds()
     {
         var (state, host) = await CreateStateAsync();
-        state.WordPoolMode = WordPoolMode.FullDictionary;
-        state.ConstantWordLength = false;
-        state.MinWordLength = 4;
-        state.MaxWordLength = 4;
-        state.WordOrderMode = WordOrderMode.ListOrder;
-        state.TotalRounds = 10;
+        state.Settings = state.Settings with { WordPoolMode = WordPoolMode.FullDictionary };
+        state.Settings = state.Settings with { ConstantWordLength = false };
+        state.Settings = state.Settings with { MinWordLength = 4 };
+        state.Settings = state.Settings with { MaxWordLength = 4 };
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
+        state.Settings = state.Settings with { TotalRounds = 10 };
 
         await _engine.StartAsync(host, state);
 
@@ -583,12 +583,12 @@ public class SpardleEngineTests
     public async Task StartAsync_FullDictionaryRange_InvertedBounds_ProducesEmptyQueue()
     {
         var (state, host) = await CreateStateAsync();
-        state.WordPoolMode = WordPoolMode.FullDictionary;
-        state.ConstantWordLength = false;
-        state.MinWordLength = 10;
-        state.MaxWordLength = 5;
-        state.WordOrderMode = WordOrderMode.ListOrder;
-        state.TotalRounds = 3;
+        state.Settings = state.Settings with { WordPoolMode = WordPoolMode.FullDictionary };
+        state.Settings = state.Settings with { ConstantWordLength = false };
+        state.Settings = state.Settings with { MinWordLength = 10 };
+        state.Settings = state.Settings with { MaxWordLength = 5 };
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
+        state.Settings = state.Settings with { TotalRounds = 3 };
 
         await _engine.StartAsync(host, state);
 
@@ -599,12 +599,12 @@ public class SpardleEngineTests
     public async Task StartAsync_CustomPool_OverridesPoolModeAndIgnoresLength()
     {
         var (state, host) = await CreateStateAsync();
-        state.WordPoolMode = WordPoolMode.FullDictionary;
-        state.ConstantWordLength = true;
-        state.TargetWordLength = 7;
+        state.Settings = state.Settings with { WordPoolMode = WordPoolMode.FullDictionary };
+        state.Settings = state.Settings with { ConstantWordLength = true };
+        state.Settings = state.Settings with { TargetWordLength = 7 };
         state.CustomWordPool = ImmutableList.Create("alpha", "betas", "gamma");
-        state.TotalRounds = 3;
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { TotalRounds = 3 };
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
 
@@ -658,13 +658,13 @@ public class SpardleEngineTests
     public async Task SubmitGuess_HardMode_FirstGuessHasNoConstraint()
     {
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.HardModeEnabled = true;
-        state.AllowDictionaryFallback = true;
-        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { HardModeEnabled = true };
+        state.Settings = state.Settings with { AllowDictionaryFallback = true };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -678,13 +678,13 @@ public class SpardleEngineTests
     public async Task SubmitGuess_HardMode_RequiresConfirmedLettersInPlace()
     {
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.HardModeEnabled = true;
-        state.AllowDictionaryFallback = true;
-        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { HardModeEnabled = true };
+        state.Settings = state.Settings with { AllowDictionaryFallback = true };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -708,13 +708,13 @@ public class SpardleEngineTests
     public async Task SubmitGuess_CompoundWordsAllowed_AcceptsConcatenationOfThreePlusLetterWords()
     {
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.AllowDictionaryFallback = true;
-        state.AllowCompoundWords = true;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { AllowDictionaryFallback = true };
+        state.Settings = state.Settings with { AllowCompoundWords = true };
         state.CustomWordPool = ["aaaaaa"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -729,13 +729,13 @@ public class SpardleEngineTests
     public async Task SubmitGuess_CompoundWordsAllowed_RejectsShortFragmentDecomposition()
     {
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.AllowDictionaryFallback = true;
-        state.AllowCompoundWords = true;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { AllowDictionaryFallback = true };
+        state.Settings = state.Settings with { AllowCompoundWords = true };
         state.CustomWordPool = ["aaa"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -751,16 +751,16 @@ public class SpardleEngineTests
     public async Task SubmitGuess_CompoundWordsAllowed_RejectsGarbage()
     {
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.AllowDictionaryFallback = true;
-        state.AllowCompoundWords = true;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { AllowDictionaryFallback = true };
+        state.Settings = state.Settings with { AllowCompoundWords = true };
         // Pool word is the target. Submit a different 7-char garbage so the custom-pool
         // shortcut in ValidateGuess can't accept it — the test has to actually reach the
         // compound-word decomposition path.
         state.CustomWordPool = ["xzqwplm"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -777,13 +777,13 @@ public class SpardleEngineTests
     public async Task CheckRoundEnd_WaitForAll_HoldsRoundUntilAllFinish()
     {
         var (state, host, players) = await CreateStateWithPlayersAsync(2);
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.WaitForAll = true;
-        state.WinCondition = WinConditionMode.Sprinter;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { WaitForAll = true };
+        state.Settings = state.Settings with { WinCondition = WinConditionMode.Sprinter };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -810,11 +810,11 @@ public class SpardleEngineTests
     public async Task GiveUp_MarksPlayerAsDnfAndFinished()
     {
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -834,13 +834,13 @@ public class SpardleEngineTests
     public async Task GiveUp_TriggersRoundEnd_WhenLastUnfinishedPlayer()
     {
         var (state, host, players) = await CreateStateWithPlayersAsync(2);
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.WaitForAll = true;
-        state.WinCondition = WinConditionMode.Sprinter;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { WaitForAll = true };
+        state.Settings = state.Settings with { WinCondition = WinConditionMode.Sprinter };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -872,12 +872,12 @@ public class SpardleEngineTests
     public async Task GiveUp_IsIdempotent_WhenPlayerAlreadyFinished()
     {
         var (state, host, players) = await CreateStateWithPlayersAsync(2);
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.WaitForAll = true;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { WaitForAll = true };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -900,11 +900,11 @@ public class SpardleEngineTests
     public async Task GiveUp_ObserverHost_ReturnsError()
     {
         var (state, host, _) = await CreateStateWithPlayersAsync(1);
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -921,14 +921,14 @@ public class SpardleEngineTests
     public async Task GiveUp_ScoringTreatsPlayerAsNonSolver()
     {
         var (state, host, players) = await CreateStateWithPlayersAsync(2);
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.WaitForAll = true;
-        state.WinCondition = WinConditionMode.Sprinter;
-        state.AllowDictionaryFallback = true;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { WaitForAll = true };
+        state.Settings = state.Settings with { WinCondition = WinConditionMode.Sprinter };
+        state.Settings = state.Settings with { AllowDictionaryFallback = true };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -952,14 +952,14 @@ public class SpardleEngineTests
     public async Task BuildOutcomes_Tactician_RanksByFewestGuesses()
     {
         var (state, host, players) = await CreateStateWithPlayersAsync(2);
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.WinCondition = WinConditionMode.Tactician;
-        state.WaitForAll = true;
-        state.AllowDictionaryFallback = true;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { WinCondition = WinConditionMode.Tactician };
+        state.Settings = state.Settings with { WaitForAll = true };
+        state.Settings = state.Settings with { AllowDictionaryFallback = true };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -1012,11 +1012,11 @@ public class SpardleEngineTests
     {
         // Full dictionary length 5 has ~10k entries — take=10 triggers rejection sampling.
         var (state, host) = await CreateStateAsync();
-        state.WordPoolMode = WordPoolMode.FullDictionary;
-        state.ConstantWordLength = true;
-        state.TargetWordLength = 5;
-        state.WordOrderMode = WordOrderMode.RandomNoRepeats;
-        state.TotalRounds = 10;
+        state.Settings = state.Settings with { WordPoolMode = WordPoolMode.FullDictionary };
+        state.Settings = state.Settings with { ConstantWordLength = true };
+        state.Settings = state.Settings with { TargetWordLength = 5 };
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.RandomNoRepeats };
+        state.Settings = state.Settings with { TotalRounds = 10 };
 
         await _engine.StartAsync(host, state);
 
@@ -1034,14 +1034,14 @@ public class SpardleEngineTests
         // Two solvers (A 1st, B 2nd) and two non-solvers on a 5-letter word.
         // n=5, place=1 → 11; place=2 → 5. Non-solver anchor = 5 (lowest solver).
         var (state, host, players) = await CreateStateWithPlayersAsync(4);
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.WinCondition = WinConditionMode.Tactician;
-        state.WaitForAll = true;
-        state.AllowDictionaryFallback = true;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { WinCondition = WinConditionMode.Tactician };
+        state.Settings = state.Settings with { WaitForAll = true };
+        state.Settings = state.Settings with { AllowDictionaryFallback = true };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -1083,12 +1083,12 @@ public class SpardleEngineTests
         // No one solves: anchor falls back to PointsForSolver(5, 1) = 11.
         // Player has best-guess "apply" (4 correct out of 5) → floor(0.8 × 11) = 8.
         var (state, host, players) = await CreateStateWithPlayersAsync(1);
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(60);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.AllowDictionaryFallback = true;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(60) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { AllowDictionaryFallback = true };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -1114,12 +1114,12 @@ public class SpardleEngineTests
         // "zorks" is not in the dictionary but is in the custom pool. With fallback
         // enabled, the engine must still accept it as a valid guess.
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.AllowDictionaryFallback = true;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { AllowDictionaryFallback = true };
         state.CustomWordPool = ["apple", "zorks"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -1134,12 +1134,12 @@ public class SpardleEngineTests
     {
         // Sanity check: a non-dictionary, non-custom-pool word still fails.
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.AllowDictionaryFallback = true;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { AllowDictionaryFallback = true };
         state.CustomWordPool = ["apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -1156,12 +1156,12 @@ public class SpardleEngineTests
         // pool for the selected mode) are accepted. A coined word like "zorks" must still
         // be accepted because it's in the custom pool.
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.AllowDictionaryFallback = false;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { AllowDictionaryFallback = false };
         state.CustomWordPool = ["zorks", "apple"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -1179,13 +1179,13 @@ public class SpardleEngineTests
         // WordPoolMode still drives IsInPool) should fail. We pick a guess of matching
         // length that we know isn't in the NYT-standard 5-letter list.
         var (state, host) = await CreateStateAsync();
-        state.TotalRounds = 1;
-        state.TransitionDuration = TimeSpan.FromMilliseconds(80);
-        state.RoundTimer = TimeSpan.FromSeconds(30);
-        state.AllowDictionaryFallback = false;
-        state.WordPoolMode = WordPoolMode.HostDefined;
+        state.Settings = state.Settings with { TotalRounds = 1 };
+        state.Settings = state.Settings with { TransitionDuration = TimeSpan.FromMilliseconds(80) };
+        state.Settings = state.Settings with { RoundTimer = TimeSpan.FromSeconds(30) };
+        state.Settings = state.Settings with { AllowDictionaryFallback = false };
+        state.Settings = state.Settings with { WordPoolMode = WordPoolMode.HostDefined };
         state.CustomWordPool = ["zorks"];
-        state.WordOrderMode = WordOrderMode.ListOrder;
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.ListOrder };
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
@@ -1224,9 +1224,9 @@ public class SpardleEngineTests
         // take/total ratio forces the Fisher–Yates branch and must terminate (the old
         // rejection-sampling implementation would stall near-completion).
         var (state, host) = await CreateStateAsync();
-        state.WordPoolMode = WordPoolMode.NytStandard;
-        state.WordOrderMode = WordOrderMode.RandomNoRepeats;
-        state.TotalRounds = int.MaxValue; // engine clamps to total available
+        state.Settings = state.Settings with { WordPoolMode = WordPoolMode.NytStandard };
+        state.Settings = state.Settings with { WordOrderMode = WordOrderMode.RandomNoRepeats };
+        state.Settings = state.Settings with { TotalRounds = int.MaxValue }; // engine clamps to total available
 
         await _engine.StartAsync(host, state);
 

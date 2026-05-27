@@ -23,13 +23,13 @@
             </div>
             <div class="spd-intro-stat">
                 <span class="spd-intro-stat-label">WIN</span>
-                <span class="spd-intro-stat-value spd-mono">@(State.WinCondition == WinConditionMode.Sprinter ? "SPRINT" : "TACTIC")</span>
+                <span class="spd-intro-stat-value spd-mono">@(State.Settings.WinCondition == WinConditionMode.Sprinter ? "SPRINT" : "TACTIC")</span>
             </div>
         </div>
 
         @if (State.PhaseExpiresAtUtc is { } expires)
         {
-            <CountdownClock EndTimeUtc="expires" Duration="State.TransitionDuration" Context="countdown">
+            <CountdownClock EndTimeUtc="expires" Duration="State.Settings.TransitionDuration" Context="countdown">
                 @{
                     int digit = Math.Max(0, (int)Math.Ceiling(countdown.RemainingSeconds));
                     float pct = Math.Clamp(countdown.Fraction, 0f, 1f);
@@ -59,6 +59,6 @@
         : 0;
 
     private int maxGuesses => wordLength > 0
-        ? SpardleEngine.CalculateMaxGuesses(wordLength, State.DifficultyMultiplier)
+        ? SpardleEngine.CalculateMaxGuesses(wordLength, State.Settings.DifficultyMultiplier)
         : 6;
 }

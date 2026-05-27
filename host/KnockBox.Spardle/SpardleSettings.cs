@@ -1,0 +1,65 @@
+using KnockBox.Spardle.Models;
+using KnockBox.WordService.Contracts;
+
+namespace KnockBox.Spardle;
+
+/// <summary>
+/// The host-configurable match rules for a Spardle game. Held by
+/// <see cref="SpardleState.Settings"/> and mutated via <c>with</c> expressions inside
+/// the state's execute lock. Persisted to the host's browser localStorage by the lobby
+/// page so a host's preferred rules survive across sessions. The custom word pool is
+/// intentionally *not* part of this record (it lives on <see cref="SpardleState"/> and
+/// is excluded from persistence). Property-initializer form keeps it round-trippable by
+/// System.Text.Json (Web defaults) via the parameterless constructor + init setters.
+/// </summary>
+public sealed record SpardleSettings
+{
+    public WordPoolMode WordPoolMode { get; init; } = WordPoolMode.NytStandard;
+    public WordOrderMode WordOrderMode { get; init; } = WordOrderMode.RandomNoRepeats;
+    public WinConditionMode WinCondition { get; init; } = WinConditionMode.Sprinter;
+
+    /// <summary>
+    /// When true, the engine picks all round words at a single fixed
+    /// <see cref="TargetWordLength"/>. When false, words are sampled across
+    /// <see cref="MinWordLength"/>–<see cref="MaxWordLength"/> inclusive.
+    /// Only consulted when <see cref="WordPoolMode"/> is
+    /// <see cref="WordPoolMode.FullDictionary"/>.
+    /// </summary>
+    public bool ConstantWordLength { get; init; } = true;
+
+    /// <summary>
+    /// Target word length when <see cref="ConstantWordLength"/> is true.
+    /// Forced to 5 by the engine when <see cref="WordPoolMode"/> is
+    /// <see cref="WordPoolMode.NytStandard"/>. Ignored when the custom word pool is non-empty.
+    /// </summary>
+    public int TargetWordLength { get; init; } = 5;
+
+    /// <summary>
+    /// Minimum word length (inclusive) when <see cref="ConstantWordLength"/> is false.
+    /// </summary>
+    public int MinWordLength { get; init; } = 3;
+
+    /// <summary>
+    /// Maximum word length (inclusive) when <see cref="ConstantWordLength"/> is false.
+    /// </summary>
+    public int MaxWordLength { get; init; } = 8;
+
+    public bool HardModeEnabled { get; init; } = false;
+    public TimeSpan RoundTimer { get; init; } = TimeSpan.FromMinutes(3);
+    public bool AllowDictionaryFallback { get; init; } = true;
+    public bool AllowCompoundWords { get; init; } = false;
+    public double DifficultyMultiplier { get; init; } = 2.0;
+
+    public bool WaitForAll { get; init; } = true;
+    public bool RevealAnswer { get; init; } = true;
+
+    /// <summary>
+    /// When true and other players are present, the host plays as a normal
+    /// participant instead of becoming the display-only observer. Off by default,
+    /// preserving the "host is the shared display once others join" behavior.
+    /// </summary>
+    public bool HostPlaysAlong { get; init; } = false;
+
+    public int TotalRounds { get; init; } = 5;
+    public TimeSpan TransitionDuration { get; init; } = TimeSpan.FromSeconds(5);
+}
