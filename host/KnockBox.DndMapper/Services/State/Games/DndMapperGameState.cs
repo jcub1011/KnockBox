@@ -23,7 +23,12 @@ namespace KnockBox.DndMapper.Services.State.Games
             = ImmutableDictionary<Guid, CharacterSheet>.Empty;
         public ImmutableDictionary<Guid, NamedTemplate> CustomTemplates { get; internal set; }
             = ImmutableDictionary<Guid, NamedTemplate>.Empty;
-        public ImmutableArray<RollResult> RollLog { get; internal set; } = ImmutableArray<RollResult>.Empty;
+        // RollLog stays an ImmutableList (not ImmutableArray): it is the one
+        // append-hot collection — AppendRoll runs on every roll — and
+        // ImmutableList.Add is O(log n) versus ImmutableArray's O(n) full-array
+        // copy. The other collections here are read/iterate-heavy and rarely
+        // mutated, so ImmutableArray is the right call for them.
+        public ImmutableList<RollResult> RollLog { get; internal set; } = ImmutableList<RollResult>.Empty;
 
         // Host-managed roll templates that ride with the save slot and are
         // visible to every sheet. Players can't author or edit these.
@@ -187,8 +192,8 @@ namespace KnockBox.DndMapper.Services.State.Games
         internal void AppendRoll(RollResult result)
         {
             var next = RollLog.Add(result);
-            if (next.Length > RollLogCap)
-                next = next.RemoveRange(0, next.Length - RollLogCap);
+            if (next.Count > RollLogCap)
+                next = next.RemoveRange(0, next.Count - RollLogCap);
             RollLog = next;
         }
 

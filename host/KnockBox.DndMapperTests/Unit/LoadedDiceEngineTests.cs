@@ -237,6 +237,30 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
+        public void RollAsync_PlayerClaimsAnotherSheetWithNullAttribute_Rejected()
+        {
+            // A crafted verb sets AttributeRef.SheetId to another player's
+            // sheet with a null attribute name (which used to skip the
+            // ownership check), trying to spoof loaded-dice attribution.
+            // Ownership is now validated whenever a SheetId is present.
+            var owner = EngineTestFactory.RegisterPlayer(_state, "Owner");
+            var attacker = EngineTestFactory.RegisterPlayer(_state, "Attacker");
+            var sheetId = _engine.CreateSheetAsync(_state, _host, owner.Id, "OwnerSheet")
+                .TryGetSuccess(out var sId) ? sId : Guid.Empty;
+            Assert.AreNotEqual(Guid.Empty, sheetId);
+
+            var req = new RollRequest(
+                Dice: [new DiceTerm(1, 20)],
+                AttributeRef: new AttributeRef(sheetId, null),
+                FlatModifier: 0,
+                Mode: RollMode.Normal,
+                Label: "");
+
+            var result = _engine.RollAsync(_state, attacker, req);
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
         public void LoadedDiceRule_RoundTripsThroughJson()
         {
             // Polymorphic Conditions and Modifications must survive a save/load

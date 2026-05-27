@@ -2614,29 +2614,38 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             string? attrName = null;
             // AttributeRef with a null/empty AttributeName means "rolling as
             // this sheet, no attribute mod applied" — used by the host's
-            // picker when they don't pick an attribute. Sheet identity is
-            // still consumed by loaded-dice rule matching below.
-            if (request.AttributeRef is { } attrRef && !string.IsNullOrEmpty(attrRef.AttributeName))
+            // picker when they don't pick an attribute. The sheet identity is
+            // still consumed by loaded-dice rule matching below, so ownership
+            // MUST be validated whenever a SheetId is present (not only when
+            // an attribute name is supplied) — otherwise a crafted verb could
+            // claim another player's sheet to spoof loaded-dice attribution.
+            if (request.AttributeRef is { } attrRef)
             {
                 if (!state.Sheets.TryGetValue(attrRef.SheetId, out var sheet))
                     return ValueResult<RollResult>.FromError("Unknown sheet id for attribute reference.");
-                if (!sheet.Values.TryGetValue(attrRef.AttributeName, out var attrValue))
-                    return ValueResult<RollResult>.FromError("Unknown attribute name on the referenced sheet.");
                 if (sheet.OwnerUserId is not null && sheet.OwnerUserId != caller.Id && !IsHost(state, caller))
                     return ValueResult<RollResult>.FromError("You may only reference your own attributes (or be host).");
 
-                if (attrValue.GetModifier() is null)
-                    return ValueResult<RollResult>.FromError("Referenced attribute does not produce a numeric modifier.");
+                // Attribute modifier only resolves when a name is supplied;
+                // a name-less ref is "rolling as this sheet" with no mod.
+                if (!string.IsNullOrEmpty(attrRef.AttributeName))
+                {
+                    if (!sheet.Values.TryGetValue(attrRef.AttributeName, out var attrValue))
+                        return ValueResult<RollResult>.FromError("Unknown attribute name on the referenced sheet.");
 
-                // §8.5 semantics: deltas apply to the attribute *value*; the
-                // scoring mode then converts the modified value to a roll
-                // modifier. The resolver handles both Score (re-floor after
-                // delta) and Modifier (straight pass-through) types.
-                var resolved = AttributeContributionResolver.Resolve(sheet, attrRef.AttributeName, attrValue);
-                attributeModifier = resolved.EffectiveModifier;
-                baseAttrValue = attrValue;
-                attrName = attrRef.AttributeName;
-                if (resolved.ValueBreakdown.Count > 1) contribution = resolved;
+                    if (attrValue.GetModifier() is null)
+                        return ValueResult<RollResult>.FromError("Referenced attribute does not produce a numeric modifier.");
+
+                    // §8.5 semantics: deltas apply to the attribute *value*; the
+                    // scoring mode then converts the modified value to a roll
+                    // modifier. The resolver handles both Score (re-floor after
+                    // delta) and Modifier (straight pass-through) types.
+                    var resolved = AttributeContributionResolver.Resolve(sheet, attrRef.AttributeName, attrValue);
+                    attributeModifier = resolved.EffectiveModifier;
+                    baseAttrValue = attrValue;
+                    attrName = attrRef.AttributeName;
+                    if (resolved.ValueBreakdown.Count > 1) contribution = resolved;
+                }
             }
 
             var rolls = new List<DieRoll>(totalDice + (request.Mode == RollMode.Normal ? 0 : 1));
@@ -2780,7 +2789,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 state.Maps = ImmutableArray<Map>.Empty;
                 state.SetActiveMapId(null);
                 state.Sheets = ImmutableDictionary<Guid, CharacterSheet>.Empty;
-                state.RollLog = ImmutableArray<RollResult>.Empty;
+                state.RollLog = ImmutableList<RollResult>.Empty;
                 state.SetSettings(new DndMapperSettings());
                 state.SetAttributeSchema(AttributeSchema.FromPreset(AttributePreset.DnD5eCore));
                 state.SetActiveSchemaTemplateId(DndMapperGameState.BuiltInDnD5eCoreId);

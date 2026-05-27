@@ -18,10 +18,8 @@ namespace KnockBox.DndMapper.Helpers
             User? caller,
             DiceRollerConfig config,
             DndMapperToastService? toasts)
-        {
-            if (caller is null || config is null) return Task.FromResult(false);
-            return SubmitAsync(engine, state, caller, config, toasts, modeOverride: null);
-        }
+            // The mode-override overload guards null caller/config itself.
+            => SubmitAsync(engine, state, caller, config, toasts, modeOverride: null);
 
         // Same as above but lets the caller override the mode for a single
         // submission without mutating Config.Mode — used by the quick-roll dock

@@ -57,12 +57,20 @@ namespace KnockBox.DndMapper.Services.State.Games.Data.LoadedDice
     }
 
     // Logical key name as reported by KeyboardEvent.key on the host's client
-    // (e.g. "Space", "Shift", "a"). Case-sensitive match against the live
-    // snapshot pushed via UpdateHostInputStateAsync.
+    // (e.g. "Space", "Shift", "a"). Matched case-insensitively against the
+    // live snapshot pushed via UpdateHostInputStateAsync, so a rule authored
+    // as "A" still fires for a streamed "a" (the browser reports "A" only
+    // while Shift is also held). HostHeldKeys is an Ordinal-comparer set, so
+    // we can't lean on its Contains for the case fold — scan explicitly.
     public sealed record HostKeyHeldCondition(string Key) : LoadedDiceCondition
     {
         public override bool Matches(LoadedDiceContext ctx)
-            => !string.IsNullOrEmpty(Key) && ctx.HostHeldKeys.Contains(Key);
+        {
+            if (string.IsNullOrEmpty(Key)) return false;
+            foreach (var held in ctx.HostHeldKeys)
+                if (string.Equals(held, Key, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
     }
 
     public sealed record CombatActiveCondition : LoadedDiceCondition

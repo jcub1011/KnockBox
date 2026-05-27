@@ -53,6 +53,22 @@ namespace KnockBox.DndMapperTests.Unit
         }
 
         [TestMethod]
+        public void HostKeyHeld_MatchesCaseInsensitively()
+        {
+            // Rule authored as uppercase "A"; the streamed held set carries
+            // lowercase "a" (browser reports "A" only while Shift is held).
+            // The match must still fire. Held set uses the Ordinal comparer,
+            // mirroring how the engine builds HostHeldKeys.
+            var ctx = ContextFor(20) with
+            {
+                HostHeldKeys = ImmutableHashSet.Create(StringComparer.Ordinal, "a"),
+            };
+            Assert.IsTrue(new HostKeyHeldCondition("A").Matches(ctx));
+            Assert.IsTrue(new HostKeyHeldCondition("a").Matches(ctx));
+            Assert.IsFalse(new HostKeyHeldCondition("b").Matches(ctx));
+        }
+
+        [TestMethod]
         public void Apply_EmptyConditionsEmptyTargets_FiresOnEveryDie()
         {
             var rule = new LoadedDiceRule
