@@ -177,6 +177,15 @@
     padding: 2rem;
 }
 
+/* Host session-actions panel (left rail): open display view + settings icon
+   buttons sit on a row with the Reset Session button. */
+.dndm-session-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .dndm-floating-actions {
     position: absolute;
     /* Clear the QuickRollFooter bar pinned to the bottom of the canvas area. */
