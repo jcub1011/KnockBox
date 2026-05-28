@@ -34,7 +34,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
                     // Informant eliminated — wait for guess.
                     context.State.AwaitingInformantGuess = true;
                     _informantGuessExpiresAt = DateTimeOffset.UtcNow.AddMilliseconds(
-                        context.State.Config.InformantGuessTimeoutMs);
+                        context.State.Settings.InformantGuessTimeoutMs);
                     _expiresAt = _informantGuessExpiresAt;
 
                     context.Logger.LogDebug(
@@ -59,7 +59,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
 
             }
 
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.RevealPhaseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Settings.RevealPhaseTimeoutMs);
 
             context.Logger.LogDebug("FSM → RevealPhaseState");
             return null;
@@ -113,7 +113,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             }
 
             // Game continues — set reveal timeout.
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.RevealPhaseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Settings.RevealPhaseTimeoutMs);
 
             return null;
         }
@@ -144,7 +144,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
                     return new GameOverState();
                 }
 
-                _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.RevealPhaseTimeoutMs);
+                _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Settings.RevealPhaseTimeoutMs);
                 return null;
             }
 

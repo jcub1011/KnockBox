@@ -48,7 +48,7 @@
             </div>
             @if (UserService.CurrentUser?.Id == GameState.Host.Id)
             {
-                bool canStart = GameState.Players.Count > 0;
+                bool canStart = GameState.Players.Length > 0;
                 <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="StartGame" disabled="@(!canStart)"
                         title="@(!canStart ? "Need at least 1 more player to start" : "Deal cards and start the game")">
                     🃏 DEAL CARDS

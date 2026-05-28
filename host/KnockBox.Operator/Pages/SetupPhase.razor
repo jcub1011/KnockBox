@@ -4,13 +4,13 @@
 <div class="op-setup">
     @if (IsHost())
     {
-        int totalPlayers = GameState.Players.Count;
+        int totalPlayers = GameState.Players.Length;
         int scoresSubmitted = GameState.GamePlayers.Values.Count(state => state.CurrentPoints != 0m);
 
         <h2 class="op-phase-title">PLAYERS SELECTING STARTING SCORE</h2>
 
         <div class="op-setup-host-grid">
-            @for (int i = 0; i < GameState.Players.Count; i++)
+            @for (int i = 0; i < GameState.Players.Length; i++)
             {
                 var entry = GameState.Players[i];
                 var playerState = GameState.GamePlayers.GetValueOrDefault(entry.User.Id);

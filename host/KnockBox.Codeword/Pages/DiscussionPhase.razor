@@ -4,14 +4,14 @@
 
 @{
     var myId = UserService.CurrentUser?.Id ?? "";
-    var isHost = GameState.Host.Id == myId;
+    var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
     int aliveCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated);
     int lockedInCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated && p.HasVoted);
     var endVote = GameState.EndGameVoteStatus;
     var skipVote = GameState.SkipTimeVoteStatus;
 }
 
-@if (isHost)
+@if (isHostSpectator)
 {
     @* ══════ HOST SPECTATOR VIEW ══════ *@
     <div class="ctc-discussion-area">

@@ -51,7 +51,7 @@ public partial class MyGameLobby : DisposableComponent
     private IDisposable? _stateDisposedSubscription;
 
     private bool IsHost => GameState?.Host.Id == UserService.CurrentUser?.Id;
-    private bool CanStart => GameState is not null && GameState.Players.Count > 0;
+    private bool CanStart => GameState is not null && GameState.Players.Length > 0;
 
     protected override async Task OnInitializedAsync()
     {

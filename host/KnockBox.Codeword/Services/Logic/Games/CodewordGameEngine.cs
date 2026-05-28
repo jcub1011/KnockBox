@@ -23,6 +23,19 @@ namespace KnockBox.Codeword.Services.Logic.Games
     {
         // ── AbstractGameEngine lifecycle ─────────────────────────────────────
 
+        /// <summary>
+        /// Codeword counts the host as a participant when
+        /// <see cref="CodewordSettings.HostPlaysGame"/> is on, so readiness is
+        /// gated on <see cref="AbstractGameState.Participants"/>.<c>Count</c>
+        /// rather than the base check's <c>Players.Count</c>.
+        /// </summary>
+        public override Task<bool> CanStartAsync(AbstractGameState state, CancellationToken ct = default)
+        {
+            int count = state.Participants.Length;
+            bool valid = MinPlayerCount <= count && count <= MaxPlayerCount && state.IsJoinable;
+            return Task.FromResult(valid);
+        }
+
         public override Task<ValueResult<AbstractGameState>> CreateStateAsync(
             User host, CancellationToken ct = default)
         {
@@ -54,8 +67,10 @@ namespace KnockBox.Codeword.Services.Logic.Games
                 gameState.SetJoinable(false);
                 gameState.Context = context;
 
-                // Snapshot all registered players into GamePlayers.
-                foreach (var entry in gameState.Players)
+                // Snapshot all participants into GamePlayers. Participants is Players
+                // by default, or {host, ...Players} when CodewordSettings.HostPlaysGame
+                // is on (the host appears as a synthetic PlayerEntry with a null Token).
+                foreach (var entry in gameState.Participants)
                 {
                     gameState.GamePlayers[entry.User.Id] = new CodewordPlayerState
                     {
@@ -99,7 +114,7 @@ namespace KnockBox.Codeword.Services.Logic.Games
 
         /// <summary>
         /// Drives time-based transitions. Call periodically from a timer or background service.
-        /// Always delegates to the FSM regardless of <see cref="CodewordGameConfig.EnableTimers"/>
+        /// Always delegates to the FSM regardless of <see cref="CodewordSettings.EnableTimers"/>
         /// (individual FSM states check the flag themselves).
         /// </summary>
         public Result Tick(CodewordGameContext context, DateTimeOffset now)
@@ -251,8 +266,8 @@ namespace KnockBox.Codeword.Services.Logic.Games
                 state.WinResult = null;
                 state.EndGameVoteStatus = new EndGameVoteStatus([], 0);
 
-                // Re-snapshot players.
-                foreach (var entry in state.Players)
+                // Re-snapshot participants (host included if HostPlaysGame is on).
+                foreach (var entry in state.Participants)
                 {
                     state.GamePlayers[entry.User.Id] = new CodewordPlayerState
                     {

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Internal;
 
 namespace KnockBox.Platform.Services.Storage.IndexedDb;
 
@@ -104,31 +105,47 @@ public sealed class BlobShareByteCache : IDisposable
     public TimeSpan SlidingExpiration => _slidingExpiration;
 
     public BlobShareByteCache(ILogger<BlobShareByteCache> logger)
-        : this(logger, DefaultSizeLimitBytes, DefaultSlidingExpiration, DefaultSummaryPeriod) { }
+        : this(logger, DefaultSizeLimitBytes, DefaultSlidingExpiration, DefaultSummaryPeriod, TimeProvider.System) { }
 
     // The size-limit override exists for tests (so they can assert the
     // oversize-bypass path without allocating 256 MB) and for future per-
     // host tuning. Production registration uses the parameterless overload.
     public BlobShareByteCache(ILogger<BlobShareByteCache> logger, long sizeLimitBytes)
-        : this(logger, sizeLimitBytes, DefaultSlidingExpiration, DefaultSummaryPeriod) { }
+        : this(logger, sizeLimitBytes, DefaultSlidingExpiration, DefaultSummaryPeriod, TimeProvider.System) { }
 
     public BlobShareByteCache(
         ILogger<BlobShareByteCache> logger,
         long sizeLimitBytes,
         TimeSpan slidingExpiration)
-        : this(logger, sizeLimitBytes, slidingExpiration, DefaultSummaryPeriod) { }
+        : this(logger, sizeLimitBytes, slidingExpiration, DefaultSummaryPeriod, TimeProvider.System) { }
 
-    // Full constructor. `summaryPeriod = Zero` disables the periodic log —
-    // tests use that to avoid Timer noise; production uses the default.
     public BlobShareByteCache(
         ILogger<BlobShareByteCache> logger,
         long sizeLimitBytes,
         TimeSpan slidingExpiration,
         TimeSpan summaryPeriod)
+        : this(logger, sizeLimitBytes, slidingExpiration, summaryPeriod, TimeProvider.System) { }
+
+    /// <summary>
+    /// Full constructor. <paramref name="summaryPeriod"/> = <see cref="TimeSpan.Zero"/>
+    /// disables the periodic summary log — tests use that to avoid Timer noise;
+    /// production uses the default. <paramref name="timeProvider"/> drives the
+    /// underlying <see cref="MemoryCache"/>'s sliding-expiration and LastAccessed
+    /// timestamps; production passes <see cref="TimeProvider.System"/>, tests pass
+    /// a <c>FakeTimeProvider</c> so sliding-window eviction is deterministic
+    /// instead of wall-clock-dependent.
+    /// </summary>
+    public BlobShareByteCache(
+        ILogger<BlobShareByteCache> logger,
+        long sizeLimitBytes,
+        TimeSpan slidingExpiration,
+        TimeSpan summaryPeriod,
+        TimeProvider timeProvider)
     {
-        if (sizeLimitBytes <= 0) throw new ArgumentOutOfRangeException(nameof(sizeLimitBytes));
-        if (slidingExpiration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(slidingExpiration));
-        if (summaryPeriod < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(summaryPeriod));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sizeLimitBytes);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(slidingExpiration, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(summaryPeriod, TimeSpan.Zero);
+        ArgumentNullException.ThrowIfNull(timeProvider);
         _logger = logger;
         _sizeLimit = sizeLimitBytes;
         _slidingExpiration = slidingExpiration;
@@ -142,17 +159,35 @@ public sealed class BlobShareByteCache : IDisposable
         // here). Mixing units — e.g., setting Size = 1 on some entries —
         // would silently turn the byte ceiling into an entry-count ceiling
         // for those entries and let the cache exceed its memory budget.
+        // Clock = TimeProvider-backed adapter so sliding-window eviction is
+        // driven by the injected clock instead of DateTimeOffset.UtcNow.
+        // Microsoft hasn't shipped a TimeProvider-shaped MemoryCacheOptions
+        // surface yet (.NET 10); ISystemClock is still the documented hook.
+#pragma warning disable CS0618 // ISystemClock obsolete; MemoryCacheOptions still uses it
         _cache = new MemoryCache(new MemoryCacheOptions
         {
             SizeLimit = sizeLimitBytes,
             CompactionPercentage = 0.25,
             TrackStatistics = true,
+            Clock = new TimeProviderClock(timeProvider),
         });
+#pragma warning restore CS0618
         if (summaryPeriod > TimeSpan.Zero)
         {
             _summaryTimer = new Timer(_ => LogSummary(), state: null, summaryPeriod, summaryPeriod);
         }
     }
+
+    // Adapts a TimeProvider to the legacy ISystemClock surface that
+    // MemoryCacheOptions.Clock expects. ISystemClock is marked obsolete in
+    // .NET 8+; MemoryCacheOptions has not yet exposed a TimeProvider-shaped
+    // replacement. The adapter is stateless besides the TimeProvider ref.
+#pragma warning disable CS0618 // ISystemClock obsolete; documented MemoryCache integration point
+    private sealed class TimeProviderClock(TimeProvider timeProvider) : ISystemClock
+    {
+        public DateTimeOffset UtcNow => timeProvider.GetUtcNow();
+    }
+#pragma warning restore CS0618
 
     /// <summary>
     /// Returns <see langword="true"/> and the cached bytes if the token's

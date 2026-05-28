@@ -478,17 +478,27 @@ Your Razor page can then branch on `state.Phase` and render a dedicated componen
 
 ### Tunable config
 
-For games with host-adjustable settings (round count, timers, difficulty), implement `IConfigurableGameState<TConfig>`:
+For games with host-adjustable settings (round count, timers, difficulty), the preferred shape is an **immutable record** held behind a private setter on the state, mutated through an `Execute`-wrapped helper. This makes the lock contract structural — callers can't write to `Settings` without going through the helper, so the state mutation always fires the change notification:
 
 ```csharp
-public record MyGameConfig { public int Rounds { get; init; } = 5; }
-
-public class MyGameGameState : AbstractGameState, IConfigurableGameState<MyGameConfig>
+public sealed record MyGameSettings
 {
-    public MyGameConfig Config { get; set; } = new();
-    // ...
+    public int Rounds { get; init; } = 5;
+    public bool EnableTimers { get; init; } = true;
+}
+
+public class MyGameGameState : AbstractGameState
+{
+    public MyGameSettings Settings { get; private set; } = new();
+
+    public Result UpdateSettings(Func<MyGameSettings, MyGameSettings> mutate) =>
+        Execute(() => Settings = mutate(Settings));
 }
 ```
+
+Razor pages then write via `state.UpdateSettings(s => s with { Rounds = 7 })`. See `host/KnockBox.Codeword/Services/State/Games/CodewordGameState.cs` and `host/KnockBox.Codeword/Pages/LobbyPhase.razor.cs` for the full pattern, including localStorage persistence.
+
+> **Legacy:** `IConfigurableGameState<TConfig>` (with a mutable `Config { get; set; }` property) is the older shape used by CardCounter, HiddenAgenda, and DrawnToDress. It still works but lets callers bypass the Execute lock — new games should prefer the immutable-settings shape above.
 
 ### FSM-driven state
 

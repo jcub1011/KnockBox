@@ -3,6 +3,7 @@ using KnockBox.Platform.Services.Storage.IndexedDb;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Microsoft.JSInterop;
 
 namespace KnockBox.PlatformTests.Unit.Services.Storage.IndexedDb;
@@ -11,15 +12,20 @@ namespace KnockBox.PlatformTests.Unit.Services.Storage.IndexedDb;
 public sealed class BlobShareEndpointTests
 {
     // Builds a cache with the periodic Timer disabled so unit tests don't
-    // allocate 5-minute Timers into the runtime queue per test.
+    // allocate 5-minute Timers into the runtime queue per test. The optional
+    // timeProvider drives sliding-window expiration deterministically — tests
+    // that touch the sliding window or LastAccessed ordering pass a
+    // FakeTimeProvider so they don't depend on Task.Delay / Thread.Sleep.
     private static BlobShareByteCache CreateTestCache(
         long? sizeLimit = null,
-        TimeSpan? slidingExpiration = null)
+        TimeSpan? slidingExpiration = null,
+        TimeProvider? timeProvider = null)
         => new(
             NullLogger<BlobShareByteCache>.Instance,
             sizeLimit ?? BlobShareByteCache.DefaultSizeLimitBytes,
             slidingExpiration ?? BlobShareByteCache.DefaultSlidingExpiration,
-            summaryPeriod: TimeSpan.Zero);
+            summaryPeriod: TimeSpan.Zero,
+            timeProvider: timeProvider ?? TimeProvider.System);
 
     private static (HttpContext ctx, MemoryStream body, BlobShareRegistry registry, BlobShareByteCache? cache) MakeContext(
         BlobShareRegistry? sharedRegistry = null,
@@ -247,19 +253,19 @@ public sealed class BlobShareEndpointTests
     }
 
     [TestMethod]
-    public async Task IdleEntry_ExpiresAfterSlidingWindow()
+    public void IdleEntry_ExpiresAfterSlidingWindow()
     {
-        // Uses a 50ms sliding window so the test runs in real time without
-        // having to mock the clock. Production sets 30 minutes — same code
-        // path. MemoryCache evicts expired entries on the next access, so
-        // querying after the window's gone is enough to surface the miss.
-        var cache = CreateTestCache(slidingExpiration: TimeSpan.FromMilliseconds(50));
+        // FakeTimeProvider drives MemoryCache's sliding-expiration check
+        // deterministically — no Task.Delay, no scheduler dependence.
+        // Production sets 30 minutes; same code path.
+        var clock = new FakeTimeProvider();
+        var cache = CreateTestCache(slidingExpiration: TimeSpan.FromSeconds(1), timeProvider: clock);
         var token = Guid.NewGuid();
         cache.Store(token, new byte[16]);
 
         Assert.IsTrue(cache.TryGetBytes(token, out _), "Entry should be present immediately after store.");
 
-        await Task.Delay(200);
+        clock.Advance(TimeSpan.FromSeconds(2));
 
         Assert.IsFalse(cache.TryGetBytes(token, out _),
             "Idle entry must expire after the sliding window so dormant blobs don't sit in RAM forever.");
@@ -273,23 +279,25 @@ public sealed class BlobShareEndpointTests
         // bucket. All our entries are at the default Normal priority, so
         // this is pure LRU. A future MemoryCache change that altered the
         // ordering would break this test — exactly what we want.
-        var cache = CreateTestCache(sizeLimit: 16 * 1024);
+        var clock = new FakeTimeProvider();
+        var cache = CreateTestCache(sizeLimit: 16 * 1024, timeProvider: clock);
         var cold1 = Guid.NewGuid();
         var cold2 = Guid.NewGuid();
         var cold3 = Guid.NewGuid();
         var hot = Guid.NewGuid();
 
-        // Order matters: oldest LastAccessed goes first under LRU. UtcNow
-        // resolution on Windows is ~15 ms, so a short sleep between sets
-        // makes the timestamps strictly monotonic.
+        // Order matters: oldest LastAccessed goes first under LRU. Advancing
+        // the fake clock by 1ms between stores makes the LastAccessed
+        // timestamps strictly monotonic and deterministic — no dependence
+        // on Windows' ~15ms wall-clock resolution.
         cache.Store(cold1, new byte[1024]);
-        Thread.Sleep(20);
+        clock.Advance(TimeSpan.FromMilliseconds(1));
         cache.Store(cold2, new byte[1024]);
-        Thread.Sleep(20);
+        clock.Advance(TimeSpan.FromMilliseconds(1));
         cache.Store(cold3, new byte[1024]);
-        Thread.Sleep(20);
+        clock.Advance(TimeSpan.FromMilliseconds(1));
         cache.Store(hot, new byte[1024]);
-        Thread.Sleep(20);
+        clock.Advance(TimeSpan.FromMilliseconds(1));
 
         // Re-touch hot via the public API so its LastAccessed becomes the
         // freshest. This is the spec the user wants verified: a steady
@@ -380,20 +388,22 @@ public sealed class BlobShareEndpointTests
     }
 
     [TestMethod]
-    public async Task AccessedEntry_KeepsSlidingWindowOpen()
+    public void AccessedEntry_KeepsSlidingWindowOpen()
     {
-        // Same 50ms window; a fetch within the window must reset it, so
-        // even after total elapsed time exceeds the window the entry stays
-        // alive as long as fetches keep coming.
-        var cache = CreateTestCache(slidingExpiration: TimeSpan.FromMilliseconds(50));
+        // A fetch within the sliding window must reset LastAccessed, so even
+        // after total elapsed time exceeds the window the entry stays alive
+        // as long as fetches keep coming. Driven by FakeTimeProvider —
+        // deterministic, no Task.Delay, immune to scheduler jitter.
+        var clock = new FakeTimeProvider();
+        var cache = CreateTestCache(slidingExpiration: TimeSpan.FromSeconds(1), timeProvider: clock);
         var token = Guid.NewGuid();
         cache.Store(token, new byte[16]);
 
-        // Three touches at 25ms intervals = 75ms of total elapsed time but
-        // no individual gap exceeds 50ms.
+        // Three touches at half-window intervals = 1.5× total elapsed time
+        // but no individual gap exceeds the window.
         for (var i = 0; i < 3; i++)
         {
-            await Task.Delay(25);
+            clock.Advance(TimeSpan.FromMilliseconds(500));
             Assert.IsTrue(cache.TryGetBytes(token, out _),
                 $"Touch #{i + 1} should refresh the sliding window and find the entry.");
         }

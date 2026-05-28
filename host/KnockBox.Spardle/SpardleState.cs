@@ -52,15 +52,24 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     // True when the host is playing alongside everyone else; false when the host is a
     // display-only observer (set at StartAsync time based on whether any other players
     // joined, then locked for the duration of the game).
-    public bool HostIsParticipant { get; private set; } = true;
+    //
+    // Hides AbstractGameState.HostIsParticipant on purpose: the base property is the
+    // dynamic, lobby-time toggle; Spardle's is the frozen-at-start snapshot the engine
+    // and UI read from for the rest of the match. The Spardle engine + UI bind to this
+    // local value; an alignment pass that migrates Spardle to the base hook is tracked
+    // separately.
+    public new bool HostIsParticipant { get; private set; } = true;
 
-    internal void SetHostIsParticipant(bool value) => HostIsParticipant = value;
+    internal new void SetHostIsParticipant(bool value) => HostIsParticipant = value;
 
     // The participant roster captured at game start, frozen for the match. Used by
     // the final standings screen so players who disconnect (and are dropped from the
     // live Players roster) still appear on the end-screen leaderboard. PlayerStates
     // already persists their TotalScore, so leavers keep their final score.
-    public ImmutableArray<PlayerEntry> Participants { get; private set; } = [];
+    //
+    // Hides AbstractGameState.Participants for the same reason: this is the immutable
+    // match roster, not the dynamic participant snapshot the base exposes.
+    public new ImmutableArray<PlayerEntry> Participants { get; private set; } = [];
 
     internal void SetParticipants(IEnumerable<PlayerEntry> participants) =>
         // Drop the unsubscriber token so the long-lived snapshot doesn't retain

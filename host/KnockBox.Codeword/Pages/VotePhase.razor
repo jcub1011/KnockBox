@@ -3,12 +3,12 @@
 
 @{
     var myId = UserService.CurrentUser?.Id ?? "";
-    var isHost = GameState.Host.Id == myId;
+    var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
     int aliveCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated);
     int votedCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated && p.HasVoted);
 }
 
-@if (isHost)
+@if (isHostSpectator)
 {
     @* ══════ HOST SPECTATOR VIEW ══════ *@
     <div class="ctc-vote-area">
