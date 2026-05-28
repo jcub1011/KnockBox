@@ -68,6 +68,9 @@ namespace KnockBox.Core.Primitives.Events
                 ImmutableInterlocked.Update(ref _listeners, static (list, cb) => list.Remove(cb), callback));
         }
 
+        // Bare read is safe: ImmutableArray<T> is a single-reference struct and writes
+        // via ImmutableInterlocked.Update use Interlocked.CompareExchange (full barrier).
+        // We can't Volatile.Read directly — its T : class constraint excludes value types.
         public Task NotifyAsync() =>
             ThreadSafeEventManagerHelper.DispatchAsync(_listeners, SafeInvokeAsync);
 
@@ -86,6 +89,7 @@ namespace KnockBox.Core.Primitives.Events
         /// </summary>
         public void Notify()
         {
+            // See NotifyAsync for the bare-read rationale.
             var snapshot = _listeners;
             if (snapshot.Length == 0) return;
 
@@ -142,6 +146,7 @@ namespace KnockBox.Core.Primitives.Events
                 ImmutableInterlocked.Update(ref _listeners, static (list, cb) => list.Remove(cb), callback));
         }
 
+        // See the non-generic ThreadSafeEventManager for the bare-read rationale.
         public Task NotifyAsync(TEventArgs args) =>
             ThreadSafeEventManagerHelper.DispatchAsync(_listeners, cb => SafeInvokeAsync(cb, args));
 
@@ -153,6 +158,7 @@ namespace KnockBox.Core.Primitives.Events
         /// </summary>
         public void Notify(TEventArgs args)
         {
+            // See the non-generic ThreadSafeEventManager for the bare-read rationale.
             var snapshot = _listeners;
             if (snapshot.Length == 0) return;
 

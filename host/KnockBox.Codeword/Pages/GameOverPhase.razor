@@ -3,7 +3,7 @@
 
 @{
     var myId = UserService.CurrentUser?.Id ?? "";
-    var isHost = GameState.Host.Id == myId && !GameState.HostIsParticipant;
+    var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
     var winResult = GameState.WinResult;
     bool isFinalGame = GameState.CurrentGameNumber >= GameState.Settings.TotalGames;
     var rankedPlayers = GameState.GamePlayers.Values
@@ -11,7 +11,7 @@
         .ToList();
 }
 
-@if (isHost)
+@if (isHostSpectator)
 {
     @* ══════ HOST SPECTATOR VIEW ══════ *@
     <div class="ctc-gameover-area">

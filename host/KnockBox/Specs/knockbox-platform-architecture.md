@@ -505,7 +505,7 @@ public abstract class AbstractGameEngine
         => Task.FromResult(HasValidPlayerCount(state) && IsLobbyOpen(state));
 
     protected bool HasValidPlayerCount(AbstractGameState state)
-        => MinPlayerCount <= state.Players.Count && state.Players.Count <= MaxPlayerCount;
+        => MinPlayerCount <= state.Players.Length && state.Players.Length <= MaxPlayerCount;
 
     protected bool IsLobbyOpen(AbstractGameState state) => state.IsJoinable;
 }

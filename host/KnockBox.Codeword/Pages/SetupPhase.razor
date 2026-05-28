@@ -3,10 +3,10 @@
 
 @{
     var myId = UserService.CurrentUser?.Id ?? string.Empty;
-    var isHost = GameState.Host.Id == myId && !GameState.HostIsParticipant;
+    var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
 }
 
-@if (isHost)
+@if (isHostSpectator)
 {
     @* ══════ HOST SPECTATOR VIEW ══════ *@
     <div class="ctc-setup-area">

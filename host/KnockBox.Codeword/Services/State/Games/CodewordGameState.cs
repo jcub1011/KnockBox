@@ -1,5 +1,6 @@
 using KnockBox.Codeword.Services.Logic.Games.FSM;
 using KnockBox.Codeword.Services.State.Games.Data;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Games.Shared.Components;
 using KnockBox.Core.Services.State.Games.Shared.Interfaces;
@@ -92,19 +93,27 @@ namespace KnockBox.Codeword.Services.State.Games
         public WinConditionResult? WinResult { get; set; }
 
         /// <summary>
-        /// Host-configurable match rules. Mutated only via <c>with</c> expressions
-        /// inside <see cref="AbstractGameState.Execute(Action)"/>. Persisted to the
-        /// host's browser localStorage by the lobby page so preferred rules survive
-        /// across sessions.
+        /// Host-configurable match rules. Always replaced atomically via
+        /// <see cref="UpdateSettings"/>; the setter is private so callers can't bypass
+        /// the lock. Persisted to the host's browser localStorage by the lobby page so
+        /// preferred rules survive across sessions.
         /// </summary>
-        public CodewordSettings Settings { get; set; } = new();
+        public CodewordSettings Settings { get; private set; } = new();
 
         /// <summary>
-        /// Reflects <see cref="Settings"/>.<c>HostPlaysGame</c> into the
-        /// <see cref="AbstractGameState.HostIsParticipant"/> snapshot. Callers must
-        /// already be inside <see cref="AbstractGameState.Execute(Action)"/>.
+        /// Atomically replaces <see cref="Settings"/> with <paramref name="mutate"/>'s
+        /// result and reflects the new <c>HostPlaysGame</c> value into
+        /// <see cref="AbstractGameState.HostIsParticipant"/> in the same critical
+        /// section. The replacement + participation update happen inside one
+        /// <see cref="AbstractGameState.Execute(Action)"/>, so subscribers observe a
+        /// single consistent transition.
         /// </summary>
-        public void ApplyHostParticipation() => SetHostIsParticipant(Settings.HostPlaysGame);
+        public Result UpdateSettings(Func<CodewordSettings, CodewordSettings> mutate) =>
+            Execute(() =>
+            {
+                Settings = mutate(Settings);
+                SetHostIsParticipant(Settings.HostPlaysGame);
+            });
 
         /// <summary>
         /// Tracking for the "vote to end game" mechanic.

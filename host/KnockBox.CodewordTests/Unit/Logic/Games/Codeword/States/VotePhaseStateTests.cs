@@ -163,7 +163,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void Tick_WithTimersEnabled_AbstainsAndTransitions()
         {
-            _state.Settings = _state.Settings with { EnableTimers = true };
+            _state.UpdateSettings(s => s with { EnableTimers = true });
             var voteState = new VotePhaseState();
             voteState.OnEnter(_context);
 
@@ -178,7 +178,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void Tick_WithTimersDisabled_DoesNotTransition()
         {
-            _state.Settings = _state.Settings with { EnableTimers = false };
+            _state.UpdateSettings(s => s with { EnableTimers = false });
             var voteState = new VotePhaseState();
             voteState.OnEnter(_context);
 

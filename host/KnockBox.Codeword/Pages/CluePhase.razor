@@ -3,14 +3,14 @@
 
 @{
     var myId = UserService.CurrentUser?.Id ?? string.Empty;
-    var isHost = GameState.Host.Id == myId && !GameState.HostIsParticipant;
+    var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
     GameState.GamePlayers.TryGetValue(myId, out var playerState);
     var activeId = GameState.TurnManager.CurrentPlayer ?? "";
-    var isMyTurn = !isHost && myId == activeId;
+    var isMyTurn = !isHostSpectator && myId == activeId;
     var activePlayerName = GameState.GamePlayers.TryGetValue(activeId, out var activePs) ? activePs.DisplayName : "...";
 }
 
-@if (isHost)
+@if (isHostSpectator)
 {
     @* ══════ HOST SPECTATOR VIEW ══════ *@
     <div class="ctc-clue-area">

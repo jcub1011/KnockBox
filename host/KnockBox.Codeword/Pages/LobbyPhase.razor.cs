@@ -25,6 +25,11 @@ namespace KnockBox.Codeword.Pages
         private readonly CancellationTokenSource _cts = new();
         private Task? _saveTask;
 
+        // True once the host has changed any setting locally. Blocks the initial
+        // localStorage load from clobbering an in-flight edit if the load returns
+        // after the user has already interacted with the drawer.
+        private bool _userHasEdited;
+
         protected void ToggleSettings() => SettingsOpen = !SettingsOpen;
 
         // Per-property setters route through UpdateSettings so every mutation runs inside
@@ -69,17 +74,13 @@ namespace KnockBox.Codeword.Pages
         protected void SetTotalGames(int value) => UpdateSettings(s => s with { TotalGames = value });
         protected void SetHostPlaysGame(bool value) => UpdateSettings(s => s with { HostPlaysGame = value });
 
-        // Replaces the Settings record inside State.Execute so readers on other circuits
-        // never see a torn value and the change notification fires after the lock is
-        // released. ApplyHostParticipation reflects the new HostPlaysGame value into the
-        // shared Participants snapshot in the same critical section.
+        // Delegates the atomic mutation to the state (which enforces Execute + reflects
+        // HostPlaysGame into HostIsParticipant) and then persists. _userHasEdited blocks
+        // any in-flight localStorage load from clobbering this edit.
         private void UpdateSettings(Func<CodewordSettings, CodewordSettings> mutate)
         {
-            GameState.Execute(() =>
-            {
-                GameState.Settings = mutate(GameState.Settings);
-                GameState.ApplyHostParticipation();
-            });
+            _userHasEdited = true;
+            GameState.UpdateSettings(mutate);
             PersistSettings();
         }
 
@@ -141,13 +142,11 @@ namespace KnockBox.Codeword.Pages
             try
             {
                 var saved = await LocalStorage.GetAsync<CodewordSettings>("codeword", "settings", _cts.Token);
-                if (saved is not null)
+                // If the host already edited a setting while the load was in flight,
+                // the user's edit wins — the saved snapshot would clobber it.
+                if (saved is not null && !_userHasEdited)
                 {
-                    GameState.Execute(() =>
-                    {
-                        GameState.Settings = saved;
-                        GameState.ApplyHostParticipation();
-                    });
+                    GameState.UpdateSettings(_ => saved);
                     StateHasChanged();
                 }
             }

@@ -3,7 +3,7 @@
 
 @{
     var myId = UserService.CurrentUser?.Id ?? "";
-    var isHost = GameState.Host.Id == myId && !GameState.HostIsParticipant;
+    var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
     int aliveCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated);
     int endVotes = GameState.EndGameVoteStatus.VotedToEnd.Count;
     int castCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated && p.ContinueOrEndVote.HasValue);
@@ -33,7 +33,7 @@
             &nbsp;(majority needs @required to end)
         </div>
 
-        @if (isHost)
+        @if (isHostSpectator)
         {
             <p class="ctc-waiting-text">[ HOST: SPECTATING ]</p>
         }

@@ -104,7 +104,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
         // single T[] reference — assignment is observed atomically and the
         // payload is deeply immutable.
         private ImmutableArray<PlayerEntry> _cachedPlayerEntries = [];
-        private ImmutableArray<PlayerEntry> _cachedRoster;
+        private ImmutableArray<PlayerEntry> _cachedRoster = [];
         private ImmutableArray<PlayerEntry> _cachedParticipants = [];
         private ImmutableArray<User> _cachedKickedUsers = [];
 
@@ -330,13 +330,15 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// Picks the first non-colliding "{base} ({n})" candidate, trimming
         /// the requested name to leave room for the suffix within the 12-char
         /// display limit. The base name is shortened — never the suffix — so
-        /// every candidate ends in " (n)".
+        /// every candidate ends in " (n)". An upper-bound on counter guarantees
+        /// the loop terminates even under pathological collisions; the fallback
+        /// uses a short random hex suffix.
         /// </summary>
         private string Disambiguate(string requestedName)
         {
             const int maxDisplayLength = 12;
-            int counter = 1;
-            while (true)
+            const int maxAttempts = 10_000;
+            for (int counter = 1; counter <= maxAttempts; counter++)
             {
                 string suffix = $" ({counter})";
                 int maxBaseLength = maxDisplayLength - suffix.Length;
@@ -345,8 +347,14 @@ namespace KnockBox.Core.Services.State.Games.Shared
                     : requestedName;
                 string candidate = baseName + suffix;
                 if (!IsNameTaken(candidate)) return candidate;
-                counter++;
             }
+
+            // Unreachable in practice (max 8 players), but kills the worst-case
+            // infinite loop if IsNameTaken's invariants ever drift.
+            string fallback = $"{requestedName[..Math.Min(requestedName.Length, 4)]}-{Guid.NewGuid():N}"[..maxDisplayLength];
+            _logger.LogWarning("Disambiguate exhausted {max} attempts for [{name}]; falling back to [{fallback}].",
+                maxAttempts, requestedName, fallback);
+            return fallback;
         }
 
         /// <summary>
