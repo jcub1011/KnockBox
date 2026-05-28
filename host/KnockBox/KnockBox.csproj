@@ -95,6 +95,8 @@
                       ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\KnockBox.AlphaChain\KnockBox.AlphaChain.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\KnockBox.Tracery\KnockBox.Tracery.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
     <!--
       Library plugins. Same ReferenceOutputAssembly="false" Private="false" pattern
       as game plugins: built transitively so libraries/{Plugin}/ is populated

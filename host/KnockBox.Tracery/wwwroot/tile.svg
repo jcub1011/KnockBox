@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200" role="img" aria-label="Tracery">
+  <defs>
+    <linearGradient id="tr-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b1230"/>
+      <stop offset="1" stop-color="#0d1a2b"/>
+    </linearGradient>
+    <radialGradient id="tr-glow" cx="0.3" cy="0.25" r="0.8">
+      <stop offset="0" stop-color="#7c5cff" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#7c5cff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="tr-stroke" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9d7bff"/>
+      <stop offset="1" stop-color="#4fd1c5"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="300" height="200" rx="16" fill="url(#tr-bg)"/>
+  <rect width="300" height="200" rx="16" fill="url(#tr-glow)"/>
+
+  <!-- Interlacing tracery motif -->
+  <g fill="none" stroke="url(#tr-stroke)" stroke-width="2.5" stroke-linecap="round" opacity="0.9">
+    <path d="M60 150 C 60 95, 100 95, 100 60 C 100 95, 140 95, 140 150"/>
+    <path d="M100 150 C 100 95, 140 95, 140 60 C 140 95, 180 95, 180 150"/>
+    <path d="M140 150 C 140 95, 180 95, 180 60 C 180 95, 220 95, 220 150"/>
+    <circle cx="100" cy="60" r="5" fill="#9d7bff" stroke="none"/>
+    <circle cx="140" cy="60" r="5" fill="#6ec3ff" stroke="none"/>
+    <circle cx="180" cy="60" r="5" fill="#4fd1c5" stroke="none"/>
+  </g>
+
+  <text x="150" y="185" text-anchor="middle"
+        font-family="Segoe UI, Helvetica, Arial, sans-serif"
+        font-size="26" font-weight="700" letter-spacing="3" fill="#f2ecff">TRACERY</text>
+</svg>

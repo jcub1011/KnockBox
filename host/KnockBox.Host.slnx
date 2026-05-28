@@ -28,6 +28,8 @@
   <Project Path="KnockBox.SpardleTests/KnockBox.SpardleTests.csproj" />
   <Project Path="KnockBox.TaskMaster/KnockBox.TaskMaster.csproj" />
   <Project Path="KnockBox.TaskMasterTests/KnockBox.TaskMasterTests.csproj" />
+  <Project Path="KnockBox.Tracery/KnockBox.Tracery.csproj" />
+  <Project Path="KnockBox.TraceryTests/KnockBox.TraceryTests.csproj" />
   <Project Path="KnockBox.WordService.Contracts/KnockBox.WordService.Contracts.csproj" />
   <Project Path="KnockBox.WordService/KnockBox.WordService.csproj" />
   <Project Path="KnockBox.WordServiceTests/KnockBox.WordServiceTests.csproj" />

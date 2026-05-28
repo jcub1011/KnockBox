@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "name": "Tracery",
+  "description": "A Tracery placeholder game.",
+  "routeIdentifier": "tracery",
+  "version": "1.0.0",
+  "entryAssembly": "KnockBox.Tracery",
+  "capabilities": [],
+  "workInProgress": true,
+  "tileAsset": "tile.svg"
+}
