@@ -24,14 +24,14 @@
             </h1>
         </div>
     </section>
-    <p class="hero-tagline">Grab a friend &mdash; pick a game &mdash; cause chaos.</p>
+    <p class="hero-tagline">Imagine Jackbox, but worse.</p>
 
     <form @onsubmit="() => JoinLobby(LobbyCode ?? string.Empty)" @onsubmit:preventDefault="true">
         <div class="join-section">
             <div class="join-card">
                 <label class="join-label" for="player-name-input">Player Name</label>
                 <input id="player-name-input"
-                       placeholder="Enter name"
+                       placeholder="Enter name to start playing!"
                        type="text" maxlength="12" name="player-name"
                        @bind="PlayerName" @bind:event="oninput" style="text-transform: none;"/>
             </div>

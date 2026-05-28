@@ -32,9 +32,16 @@
        .hero-ribbon-tile so they can compute width and duration off the
        same numbers. Each tile becomes exactly enough integer image copies
        to cover the viewport, no more — narrow screens don't pay for the
-       12 copies a dual-monitor setup needs. */
+       12 copies a dual-monitor setup needs.
+
+       --img-w is the image's NATIVE pixel width (1536px), so the background
+       renders 1:1 and each tile is an exact integer count of native-width
+       copies — background-repeat-x lands cleanly and translateX(-50%) wraps
+       with no seam. Deriving width from a constant (not the element height)
+       also sidesteps the global border-box + 4px top/bottom border shrink,
+       which previously made the rendered image width disagree with --img-w. */
     --ribbon-h: clamp(140px, 18vw, 200px);
-    --img-w: calc(var(--ribbon-h) * 1536 / 645);
+    --img-w: 1536px;
     --copies: round(up, 100vw / var(--img-w), 1);
 
     position: absolute;
@@ -80,9 +87,13 @@
        lands cleanly on the tile boundary (no seam at the tile↔tile join).
        Both tiles are identical width, so translateX(-50%) is seamless too. */
     width: calc(var(--copies) * var(--img-w));
-    background-image: url("/_content/KnockBox.Platform/content/backgrounds/yellow-vertical_loop_crop_lq.webp");
+    background-image: url("/_content/KnockBox.Platform/content/backgrounds/yellow-vertical_loop_crop.webp");
     background-repeat: repeat-x;
-    background-size: auto 100%;
+    /* Native intrinsic size (1536×645) — pixels render 1:1 instead of being
+       squeezed to the band height. The 645px-tall image is taller than the
+       band, so center it vertically and let the band crop it. */
+    background-size: auto;
+    background-position: center;
 }
 
 @keyframes ribbonScroll {
