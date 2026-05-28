@@ -252,6 +252,13 @@
                         </label>
                     </div>
                 </section>
+
+                <div class="spd-lobby-drawer-footer">
+                    <button type="button" class="spd-btn @(_resetArmed ? "spd-btn-danger" : "spd-btn-ghost")"
+                            @onclick="ResetToDefaults">
+                        @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+                    </button>
+                </div>
             </div>
         </aside>
     }
@@ -303,6 +310,35 @@
         _userHasEdited = true;
         State.UpdateSettings(mutate);
         PersistSettings();
+    }
+
+    // Two-step confirm so an accidental click can't wipe the host's whole config.
+    // First click arms; a second click within the window resets. Auto-disarms after ~3s.
+    private bool _resetArmed;
+    private int _resetGeneration;
+
+    private void ResetToDefaults()
+    {
+        if (!_resetArmed)
+        {
+            _resetArmed = true;
+            _ = DisarmResetAfterDelay(++_resetGeneration);
+            return;
+        }
+        _resetArmed = false;
+        _resetGeneration++;                          // invalidate any pending disarm
+        UpdateSettings(_ => new SpardleSettings());
+        // Keep the "unlimited timer" toggle in sync with the default RoundTimer.
+        _unlimitedTimer = State.Settings.RoundTimer <= TimeSpan.Zero;
+    }
+
+    private async Task DisarmResetAfterDelay(int generation)
+    {
+        try { await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token); }
+        catch (OperationCanceledException) { return; }   // component disposed
+        if (generation != _resetGeneration) return;      // superseded by a newer arm/reset
+        _resetArmed = false;
+        await InvokeAsync(StateHasChanged);
     }
 
     private void SetWordPoolMode(WordPoolMode value)

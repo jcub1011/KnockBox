@@ -603,6 +603,7 @@ Plugins that expose host-configurable rules (round counts, timers, gameplay togg
 - That method is `public Result UpdateSettings(Func<TSettings, TSettings> mutate) => Execute(() => { Settings = mutate(Settings); });` — the `Execute` wrapper makes the swap atomic and fires `StateChanged` once after the lock releases.
 - The lobby Razor page injects `ILocalStorageService` and persists snapshots to the host's browser using key `("{plugin-route-id}", "settings")`. Writes are serialized through a chained `_saveTask`, the load on first render is guarded by a `_userHasEdited` flag so an in-flight load can't clobber a host edit, and `DisposeAsync` flushes the last pending write before circuit teardown.
 - Razor inputs use `@bind:get`/`@bind:set` pairs routed through per-property setters that call `state.UpdateSettings(s => s with { ... })`.
+- The settings UI also exposes a host-only, two-step-confirm **"Reset to Defaults"** button that calls `UpdateSettings(_ => new TSettings())`, restoring the record's declared defaults and persisting them through the same path.
 
 The reference implementation is `host/KnockBox.Codeword/CodewordSettings.cs` + `Services/State/Games/CodewordGameState.cs` + `Pages/LobbyPhase.razor{,.cs}`. The same pattern is used by every other plugin with settings (CardCounter, DndMapper, DrawnToDress, HiddenAgenda, Operator, Spardle). LocalStorage stores **per-host preferences for new sessions**; session-internal persistence (e.g., DndMapper's IndexedDB snapshot) is a separate mechanism owned by individual plugins.
 

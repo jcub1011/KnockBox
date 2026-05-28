@@ -107,6 +107,7 @@ Plugins that expose host-configurable rules (round counts, timers, gameplay togg
    ```razor
    <input type="checkbox" @bind:get="GameState.Settings.EnableTimers" @bind:set="SetEnableTimers" />
    ```
+5. **Reset to defaults** is a two-step-confirm button in the same settings UI that calls `UpdateSettings(_ => new TSettings())` — restoring the record's declared defaults and persisting them through the same path.
 
 The reference implementation is `KnockBox.Codeword` (`CodewordSettings.cs`, `CodewordGameState.cs`, `Pages/LobbyPhase.razor.cs`).
 

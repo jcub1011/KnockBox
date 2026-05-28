@@ -218,6 +218,13 @@
                     </label>
                 </div>
 
+                <div class="cc-settings-drawer-footer">
+                    <button type="button" class="cc-btn @(_resetArmed ? "cc-btn-danger" : "cc-btn-secondary")"
+                            @onclick="ResetToDefaults">
+                        @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+                    </button>
+                </div>
+
             </div>
         </div>
     }

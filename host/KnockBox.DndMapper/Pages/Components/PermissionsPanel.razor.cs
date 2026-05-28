@@ -87,6 +87,35 @@ namespace KnockBox.DndMapper.Pages.Components
             PersistSettings();
         }
 
+        // Two-step confirm so an accidental click can't wipe the host's whole config.
+        // First click arms; a second click within the window resets. Auto-disarms after ~3s.
+        // Apply() is host-checked by the engine and persists to both localStorage and the
+        // IndexedDB session snapshot, so the reset propagates exactly like any other edit.
+        private bool _resetArmed;
+        private int _resetGeneration;
+
+        private async Task ResetToDefaults()
+        {
+            if (!_resetArmed)
+            {
+                _resetArmed = true;
+                _ = DisarmResetAfterDelay(++_resetGeneration);
+                return;
+            }
+            _resetArmed = false;
+            _resetGeneration++;                          // invalidate any pending disarm
+            await Apply(new DndMapperSettings());
+        }
+
+        private async Task DisarmResetAfterDelay(int generation)
+        {
+            try { await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token); }
+            catch (OperationCanceledException) { return; }   // component disposed
+            if (generation != _resetGeneration) return;      // superseded by a newer arm/reset
+            _resetArmed = false;
+            await InvokeAsync(StateHasChanged);
+        }
+
         private async Task LoadSettingsAsync()
         {
             try

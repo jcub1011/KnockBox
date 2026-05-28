@@ -83,6 +83,33 @@ namespace KnockBox.Operator.Pages
             PersistSettings();
         }
 
+        // Two-step confirm so an accidental click can't wipe the host's whole config.
+        // First click arms; a second click within the window resets. Auto-disarms after ~3s.
+        private bool _resetArmed;
+        private int _resetGeneration;
+
+        protected void ResetToDefaults()
+        {
+            if (!_resetArmed)
+            {
+                _resetArmed = true;
+                _ = DisarmResetAfterDelay(++_resetGeneration);
+                return;
+            }
+            _resetArmed = false;
+            _resetGeneration++;                            // invalidate any pending disarm
+            UpdateSettings(_ => new OperatorSettings());
+        }
+
+        private async Task DisarmResetAfterDelay(int generation)
+        {
+            try { await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token); }
+            catch (OperationCanceledException) { return; }   // component disposed
+            if (generation != _resetGeneration) return;      // superseded by a newer arm/reset
+            _resetArmed = false;
+            await InvokeAsync(StateHasChanged);
+        }
+
         protected void KickPlayer(string userId)
         {
             if (string.IsNullOrWhiteSpace(userId))

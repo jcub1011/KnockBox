@@ -192,6 +192,34 @@ namespace KnockBox.DrawnToDress.Pages
             UpdateSettings(Presets[index].Apply);
         }
 
+        // Two-step confirm so an accidental click can't wipe the host's whole config.
+        // First click arms; a second click within the window resets. Auto-disarms after ~3s.
+        // UpdateSettings already applies Normalize(), so the fresh record is normalized too.
+        private bool _resetArmed;
+        private int _resetGeneration;
+
+        protected void ResetToDefaults()
+        {
+            if (!_resetArmed)
+            {
+                _resetArmed = true;
+                _ = DisarmResetAfterDelay(++_resetGeneration);
+                return;
+            }
+            _resetArmed = false;
+            _resetGeneration++;                              // invalidate any pending disarm
+            UpdateSettings(_ => new DrawnToDressSettings());
+        }
+
+        private async Task DisarmResetAfterDelay(int generation)
+        {
+            try { await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token); }
+            catch (OperationCanceledException) { return; }   // component disposed
+            if (generation != _resetGeneration) return;      // superseded by a newer arm/reset
+            _resetArmed = false;
+            await InvokeAsync(StateHasChanged);
+        }
+
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             // localStorage needs JS interop, so the host's saved settings load here (not

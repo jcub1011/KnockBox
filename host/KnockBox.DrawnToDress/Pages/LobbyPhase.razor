@@ -97,6 +97,11 @@
                             @preset.Name
                         </button>
                     }
+                    <button class="dtd-btn @(_resetArmed ? "dtd-btn-accent" : "dtd-btn-secondary")"
+                            @onclick="ResetToDefaults"
+                            title="Restore all settings to their defaults">
+                        @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+                    </button>
                 </div>
 
                 <!-- ── Drawing ────────────────────────────────────────────── -->

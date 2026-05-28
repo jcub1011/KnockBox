@@ -60,6 +60,12 @@
                 }
             </select>
         </div>
+        <div class="ha-config-reset">
+            <button type="button" class="ha-btn @(_resetArmed ? "ha-btn-danger" : "ha-btn-secondary") ha-btn-sm"
+                    disabled="@(!IsHost)" @onclick="ResetToDefaults">
+                @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+            </button>
+        </div>
     </div>
 
     @if (IsHost)
