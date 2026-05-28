@@ -7,35 +7,8 @@
 
 <div class="home-container @(_isTransitioning ? "transitioning" : "") @(_isReturning ? "returning" : "")">
 
-    <svg class="home-decor home-decor-star home-decor-star-1" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-        <path d="M32 4 L38 24 L60 26 L42 40 L48 60 L32 48 L16 60 L22 40 L4 26 L26 24 Z"
-              fill="#FFD166" stroke="#000" stroke-width="4" stroke-linejoin="round" />
-    </svg>
-    <svg class="home-decor home-decor-star home-decor-star-2" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-        <path d="M32 4 L38 24 L60 26 L42 40 L48 60 L32 48 L16 60 L22 40 L4 26 L26 24 Z"
-              fill="#1EFFBC" stroke="#000" stroke-width="4" stroke-linejoin="round" />
-    </svg>
-    <svg class="home-decor home-decor-squiggle" viewBox="0 0 120 40" aria-hidden="true" focusable="false">
-        <path d="M4 20 Q 20 4, 36 20 T 68 20 T 100 20 T 132 20"
-              fill="none" stroke="#FF0055" stroke-width="6" stroke-linecap="round" />
-    </svg>
-    <svg class="home-decor home-decor-dots" viewBox="0 0 80 80" aria-hidden="true" focusable="false">
-        <circle cx="14" cy="14" r="8" fill="#1EFFBC" stroke="#000" stroke-width="3" />
-        <circle cx="50" cy="22" r="6" fill="#FF0055" stroke="#000" stroke-width="3" />
-        <circle cx="28" cy="50" r="7" fill="#FFD166" stroke="#000" stroke-width="3" />
-        <circle cx="62" cy="60" r="5" fill="#fff" stroke="#000" stroke-width="3" />
-    </svg>
-
     <section class="hero-banner">
         <div class="hero-ribbon" aria-hidden="true"></div>
-        <svg class="hero-sparkle hero-sparkle-left" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-            <path d="M24 2 L28 20 L46 24 L28 28 L24 46 L20 28 L2 24 L20 20 Z"
-                  fill="#fff" stroke="#000" stroke-width="3" stroke-linejoin="round" />
-        </svg>
-        <svg class="hero-sparkle hero-sparkle-right" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-            <path d="M24 2 L28 20 L46 24 L28 28 L24 46 L20 28 L2 24 L20 20 Z"
-                  fill="#FF0055" stroke="#000" stroke-width="3" stroke-linejoin="round" />
-        </svg>
         <div class="hero">
             <h1 class="title">
                 @foreach (var letter in PlatformOptions.Value.Branding.HomeHeroTitle)
@@ -44,9 +17,9 @@
                 }
                 <span class="sr-only">@PlatformOptions.Value.Branding.HomeHeroTitle</span>
             </h1>
-            <p class="hero-tagline">Grab a friend &mdash; pick a game &mdash; cause chaos.</p>
         </div>
     </section>
+    <p class="hero-tagline">Grab a friend &mdash; pick a game &mdash; cause chaos.</p>
 
     <form @onsubmit="() => JoinLobby(LobbyCode ?? string.Empty)" @onsubmit:preventDefault="true">
         <div class="join-section">
@@ -72,10 +45,7 @@
     </form>
 
     <div class="games-section">
-        <h2 class="games-heading">
-            <span class="games-heading-icon" aria-hidden="true">&#127922;</span>
-            Pick a Game
-        </h2>
+        <h2 class="games-heading">Pick a Game</h2>
         <div class="game-grid">
             @foreach (var module in VisibleGameModules)
             {
