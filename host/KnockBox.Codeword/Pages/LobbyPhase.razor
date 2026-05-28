@@ -15,7 +15,7 @@
             <div class="ctc-lobby-players">
                 @{
                     bool isUserHost = GameState.Host.Id == UserService.CurrentUser?.Id;
-                    int participantCount = GameState.Participants.Count;
+                    int participantCount = GameState.Participants.Length;
                 }
 
                 @foreach (var entry in GameState.RosterIncludingHost)

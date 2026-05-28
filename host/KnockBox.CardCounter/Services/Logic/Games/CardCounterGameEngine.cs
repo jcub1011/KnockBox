@@ -46,7 +46,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
                     "Error starting game.",
                     $"State type [{state?.GetType().Name}] cannot be cast to [{nameof(CardCounterGameState)}].");
 
-            if (gameState.Players.Count == 0)
+            if (gameState.Players.Length == 0)
                 return Result.FromError("At least one other player must join before starting the game.");
 
             var context = new CardCounterGameContext(gameState, randomNumberService, logger);

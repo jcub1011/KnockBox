@@ -62,7 +62,7 @@ else
        to render the right screen for the current moment. *@
     <div class="mg-game">
         <h2>Game in progress!</h2>
-        <p>Players: @GameState.Players.Count</p>
+        <p>Players: @GameState.Players.Length</p>
         @* TODO: Add your game UI here. A common pattern is to dispatch on a
            phase enum stored on your GameState (IPhasedGameState&lt;TPhase&gt;)
            and render a dedicated Razor component per phase. *@

@@ -5,7 +5,7 @@
 <div class="dtd-lobby">
     @{
         bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
-        int playerCount = GameState.Players.Count;
+        int playerCount = GameState.Players.Length;
         bool belowMinimum = playerCount < DrawnToDressConfig.RecommendedMinimumPlayers;
     }
 

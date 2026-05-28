@@ -12,7 +12,7 @@
     </div>
 
     <div class="ha-lobby-players">
-        <h4 class="ha-subheading">Curators (@GameState.Players.Count / 6)</h4>
+        <h4 class="ha-subheading">Curators (@GameState.Players.Length / 6)</h4>
         <div class="ha-lobby-player-grid">
             @foreach (var entry in GameState.Players)
             {
@@ -29,7 +29,7 @@
                 </div>
             }
         </div>
-        @if (GameState.Players.Count < 3)
+        @if (GameState.Players.Length < 3)
         {
             <p class="ha-text-warning">Need at least 3 curators to begin the exhibition.</p>
         }
@@ -60,7 +60,7 @@
     {
         <div class="ha-actions">
             <button class="ha-btn ha-btn-primary ha-btn-lg"
-                    disabled="@(GameState.Players.Count < 3)"
+                    disabled="@(GameState.Players.Length < 3)"
                     @onclick="StartGame">Open the Exhibition</button>
         </div>
     }

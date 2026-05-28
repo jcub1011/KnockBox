@@ -31,7 +31,7 @@ namespace KnockBox.Codeword.Services.Logic.Games
         /// </summary>
         public override Task<bool> CanStartAsync(AbstractGameState state, CancellationToken ct = default)
         {
-            int count = state.Participants.Count;
+            int count = state.Participants.Length;
             bool valid = MinPlayerCount <= count && count <= MaxPlayerCount && state.IsJoinable;
             return Task.FromResult(valid);
         }

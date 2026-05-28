@@ -48,7 +48,7 @@ public class SpardleEngine(
             // SetJoinable(false) closes the join race before we read Players.Count;
             // once the lobby is non-joinable, RegisterPlayer rejects new joins.
             s.SetJoinable(false);
-            s.SetHostIsParticipant(s.Players.Count == 0 || s.Settings.HostPlaysAlong);
+            s.SetHostIsParticipant(s.Players.Length == 0 || s.Settings.HostPlaysAlong);
             // Freeze the participant roster now so the final standings screen can show
             // everyone even after disconnects prune them from the live Players roster.
             s.SetParticipants(s.HostIsParticipant ? s.RosterIncludingHost : s.Players);
