@@ -1,4 +1,4 @@
-namespace KnockBox.Platform.Filtering
+namespace KnockBox.Core.Services.Logic.Filtering
 {
     public readonly record struct ProfanityMatch(int StartIndex, int Length);
 

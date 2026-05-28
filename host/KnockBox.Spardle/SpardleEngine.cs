@@ -21,7 +21,22 @@ public class SpardleEngine(
     {
         var state = new SpardleState(host, _logger);
         state.Execute(() => state.SetJoinable(true));
+        // A mid-round departure removes the player from the live roster but leaves no
+        // guess to trigger CheckRoundEnd, so re-check here or the round hangs until the
+        // timer (or forever, when unlimited) waiting on someone who already left.
+        // The returned token is intentionally not stored: the subscription is scoped to
+        // this state's lifetime and released when the state is disposed.
+        state.SubscribePlayerUnregistered(player => HandlePlayerLeft(state, player));
         return Task.FromResult<ValueResult<AbstractGameState>>(state);
+    }
+
+    private void HandlePlayerLeft(SpardleState state, User player)
+    {
+        state.Execute(() =>
+        {
+            if (state.Phase == GamePhase.Playing && state.IsRoundActive)
+                CheckRoundEnd(state);
+        });
     }
 
     protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
@@ -33,7 +48,10 @@ public class SpardleEngine(
             // SetJoinable(false) closes the join race before we read Players.Count;
             // once the lobby is non-joinable, RegisterPlayer rejects new joins.
             s.SetJoinable(false);
-            s.SetHostIsParticipant(s.Players.Count == 0);
+            s.SetHostIsParticipant(s.Players.Count == 0 || s.Settings.HostPlaysAlong);
+            // Freeze the participant roster now so the final standings screen can show
+            // everyone even after disconnects prune them from the live Players roster.
+            s.SetParticipants(s.HostIsParticipant ? s.RosterIncludingHost : s.Players);
             s.CurrentRound = 0;
             s.IsGameOver = false;
             s.RoundHistory = s.RoundHistory.Clear();
@@ -63,30 +81,30 @@ public class SpardleEngine(
     {
         var queue = new List<string>();
 
-        int requested = state.TotalRounds > 0 ? state.TotalRounds : int.MaxValue;
+        int requested = state.Settings.TotalRounds > 0 ? state.Settings.TotalRounds : int.MaxValue;
 
         if (state.CustomWordPool.Count > 0)
         {
             var pool = new List<string>(state.CustomWordPool);
-            OrderInPlace(pool, state.WordOrderMode);
+            OrderInPlace(pool, state.Settings.WordOrderMode);
             queue.AddRange(pool.Take(Math.Min(requested, pool.Count)));
             state.RoundQueue = queue.ToImmutableList();
             return;
         }
 
-        if (state.WordPoolMode == WordPoolMode.NytStandard)
+        if (state.Settings.WordPoolMode == WordPoolMode.NytStandard)
         {
-            FillFromSingleLength(queue, state.WordPoolMode, state.WordOrderMode, length: 5, requested);
+            FillFromSingleLength(queue, state.Settings.WordPoolMode, state.Settings.WordOrderMode, length: 5, requested);
             state.RoundQueue = queue.ToImmutableList();
             return;
         }
 
-        if (state.WordPoolMode == WordPoolMode.FullDictionary)
+        if (state.Settings.WordPoolMode == WordPoolMode.FullDictionary)
         {
-            if (state.ConstantWordLength)
-                FillFromSingleLength(queue, state.WordPoolMode, state.WordOrderMode, state.TargetWordLength, requested);
+            if (state.Settings.ConstantWordLength)
+                FillFromSingleLength(queue, state.Settings.WordPoolMode, state.Settings.WordOrderMode, state.Settings.TargetWordLength, requested);
             else
-                FillFromLengthRange(queue, state.WordPoolMode, state.WordOrderMode, state.MinWordLength, state.MaxWordLength, requested);
+                FillFromLengthRange(queue, state.Settings.WordPoolMode, state.Settings.WordOrderMode, state.Settings.MinWordLength, state.Settings.MaxWordLength, requested);
             
             state.RoundQueue = queue.ToImmutableList();
             return;
@@ -241,7 +259,7 @@ public class SpardleEngine(
             return;
         }
 
-        var introDuration = duration ?? s.TransitionDuration;
+        var introDuration = duration ?? s.Settings.TransitionDuration;
 
         s.Phase = GamePhase.RoundIntro;
         s.PhaseExpiresAtUtc = DateTimeOffset.UtcNow + introDuration;
@@ -259,11 +277,11 @@ public class SpardleEngine(
         StartNextRound(s);
 
         s.Phase = GamePhase.Playing;
-        if (s.RoundTimer > TimeSpan.Zero)
+        if (s.Settings.RoundTimer > TimeSpan.Zero)
         {
-            s.PhaseExpiresAtUtc = DateTimeOffset.UtcNow + s.RoundTimer;
+            s.PhaseExpiresAtUtc = DateTimeOffset.UtcNow + s.Settings.RoundTimer;
             int capturedRound = s.CurrentRound;
-            s.ScheduleCallback(s.RoundTimer, () =>
+            s.ScheduleCallback(s.Settings.RoundTimer, () =>
             {
                 EndRoundIfStillActive(s, capturedRound);
                 return Task.CompletedTask;
@@ -338,9 +356,9 @@ public class SpardleEngine(
         }
 
         s.Phase = GamePhase.RoundResults;
-        s.PhaseExpiresAtUtc = DateTimeOffset.UtcNow + s.TransitionDuration;
+        s.PhaseExpiresAtUtc = DateTimeOffset.UtcNow + s.Settings.TransitionDuration;
 
-        s.ScheduleCallback(s.TransitionDuration, () =>
+        s.ScheduleCallback(s.Settings.TransitionDuration, () =>
         {
             AdvanceAfterResults(s);
             return Task.CompletedTask;
@@ -385,7 +403,7 @@ public class SpardleEngine(
             .ToList();
 
         IEnumerable<IGrouping<(int, long), (User User, string DisplayName, PlayerState Ps)>> solverGroups;
-        if (s.WinCondition == WinConditionMode.Tactician)
+        if (s.Settings.WinCondition == WinConditionMode.Tactician)
         {
             solverGroups = solvers
                 .OrderBy(p => p.Ps.Guesses.Count)
@@ -506,7 +524,7 @@ public class SpardleEngine(
             var result = EvaluateGuess(state.TargetWord, guess);
             pState.Guesses = pState.Guesses.Add(result);
 
-            int maxGuesses = CalculateMaxGuesses(state.TargetWord.Length, state.DifficultyMultiplier);
+            int maxGuesses = CalculateMaxGuesses(state.TargetWord.Length, state.Settings.DifficultyMultiplier);
 
             if (result.IsCorrect)
             {
@@ -562,7 +580,7 @@ public class SpardleEngine(
         if (guess.Length != state.TargetWord.Length)
             return Result.FromError($"Guess must be {state.TargetWord.Length} characters.");
 
-        if (state.HardModeEnabled && pState.Guesses.Count > 0)
+        if (state.Settings.HardModeEnabled && pState.Guesses.Count > 0)
         {
             var lastGuess = pState.Guesses.Last();
             
@@ -595,16 +613,16 @@ public class SpardleEngine(
         if (state.CustomWordPoolLookup.Contains(guess))
             return Result.Success;
 
-        if (!state.AllowDictionaryFallback)
+        if (!state.Settings.AllowDictionaryFallback)
         {
-            if (!wordListService.IsInPool(state.WordPoolMode, guess))
+            if (!wordListService.IsInPool(state.Settings.WordPoolMode, guess))
                 return Result.FromError("Word not in list.");
         }
         else
         {
             if (!wordListService.IsValidWord(guess))
             {
-                if (state.AllowCompoundWords)
+                if (state.Settings.AllowCompoundWords)
                 {
                     if (!IsValidCompoundWord(guess, wordListService))
                         return Result.FromError("Not a valid word or compound word.");
@@ -696,21 +714,37 @@ public class SpardleEngine(
 
     private void CheckRoundEnd(SpardleState state)
     {
+        // Only consider players who are still present. PlayerStates retains entries for
+        // players who have left (so the final standings keep them), but an unfinished
+        // leaver must not hold the round open. An empty set ends the round immediately.
+        var active = ActiveParticipantStates(state).ToList();
+
         bool shouldEnd;
-        if (state.WaitForAll)
+        if (state.Settings.WaitForAll)
         {
-            shouldEnd = state.PlayerStates.Values.All(p => p.HasFinishedRound);
+            shouldEnd = active.All(p => p.HasFinishedRound);
         }
-        else if (state.WinCondition == WinConditionMode.Sprinter)
+        else if (state.Settings.WinCondition == WinConditionMode.Sprinter)
         {
-            shouldEnd = state.PlayerStates.Values.Any(p => p.HasFinishedRound && !p.Dnf)
-                        || state.PlayerStates.Values.All(p => p.HasFinishedRound);
+            shouldEnd = active.Any(p => p.HasFinishedRound && !p.Dnf)
+                        || active.All(p => p.HasFinishedRound);
         }
         else // Tactician
         {
-            shouldEnd = state.PlayerStates.Values.All(p => p.HasFinishedRound);
+            shouldEnd = active.All(p => p.HasFinishedRound);
         }
 
         if (shouldEnd) CompleteRound(state);
+    }
+
+    // The PlayerStates for players currently in the live roster (host included when
+    // participating). Used by round-end checks so departed players don't block the round.
+    // Caller must hold the execute lock (TryGetPlayerState is a read-only lookup).
+    private static IEnumerable<PlayerState> ActiveParticipantStates(SpardleState state)
+    {
+        var roster = state.HostIsParticipant ? state.RosterIncludingHost : state.Players;
+        foreach (var entry in roster)
+            if (state.TryGetPlayerState(entry.User.Id, out var ps))
+                yield return ps;
     }
 }

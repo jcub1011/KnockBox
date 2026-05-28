@@ -2,7 +2,7 @@ using System.Reflection;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Shared;
 using KnockBox.Core.Services.State.Users;
-using KnockBox.Platform.ClientStorage;
+using KnockBox.Core.Services.Storage.ClientStorage;
 using KnockBox.Services.State.Users;
 using Microsoft.Extensions.Logging.Abstractions;
 

@@ -97,6 +97,6 @@
     [Parameter] public bool HighContrast { get; set; }
 
     private PlayerState? PlayerState => State.TryGetPlayerState(CurrentUserId, out var p) ? p : null;
-    private int MaxGuesses => SpardleEngine.CalculateMaxGuesses(State.TargetWord.Length, State.DifficultyMultiplier);
+    private int MaxGuesses => SpardleEngine.CalculateMaxGuesses(State.TargetWord.Length, State.Settings.DifficultyMultiplier);
     private int WordLen => State.TargetWord.Length;
 }
