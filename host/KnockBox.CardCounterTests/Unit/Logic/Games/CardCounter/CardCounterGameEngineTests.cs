@@ -131,7 +131,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (CardCounterGameState)stateResult.Value!;
-            state.Config.ActiveOperatorMode = true;
+            state.UpdateSettings(s => s with { ActiveOperatorMode = true });
             foreach (var p in players)
                 state.RegisterPlayer(p);
             await _engine.StartAsync(_host, state);
@@ -322,7 +322,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             using var state = await CreateStartedGameAsync(_player1);
 
             var context = state.Context!;
-            state.Config.EnableActionTimer = false;
+            state.UpdateSettings(s => s with { EnableActionTimer = false });
             var p1 = state.GamePlayers.Values.First();
             state.CurrentShoe.Push(new NumberCard(3));
             state.CurrentShoe.Push(new NumberCard(7));

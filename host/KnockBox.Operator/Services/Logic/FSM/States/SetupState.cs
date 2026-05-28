@@ -28,9 +28,9 @@ public class SetupState : IOperatorGameState, ITimedGameState<OperatorGameContex
     {
         if (command is SubmitSetupChoiceCommand setupCommand)
         {
-            if (setupCommand.Choice != context.State.Config.InitialPointsPositive && setupCommand.Choice != context.State.Config.InitialPointsNegative)
+            if (setupCommand.Choice != context.State.Settings.InitialPointsPositive && setupCommand.Choice != context.State.Settings.InitialPointsNegative)
             {
-                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError($"Invalid choice. Must be {context.State.Config.InitialPointsPositive} or {context.State.Config.InitialPointsNegative}.");
+                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError($"Invalid choice. Must be {context.State.Settings.InitialPointsPositive} or {context.State.Settings.InitialPointsNegative}.");
             }
 
             if (!context.GamePlayers.TryGetValue(setupCommand.PlayerId, out var playerState))
@@ -43,15 +43,15 @@ public class SetupState : IOperatorGameState, ITimedGameState<OperatorGameContex
             playerState.ScoreTimestamp = DateTimeOffset.UtcNow;
 
             // Check if everyone chose
-            var posPoints = context.State.Config.InitialPointsPositive;
-            var negPoints = context.State.Config.InitialPointsNegative;
+            var posPoints = context.State.Settings.InitialPointsPositive;
+            var negPoints = context.State.Settings.InitialPointsNegative;
             if (context.GamePlayers.Values.All(p => p.CurrentPoints == posPoints || p.CurrentPoints == negPoints))
             {
                 // Deal cards
                 context.State.Deck = OperatorGameContext.GenerateDeck(context.GamePlayers.Count, context.Rng);
                 foreach (var player in context.GamePlayers.Values)
                 {
-                    context.DealCards(player, context.State.Config.MaxHandSize);
+                    context.DealCards(player, context.State.Settings.MaxHandSize);
                 }
 
                 // Initialize TurnManager
@@ -69,37 +69,37 @@ public class SetupState : IOperatorGameState, ITimedGameState<OperatorGameContex
 
     public ValueResult<TimeSpan> GetRemainingTime(OperatorGameContext context, DateTimeOffset now)
     {
-        if (!context.State.Config.TimersEnabled) return ValueResult<TimeSpan>.FromValue(TimeSpan.MaxValue);
+        if (!context.State.Settings.TimersEnabled) return ValueResult<TimeSpan>.FromValue(TimeSpan.MaxValue);
         var elapsed = now - context.State.StateStartTime;
-        var remaining = context.State.Config.SetupPhaseTimeout - elapsed;
+        var remaining = context.State.Settings.SetupPhaseTimeout - elapsed;
         return ValueResult<TimeSpan>.FromValue(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
     }
 
     public ValueResult<IGameState<OperatorGameContext, OperatorCommand>?> Tick(OperatorGameContext context, DateTimeOffset now)
     {
-        if (!context.State.Config.TimersEnabled) return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(null);
+        if (!context.State.Settings.TimersEnabled) return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(null);
 
         var elapsed = now - context.State.StateStartTime;
-        if (elapsed >= context.State.Config.SetupPhaseTimeout)
+        if (elapsed >= context.State.Settings.SetupPhaseTimeout)
         {
             foreach (var p in context.GamePlayers.Values)
             {
                 if (p.CurrentPoints == 0m)
                 {
-                    p.CurrentPoints = context.State.Config.InitialPointsPositive;
+                    p.CurrentPoints = context.State.Settings.InitialPointsPositive;
                     p.ActiveOperator = CardOperator.Add;
                     p.ScoreTimestamp = DateTimeOffset.UtcNow;
                 }
             }
 
-            var posPoints2 = context.State.Config.InitialPointsPositive;
-            var negPoints2 = context.State.Config.InitialPointsNegative;
+            var posPoints2 = context.State.Settings.InitialPointsPositive;
+            var negPoints2 = context.State.Settings.InitialPointsNegative;
             if (context.GamePlayers.Values.All(p => p.CurrentPoints == posPoints2 || p.CurrentPoints == negPoints2))
             {
                 context.State.Deck = OperatorGameContext.GenerateDeck(context.GamePlayers.Count, context.Rng);
                 foreach (var player in context.GamePlayers.Values)
                 {
-                    context.DealCards(player, context.State.Config.MaxHandSize);
+                    context.DealCards(player, context.State.Settings.MaxHandSize);
                 }
 
                 context.State.TurnManager.SetTurnOrder(context.GamePlayers.Keys);

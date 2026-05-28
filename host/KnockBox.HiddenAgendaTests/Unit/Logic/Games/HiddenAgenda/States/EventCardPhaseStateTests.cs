@@ -132,12 +132,12 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         [TestMethod]
         public void Tick_AutoSkipsAfterTimeout()
         {
-            _state.Config.EnableTimers = true;
+            _state.UpdateSettings(s => s with { EnableTimers = true });
             _state.GamePlayers["p0"].HeldEventCard = EventCardDefinitions.Catalog;
             var state = new EventCardPhaseState();
             state.OnEnter(_context);
 
-            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.EventCardPhaseTimeoutMs + 100));
+            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Settings.EventCardPhaseTimeoutMs + 100));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<SpinPhaseState>(result.Value);
         }
@@ -149,7 +149,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new EventCardPhaseState();
             state.OnEnter(_context);
 
-            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.EventCardPhaseTimeoutMs + 100));
+            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Settings.EventCardPhaseTimeoutMs + 100));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsNull(result.Value);
         }

@@ -75,7 +75,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         public void Build_RollLogHiddenWhenSettingFalse()
         {
             AddMap();
-            _state.SetSettings(_state.Settings with { RollsVisibleToPlayers = false });
+            _state.UpdateSettings(s => s with { RollsVisibleToPlayers = false });
             for (var i = 0; i < 5; i++)
                 _state.RollLog = _state.RollLog.Add(MakeRoll($"r{i}"));
 
@@ -88,7 +88,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         public void Build_RollLogVisibleWhenSettingTrue_CapsAtTenAndReverses()
         {
             AddMap();
-            _state.SetSettings(_state.Settings with { RollsVisibleToPlayers = true });
+            _state.UpdateSettings(s => s with { RollsVisibleToPlayers = true });
             var rolls = new List<RollResult>();
             for (var i = 0; i < 20; i++)
             {

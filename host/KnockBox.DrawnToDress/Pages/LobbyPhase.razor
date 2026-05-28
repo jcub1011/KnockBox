@@ -6,7 +6,7 @@
     @{
         bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
         int playerCount = GameState.Players.Length;
-        bool belowMinimum = playerCount < DrawnToDressConfig.RecommendedMinimumPlayers;
+        bool belowMinimum = playerCount < DrawnToDressSettings.RecommendedMinimumPlayers;
     }
 
     <div class="dtd-lobby-main">
@@ -53,7 +53,7 @@
             @if (belowMinimum)
             {
                 <p class="dtd-warning">
-                    ⚠️ Recommended minimum is @DrawnToDressConfig.RecommendedMinimumPlayers players.
+                    ⚠️ Recommended minimum is @DrawnToDressSettings.RecommendedMinimumPlayers players.
                     You can still start, but gameplay may feel limited.
                 </p>
             }
@@ -105,34 +105,34 @@
                     <label class="dtd-setting-label">
                         Drawing Time (sec):
                         <input type="number" min="30" max="600" step="10" class="dtd-setting-input"
-                               @bind="EditConfig.DrawingTimeSec" @bind:after="ApplyConfig" />
+                               @bind:get="GameState.Settings.DrawingTimeSec" @bind:set="SetDrawingTimeSec" />
                     </label>
                     <label class="dtd-setting-label dtd-setting-label-row" title="Automatically advance phases when the timer expires">
                         <span>Enable Game Timers:</span>
                         <input type="checkbox" class="dtd-setting-checkbox"
-                               @bind="EditConfig.EnableTimer" @bind:after="ApplyConfig" />
+                               @bind:get="GameState.Settings.EnableTimer" @bind:set="SetEnableTimer" />
                     </label>
                     <label class="dtd-setting-label">
                         Theme Announcement Time (seconds):
                         <input type="number" min="5" class="dtd-setting-input"
-                               @bind="EditConfig.ThemeAnnouncementTimeSec" @bind:after="ApplyConfig" />
+                               @bind:get="GameState.Settings.ThemeAnnouncementTimeSec" @bind:set="SetThemeAnnouncementTimeSec" />
                     </label>
                     <label class="dtd-setting-label dtd-setting-label-row" title="Players can keep sketching while outfit building is active">
                         <span>Allow Sketching During Outfit Building:</span>
                         <input type="checkbox" class="dtd-setting-checkbox"
-                               @bind="EditConfig.AllowSketchingDuringOutfitBuilding" @bind:after="ApplyConfig" />
+                               @bind:get="GameState.Settings.AllowSketchingDuringOutfitBuilding" @bind:set="SetAllowSketchingDuringOutfitBuilding" />
                     </label>
                     <label class="dtd-setting-label dtd-setting-label-row" title="Show a live gallery of drawings on the host screen during the drawing phase">
                         <span>Show Drawings on Host Screen:</span>
                         <input type="checkbox" class="dtd-setting-checkbox"
-                               @bind="EditConfig.ShowDrawingsOnHostScreen" @bind:after="ApplyConfig" />
+                               @bind:get="GameState.Settings.ShowDrawingsOnHostScreen" @bind:set="SetShowDrawingsOnHostScreen" />
                     </label>
                 </div>
 
                 <!-- ── Clothing Types ─────────────────────────────────────── -->
                 <h4 class="dtd-settings-section">👕 Clothing Categories</h4>
                 <div class="dtd-settings-grid">
-                    @foreach (var ct in DrawnToDressConfig.DefaultClothingTypes)
+                    @foreach (var ct in DrawnToDressSettings.DefaultClothingTypes)
                     {
                         var typeId = ct.Id;
                         <label class="dtd-setting-label dtd-setting-label-row" title="Include @ct.DisplayName drawings in the game">
@@ -149,7 +149,7 @@
                 <div class="dtd-settings-grid">
                     <label class="dtd-setting-label">
                         Theme Source:
-                        <select class="dtd-setting-select" @bind="EditConfig.ThemeSource" @bind:after="ApplyConfig">
+                        <select class="dtd-setting-select" @bind:get="GameState.Settings.ThemeSource" @bind:set="SetThemeSource">
                             @foreach (var source in Enum.GetValues<ThemeSource>())
                             {
                                 <option value="@source">@source</option>
@@ -158,7 +158,7 @@
                     </label>
                     <label class="dtd-setting-label">
                         Theme Reveal:
-                        <select class="dtd-setting-select" @bind="EditConfig.ThemeAnnouncement" @bind:after="ApplyConfig">
+                        <select class="dtd-setting-select" @bind:get="GameState.Settings.ThemeAnnouncement" @bind:set="SetThemeAnnouncement">
                             @foreach (var announcement in Enum.GetValues<ThemeAnnouncement>())
                             {
                                 <option value="@announcement">@announcement</option>
@@ -173,27 +173,27 @@
                     <label class="dtd-setting-label">
                         Outfit Building Time (seconds):
                         <input type="number" min="30" class="dtd-setting-input"
-                               @bind="EditConfig.OutfitBuildingTimeSec" @bind:after="ApplyConfig" />
+                               @bind:get="GameState.Settings.OutfitBuildingTimeSec" @bind:set="SetOutfitBuildingTimeSec" />
                     </label>
                     <label class="dtd-setting-label">
                         Outfit Customization Time (seconds):
                         <input type="number" min="15" class="dtd-setting-input"
-                               @bind="EditConfig.OutfitCustomizationTimeSec" @bind:after="ApplyConfig" />
+                               @bind:get="GameState.Settings.OutfitCustomizationTimeSec" @bind:set="SetOutfitCustomizationTimeSec" />
                     </label>
                     <label class="dtd-setting-label dtd-setting-label-row" title="Players may reuse their own drawn items in their outfit">
                         <span>Allow Reuse of Own Items:</span>
                         <input type="checkbox" class="dtd-setting-checkbox"
-                               @bind="EditConfig.AllowReuseOwnItems" @bind:after="ApplyConfig" />
+                               @bind:get="GameState.Settings.AllowReuseOwnItems" @bind:set="SetAllowReuseOwnItems" />
                     </label>
                     <label class="dtd-setting-label dtd-setting-label-row" title="Players may actively select their own drawings from the pool">
                         <span>Allow Selecting Own Drawings:</span>
                         <input type="checkbox" class="dtd-setting-checkbox"
-                               @bind="EditConfig.AllowSelectOwnDrawings" @bind:after="ApplyConfig" />
+                               @bind:get="GameState.Settings.AllowSelectOwnDrawings" @bind:set="SetAllowSelectOwnDrawings" />
                     </label>
                     <label class="dtd-setting-label dtd-setting-label-row" title="Each outfit slot must contain a unique item">
                         <span>Require Distinct Items Per Slot:</span>
                         <input type="checkbox" class="dtd-setting-checkbox"
-                               @bind="EditConfig.RequireDistinctItemsPerSlot" @bind:after="ApplyConfig" />
+                               @bind:get="GameState.Settings.RequireDistinctItemsPerSlot" @bind:set="SetRequireDistinctItemsPerSlot" />
                     </label>
                 </div>
 
@@ -203,12 +203,12 @@
                     <label class="dtd-setting-label">
                         Voting Time (seconds):
                         <input type="number" min="15" class="dtd-setting-input"
-                               @bind="EditConfig.VotingTimeSec" @bind:after="ApplyConfig" />
+                               @bind:get="GameState.Settings.VotingTimeSec" @bind:set="SetVotingTimeSec" />
                     </label>
                     <label class="dtd-setting-label dtd-setting-label-row" title="Reveal who created each outfit to voters">
                         <span>Show Creator During Voting:</span>
                         <input type="checkbox" class="dtd-setting-checkbox"
-                               @bind="EditConfig.ShowCreatorDuringVoting" @bind:after="ApplyConfig" />
+                               @bind:get="GameState.Settings.ShowCreatorDuringVoting" @bind:set="SetShowCreatorDuringVoting" />
                     </label>
                 </div>
 
@@ -218,8 +218,8 @@
                     <label class="dtd-setting-label">
                         Voting Rounds:
                         <input type="number" min="0" class="dtd-setting-input"
-                               @bind="EditConfig.VotingRounds" @bind:after="ApplyConfig" />
-                        @if (EditConfig.VotingRounds == 0)
+                               @bind:get="GameState.Settings.VotingRounds" @bind:set="SetVotingRounds" />
+                        @if (GameState.Settings.VotingRounds == 0)
                         {
                             <span class="dtd-setting-hint">(Auto)</span>
                         }
@@ -227,7 +227,7 @@
                     <label class="dtd-setting-label">
                         Bonus Points for Complete Outfit:
                         <input type="number" min="0" class="dtd-setting-input"
-                               @bind="EditConfig.BonusPointsForCompleteOutfit" @bind:after="ApplyConfig" />
+                               @bind:get="GameState.Settings.BonusPointsForCompleteOutfit" @bind:set="SetBonusPointsForCompleteOutfit" />
                     </label>
                 </div>
 
@@ -237,7 +237,7 @@
                     <label class="dtd-setting-label">
                         Host Disconnect Timeout (seconds):
                         <input type="number" min="30" class="dtd-setting-input"
-                               @bind="EditConfig.HostDisconnectTimeoutSec" @bind:after="ApplyConfig" />
+                               @bind:get="GameState.Settings.HostDisconnectTimeoutSec" @bind:set="SetHostDisconnectTimeoutSec" />
                     </label>
                 </div>
 

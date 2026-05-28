@@ -113,7 +113,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new RoundSetupState();
             state.OnEnter(_context);
 
-            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.RoundSetupTimeoutMs + 100));
+            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Settings.RoundSetupTimeoutMs + 100));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
         }

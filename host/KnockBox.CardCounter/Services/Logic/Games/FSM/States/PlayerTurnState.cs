@@ -14,7 +14,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
 
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.PlayerTurnTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Settings.PlayerTurnTimeoutMs);
             context.State.SetPhase(GamePhase.Playing);
             context.State.PendingReaction = null;
             context.State.FeelingLuckyTargetId = null;
@@ -199,7 +199,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             var player = context.GetPlayer(cmd.PlayerId);
             if (player is null) return null;
 
-            if (player.ActionHand.Count > context.Config.ActionHandLimit)
+            if (player.ActionHand.Count > context.Settings.ActionHandLimit)
             {
                 context.Logger.LogWarning("PlayAction: player [{id}] must discard before playing.", cmd.PlayerId);
                 return null;
@@ -317,7 +317,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                 switch (card.Action)
                 {
                     case ActionType.TurnTheTable:
-                        if (context.State.Config.ActiveOperatorMode)
+                        if (context.State.Settings.ActiveOperatorMode)
                             target.Balance = CardCounterGameContext.ReverseBalanceDigits(target.Balance);
                         else
                             target.Pot.Reverse();

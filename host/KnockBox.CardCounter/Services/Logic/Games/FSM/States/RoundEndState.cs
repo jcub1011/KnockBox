@@ -15,7 +15,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
 
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
-            _expirationTime = DateTimeOffset.Now.AddMilliseconds(context.Config.RoundEndTimeoutMs);
+            _expirationTime = DateTimeOffset.Now.AddMilliseconds(context.Settings.RoundEndTimeoutMs);
             context.Logger.LogDebug("FSM → RoundEndState (shoe {n} exhausted).", context.State.ShoeIndex);
 
             var hasShoe = context.DealNextShoe();
@@ -26,7 +26,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             context.DealActionCards();
 
             // Immediately transition if all players are under limit
-            if (!context.GamePlayers.Values.Any(state => state.ActionHand.Count > context.Config.ActionHandLimit))
+            if (!context.GamePlayers.Values.Any(state => state.ActionHand.Count > context.Settings.ActionHandLimit))
                 return new PlayerTurnState();
 
             return null;
@@ -43,7 +43,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             HandleDiscard(context, discardCommand);
 
             // Don't leave state if not all players have discarded extra cards
-            if (context.GamePlayers.Values.Any(state => state.ActionHand.Count > context.Config.ActionHandLimit))
+            if (context.GamePlayers.Values.Any(state => state.ActionHand.Count > context.Settings.ActionHandLimit))
                 return null;
 
             return new PlayerTurnState();
@@ -53,10 +53,10 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
         {
             if (now < _expirationTime) return null;
 
-            int actionHandLimit = context.Config.ActionHandLimit;
+            int actionHandLimit = context.Settings.ActionHandLimit;
 
             // Discard last cards automatically
-            foreach (var (id, state) in context.GamePlayers.Where(state => state.Value.ActionHand.Count > context.Config.ActionHandLimit))
+            foreach (var (id, state) in context.GamePlayers.Where(state => state.Value.ActionHand.Count > context.Settings.ActionHandLimit))
             {
                 int excessCards = state.ActionHand.Count - actionHandLimit;
                 HandleDiscard(context, new DiscardActionCardsCommand(id, [.. Enumerable.Range(actionHandLimit, excessCards)]));
@@ -72,7 +72,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             var player = context.GetPlayer(cmd.PlayerId);
             if (player is null) return;
 
-            if (player.ActionHand.Count <= context.Config.ActionHandLimit)
+            if (player.ActionHand.Count <= context.Settings.ActionHandLimit)
             {
                 context.Logger.LogWarning("Discard: player [{id}] is not over the action hand limit.", cmd.PlayerId);
                 return;
@@ -88,7 +88,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             }
 
             int afterDiscard = player.ActionHand.Count - indices.Length;
-            if (afterDiscard > context.Config.ActionHandLimit)
+            if (afterDiscard > context.Settings.ActionHandLimit)
             {
                 context.Logger.LogWarning("Discard: player [{id}] must discard enough to reach the hand limit.", cmd.PlayerId);
                 return;

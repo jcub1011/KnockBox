@@ -115,14 +115,14 @@ namespace KnockBox.CardCounter.Pages
         protected bool IsOverHandLimit()
         {
             var me = GetMyPlayer();
-            return me != null && GameState != null && me.ActionHand.Count > GameState.Config.ActionHandLimit;
+            return me != null && GameState != null && me.ActionHand.Count > GameState.Settings.ActionHandLimit;
         }
 
         protected int DiscardNeeded()
         {
             var me = GetMyPlayer();
             if (me == null || GameState == null) return 0;
-            return Math.Max(0, me.ActionHand.Count - GameState.Config.ActionHandLimit);
+            return Math.Max(0, me.ActionHand.Count - GameState.Settings.ActionHandLimit);
         }
 
         protected bool CanConfirmDiscard()
@@ -130,7 +130,7 @@ namespace KnockBox.CardCounter.Pages
             var me = GetMyPlayer();
             if (me == null || GameState == null) return false;
             int afterDiscard = me.ActionHand.Count - _selectedDiscardIndices.Count;
-            return afterDiscard <= GameState.Config.ActionHandLimit && _selectedDiscardIndices.Count > 0;
+            return afterDiscard <= GameState.Settings.ActionHandLimit && _selectedDiscardIndices.Count > 0;
         }
 
         /// <summary>Returns whether the Skim card can be played by the current player.</summary>

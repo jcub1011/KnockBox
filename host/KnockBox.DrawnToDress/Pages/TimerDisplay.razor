@@ -30,14 +30,14 @@
 
     private TimeSpan GetTotalDuration() => GameState.Phase switch
     {
-        GamePhase.ThemeSelection => TimeSpan.FromSeconds(GameState.Config.ThemeAnnouncementTimeSec),
-        GamePhase.Drawing => TimeSpan.FromSeconds(GameState.Config.DrawingTimeSec),
-        GamePhase.PoolReveal => TimeSpan.FromSeconds(GameState.Config.PoolRevealTimeSec),
-        GamePhase.OutfitBuilding => TimeSpan.FromSeconds(GameState.Config.OutfitBuildingTimeSec),
-        GamePhase.OutfitCustomization => TimeSpan.FromSeconds(GameState.Config.OutfitCustomizationTimeSec),
-        GamePhase.Voting => TimeSpan.FromSeconds(GameState.Config.VotingTimeSec),
-        GamePhase.VotingRoundResults => TimeSpan.FromSeconds(GameState.Config.VotingRoundResultsTimeSec),
-        GamePhase.CoinFlip => TimeSpan.FromSeconds(GameState.Config.CoinFlipTimeSec),
+        GamePhase.ThemeSelection => TimeSpan.FromSeconds(GameState.Settings.ThemeAnnouncementTimeSec),
+        GamePhase.Drawing => TimeSpan.FromSeconds(GameState.Settings.DrawingTimeSec),
+        GamePhase.PoolReveal => TimeSpan.FromSeconds(GameState.Settings.PoolRevealTimeSec),
+        GamePhase.OutfitBuilding => TimeSpan.FromSeconds(GameState.Settings.OutfitBuildingTimeSec),
+        GamePhase.OutfitCustomization => TimeSpan.FromSeconds(GameState.Settings.OutfitCustomizationTimeSec),
+        GamePhase.Voting => TimeSpan.FromSeconds(GameState.Settings.VotingTimeSec),
+        GamePhase.VotingRoundResults => TimeSpan.FromSeconds(GameState.Settings.VotingRoundResultsTimeSec),
+        GamePhase.CoinFlip => TimeSpan.FromSeconds(GameState.Settings.CoinFlipTimeSec),
         _ => TimeSpan.FromSeconds(30)
     };
 }

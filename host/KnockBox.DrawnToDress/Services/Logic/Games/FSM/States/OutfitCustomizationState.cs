@@ -21,9 +21,9 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
-            if (context.Config.EnableTimer)
+            if (context.Settings.EnableTimer)
             {
-                context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.OutfitCustomizationTimeSec);
+                context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Settings.OutfitCustomizationTimeSec);
             }
 
             context.State.SetPhase(GamePhase.OutfitCustomization);
@@ -106,7 +106,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                 return null;
             }
 
-            if (context.Config.SketchingRequired && string.IsNullOrWhiteSpace(cmd.SketchSvgContent))
+            if (context.Settings.SketchingRequired && string.IsNullOrWhiteSpace(cmd.SketchSvgContent))
             {
                 context.Logger.LogWarning(
                     "SubmitCustomization: player [{id}] submitted without a required sketch.", cmd.PlayerId);
@@ -122,10 +122,10 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             if (cmd.ItemPositionOverrides is { Count: > 0 })
             {
-                int canvasWidth = CompositeCanvasLayout.ComputeCompositeWidth(context.Config);
-                int totalHeight = CompositeCanvasLayout.ComputeCompositeHeight(context.Config);
+                int canvasWidth = CompositeCanvasLayout.ComputeCompositeWidth(context.Settings);
+                int totalHeight = CompositeCanvasLayout.ComputeCompositeHeight(context.Settings);
 
-                var clothingTypeById = context.Config.ClothingTypes.ToDictionary(ct => ct.Id);
+                var clothingTypeById = context.Settings.ClothingTypes.ToDictionary(ct => ct.Id);
 
                 foreach (var kvp in cmd.ItemPositionOverrides)
                 {
@@ -194,10 +194,10 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                 player.DraftOutfitName = string.Empty;
             }
 
-            if (_outfitRound < context.Config.NumOutfitRounds)
+            if (_outfitRound < context.Settings.NumOutfitRounds)
             {
                 // More outfit rounds to go — check distinctness, then proceed to next round.
-                if (_outfitRound == 1 && context.Config.RequireDistinctItemsPerSlot && HasDistinctnessConflict(context))
+                if (_outfitRound == 1 && context.Settings.RequireDistinctItemsPerSlot && HasDistinctnessConflict(context))
                 {
                     context.Logger.LogDebug(
                         "Distinctness conflict detected. Moving to resolution state.");

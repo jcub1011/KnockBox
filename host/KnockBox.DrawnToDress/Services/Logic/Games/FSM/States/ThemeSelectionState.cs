@@ -59,9 +59,9 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             context.State.SetPhase(GamePhase.ThemeSelection);
             context.Logger.LogDebug("FSM → ThemeSelectionState");
 
-            context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.ThemeAnnouncementTimeSec);
+            context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Settings.ThemeAnnouncementTimeSec);
 
-            switch (context.Config.ThemeSource)
+            switch (context.Settings.ThemeSource)
             {
                 case ThemeSource.Random:
                     SelectRandomTheme(context);
@@ -103,10 +103,10 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         {
             // Only auto-advance if we have a selected theme and we're not waiting for votes/input.
             if (context.State.CurrentTheme != null && 
-                (context.Config.ThemeSource == ThemeSource.Random || 
-                 context.Config.ThemeSource == ThemeSource.RandomVoting && context.GamePlayers.Keys.All(id => context.State.ThemeVotes.ContainsKey(id)) ||
-                 context.Config.ThemeSource == ThemeSource.PlayerWritten && context.GamePlayers.Keys.All(id => context.State.PlayerThemeSubmissions.ContainsKey(id)) ||
-                 context.Config.ThemeSource == ThemeSource.HostPick))
+                (context.Settings.ThemeSource == ThemeSource.Random || 
+                 context.Settings.ThemeSource == ThemeSource.RandomVoting && context.GamePlayers.Keys.All(id => context.State.ThemeVotes.ContainsKey(id)) ||
+                 context.Settings.ThemeSource == ThemeSource.PlayerWritten && context.GamePlayers.Keys.All(id => context.State.PlayerThemeSubmissions.ContainsKey(id)) ||
+                 context.Settings.ThemeSource == ThemeSource.HostPick))
             {
                 if (context.State.PhaseDeadlineUtc is { } deadline && now >= deadline)
                 {
@@ -147,7 +147,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         private static ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleSelectTheme(
             DrawnToDressGameContext context, SelectThemeCommand cmd)
         {
-            if (context.Config.ThemeSource != ThemeSource.HostPick)
+            if (context.Settings.ThemeSource != ThemeSource.HostPick)
             {
                 context.Logger.LogWarning(
                     "SelectTheme ignored: theme source is not HostPick.");
@@ -170,7 +170,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         private static ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleSubmitPlayerTheme(
             DrawnToDressGameContext context, SubmitPlayerThemeCommand cmd)
         {
-            if (context.Config.ThemeSource != ThemeSource.PlayerWritten)
+            if (context.Settings.ThemeSource != ThemeSource.PlayerWritten)
             {
                 context.Logger.LogWarning(
                     "SubmitPlayerTheme ignored: theme source is not PlayerWritten.");
@@ -214,7 +214,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         private static ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> HandleVoteForTheme(
             DrawnToDressGameContext context, VoteForThemeCommand cmd)
         {
-            if (context.Config.ThemeSource != ThemeSource.RandomVoting)
+            if (context.Settings.ThemeSource != ThemeSource.RandomVoting)
             {
                 context.Logger.LogWarning(
                     "VoteForTheme ignored: theme source is not RandomVoting.");
@@ -271,14 +271,14 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         private static void PopulateThemeCandidates(DrawnToDressGameContext context)
         {
             var allThemes = FallbackThemes;
-            int count = Math.Min(context.Config.RandomVotingCandidateCount, allThemes.Length);
+            int count = Math.Min(context.Settings.RandomVotingCandidateCount, allThemes.Length);
 
-            if (count < context.Config.RandomVotingCandidateCount)
+            if (count < context.Settings.RandomVotingCandidateCount)
             {
                 context.Logger.LogWarning(
                     "RandomVotingCandidateCount ({configured}) exceeds available themes ({available}); " +
                     "capping to {count}.",
-                    context.Config.RandomVotingCandidateCount, allThemes.Length, count);
+                    context.Settings.RandomVotingCandidateCount, allThemes.Length, count);
             }
 
             // Pick a random subset without replacement using a partial Fisher-Yates shuffle.
@@ -325,7 +325,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         /// </summary>
         private static void ApplyAnnouncementTiming(DrawnToDressGameContext context)
         {
-            if (context.Config.ThemeAnnouncement == ThemeAnnouncement.BeforeDrawing)
+            if (context.Settings.ThemeAnnouncement == ThemeAnnouncement.BeforeDrawing)
             {
                 context.State.ThemeRevealedToPlayers = true;
             }

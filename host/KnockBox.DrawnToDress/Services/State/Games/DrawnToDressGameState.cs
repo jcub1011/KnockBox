@@ -1,6 +1,7 @@
 using KnockBox.DrawnToDress.Services.Logic.Games;
 using KnockBox.DrawnToDress.Services.Logic.Games.FSM;
 using KnockBox.DrawnToDress.Services.State.Games.Data;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Games.Shared.Interfaces;
 using KnockBox.Core.Services.State.Users;
@@ -13,7 +14,6 @@ namespace KnockBox.DrawnToDress.Services.State.Games
         ILogger<DrawnToDressGameState> logger)
         : AbstractGameState(host, logger),
           IPhasedGameState<GamePhase>,
-          IConfigurableGameState<DrawnToDressConfig>,
           IPlayerTrackedGameState<DrawnToDressPlayerState>,
           IFsmContextGameState<DrawnToDressGameContext>
     {
@@ -27,9 +27,19 @@ namespace KnockBox.DrawnToDress.Services.State.Games
         // ── Configuration ─────────────────────────────────────────────────────
 
         /// <summary>
-        /// Game configuration (tunable values with GDD defaults).
+        /// Host-configurable match rules. Always replaced atomically via UpdateSettings;
+        /// the setter is private so callers can't bypass the lock. Persisted to the host's
+        /// browser localStorage by the lobby page so preferred rules survive across sessions.
         /// </summary>
-        public DrawnToDressConfig Config { get; set; } = new();
+        public DrawnToDressSettings Settings { get; private set; } = new();
+
+        /// <summary>
+        /// Atomically replaces <see cref="Settings"/> with <paramref name="mutate"/>'s result
+        /// inside <see cref="AbstractGameState.Execute(Action)"/>, so subscribers observe a
+        /// single consistent transition and notification fires once after the lock releases.
+        /// </summary>
+        public Result UpdateSettings(Func<DrawnToDressSettings, DrawnToDressSettings> mutate) =>
+            Execute(() => { Settings = mutate(Settings); });
 
         // ── Players ───────────────────────────────────────────────────────────
 
@@ -72,14 +82,14 @@ namespace KnockBox.DrawnToDress.Services.State.Games
         public bool ThemeRevealedToPlayers { get; set; }
 
         /// <summary>
-        /// Theme texts submitted by players when <see cref="DrawnToDressConfig.ThemeSource"/>
+        /// Theme texts submitted by players when <see cref="DrawnToDressSettings.ThemeSource"/>
         /// is <see cref="ThemeSource.PlayerWritten"/>.  Keyed by player ID.
         /// </summary>
         public readonly ConcurrentDictionary<string, string> PlayerThemeSubmissions = new();
 
         /// <summary>
         /// Candidate themes presented to players for voting when
-        /// <see cref="DrawnToDressConfig.ThemeSource"/> is <see cref="ThemeSource.RandomVoting"/>.
+        /// <see cref="DrawnToDressSettings.ThemeSource"/> is <see cref="ThemeSource.RandomVoting"/>.
         /// Populated on entry to <see cref="GamePhase.ThemeSelection"/>.
         /// </summary>
         public List<ThemeDefinition> ThemeCandidates { get; set; } = [];
@@ -94,7 +104,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games
         // ── Drawing round tracking ────────────────────────────────────────────
 
         /// <summary>
-        /// 0-based index into <see cref="DrawnToDressConfig.ClothingTypes"/> identifying the
+        /// 0-based index into <see cref="DrawnToDressSettings.ClothingTypes"/> identifying the
         /// clothing type whose drawing round is currently active.
         /// Updated by <c>DrawingRoundState</c> on entry to each sequential round.
         /// </summary>

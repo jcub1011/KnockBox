@@ -38,16 +38,22 @@
     <div class="ha-lobby-config">
         <h4 class="ha-subheading">Exhibition Settings</h4>
         <div class="ha-form-group">
-            <label>Rounds: @Config.TotalRounds</label>
-            <input type="range" min="3" max="5" step="1" @bind="Config.TotalRounds" disabled="@(!IsHost)" class="ha-range" />
+            <label>Rounds: @GameState.Settings.TotalRounds</label>
+            <input type="range" min="3" max="5" step="1"
+                   @bind:get="GameState.Settings.TotalRounds" @bind:set="SetTotalRounds"
+                   disabled="@(!IsHost)" class="ha-range" />
         </div>
         <div class="ha-checkbox-row">
-            <input type="checkbox" id="timerToggle" @bind="Config.EnableTimers" disabled="@(!IsHost)" class="ha-checkbox" />
+            <input type="checkbox" id="timerToggle"
+                   @bind:get="GameState.Settings.EnableTimers" @bind:set="SetEnableTimers"
+                   disabled="@(!IsHost)" class="ha-checkbox" />
             <label class="ha-checkbox-label" for="timerToggle">Enable Timers</label>
         </div>
         <div class="ha-form-group">
             <label for="poolRotation">Pool Rotation</label>
-            <select id="poolRotation" class="ha-select" @bind="Config.PoolRotation" disabled="@(!IsHost)">
+            <select id="poolRotation" class="ha-select"
+                    @bind:get="GameState.Settings.PoolRotation" @bind:set="SetPoolRotation"
+                    disabled="@(!IsHost)">
                 @foreach (var type in Enum.GetValues<TaskPoolRotation>())
                 {
                     <option value="@type">@type</option>

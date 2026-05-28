@@ -36,7 +36,7 @@
     <div class="ha-actions">
         @if (IsHost)
         {
-            @if (GameState.CurrentRound < GameState.Config.TotalRounds)
+            @if (GameState.CurrentRound < GameState.Settings.TotalRounds)
             {
                 <button class="ha-btn ha-btn-primary ha-btn-lg" @onclick="HandleNextRound">Start Next Round</button>
             }

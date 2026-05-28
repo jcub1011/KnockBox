@@ -17,7 +17,7 @@ public class DrawPhaseState : IOperatorGameState
         var playerId = context.State.TurnManager.CurrentPlayer;
         if (playerId != null && context.GamePlayers.TryGetValue(playerId, out var pState))
         {
-            int cardsNeeded = Math.Min(context.State.Config.MaxDrawPerTurn, context.State.Config.MaxHandSize - pState.Hand.Count);
+            int cardsNeeded = Math.Min(context.State.Settings.MaxDrawPerTurn, context.State.Settings.MaxHandSize - pState.Hand.Count);
             context.DealCards(pState, cardsNeeded);
         }
 

@@ -40,7 +40,7 @@
 
                 <!-- Per-criterion breakdown -->
                 <div class="dtd-round-results-criteria">
-                    @foreach (var criterion in GameState.Config.VotingCriteria)
+                    @foreach (var criterion in GameState.Settings.VotingCriteria)
                     {
                         var (aScore, bScore) = CalculateCriterionScores(matchup, criterion);
                         bool flipped = IsCriterionFlipped(matchup.Id, criterion.Id);

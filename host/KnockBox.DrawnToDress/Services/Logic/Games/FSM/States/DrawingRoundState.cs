@@ -24,7 +24,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
     /// Initialises the drawing round for the specified clothing-type slot.
     /// </remarks>
     /// <param name="clothingTypeIndex">
-    /// 0-based index into <see cref="DrawnToDressConfig.ClothingTypes"/> for the type
+    /// 0-based index into <see cref="DrawnToDressSettings.ClothingTypes"/> for the type
     /// players will draw during this round.  Defaults to <c>0</c> (first type).
     /// </param>
     public sealed class DrawingRoundState(int clothingTypeIndex = 0) : ITimedDrawnToDressGameState
@@ -34,9 +34,9 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
-            if (context.Config.EnableTimer)
+            if (context.Settings.EnableTimer)
             {
-                context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.DrawingTimeSec);
+                context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Settings.DrawingTimeSec);
             }
 
             context.State.CurrentDrawingClothingTypeIndex = _clothingTypeIndex;
@@ -100,7 +100,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
         private string GetCurrentTypeName(DrawnToDressGameContext context)
         {
-            var types = context.Config.ClothingTypes;
+            var types = context.Settings.ClothingTypes;
             if (_clothingTypeIndex < types.Count)
                 return types[_clothingTypeIndex].DisplayName;
             return $"[{_clothingTypeIndex}]";
@@ -114,7 +114,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             DrawnToDressGameContext context)
         {
             int nextIndex = _clothingTypeIndex + 1;
-            if (nextIndex < context.Config.ClothingTypes.Count)
+            if (nextIndex < context.Settings.ClothingTypes.Count)
             {
                 context.Logger.LogDebug(
                     "Advancing to DrawingRoundState [{index}].", nextIndex);
@@ -137,7 +137,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             }
 
             // Validate the clothing type matches the CURRENT round.
-            var types = context.Config.ClothingTypes;
+            var types = context.Settings.ClothingTypes;
             if (_clothingTypeIndex >= types.Count)
             {
                 context.Logger.LogWarning(

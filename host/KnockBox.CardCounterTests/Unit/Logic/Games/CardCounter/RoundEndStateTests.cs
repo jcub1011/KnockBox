@@ -55,7 +55,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         {
             AddPlayer("p1", "Player 1");
             // Push enough cards for the minimum shoe size
-            PushCardsToMainDeck(_state.Config.MinShoeSize);
+            PushCardsToMainDeck(_state.Settings.MinShoeSize);
 
             var fsmState = new RoundEndState();
             fsmState.OnEnter(_context);
@@ -79,7 +79,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         public void OnEnter_WhenDeckHasCards_PopulatesCurrentShoe()
         {
             AddPlayer("p1", "Player 1");
-            PushCardsToMainDeck(_state.Config.MinShoeSize + 5);
+            PushCardsToMainDeck(_state.Settings.MinShoeSize + 5);
 
             var fsmState = new RoundEndState();
             fsmState.OnEnter(_context);
@@ -91,12 +91,12 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         public void OnEnter_WhenDeckHasCards_DealActionCardsToPlayers()
         {
             var p1 = AddPlayer("p1", "Player 1");
-            PushCardsToMainDeck(_state.Config.MinShoeSize);
+            PushCardsToMainDeck(_state.Settings.MinShoeSize);
 
             var fsmState = new RoundEndState();
             fsmState.OnEnter(_context);
 
-            Assert.HasCount(_state.Config.ActionsDealtPerRound, p1.ActionHand,
+            Assert.HasCount(_state.Settings.ActionsDealtPerRound, p1.ActionHand,
                 "Each player should receive action cards on round end.");
         }
 
@@ -104,7 +104,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         public void OnEnter_AllPlayersUnderHandLimit_ReturnsPlayerTurnState()
         {
             AddPlayer("p1", "Player 1");
-            PushCardsToMainDeck(_state.Config.MinShoeSize);
+            PushCardsToMainDeck(_state.Settings.MinShoeSize);
 
             var fsmState = new RoundEndState();
             var next = fsmState.OnEnter(_context);
@@ -117,10 +117,10 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         public void HandleCommand_Discard_ValidIndices_RemovesCards()
         {
             var p1 = AddPlayer("p1", "Player 1");
-            PushCardsToMainDeck(_state.Config.MinShoeSize);
+            PushCardsToMainDeck(_state.Settings.MinShoeSize);
 
             // Pre-fill the hand to beyond the limit
-            int limit = _state.Config.ActionHandLimit;
+            int limit = _state.Settings.ActionHandLimit;
             for (int i = 0; i <= limit; i++) // limit+1 cards
                 p1.ActionHand.Add(new ActionCard(ActionType.Burn));
 
@@ -146,7 +146,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         public void HandleCommand_Discard_InvalidIndices_IsNoOp()
         {
             var p1 = AddPlayer("p1", "Player 1");
-            int limit = _state.Config.ActionHandLimit;
+            int limit = _state.Settings.ActionHandLimit;
             for (int i = 0; i <= limit; i++)
                 p1.ActionHand.Add(new ActionCard(ActionType.Burn));
 
@@ -163,7 +163,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         public void HandleCommand_Discard_DuplicateIndices_IsNoOp()
         {
             var p1 = AddPlayer("p1", "Player 1");
-            int limit = _state.Config.ActionHandLimit;
+            int limit = _state.Settings.ActionHandLimit;
             for (int i = 0; i <= limit; i++)
                 p1.ActionHand.Add(new ActionCard(ActionType.Burn));
 
@@ -180,7 +180,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         public void HandleCommand_Discard_NotEnoughCardsDiscarded_IsNoOp()
         {
             var p1 = AddPlayer("p1", "Player 1");
-            int limit = _state.Config.ActionHandLimit;
+            int limit = _state.Settings.ActionHandLimit;
             // Two cards over the limit
             for (int i = 0; i < limit + 2; i++)
                 p1.ActionHand.Add(new ActionCard(ActionType.Burn));
@@ -200,7 +200,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         {
             var p1 = AddPlayer("p1", "Player 1");
             var p2 = AddPlayer("p2", "Player 2");
-            int limit = _state.Config.ActionHandLimit;
+            int limit = _state.Settings.ActionHandLimit;
 
             // Both players have one card over limit
             for (int i = 0; i <= limit; i++)

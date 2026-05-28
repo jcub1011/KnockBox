@@ -21,7 +21,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
 
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.SkimTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Settings.SkimTimeoutMs);
             context.State.PendingReaction = new PendingReactionInfo(
                 _sourceId,
                 context.GetPlayer(_sourceId)?.DisplayName ?? _sourceId,

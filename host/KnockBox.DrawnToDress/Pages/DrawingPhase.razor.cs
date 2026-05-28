@@ -38,12 +38,12 @@ namespace KnockBox.DrawnToDress.Pages
 
         protected override void OnInitialized()
         {
-            _showMannequin = GameState.Config.ShowMannequin;
+            _showMannequin = GameState.Settings.ShowMannequin;
         }
 
         private string GetMannequinSvg(ClothingType currentTypeId)
         {
-            var config = GameState.Config;
+            var config = GameState.Settings;
             var typeDef = config.ClothingTypes.FirstOrDefault(t => t.Id == currentTypeId);
             int yOffset = typeDef?.MannequinAnchorY ?? 0;
             string imagePath = typeDef?.MannequinFocusImagePath ?? config.MannequinImagePath;
@@ -62,7 +62,7 @@ namespace KnockBox.DrawnToDress.Pages
         {
             get
             {
-                var types = GameState.Config.ClothingTypes;
+                var types = GameState.Settings.ClothingTypes;
                 int idx = GameState.CurrentDrawingClothingTypeIndex;
                 return idx >= 0 && idx < types.Count
                     ? types[idx].DisplayName
@@ -77,7 +77,7 @@ namespace KnockBox.DrawnToDress.Pages
         {
             get
             {
-                var types = GameState.Config.ClothingTypes;
+                var types = GameState.Settings.ClothingTypes;
                 int idx = GameState.CurrentDrawingClothingTypeIndex;
                 return idx >= 0 && idx < types.Count ? types[idx].Id : default;
             }
@@ -88,7 +88,7 @@ namespace KnockBox.DrawnToDress.Pages
         {
             get
             {
-                var types = GameState.Config.ClothingTypes;
+                var types = GameState.Settings.ClothingTypes;
                 int idx = GameState.CurrentDrawingClothingTypeIndex;
                 return idx >= 0 && idx < types.Count ? types[idx].CanvasWidth : 300;
             }
@@ -99,7 +99,7 @@ namespace KnockBox.DrawnToDress.Pages
         {
             get
             {
-                var types = GameState.Config.ClothingTypes;
+                var types = GameState.Settings.ClothingTypes;
                 int idx = GameState.CurrentDrawingClothingTypeIndex;
                 return idx >= 0 && idx < types.Count ? types[idx].CanvasHeight : 300;
             }
@@ -112,7 +112,7 @@ namespace KnockBox.DrawnToDress.Pages
         {
             get
             {
-                var types = GameState.Config.ClothingTypes;
+                var types = GameState.Settings.ClothingTypes;
                 int idx = GameState.CurrentDrawingClothingTypeIndex;
                 return idx >= 0 && idx < types.Count ? types[idx].MaxItemsPerRound : 0;
             }

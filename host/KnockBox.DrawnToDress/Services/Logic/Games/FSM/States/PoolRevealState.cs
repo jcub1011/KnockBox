@@ -21,7 +21,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
-            context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.PoolRevealTimeSec);
+            context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Settings.PoolRevealTimeSec);
             context.State.SetPhase(GamePhase.PoolReveal);
             context.CurrentOutfitRound = _outfitRound;
             context.ResetReadyFlags();
@@ -33,7 +33,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                     context.ClothingPool.Count, context.State.PhaseDeadlineUtc);
 
                 // In AfterDrawing mode the theme is revealed now that drawing is complete.
-                if (context.Config.ThemeAnnouncement == ThemeAnnouncement.AfterDrawing &&
+                if (context.Settings.ThemeAnnouncement == ThemeAnnouncement.AfterDrawing &&
                     !context.State.ThemeRevealedToPlayers)
                 {
                     context.State.ThemeRevealedToPlayers = true;

@@ -1,18 +1,21 @@
 using KnockBox.DrawnToDress.Services.Logic.Games;
-using KnockBox.DrawnToDress.Services.Logic.Games.FSM;
 using KnockBox.DrawnToDress.Services.State.Games;
 using KnockBox.DrawnToDress.Services.State.Games.Data;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.Core.Services.Storage.ClientStorage;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace KnockBox.DrawnToDress.Pages
 {
-    public partial class LobbyPhase : ComponentBase
+    public partial class LobbyPhase : ComponentBase, IAsyncDisposable
     {
         [Inject] protected DrawnToDressGameEngine GameEngine { get; set; } = default!;
 
         [Inject] protected IUserService UserService { get; set; } = default!;
+
+        [Inject] protected ILocalStorageService LocalStorage { get; set; } = default!;
 
         [Inject] protected ILogger<LobbyPhase> Logger { get; set; } = default!;
 
@@ -20,102 +23,75 @@ namespace KnockBox.DrawnToDress.Pages
 
         protected bool SettingsOpen { get; private set; } = false;
 
-        /// <summary>
-        /// A local mutable copy of the config that the host edits in the settings panel.
-        /// Kept in sync with <see cref="DrawnToDressGameState.Config"/> on first render and
-        /// after each successful <see cref="ApplyConfig"/> call.
-        /// </summary>
-        protected DrawnToDressConfig EditConfig { get; private set; } = new();
+        private readonly CancellationTokenSource _cts = new();
+        private Task? _saveTask;
 
-        protected override void OnParametersSet()
-        {
-            // Refresh local edit copy whenever the parent passes a new state.
-            SyncEditConfig();
-        }
-
-        private void SyncEditConfig()
-        {
-            var src = GameState.Config;
-            EditConfig = new DrawnToDressConfig
-            {
-                DrawingTimeSec = src.DrawingTimeSec,
-                ShowMannequin = src.ShowMannequin,
-                EnableTimer = src.EnableTimer,
-                AllowSketchingDuringOutfitBuilding = src.AllowSketchingDuringOutfitBuilding,
-                ClothingTypes = [.. src.ClothingTypes.Select(t => t with { })],
-                ThemeSource = src.ThemeSource,
-                ThemeAnnouncement = src.ThemeAnnouncement,
-                ThemeAnnouncementTimeSec = src.ThemeAnnouncementTimeSec,
-                OutfitBuildingTimeSec = src.OutfitBuildingTimeSec,
-                OutfitCustomizationTimeSec = src.OutfitCustomizationTimeSec,
-                AllowReuseOwnItems = src.AllowReuseOwnItems,
-                RequireDistinctItemsPerSlot = src.RequireDistinctItemsPerSlot,
-                NumOutfitRounds = src.NumOutfitRounds,
-                CanReuseOutfit1Items = src.CanReuseOutfit1Items,
-                Outfit2DistinctnessThreshold = src.Outfit2DistinctnessThreshold,
-                SketchingRequired = src.SketchingRequired,
-                VotingCriteria = [.. src.VotingCriteria.Select(c => new VotingCriterionDefinition
-                {
-                    Id = c.Id,
-                    DisplayName = c.DisplayName,
-                    Weight = c.Weight,
-                })],
-                VotingTimeSec = src.VotingTimeSec,
-                ShowCreatorDuringVoting = src.ShowCreatorDuringVoting,
-                VoteVisibility = src.VoteVisibility,
-                VotingRounds = src.VotingRounds,
-                BonusPointsForCompleteOutfit = src.BonusPointsForCompleteOutfit,
-                RoundLeaderBonusPoints = src.RoundLeaderBonusPoints,
-                TournamentWinnerBonusPoints = src.TournamentWinnerBonusPoints,
-                VotingRoundResultsTimeSec = src.VotingRoundResultsTimeSec,
-                CoinFlipTimeSec = src.CoinFlipTimeSec,
-                HostDisconnectTimeoutSec = src.HostDisconnectTimeoutSec,
-            };
-        }
+        // True once the host has changed any setting locally. Blocks the initial localStorage
+        // load from clobbering an in-flight edit if the load returns after the user interacted.
+        private bool _userHasEdited;
 
         protected bool IsClothingTypeEnabled(ClothingType id)
-            => EditConfig.ClothingTypes.Any(t => t.Id == id);
+            => GameState.Settings.ClothingTypes.Any(t => t.Id == id);
 
         protected void ToggleClothingType(ClothingType id)
         {
-            if (IsClothingTypeEnabled(id))
+            UpdateSettings(s =>
             {
-                EditConfig.ClothingTypes.RemoveAll(t => t.Id == id);
-            }
-            else
-            {
-                // Clone from the static defaults so dimensions and anchors are always correct.
-                var template = DrawnToDressConfig.DefaultClothingTypes.First(t => t.Id == id);
-                var entry = template with { };
+                if (s.ClothingTypes.Any(t => t.Id == id))
+                {
+                    return s with { ClothingTypes = s.ClothingTypes.Where(t => t.Id != id).ToList() };
+                }
 
-                // Insert at the correct position to preserve canonical order.
-                int targetIndex = DrawnToDressConfig.DefaultClothingTypes.ToList().FindIndex(t => t.Id == id);
+                // Clone from the static defaults so dimensions and anchors are always correct,
+                // and insert at the canonical position so the order matches DefaultClothingTypes.
+                var template = DrawnToDressSettings.DefaultClothingTypes.First(t => t.Id == id);
+                var defaults = DrawnToDressSettings.DefaultClothingTypes;
+                int targetIndex = -1;
+                for (int i = 0; i < defaults.Count; i++)
+                {
+                    if (defaults[i].Id == id) { targetIndex = i; break; }
+                }
                 int insertIndex = 0;
                 for (int i = 0; i < targetIndex; i++)
                 {
-                    if (EditConfig.ClothingTypes.Any(t => t.Id == DrawnToDressConfig.DefaultClothingTypes[i].Id))
+                    if (s.ClothingTypes.Any(t => t.Id == defaults[i].Id))
                         insertIndex++;
                 }
-                EditConfig.ClothingTypes.Insert(insertIndex, entry);
-            }
-            ApplyConfig();
+                var next = s.ClothingTypes.ToList();
+                next.Insert(insertIndex, template with { });
+                return s with { ClothingTypes = next };
+            });
         }
 
         protected void ToggleSettings() => SettingsOpen = !SettingsOpen;
 
-        protected void ApplyConfig()
-        {
-            if (UserService.CurrentUser is null) return;
-            if (GameState.Context is null) return;
+        // Per-property setters route every mutation through UpdateSettings so the change is
+        // atomic, notification fires once outside the lock, and the snapshot is persisted to
+        // the host's browser localStorage.
+        protected void SetDrawingTimeSec(int v) => UpdateSettings(s => s with { DrawingTimeSec = v });
+        protected void SetEnableTimer(bool v) => UpdateSettings(s => s with { EnableTimer = v });
+        protected void SetThemeAnnouncementTimeSec(int v) => UpdateSettings(s => s with { ThemeAnnouncementTimeSec = v });
+        protected void SetAllowSketchingDuringOutfitBuilding(bool v) => UpdateSettings(s => s with { AllowSketchingDuringOutfitBuilding = v });
+        protected void SetShowDrawingsOnHostScreen(bool v) => UpdateSettings(s => s with { ShowDrawingsOnHostScreen = v });
+        protected void SetThemeSource(ThemeSource v) => UpdateSettings(s => s with { ThemeSource = v });
+        protected void SetThemeAnnouncement(ThemeAnnouncement v) => UpdateSettings(s => s with { ThemeAnnouncement = v });
+        protected void SetOutfitBuildingTimeSec(int v) => UpdateSettings(s => s with { OutfitBuildingTimeSec = v });
+        protected void SetOutfitCustomizationTimeSec(int v) => UpdateSettings(s => s with { OutfitCustomizationTimeSec = v });
+        protected void SetAllowReuseOwnItems(bool v) => UpdateSettings(s => s with { AllowReuseOwnItems = v });
+        protected void SetAllowSelectOwnDrawings(bool v) => UpdateSettings(s => s with { AllowSelectOwnDrawings = v });
+        protected void SetRequireDistinctItemsPerSlot(bool v) => UpdateSettings(s => s with { RequireDistinctItemsPerSlot = v });
+        protected void SetVotingTimeSec(int v) => UpdateSettings(s => s with { VotingTimeSec = v });
+        protected void SetShowCreatorDuringVoting(bool v) => UpdateSettings(s => s with { ShowCreatorDuringVoting = v });
+        protected void SetVotingRounds(int v) => UpdateSettings(s => s with { VotingRounds = v });
+        protected void SetBonusPointsForCompleteOutfit(int v) => UpdateSettings(s => s with { BonusPointsForCompleteOutfit = v });
+        protected void SetHostDisconnectTimeoutSec(int v) => UpdateSettings(s => s with { HostDisconnectTimeoutSec = v });
 
-            var cmd = new UpdateConfigCommand(UserService.CurrentUser.Id, EditConfig);
-            var result = GameEngine.ProcessCommand(GameState.Context, cmd);
-            if (result.TryGetFailure(out var err))
-            {
-                Logger.LogWarning("Failed to apply config: {msg}", err.PublicMessage);
-                // Resync local copy from authoritative state.
-                SyncEditConfig();
-            }
+        private void UpdateSettings(Func<DrawnToDressSettings, DrawnToDressSettings> mutate)
+        {
+            if (UserService.CurrentUser?.Id != GameState.Host.Id) return;
+            _userHasEdited = true;
+            GameState.UpdateSettings(s => mutate(s).Normalize());
+            PersistSettings();
         }
 
         protected void KickPlayer(string userId)
@@ -144,8 +120,6 @@ namespace KnockBox.DrawnToDress.Pages
             }
 
             // Kicking is a lobby-level state operation (same pattern as CardCounter).
-            // It does not need to go through the FSM because it has no game-logic side-effects
-            // while still in the lobby phase.
             var result = GameState.KickPlayer(UserService.CurrentUser, match.Value.User);
             if (result.TryGetFailure(out var err))
             {
@@ -163,61 +137,131 @@ namespace KnockBox.DrawnToDress.Pages
 
         // ── Presets ─────────────────────────────────────────────────────────────
 
-        protected static readonly (string Name, string Description, Action<DrawnToDressConfig> Apply)[] Presets =
+        protected static readonly (string Name, string Description, Func<DrawnToDressSettings, DrawnToDressSettings> Apply)[] Presets =
         [
             ("Quick Game", "Short timers, 1 outfit round",
-                cfg =>
+                s => s with
                 {
-                    cfg.DrawingTimeSec = 60;
-                    cfg.OutfitBuildingTimeSec = 60;
-                    cfg.OutfitCustomizationTimeSec = 30;
-                    cfg.VotingTimeSec = 30;
-                    cfg.NumOutfitRounds = 1;
-                    cfg.VotingRounds = 2;
-                    cfg.AllowReuseOwnItems = true;
+                    DrawingTimeSec = 60,
+                    OutfitBuildingTimeSec = 60,
+                    OutfitCustomizationTimeSec = 30,
+                    VotingTimeSec = 30,
+                    NumOutfitRounds = 1,
+                    VotingRounds = 2,
+                    AllowReuseOwnItems = true,
                 }),
             ("Standard", "Default settings",
-                cfg =>
+                s => s with
                 {
-                    cfg.DrawingTimeSec = 180;
-                    cfg.OutfitBuildingTimeSec = 90;
-                    cfg.OutfitCustomizationTimeSec = 60;
-                    cfg.VotingTimeSec = 60;
-                    cfg.NumOutfitRounds = 1;
-                    cfg.VotingRounds = 3;
-                    cfg.AllowReuseOwnItems = true;
+                    DrawingTimeSec = 180,
+                    OutfitBuildingTimeSec = 90,
+                    OutfitCustomizationTimeSec = 60,
+                    VotingTimeSec = 60,
+                    NumOutfitRounds = 1,
+                    VotingRounds = 3,
+                    AllowReuseOwnItems = true,
                 }),
             ("Full Experience", "Longer timers, 2 outfit rounds",
-                cfg =>
+                s => s with
                 {
-                    cfg.DrawingTimeSec = 180;
-                    cfg.OutfitBuildingTimeSec = 120;
-                    cfg.OutfitCustomizationTimeSec = 90;
-                    cfg.VotingTimeSec = 90;
-                    cfg.NumOutfitRounds = 2;
-                    cfg.VotingRounds = 4;
-                    cfg.AllowReuseOwnItems = true;
+                    DrawingTimeSec = 180,
+                    OutfitBuildingTimeSec = 120,
+                    OutfitCustomizationTimeSec = 90,
+                    VotingTimeSec = 90,
+                    NumOutfitRounds = 2,
+                    VotingRounds = 4,
+                    AllowReuseOwnItems = true,
                 }),
             ("Creative Focus", "Extra drawing & customization time, sketching required",
-                cfg =>
+                s => s with
                 {
-                    cfg.DrawingTimeSec = 300;
-                    cfg.OutfitBuildingTimeSec = 120;
-                    cfg.OutfitCustomizationTimeSec = 120;
-                    cfg.VotingTimeSec = 60;
-                    cfg.NumOutfitRounds = 1;
-                    cfg.VotingRounds = 3;
-                    cfg.SketchingRequired = true;
-                    cfg.AllowReuseOwnItems = true;
+                    DrawingTimeSec = 300,
+                    OutfitBuildingTimeSec = 120,
+                    OutfitCustomizationTimeSec = 120,
+                    VotingTimeSec = 60,
+                    NumOutfitRounds = 1,
+                    VotingRounds = 3,
+                    SketchingRequired = true,
+                    AllowReuseOwnItems = true,
                 }),
         ];
 
         protected void ApplyPreset(int index)
         {
             if (index < 0 || index >= Presets.Length) return;
-            Presets[index].Apply(EditConfig);
-            ApplyConfig();
+            UpdateSettings(Presets[index].Apply);
+        }
+
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            // localStorage needs JS interop, so the host's saved settings load here (not
+            // OnInitialized, which also runs during prerender). Host-only — only the host
+            // edits and persists these.
+            if (firstRender && UserService.CurrentUser?.Id == GameState.Host.Id)
+            {
+                await LoadSettingsAsync();
+            }
+        }
+
+        private async Task LoadSettingsAsync()
+        {
+            try
+            {
+                var saved = await LocalStorage.GetAsync<DrawnToDressSettings>("drawn-to-dress", "settings", _cts.Token);
+                // If the host already edited a setting while the load was in flight,
+                // the user's edit wins — the saved snapshot would clobber it.
+                if (saved is not null && !_userHasEdited)
+                {
+                    GameState.UpdateSettings(_ => saved.Normalize());
+                    StateHasChanged();
+                }
+            }
+            catch (OperationCanceledException) { /* component disposed */ }
+            catch (ObjectDisposedException) { /* circuit gone */ }
+            catch (JSDisconnectedException) { /* circuit gone */ }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error loading Drawn To Dress settings.");
+            }
+        }
+
+        private void PersistSettings()
+        {
+            var snapshot = GameState.Settings;
+            _saveTask = SaveSettingsAsync(snapshot, _saveTask, _cts.Token);
+        }
+
+        private async Task SaveSettingsAsync(DrawnToDressSettings settings, Task? prior, CancellationToken ct)
+        {
+            if (prior is not null)
+            {
+                try { await prior; } catch { /* prior failure already logged */ }
+            }
+            try
+            {
+                await LocalStorage.SetAsync("drawn-to-dress", "settings", settings, ct);
+            }
+            catch (OperationCanceledException) { /* component disposed */ }
+            catch (ObjectDisposedException) { /* circuit gone */ }
+            catch (JSDisconnectedException) { /* circuit gone */ }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error saving Drawn To Dress settings.");
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            // Flush the last pending save before tearing down so a change made right before
+            // navigating away isn't lost. A dead circuit makes SetAsync throw
+            // JSDisconnectedException, which SaveSettingsAsync swallows.
+            if (_saveTask is not null)
+            {
+                try { await _saveTask; } catch { /* best-effort flush */ }
+            }
+
+            _cts.Cancel();
+            _cts.Dispose();
         }
     }
 }
-

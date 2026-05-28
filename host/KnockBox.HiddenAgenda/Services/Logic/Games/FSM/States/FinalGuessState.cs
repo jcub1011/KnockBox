@@ -24,7 +24,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
 
             context.State.SetPhase(GamePhase.FinalGuess);
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(
-                context.State.Config.FinalGuessTimeoutMs);
+                context.State.Settings.FinalGuessTimeoutMs);
             context.State.PhaseEndTime = _expiresAt;
             return null;
         }
@@ -82,7 +82,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> Tick(HiddenAgendaGameContext context, DateTimeOffset now)
         {
             if (now < _expiresAt) return null;
-            if (!context.State.Config.EnableTimers) return null;
+            if (!context.State.Settings.EnableTimers) return null;
 
             // Timeout: mark all non-guessing players as skipped
             foreach (var player in context.GamePlayers.Values)

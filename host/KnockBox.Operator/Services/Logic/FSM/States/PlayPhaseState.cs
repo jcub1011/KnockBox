@@ -70,8 +70,8 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
 
             if (!pState.HasPlayedCardThisTurn)
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Cannot end turn before playing a card.");
-            if (pState.Hand.Count > context.State.Config.MaxHandSize)
-                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError($"Cannot end turn with more than {context.State.Config.MaxHandSize} cards.");
+            if (pState.Hand.Count > context.State.Settings.MaxHandSize)
+                return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError($"Cannot end turn with more than {context.State.Settings.MaxHandSize} cards.");
 
             return TransitionToDrawPhase(context);
         }
@@ -174,18 +174,18 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
 
     public ValueResult<TimeSpan> GetRemainingTime(OperatorGameContext context, DateTimeOffset now)
     {
-        if (!context.State.Config.TimersEnabled) return ValueResult<TimeSpan>.FromValue(TimeSpan.MaxValue);
+        if (!context.State.Settings.TimersEnabled) return ValueResult<TimeSpan>.FromValue(TimeSpan.MaxValue);
         var elapsed = now - context.State.StateStartTime;
-        var remaining = context.State.Config.PlayPhaseTimeout - elapsed;
+        var remaining = context.State.Settings.PlayPhaseTimeout - elapsed;
         return ValueResult<TimeSpan>.FromValue(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
     }
 
     public ValueResult<IGameState<OperatorGameContext, OperatorCommand>?> Tick(OperatorGameContext context, DateTimeOffset now)
     {
-        if (!context.State.Config.TimersEnabled) return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(null);
+        if (!context.State.Settings.TimersEnabled) return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(null);
 
         var elapsed = now - context.State.StateStartTime;
-        if (elapsed >= context.State.Config.PlayPhaseTimeout)
+        if (elapsed >= context.State.Settings.PlayPhaseTimeout)
         {
             AutoPlayOnTimeout(context);
             return TransitionToDrawPhase(context);
@@ -248,7 +248,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
         }
 
         // Discard extra cards to bring hand size down to max
-        while (pState.Hand.Count > context.State.Config.MaxHandSize)
+        while (pState.Hand.Count > context.State.Settings.MaxHandSize)
         {
             // Prefer discarding non-Shield cards
             var nonShieldIdx = pState.Hand.FindIndex(c => c is not ShieldCard);

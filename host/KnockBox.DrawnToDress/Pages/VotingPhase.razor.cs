@@ -44,14 +44,14 @@ namespace KnockBox.DrawnToDress.Pages
         /// <summary>
         /// Returns the display label for an entrant during voting.
         /// Always shows the outfit name. Optionally shows creator name below
-        /// when <see cref="DrawnToDressConfig.ShowCreatorDuringVoting"/> is enabled.
+        /// when <see cref="DrawnToDressSettings.ShowCreatorDuringVoting"/> is enabled.
         /// </summary>
         protected string GetEntrantLabel(EntrantId entrantId)
         {
             var outfit = GetEntrantOutfit(entrantId);
             string outfitName = outfit?.Customization.OutfitName ?? "Unnamed Outfit";
 
-            if (GameState.Config.ShowCreatorDuringVoting)
+            if (GameState.Settings.ShowCreatorDuringVoting)
             {
                 string creatorName = GetEntrantDisplayName(entrantId);
                 return $"{outfitName} — {creatorName}";
@@ -88,7 +88,7 @@ namespace KnockBox.DrawnToDress.Pages
 
         protected bool AllCriteriaVotedForMatchup(Guid matchupId)
         {
-            return GameState.Config.VotingCriteria.All(c =>
+            return GameState.Settings.VotingCriteria.All(c =>
                 _selectedVotes.ContainsKey((matchupId, c.Id)));
         }
 
@@ -108,7 +108,7 @@ namespace KnockBox.DrawnToDress.Pages
 
             try
             {
-                foreach (var criterion in GameState.Config.VotingCriteria)
+                foreach (var criterion in GameState.Settings.VotingCriteria)
                 {
                     var key = (matchupId, criterion.Id);
                     if (!_selectedVotes.TryGetValue(key, out var chosenEntrantId)) continue;
@@ -136,13 +136,13 @@ namespace KnockBox.DrawnToDress.Pages
         }
 
         protected int TotalOutfitWidth =>
-            CompositeCanvasLayout.ComputeCompositeWidth(GameState.Config);
+            CompositeCanvasLayout.ComputeCompositeWidth(GameState.Settings);
 
         protected int TotalOutfitHeight =>
-            CompositeCanvasLayout.ComputeCompositeHeight(GameState.Config);
+            CompositeCanvasLayout.ComputeCompositeHeight(GameState.Settings);
 
         protected double MannequinDisplaySize =>
-            CompositeCanvasLayout.MannequinDisplaySize(GameState.Config);
+            CompositeCanvasLayout.MannequinDisplaySize(GameState.Settings);
 
         protected static string? SafeSvgContent(string? raw)
             => SvgContentSanitizer.Sanitize(raw);

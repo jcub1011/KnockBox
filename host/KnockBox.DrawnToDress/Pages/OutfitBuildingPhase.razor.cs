@@ -23,10 +23,10 @@ namespace KnockBox.DrawnToDress.Pages
         [Parameter] public int OutfitRound { get; set; } = 1;
 
         protected int ComposedOutfitWidth =>
-            ComputeCompositeWidth(GameState.Config);
+            ComputeCompositeWidth(GameState.Settings);
 
         protected int ComposedOutfitHeight =>
-            ComputeCompositeHeight(GameState.Config);
+            ComputeCompositeHeight(GameState.Settings);
 
         private bool _submitting;
         private string? _errorMessage;
@@ -35,8 +35,8 @@ namespace KnockBox.DrawnToDress.Pages
 
         protected override void OnInitialized()
         {
-            _showMannequin = GameState.Config.ShowMannequin;
-            _selectedTypeId = GameState.Config.ClothingTypes.FirstOrDefault()?.Id ?? ClothingType.Top;
+            _showMannequin = GameState.Settings.ShowMannequin;
+            _selectedTypeId = GameState.Settings.ClothingTypes.FirstOrDefault()?.Id ?? ClothingType.Top;
         }
 
         /// <summary>
@@ -55,7 +55,7 @@ namespace KnockBox.DrawnToDress.Pages
             }
 
             // Fall back to own drawing for this type if enabled.
-            if (GameState.Config.AllowReuseOwnItems)
+            if (GameState.Settings.AllowReuseOwnItems)
             {
                 foreach (var id in player.OwnedClothingItemIds)
                 {
@@ -186,7 +186,7 @@ namespace KnockBox.DrawnToDress.Pages
         {
             var result = new Dictionary<ClothingType, Guid>();
 
-            foreach (var clothingType in GameState.Config.ClothingTypes)
+            foreach (var clothingType in GameState.Settings.ClothingTypes)
             {
                 var selected = GetSelectedItemForType(player, clothingType.Id);
                 if (selected.HasValue)

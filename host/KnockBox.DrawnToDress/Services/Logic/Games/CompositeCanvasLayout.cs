@@ -15,7 +15,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         /// <summary>Total vertical padding (200 px top + 200 px bottom).</summary>
         private const int VerticalPadding = 400;
 
-        public static int ComputeCompositeWidth(DrawnToDressConfig config)
+        public static int ComputeCompositeWidth(DrawnToDressSettings config)
             => (config.ClothingTypes.Count > 0
                 ? config.ClothingTypes.Max(ct => ct.CanvasWidth)
                 : DefaultCanvasWidth) + CanvasWidthPadding;
@@ -24,7 +24,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         /// The mannequin display size in the composite canvas, based on the widest
         /// item canvas so the mannequin-to-item ratio matches the drawing phase.
         /// </summary>
-        public static double MannequinDisplaySize(DrawnToDressConfig config)
+        public static double MannequinDisplaySize(DrawnToDressSettings config)
             => (config.ClothingTypes.Count > 0
                 ? config.ClothingTypes.Max(ct => ct.CanvasWidth)
                 : DefaultCanvasWidth) * config.MannequinScaleFactor;
@@ -32,7 +32,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         /// <summary>
         /// Composite canvas height = mannequin display height + 200 px padding top and bottom.
         /// </summary>
-        public static int ComputeCompositeHeight(DrawnToDressConfig config)
+        public static int ComputeCompositeHeight(DrawnToDressSettings config)
             => (int)MannequinDisplaySize(config) + VerticalPadding;
 
         /// <summary>

@@ -17,7 +17,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
 
             context.State.SetPhase(GamePhase.Reveal);
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(
-                context.State.Config.RevealTimeoutMs);
+                context.State.Settings.RevealTimeoutMs);
             context.State.PhaseEndTime = _expiresAt;
             return null;
         }
