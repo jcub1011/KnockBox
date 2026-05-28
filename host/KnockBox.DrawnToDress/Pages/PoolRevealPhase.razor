@@ -28,7 +28,7 @@
             if (remaining.IsSuccess && remaining.Value.TotalSeconds >= 0)
             {
                 var endTime = DateTimeOffset.UtcNow.Add(remaining.Value);
-                var duration = TimeSpan.FromSeconds(GameState.Config.PoolRevealTimeSec);
+                var duration = TimeSpan.FromSeconds(GameState.Settings.PoolRevealTimeSec);
 
                 <CountdownClock EndTimeUtc="endTime" Duration="duration" Context="countdown">
                     @{

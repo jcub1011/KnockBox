@@ -2,7 +2,7 @@
 
 ## Goal
 
-Expose `AlphaChainGameConfig` to the host through a lobby configuration panel, replace placeholder visuals with the final look, and bring test coverage to release-grade. After this milestone the game ships.
+Expose `AlphaChainSettings` to the host through a lobby configuration panel, replace placeholder visuals with the final look, and bring test coverage to release-grade. After this milestone the game ships.
 
 ## Demonstrable outcome
 
@@ -18,7 +18,7 @@ Expose `AlphaChainGameConfig` to the host through a lobby configuration panel, r
 
 ### Host configuration UI
 
-- `Pages/AlphaChainLobby.razor` — add a host-only `<AlphaChainConfigPanel>` section:
+- `Pages/AlphaChainLobby.razor` — add a host-only `<AlphaChainSettingsPanel>` section:
   - **Ban Mode** radio group: `Vowels Only` / `Consonants Only` / `All Bannable`.
   - **Shot Clock** slider, 5–20 s (default 12).
   - **Era Interval** numeric input, ≥1 (default 4).
@@ -27,12 +27,12 @@ Expose `AlphaChainGameConfig` to the host through a lobby configuration panel, r
   - **Intermission Timer** numeric input, ≥5 s (default 30).
   - **Sniper Ban Timer** numeric input, ≥5 s (default 15).
   - Cards-per-era numeric inputs (`ModifiersDealtPerEra`, `ActionsDealtPerEra`) if those were left configurable in M4.
-- `Components/AlphaChainConfigPanel.razor` — the panel itself; two-way bound to a local `AlphaChainGameConfig` instance owned by the page.
+- `Components/AlphaChainSettingsPanel.razor` — the panel itself; two-way bound to a local `AlphaChainSettings` instance owned by the page.
 - `Pages/AlphaChainLobby.razor.cs`:
   - On every change, validate via `config.Validate()`; gate "Start Session" until valid.
-  - On Start, persist via `state.Execute(() => state.Config = config)` before calling `engine.StartAsync`.
+  - On Start, persist via `state.UpdateSettings(_ => config)` before calling `engine.StartAsync`.
   - Subscribe to `StateChangedEventManager` so non-host viewers re-render when the host edits the config.
-- `Services/Logic/Games/Data/AlphaChainGameConfig.cs`:
+- `Services/Logic/Games/Data/AlphaChainSettings.cs`:
   - Add `ConfigValidationResult Validate()` method enumerating violations.
   - All numeric ranges defined as `const` named constants (e.g., `MinShotClockSeconds`, `MaxShotClockSeconds`).
 
@@ -55,7 +55,7 @@ Expose `AlphaChainGameConfig` to the host through a lobby configuration panel, r
 
 Add or expand under `host/KnockBox.AlphaChainTests/`:
 
-- `Unit/Logic/Games/Data/AlphaChainGameConfigTests.cs` — every validation rule has a positive and negative test.
+- `Unit/Logic/Games/Data/AlphaChainSettingsTests.cs` — every validation rule has a positive and negative test.
 - `Unit/Logic/Games/AlphaChain/States/RoundStateTests.cs` — expand from M2/M3 to cover:
   - Pivot + Banned Letter interactions.
   - Amnesty interacting with a word whose last char is banned (still clears `RequiredStartLetter`?).
@@ -78,13 +78,13 @@ Add or expand under `host/KnockBox.AlphaChainTests/`:
 
 ## Key types & contracts
 
-- `AlphaChainGameConfig.Validate()` is the single source of truth for what's a legal config; both the UI and `StartAsyncCore` call it.
+- `AlphaChainSettings.Validate()` is the single source of truth for what's a legal config; both the UI and `StartAsyncCore` call it.
 - No new public API on the SDK. All polish stays plugin-internal.
 
 ## Step-by-step build order
 
-1. Add validation + constants to `AlphaChainGameConfig`.
-2. Build `AlphaChainConfigPanel` and integrate into the lobby; non-host read-only view first, then host editable.
+1. Add validation + constants to `AlphaChainSettings`.
+2. Build `AlphaChainSettingsPanel` and integrate into the lobby; non-host read-only view first, then host editable.
 3. Wire validation gating + persist on Start.
 4. Replace tile + header art; finalize game-page CSS.
 5. Implement drag-reorder for Engine Bay; verify keyboard accessibility.

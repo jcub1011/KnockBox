@@ -129,12 +129,12 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         [TestMethod]
         public void Tick_AutoSelectsFirstCardAfterTimeout()
         {
-            _state.Config.EnableTimers = true;
+            _state.UpdateSettings(s => s with { EnableTimers = true });
             _state.GamePlayers["p0"].CurrentSpaceId = 0;
             var state = new DrawPhaseState();
             state.OnEnter(_context);
 
-            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.DrawPhaseTimeoutMs + 100));
+            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Settings.DrawPhaseTimeoutMs + 100));
 
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
@@ -148,7 +148,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new DrawPhaseState();
             state.OnEnter(_context);
 
-            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.DrawPhaseTimeoutMs + 100));
+            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Settings.DrawPhaseTimeoutMs + 100));
 
             Assert.IsTrue(result.IsSuccess);
             Assert.IsNull(result.Value);

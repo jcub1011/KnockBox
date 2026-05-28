@@ -52,7 +52,7 @@ namespace KnockBox.DrawnToDress.Pages
 
         protected override void OnInitialized()
         {
-            _showMannequin = GameState.Config.ShowMannequin;
+            _showMannequin = GameState.Settings.ShowMannequin;
             var myPlayer = GameState.GamePlayers.GetValueOrDefault(CurrentPlayerId);
             _outfitName = myPlayer?.DraftOutfitName ?? string.Empty;
 
@@ -62,13 +62,13 @@ namespace KnockBox.DrawnToDress.Pages
                 _outfitName = myOutfit.Customization.OutfitName;
             }
             _selectedFace = myOutfit?.Customization.SelectedFace ?? FaceType.Default;
-            _showMannequin = myOutfit?.Customization.ShowMannequin ?? GameState.Config.ShowMannequin;
+            _showMannequin = myOutfit?.Customization.ShowMannequin ?? GameState.Settings.ShowMannequin;
 
             // Compute default positions so each item's center aligns with the
             // corresponding mannequin body-part center in the composite canvas.
-            int cw = ComputeCompositeWidth(GameState.Config);
-            int ch = ComputeCompositeHeight(GameState.Config);
-            foreach (var ct in GameState.Config.ClothingTypes)
+            int cw = ComputeCompositeWidth(GameState.Settings);
+            int ch = ComputeCompositeHeight(GameState.Settings);
+            foreach (var ct in GameState.Settings.ClothingTypes)
             {
                 if (myOutfit?.Customization.ItemPositionOverrides.TryGetValue(ct.Id, out var ovr) == true)
                 {
@@ -76,12 +76,12 @@ namespace KnockBox.DrawnToDress.Pages
                 }
                 else
                 {
-                    var (x, y) = GetItemPosition(ct.CanvasWidth, ct.CanvasHeight, ct.MannequinAnchorY, cw, ch, GameState.Config.MannequinDimensions.X);
+                    var (x, y) = GetItemPosition(ct.CanvasWidth, ct.CanvasHeight, ct.MannequinAnchorY, cw, ch, GameState.Settings.MannequinDimensions.X);
                     _itemPositions[ct.Id] = new ItemPositionOverride { X = x, Y = y };
                 }
             }
 
-            _selectedTypeId = GameState.Config.ClothingTypes.FirstOrDefault()?.Id;
+            _selectedTypeId = GameState.Settings.ClothingTypes.FirstOrDefault()?.Id;
         }
 
         private async Task OnOutfitNameChangedAsync(string newName)
@@ -139,7 +139,7 @@ namespace KnockBox.DrawnToDress.Pages
             _dotNetRef ??= DotNetObjectReference.Create(this);
 
             var items = new List<object>();
-            foreach (var ct in GameState.Config.ClothingTypes)
+            foreach (var ct in GameState.Settings.ClothingTypes)
             {
                 if (myOutfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
                     && GameState.ClothingPool.TryGetValue(itemId, out var poolItem)
@@ -158,8 +158,8 @@ namespace KnockBox.DrawnToDress.Pages
                 }
             }
 
-            int canvasWidth = ComputeCompositeWidth(GameState.Config);
-            int totalHeight = ComputeCompositeHeight(GameState.Config);
+            int canvasWidth = ComputeCompositeWidth(GameState.Settings);
+            int totalHeight = ComputeCompositeHeight(GameState.Settings);
             await _dragModule.InvokeVoidAsync("initialize", _dragSvgId, _dotNetRef, items, canvasWidth, totalHeight);
             _dragInitialized = true;
         }
@@ -238,7 +238,7 @@ namespace KnockBox.DrawnToDress.Pages
                     sketchSvg = string.IsNullOrWhiteSpace(svg) ? null : svg;
                 }
 
-                if (GameState.Config.SketchingRequired && sketchSvg is null)
+                if (GameState.Settings.SketchingRequired && sketchSvg is null)
                 {
                     _errorMessage = "A sketch overlay is required for this game. Please draw something before finalizing.";
                     return;
@@ -246,7 +246,7 @@ namespace KnockBox.DrawnToDress.Pages
 
                 // Always submit position overrides so VotingPhase properly reconstructs the mapped outfit.
                 Dictionary<ClothingType, ItemPositionOverride>? positionOverrides = [];
-                foreach (var ct in GameState.Config.ClothingTypes)
+                foreach (var ct in GameState.Settings.ClothingTypes)
                 {
                     if (_itemPositions.TryGetValue(ct.Id, out var pos))
                     {

@@ -282,24 +282,26 @@ public record CardDrawRecord(
 );
 ```
 
-### 8. `Services/State/Games/Data/HiddenAgendaGameConfig.cs`
+### 8. `Services/State/Games/Data/HiddenAgendaSettings.cs`
 
 ```csharp
 public enum TaskPoolRotation { Full, Partial, Fixed }
 
-public class HiddenAgendaGameConfig
+public sealed record HiddenAgendaSettings
 {
-    public int TotalRounds { get; set; } = 4;
-    public int RoundSetupTimeoutMs { get; set; } = 10000;
-    public int EventCardPhaseTimeoutMs { get; set; } = 10000;
-    public int SpinPhaseTimeoutMs { get; set; } = 10000;
-    public int MovePhaseTimeoutMs { get; set; } = 15000;
-    public int DrawPhaseTimeoutMs { get; set; } = 15000;
-    public int GuessPhaseTimeoutMs { get; set; } = 60000;
-    public int FinalGuessTimeoutMs { get; set; } = 45000;
-    public int RevealTimeoutMs { get; set; } = 15000;
-    public bool EnableTimers { get; set; } = true;
-    public TaskPoolRotation PoolRotation { get; set; } = TaskPoolRotation.Partial;
+    public int TotalRounds { get; init; } = 4;
+    public int RoundSetupTimeoutMs { get; init; } = 10000;
+    public int EventCardPhaseTimeoutMs { get; init; } = 10000;
+    public int SpinPhaseTimeoutMs { get; init; } = 10000;
+    public int MovePhaseTimeoutMs { get; init; } = 15000;
+    public int DrawPhaseTimeoutMs { get; init; } = 15000;
+    public int GuessPhaseTimeoutMs { get; init; } = 60000;
+    public int FinalGuessTimeoutMs { get; init; } = 45000;
+    public int RevealTimeoutMs { get; init; } = 15000;
+    public bool EnableTimers { get; init; } = true;
+
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public TaskPoolRotation PoolRotation { get; init; } = TaskPoolRotation.Partial;
 }
 ```
 
@@ -349,24 +351,25 @@ public enum GamePhase
 public class HiddenAgendaGameState(User host, ILogger<HiddenAgendaGameState> logger)
     : AbstractGameState(host, logger),
       IPhasedGameState<GamePhase>,
-      IConfigurableGameState<HiddenAgendaGameConfig>,
       IPlayerTrackedGameState<HiddenAgendaPlayerState>,
       IFsmContextGameState<HiddenAgendaGameContext>
 ```
 
 The interfaces are defined in `KnockBox.Core/Services/State/Games/Shared/Interfaces/`:
 - `IPhasedGameState<TPhase>` -- Phase property + SetPhase
-- `IConfigurableGameState<TConfig>` -- Config property
 - `IPlayerTrackedGameState<TPlayerState>` -- ConcurrentDictionary<string, TPlayerState> GamePlayers
 - `IFsmContextGameState<TContext>` -- Context property
 
-3. Add properties:
+3. Add properties + the `UpdateSettings` mutator (the platform-wide settings recipe — see SDK README for the full pattern):
 ```csharp
 // FSM context (set when game starts)
 public HiddenAgendaGameContext? Context { get; set; }
 
-// Configuration
-public HiddenAgendaGameConfig Config { get; set; } = new();
+// Host-configurable match rules. Private setter forces mutation through UpdateSettings.
+public HiddenAgendaSettings Settings { get; private set; } = new();
+
+public Result UpdateSettings(Func<HiddenAgendaSettings, HiddenAgendaSettings> mutate) =>
+    Execute(() => { Settings = mutate(Settings); });
 
 // Player state
 public ConcurrentDictionary<string, HiddenAgendaPlayerState> GamePlayers { get; } = new();

@@ -88,7 +88,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic.States
         [TestMethod]
         public void Tick_OnTimeout_TransitionsToReveal()
         {
-            _state.Config.EnableTimers = true;
+            _state.UpdateSettings(s => s with { EnableTimers = true });
             _stateLogic.OnEnter(_context);
             var result = _stateLogic.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
 

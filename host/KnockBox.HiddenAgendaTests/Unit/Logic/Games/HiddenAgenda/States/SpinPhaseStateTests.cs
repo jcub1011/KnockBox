@@ -88,11 +88,11 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         [TestMethod]
         public void Tick_AutoSpinsAfterTimeout()
         {
-            _state.Config.EnableTimers = true;
+            _state.UpdateSettings(s => s with { EnableTimers = true });
             var state = new SpinPhaseState();
             state.OnEnter(_context);
 
-            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.SpinPhaseTimeoutMs + 100));
+            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Settings.SpinPhaseTimeoutMs + 100));
 
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<MovePhaseState>(result.Value);
@@ -105,7 +105,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new SpinPhaseState();
             state.OnEnter(_context);
 
-            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.SpinPhaseTimeoutMs + 100));
+            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Settings.SpinPhaseTimeoutMs + 100));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsNull(result.Value);
         }

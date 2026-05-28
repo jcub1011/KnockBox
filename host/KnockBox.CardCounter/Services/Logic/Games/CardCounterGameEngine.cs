@@ -65,7 +65,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
             // Transition into the initial FSM state.
             // In Active Operator Mode the buy-in step is skipped: every player starts with a
             // balance of 10 and the game goes straight to the first round.
-            if (gameState.Config.ActiveOperatorMode)
+            if (gameState.Settings.ActiveOperatorMode)
             {
                 foreach (var ps in context.State.GamePlayers.Values)
                 {
@@ -98,13 +98,13 @@ namespace KnockBox.CardCounter.Services.Logic.Games
         /// <summary>
         /// Drives time-based transitions (e.g., action-response timeouts).
         /// Call periodically from a timer or background service.
-        /// Does nothing when <see cref="GameConfig.EnableActionTimer"/> is <c>false</c>.
+        /// Does nothing when <see cref="CardCounterSettings.EnableActionTimer"/> is <c>false</c>.
         /// </summary>
         public Result Tick(CardCounterGameContext context, DateTimeOffset now)
         {
             return context.State.Execute(() =>
             {
-                if (!context.Config.EnableActionTimer) return;
+                if (!context.Settings.EnableActionTimer) return;
                 context.Fsm.Tick(context, now);
             });
         }
@@ -273,7 +273,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
                 InitializeGame(context);
 
                 // Respect Active Operator Mode on reset: same logic as StartAsync.
-                if (state.Config.ActiveOperatorMode)
+                if (state.Settings.ActiveOperatorMode)
                 {
                     foreach (var ps in context.State.GamePlayers.Values)
                     {
@@ -377,9 +377,9 @@ namespace KnockBox.CardCounter.Services.Logic.Games
                 {
                     PlayerId = entry.User.Id,
                     DisplayName = entry.DisplayName,
-                    PassesRemaining = state.Config.TotalPassesPerPlayer,
+                    PassesRemaining = state.Settings.TotalPassesPerPlayer,
                     BuyInRoll = randomNumberService.GetRandomInt(1, 7, RandomType.Fast),
-                    ActiveOperator = state.Config.ActiveOperatorMode ? Operator.Add : null
+                    ActiveOperator = state.Settings.ActiveOperatorMode ? Operator.Add : null
                 };
 
                 state.GamePlayers[entry.User.Id] = ps;
@@ -393,7 +393,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
         private void BuildAndShuffleDeck(CardCounterGameContext context)
         {
             var state = context.State;
-            var cfg = state.Config;
+            var cfg = state.Settings;
             var cards = new List<BaseCard>(cfg.DeckSize);
 
             int numNumberCards = (int)(cfg.DeckSize * (cfg.NumberToOperatorRatio / (cfg.NumberToOperatorRatio + 1)));

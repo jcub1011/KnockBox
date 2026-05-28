@@ -39,8 +39,8 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
 
         // ── Convenience accessors ─────────────────────────────────────────────
 
-        /// <summary>Shortcut to <see cref="DrawnToDressGameState.Config"/>.</summary>
-        public DrawnToDressConfig Config => State.Config;
+        /// <summary>Shortcut to <see cref="DrawnToDressGameState.Settings"/>.</summary>
+        public DrawnToDressSettings Settings => State.Settings;
 
         /// <summary>Shortcut to <see cref="DrawnToDressGameState.GamePlayers"/>.</summary>
         public ConcurrentDictionary<string, DrawnToDressPlayerState> GamePlayers => State.GamePlayers;
@@ -146,7 +146,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
                 }
 
                 // When reuse is permitted, add the player's own previous outfit picks back.
-                if (Config.CanReuseOutfit1Items)
+                if (Settings.CanReuseOutfit1Items)
                 {
                     foreach (var (round, outfit) in player.SubmittedOutfits)
                     {

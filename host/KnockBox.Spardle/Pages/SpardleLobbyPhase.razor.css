@@ -271,6 +271,11 @@
     margin-bottom: 26px;
 }
 
+.spd-lobby-drawer-footer {
+    padding-top: 14px;
+    border-top: 1px solid var(--spd-border-strong, rgba(255, 255, 255, 0.15));
+}
+
 .spd-lobby-section-title {
     font-family: var(--spd-font-display);
     font-size: 0.9rem;

@@ -170,7 +170,7 @@ CardCounterGameState : AbstractGameState
 ├── LastDrawnCard        : LastDrawnCardInfo?         // most recently drawn shoe card
 ├── DiscardHistory       : List<DiscardHistoryEntry>  // visible discard timeline
 │
-└── Config               : GameConfig                 // tunable playtesting values
+└── Settings             : CardCounterSettings         // host-configurable rules (private setter)
 ```
 
 ### GamePhase Enum
@@ -705,18 +705,21 @@ Server-side timeouts in FSM states use `ScheduleCallback()` on `AbstractGameStat
 
 ## Playtesting Configuration
 
+`CardCounterSettings` is a `sealed record` with `init`-only properties, mutated only via `state.UpdateSettings(Func<>)` (which wraps `Execute`). The lobby Razor page persists snapshots to per-host `localStorage` under key `("card-counter", "settings")`. See the SDK README "Configurable settings" section for the full recipe.
+
 ```csharp
-public class GameConfig
+public sealed record CardCounterSettings
 {
-    public int DeckSize { get; set; } = 52;
-    public float NumberToOperatorRatio { get; set; } = 4.0f;
-    public float AddSubToMulDivRatio { get; set; } = 4.0f;
-    public int ActionsDealtPerRound { get; set; } = 3;
-    public int ActionHandLimit { get; set; } = 6;
-    public int TotalPassesPerPlayer { get; set; } = 3;
-    public int MinShoeSize { get; set; } = 12;
-    public int MaxShoeSize { get; set; } = 20;
-    public int ActionResponseTimeoutMs { get; set; } = 15000;
+    public int DeckSize { get; init; } = 52;
+    public float NumberToOperatorRatio { get; init; } = 4.0f;
+    public float AddSubToMulDivRatio { get; init; } = 4.0f;
+    public int ActionsDealtPerRound { get; init; } = 3;
+    public int ActionHandLimit { get; init; } = 6;
+    public int TotalPassesPerPlayer { get; init; } = 3;
+    public int MinShoeSize { get; init; } = 12;
+    public int MaxShoeSize { get; init; } = 20;
+    // ... plus per-phase timeouts, feature flags, and action-card weights —
+    // see CardCounterSettings.cs for the full property list.
 }
 ```
 

@@ -170,7 +170,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new GuessPhaseState();
             state.OnEnter(_context);
 
-            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.GuessPhaseTimeoutMs + 100));
+            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Settings.GuessPhaseTimeoutMs + 100));
 
             Assert.IsNotNull(result.Value);
             Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);

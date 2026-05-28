@@ -63,7 +63,7 @@ public sealed class FinalGuessState : ITimedHiddenAgendaGameState
 
         context.State.SetPhase(GamePhase.FinalGuess);
         _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(
-            context.State.Config.FinalGuessTimeoutMs);
+            context.State.Settings.FinalGuessTimeoutMs);
         return null;
     }
 
@@ -154,7 +154,7 @@ public sealed class RevealState : ITimedHiddenAgendaGameState
 
         context.State.SetPhase(GamePhase.Reveal);
         _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(
-            context.State.Config.RevealTimeoutMs);
+            context.State.Settings.RevealTimeoutMs);
         return null;
     }
 
@@ -202,7 +202,7 @@ public sealed class RoundOverState : IHiddenAgendaGameState
             return new ResultError("Only the host can start the next round.");
 
         // Check if match is over
-        if (context.State.CurrentRound >= context.State.Config.TotalRounds)
+        if (context.State.CurrentRound >= context.State.Settings.TotalRounds)
             return new MatchOverState();
 
         // Reset for new round and start

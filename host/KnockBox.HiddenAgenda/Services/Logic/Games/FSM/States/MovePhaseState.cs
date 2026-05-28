@@ -20,7 +20,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
             }
 
             context.State.SetPhase(GamePhase.MovePhase);
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.MovePhaseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Settings.MovePhaseTimeoutMs);
 
             context.State.ReachableSpaces = context.Board.GetReachableSpaces(player.CurrentSpaceId, player.LastSpinResult).ToList();
             
@@ -77,7 +77,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> Tick(HiddenAgendaGameContext context, DateTimeOffset now)
         {
             if (now < _expiresAt) return null;
-            if (!context.State.Config.EnableTimers) return null;
+            if (!context.State.Settings.EnableTimers) return null;
 
             var currentPlayerId = context.State.TurnManager.CurrentPlayer;
             if (currentPlayerId != null && context.GamePlayers.TryGetValue(currentPlayerId, out var player))

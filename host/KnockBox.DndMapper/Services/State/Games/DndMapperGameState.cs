@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.DndMapper.Models;
@@ -12,7 +13,23 @@ namespace KnockBox.DndMapper.Services.State.Games
         public const int RollLogCap = 50;
 
         public DndMapperPhase Phase { get; private set; } = DndMapperPhase.Lobby;
+
+        /// <summary>
+        /// Host-configurable session settings. Replaced atomically via
+        /// <see cref="UpdateSettings"/> (or <see cref="SetSettings"/> for bundled
+        /// inside-Execute mutations like snapshot hydration). The setter is private
+        /// so external callers can't bypass the lock.
+        /// </summary>
         public DndMapperSettings Settings { get; private set; } = new();
+
+        /// <summary>
+        /// Atomically replaces <see cref="Settings"/> with <paramref name="mutate"/>'s
+        /// result inside <see cref="AbstractGameState.Execute(Action)"/>, so subscribers
+        /// observe a single consistent transition and notification fires once after the
+        /// lock releases.
+        /// </summary>
+        public Result UpdateSettings(Func<DndMapperSettings, DndMapperSettings> mutate) =>
+            Execute(() => { Settings = mutate(Settings); });
         public AttributeSchema AttributeSchema { get; private set; }
             = AttributeSchema.FromPreset(AttributePreset.DnD5eCore);
 

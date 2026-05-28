@@ -22,9 +22,9 @@
 
     var myOutfit = myPlayer?.GetOutfit(OutfitRound);
 
-    int canvasWidth = CompositeCanvasLayout.ComputeCompositeWidth(GameState.Config);
-    int totalOutfitHeight = CompositeCanvasLayout.ComputeCompositeHeight(GameState.Config);
-    double mannequinSize = CompositeCanvasLayout.MannequinDisplaySize(GameState.Config);
+    int canvasWidth = CompositeCanvasLayout.ComputeCompositeWidth(GameState.Settings);
+    int totalOutfitHeight = CompositeCanvasLayout.ComputeCompositeHeight(GameState.Settings);
+    double mannequinSize = CompositeCanvasLayout.MannequinDisplaySize(GameState.Settings);
 
     // Build a composite background SVG from the player's selected outfit items, applying
     // any position overrides set via the drag/manual-input layer.
@@ -36,7 +36,7 @@
 
         if (_mode == InteractionMode.Draw)
         {
-            foreach (var ct in GameState.Config.ClothingTypes)
+            foreach (var ct in GameState.Settings.ClothingTypes)
             {
                 if (myOutfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
                     && GameState.ClothingPool.TryGetValue(itemId, out var bgItem)
@@ -57,11 +57,11 @@
             }
         }
 
-        if (_showMannequin && GameState.Config.ShowMannequin)
+        if (_showMannequin && GameState.Settings.ShowMannequin)
         {
-            mannequinSvg = MannequinSvgHelper.Build(canvasWidth, totalOutfitHeight, GameState.Config.MannequinDimensions.Y / 2,
-                GameState.Config.MannequinDimensions.X, GameState.Config.MannequinScaleFactor,
-                new MannequinDisplayOptions(GameState.Config.MannequinImagePath, OverrideDisplaySize: mannequinSize, FaceType: _selectedFace));
+            mannequinSvg = MannequinSvgHelper.Build(canvasWidth, totalOutfitHeight, GameState.Settings.MannequinDimensions.Y / 2,
+                GameState.Settings.MannequinDimensions.X, GameState.Settings.MannequinScaleFactor,
+                new MannequinDisplayOptions(GameState.Settings.MannequinImagePath, OverrideDisplaySize: mannequinSize, FaceType: _selectedFace));
         }
 
         if (bgParts.Length > 0)
@@ -105,7 +105,7 @@
                                 @if (outfit != null)
                                 {
                                     <svg viewBox="0 0 @canvasWidth @totalOutfitHeight" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
-                                        @foreach (var ct in GameState.Config.ClothingTypes)
+                                        @foreach (var ct in GameState.Settings.ClothingTypes)
                                         {
                                             if (outfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
                                                 && GameState.ClothingPool.TryGetValue(itemId, out var item))
@@ -114,7 +114,7 @@
                                                 {
                                                     var (itemX, itemY) = CompositeCanvasLayout.GetItemPosition(
                                                         ct, canvasWidth, totalOutfitHeight,
-                                                        GameState.Config.MannequinDimensions.X, outfit);
+                                                        GameState.Settings.MannequinDimensions.X, outfit);
                                                     <g transform="translate(@itemX,@itemY)">
                                                         @((MarkupString)safeSvg)
                                                     </g>
@@ -225,7 +225,7 @@
                             <div class="dtd-customization-field">
                                 <label class="dtd-customization-label">Select Item</label>
                                 <div class="dtd-item-ribbon">
-                                    @foreach (var ct in GameState.Config.ClothingTypes)
+                                    @foreach (var ct in GameState.Settings.ClothingTypes)
                                     {
                                         <button class="dtd-item-tab @(ct.Id == _selectedTypeId ? "dtd-item-tab-active" : "")"
                                                 @onclick="() => SelectItemAsync(ct.Id)">
@@ -240,7 +240,7 @@
                         <div class="dtd-customization-spacer"></div>
 
                         <div class="dtd-customization-settings-group">
-                            @if (GameState.Config.ShowMannequin)
+                            @if (GameState.Settings.ShowMannequin)
                             {
                                 <div class="dtd-customization-field">
                                     <label class="dtd-customization-label">Mannequin Face</label>

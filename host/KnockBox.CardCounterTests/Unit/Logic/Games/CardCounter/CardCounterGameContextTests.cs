@@ -181,7 +181,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void DealNextShoe_WhenDeckHasCards_ReturnsTrue()
         {
-            for (int i = 0; i < _state.Config.MinShoeSize; i++)
+            for (int i = 0; i < _state.Settings.MinShoeSize; i++)
                 _state.MainDeck.Push(new NumberCard(i % 10));
 
             bool result = _context.DealNextShoe();
@@ -200,7 +200,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void DealNextShoe_PopulatesCurrentShoe()
         {
-            for (int i = 0; i < _state.Config.MinShoeSize + 5; i++)
+            for (int i = 0; i < _state.Settings.MinShoeSize + 5; i++)
                 _state.MainDeck.Push(new NumberCard(i % 10));
 
             _context.DealNextShoe();
@@ -211,7 +211,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void DealNextShoe_IncrementsShoeIndex()
         {
-            for (int i = 0; i < _state.Config.MinShoeSize; i++)
+            for (int i = 0; i < _state.Settings.MinShoeSize; i++)
                 _state.MainDeck.Push(new NumberCard(i % 10));
 
             int initialIndex = _state.ShoeIndex;
@@ -226,7 +226,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             // Put some cards in the shoe first
             _state.CurrentShoe.Push(new NumberCard(0));
 
-            for (int i = 0; i < _state.Config.MinShoeSize; i++)
+            for (int i = 0; i < _state.Settings.MinShoeSize; i++)
                 _state.MainDeck.Push(new NumberCard(i % 10));
 
             _context.DealNextShoe();
@@ -234,7 +234,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             // The shoe should only contain cards from the new deal, not the old one
             // (as long as MinShoeSize < old shoe count + new count, we can't verify directly,
             //  but we know DealNextShoe calls CurrentShoe.Clear() first)
-            Assert.IsLessThanOrEqualTo(_state.Config.MaxShoeSize, _state.CurrentShoe.Count,
+            Assert.IsLessThanOrEqualTo(_state.Settings.MaxShoeSize, _state.CurrentShoe.Count,
                 "Shoe size should not exceed MaxShoeSize.");
         }
 
@@ -248,8 +248,8 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             _context.DealActionCards();
 
-            Assert.HasCount(_state.Config.ActionsDealtPerRound, p1.ActionHand);
-            Assert.HasCount(_state.Config.ActionsDealtPerRound, p2.ActionHand);
+            Assert.HasCount(_state.Settings.ActionsDealtPerRound, p1.ActionHand);
+            Assert.HasCount(_state.Settings.ActionsDealtPerRound, p2.ActionHand);
         }
 
         // ── RecalculateShoeCounts ─────────────────────────────────────────────

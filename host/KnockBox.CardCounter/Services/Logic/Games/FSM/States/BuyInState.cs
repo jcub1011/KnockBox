@@ -15,7 +15,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
 
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
-            _expirationTime = DateTimeOffset.Now.AddMilliseconds(context.Config.BuyInTimeoutMs);
+            _expirationTime = DateTimeOffset.Now.AddMilliseconds(context.Settings.BuyInTimeoutMs);
             context.State.SetPhase(GamePhase.BuyIn);
             context.Logger.LogDebug("FSM → BuyInState");
             return null;

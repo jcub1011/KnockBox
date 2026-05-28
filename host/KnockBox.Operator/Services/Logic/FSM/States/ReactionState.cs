@@ -206,13 +206,13 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
 
         if (!canReact)
         {
-            var remaining = context.State.Config.NoReactionTimeout - elapsed;
+            var remaining = context.State.Settings.NoReactionTimeout - elapsed;
             return ValueResult<TimeSpan>.FromValue(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
         }
 
-        if (!context.State.Config.TimersEnabled) return ValueResult<TimeSpan>.FromValue(TimeSpan.MaxValue);
+        if (!context.State.Settings.TimersEnabled) return ValueResult<TimeSpan>.FromValue(TimeSpan.MaxValue);
 
-        var normalRemaining = context.State.Config.ReactionPhaseTimeout - elapsed;
+        var normalRemaining = context.State.Settings.ReactionPhaseTimeout - elapsed;
         return ValueResult<TimeSpan>.FromValue(normalRemaining > TimeSpan.Zero ? normalRemaining : TimeSpan.Zero);
     }
 
@@ -222,11 +222,11 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
         bool canReact = TargetCanReact(context);
 
         bool isTimeout = false;
-        if (!canReact && elapsed >= context.State.Config.NoReactionTimeout)
+        if (!canReact && elapsed >= context.State.Settings.NoReactionTimeout)
         {
             isTimeout = true;
         }
-        else if (context.State.Config.TimersEnabled && elapsed >= context.State.Config.ReactionPhaseTimeout)
+        else if (context.State.Settings.TimersEnabled && elapsed >= context.State.Settings.ReactionPhaseTimeout)
         {
             isTimeout = true;
         }

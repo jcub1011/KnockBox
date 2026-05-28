@@ -80,8 +80,39 @@ namespace KnockBox.Codeword.Pages
         private void UpdateSettings(Func<CodewordSettings, CodewordSettings> mutate)
         {
             _userHasEdited = true;
-            GameState.UpdateSettings(mutate);
+            if (GameState.UpdateSettings(mutate).TryGetFailure(out var error))
+            {
+                Logger.LogError("Failed to update Codeword settings: {Error}", error.PublicMessage);
+                return;
+            }
             PersistSettings();
+        }
+
+        // Two-step confirm so an accidental click can't wipe the host's whole config.
+        // First click arms; a second click within the window resets. Auto-disarms after ~3s.
+        private bool _resetArmed;
+        private int _resetGeneration;
+
+        protected void ResetToDefaults()
+        {
+            if (!_resetArmed)
+            {
+                _resetArmed = true;
+                _ = DisarmResetAfterDelay(++_resetGeneration);
+                return;
+            }
+            _resetArmed = false;
+            _resetGeneration++;                          // invalidate any pending disarm
+            UpdateSettings(_ => new CodewordSettings());
+        }
+
+        private async Task DisarmResetAfterDelay(int generation)
+        {
+            try { await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token); }
+            catch (OperationCanceledException) { return; }   // component disposed
+            if (generation != _resetGeneration) return;      // superseded by a newer arm/reset
+            _resetArmed = false;
+            await InvokeAsync(StateHasChanged);
         }
 
         protected void KickPlayer(string userId)
@@ -146,7 +177,11 @@ namespace KnockBox.Codeword.Pages
                 // the user's edit wins — the saved snapshot would clobber it.
                 if (saved is not null && !_userHasEdited)
                 {
-                    GameState.UpdateSettings(_ => saved);
+                    if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
+                    {
+                        Logger.LogError("Failed to apply saved Codeword settings: {Error}", error.PublicMessage);
+                        return;
+                    }
                     StateHasChanged();
                 }
             }

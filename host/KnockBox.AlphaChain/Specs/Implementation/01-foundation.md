@@ -17,7 +17,7 @@ Stand up the FSM skeleton, state shape, config record, and turn loop for Alpha C
 ### Domain types
 
 - `Services/Logic/Games/Data/AlphaChainGamePhase.cs` — `enum AlphaChainGamePhase { Setup, Round, Intermission, GameOver }`.
-- `Services/Logic/Games/Data/AlphaChainGameConfig.cs` — record with defaults:
+- `Services/Logic/Games/Data/AlphaChainSettings.cs` — record with defaults:
   - `BanLetterMode BanMode = BanLetterMode.All` (enum: `Vowels`, `Consonants`, `All`)
   - `int ShotClockSeconds = 12`
   - `int IntermissionCardSelectSeconds = 30`
@@ -52,7 +52,6 @@ Stand up the FSM skeleton, state shape, config record, and turn loop for Alpha C
 
 - `Services/State/Games/AlphaChainGameState.cs` — flesh out (currently empty stub). Implement:
   - `IPhasedGameState<AlphaChainGamePhase>` → `Phase` property + change notification through `Execute`.
-  - `IConfigurableGameState<AlphaChainGameConfig>` → `Config` property.
   - `IPlayerTrackedGameState<AlphaChainPlayerState>` → `ConcurrentDictionary<string, AlphaChainPlayerState> GamePlayers`.
   - `IFsmContextGameState<AlphaChainGameContext>` → `Context` (settable once at start).
   - Plus: `TurnManager TurnManager`, `int CurrentRound`, `int CurrentEra`, `DateTimeOffset PhaseEndTime`, `GameResults? Results`.
@@ -60,7 +59,7 @@ Stand up the FSM skeleton, state shape, config record, and turn loop for Alpha C
 - `Services/Logic/Games/AlphaChainGameEngine.cs` — flesh out:
   - Constructor takes `ILogger<AlphaChainGameEngine>`, `ILogger<AlphaChainGameState>` (for state logging once it's logger-aware).
   - `MinPlayerCount => 2`, `MaxPlayerCount => 8`.
-  - `CreateStateAsync(User host, CancellationToken ct)` → returns `ValueResult<AbstractGameState>` containing a new `AlphaChainGameState` with default `AlphaChainGameConfig`.
+  - `CreateStateAsync(User host, CancellationToken ct)` → returns `ValueResult<AbstractGameState>` containing a new `AlphaChainGameState` with default `AlphaChainSettings`.
   - `StartAsyncCore(AbstractGameState state, CancellationToken ct)`:
     - Cast to `AlphaChainGameState`.
     - Inside `state.Execute(...)`: build `AlphaChainGameContext`, set `state.Context`, init `TurnManager` from `state.Players`, set `state.SetJoinable(false)`.

@@ -31,7 +31,7 @@
         <div class="dtd-coinflip-context">
             @if (currentFlip.Context == CoinFlipContext.CriterionTie)
             {
-                string criterionName = GameState.Config.VotingCriteria
+                string criterionName = GameState.Settings.VotingCriteria
                     .FirstOrDefault(c => c.Id == currentFlip.CriterionId)?.DisplayName ?? currentFlip.CriterionId;
                 <p>Tied on <strong>@criterionName</strong></p>
             }

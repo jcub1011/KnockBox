@@ -99,10 +99,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
             // Use a single clothing type so the first (and only) round's timer goes
             // directly to PoolReveal → OutfitBuilding.
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -129,10 +128,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             // Use a single clothing type so all-ready skips straight to OutfitBuilding.
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -158,12 +156,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat,  DisplayName = "Hat",  MaxItemsPerRound = 3 },
                 new() { Id = ClothingType.Top,  DisplayName = "Top",  MaxItemsPerRound = 3 },
                 new() { Id = ClothingType.Shoes, DisplayName = "Shoes", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -184,11 +181,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat,  DisplayName = "Hat",  MaxItemsPerRound = 3 },
                 new() { Id = ClothingType.Top,  DisplayName = "Top",  MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -215,11 +211,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
                 new() { Id = ClothingType.Top, DisplayName = "Top", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -239,11 +234,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
                 new() { Id = ClothingType.Top, DisplayName = "Top", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -271,12 +265,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat,    DisplayName = "Hat",    MaxItemsPerRound = 3 },
                 new() { Id = ClothingType.Top,    DisplayName = "Top",    MaxItemsPerRound = 3 },
                 new() { Id = ClothingType.Bottom, DisplayName = "Bottom", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -304,11 +297,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
                 new() { Id = ClothingType.Top, DisplayName = "Top", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -326,10 +318,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 2 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -350,10 +341,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -379,10 +369,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -404,10 +393,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -427,11 +415,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
                 new() { Id = ClothingType.Top, DisplayName = "Top", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -591,7 +578,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.PoolRevealTimeSec = 45;
+            state.UpdateSettings(s => s with { PoolRevealTimeSec = 45 });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -612,8 +599,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.PoolRevealTimeSec = 30;
-            state.Config.OutfitBuildingTimeSec = 90;
+            state.UpdateSettings(s => s with { PoolRevealTimeSec = 30 });
+            state.UpdateSettings(s => s with { OutfitBuildingTimeSec = 90 });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -638,11 +625,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
                 new() { Id = ClothingType.Top, DisplayName = "Top", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -678,10 +664,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -704,11 +689,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
                 new() { Id = ClothingType.Top, DisplayName = "Top", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -770,16 +754,16 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            var context = state.Context!;
 
-            var invalidConfig = new KnockBox.DrawnToDress.Services.State.Games.Data.DrawnToDressConfig
+            var invalidConfig = new KnockBox.DrawnToDress.Services.State.Games.Data.DrawnToDressSettings
             {
                 PoolRevealTimeSec = 1, // below minimum of 5
             };
 
-            _engine.ProcessCommand(context, new UpdateConfigCommand(_host.Id, invalidConfig));
+            // Normalize() is the public clamp; the lobby page applies it on every edit.
+            state.UpdateSettings(_ => invalidConfig.Normalize());
 
-            Assert.AreEqual(5, state.Config.PoolRevealTimeSec,
+            Assert.AreEqual(5, state.Settings.PoolRevealTimeSec,
                 "PoolRevealTimeSec must be clamped to the minimum of 5 seconds.");
         }
 
@@ -811,7 +795,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             // No players → no distinctness conflicts, so goes straight to PoolRevealState.
-            context.Config.NumOutfitRounds = 2;
+            state.UpdateSettings(s => s with { NumOutfitRounds = 2 });
             context.Fsm.TransitionTo(context, new OutfitCustomizationState());
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
@@ -847,8 +831,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             // Set explicit round count and pre-fill all voting rounds so the timer expiry ends the game.
-            state.Config.VotingRounds = 3;
-            for (int i = 0; i < state.Config.VotingRounds; i++)
+            state.UpdateSettings(s => s with { VotingRounds = 3 });
+            for (int i = 0; i < state.Settings.VotingRounds; i++)
                 state.VotingRounds.Add(new() { RoundNumber = i + 1 });
 
             context.Fsm.TransitionTo(context, new VotingRoundResultsState());
@@ -871,7 +855,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             // Set explicit round count and add fewer than configured.
             // Add 2 rounds, so one more should remain.
-            state.Config.VotingRounds = 3;
+            state.UpdateSettings(s => s with { VotingRounds = 3 });
             state.VotingRounds.Add(new() { RoundNumber = 1 });
             state.VotingRounds.Add(new() { RoundNumber = 2 });
 
@@ -972,7 +956,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             // Force back to ThemeSelectionState with HostPick mode.
-            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.HostPick;
+            state.UpdateSettings(s => s with { ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.HostPick });
             context.Fsm.TransitionTo(context, new ThemeSelectionState());
 
             Assert.IsInstanceOfType<ThemeSelectionState>(context.Fsm.CurrentState);
@@ -995,7 +979,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.Random;
+            state.UpdateSettings(s => s with { ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.Random });
             var context = state.Context!;
 
             context.Fsm.TransitionTo(context, new ThemeSelectionState());
@@ -1015,7 +999,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.PlayerWritten;
+            state.UpdateSettings(s => s with { ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.PlayerWritten });
 
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
             state.GamePlayers["p2"] = new() { PlayerId = "p2" };
@@ -1035,7 +1019,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.PlayerWritten;
+            state.UpdateSettings(s => s with { ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.PlayerWritten });
 
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
             state.GamePlayers["p2"] = new() { PlayerId = "p2" };
@@ -1061,7 +1045,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.PlayerWritten;
+            state.UpdateSettings(s => s with { ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.PlayerWritten });
 
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
             state.GamePlayers["p2"] = new() { PlayerId = "p2" };
@@ -1080,8 +1064,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.RandomVoting;
-            state.Config.RandomVotingCandidateCount = 3;
+            state.UpdateSettings(s => s with { ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.RandomVoting });
+            state.UpdateSettings(s => s with { RandomVotingCandidateCount = 3 });
 
             context.Fsm.TransitionTo(context, new ThemeSelectionState());
 
@@ -1098,8 +1082,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.RandomVoting;
-            state.Config.RandomVotingCandidateCount = 3;
+            state.UpdateSettings(s => s with { ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.RandomVoting });
+            state.UpdateSettings(s => s with { RandomVotingCandidateCount = 3 });
 
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
             state.GamePlayers["p2"] = new() { PlayerId = "p2" };
@@ -1129,8 +1113,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.RandomVoting;
-            state.Config.RandomVotingCandidateCount = 3;
+            state.UpdateSettings(s => s with { ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.RandomVoting });
+            state.UpdateSettings(s => s with { RandomVotingCandidateCount = 3 });
 
             state.GamePlayers["p1"] = new() { PlayerId = "p1" };
             state.GamePlayers["p2"] = new() { PlayerId = "p2" };
@@ -1152,8 +1136,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.Random;
-            state.Config.ThemeAnnouncement = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeAnnouncement.BeforeDrawing;
+            state.UpdateSettings(s => s with { ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.Random });
+            state.UpdateSettings(s => s with { ThemeAnnouncement = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeAnnouncement.BeforeDrawing });
 
             context.Fsm.TransitionTo(context, new ThemeSelectionState());
 
@@ -1172,8 +1156,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.Random;
-            state.Config.ThemeAnnouncement = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeAnnouncement.AfterDrawing;
+            state.UpdateSettings(s => s with { ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.Random });
+            state.UpdateSettings(s => s with { ThemeAnnouncement = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeAnnouncement.AfterDrawing });
 
             context.Fsm.TransitionTo(context, new ThemeSelectionState());
 
@@ -1193,13 +1177,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
-            state.Config.ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.Random;
-            state.Config.ThemeAnnouncement = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeAnnouncement.AfterDrawing;
+            state.UpdateSettings(s => s with { ThemeSource = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeSource.Random });
+            state.UpdateSettings(s => s with { ThemeAnnouncement = KnockBox.DrawnToDress.Services.State.Games.Data.ThemeAnnouncement.AfterDrawing });
             // Use a single clothing type so one tick exhausts the drawing phase.
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
-            ];
+            ] });
 
             // Enter ThemeSelectionState → auto-selects theme but does not reveal.
             context.Fsm.TransitionTo(context, new ThemeSelectionState());
@@ -1280,7 +1263,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 }
             };
 
-            context.Config.NumOutfitRounds = 2;
+            state.UpdateSettings(s => s with { NumOutfitRounds = 2 });
             context.Fsm.TransitionTo(context, new OutfitCustomizationState());
             // Timer expires with all outfits already submitted and a conflict present.
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -1289,65 +1272,40 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.AreEqual(GamePhase.OutfitDistinctnessResolution, state.Phase);
         }
 
-        // ── Lobby: host permissions ───────────────────────────────────────────
+        // ── Lobby: settings updates ───────────────────────────────────────────
 
         [TestMethod]
-        public async Task LobbyState_UpdateConfigCommand_ByHost_UpdatesConfig()
+        public async Task LobbyState_UpdateSettings_UpdatesSettings()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             var context = state.Context!;
 
-            var updatedConfig = new KnockBox.DrawnToDress.Services.State.Games.Data.DrawnToDressConfig
-            {
-                DrawingTimeSec = 240,
-            };
+            state.UpdateSettings(s => s with { DrawingTimeSec = 240 });
 
-            _engine.ProcessCommand(context, new UpdateConfigCommand(_host.Id, updatedConfig));
-
-            // Should remain in lobby and config should be updated.
+            // Should remain in lobby and settings should be updated.
             Assert.IsInstanceOfType<LobbyState>(context.Fsm.CurrentState);
-            Assert.AreEqual(240, state.Config.DrawingTimeSec);
+            Assert.AreEqual(240, state.Settings.DrawingTimeSec);
         }
 
         [TestMethod]
-        public async Task LobbyState_UpdateConfigCommand_ByNonHost_IsRejected()
+        public async Task Settings_Normalize_ClampsInvalidValues()
         {
-            var stateResult = await _engine.CreateStateAsync(_host);
-            var state = (DrawnToDressGameState)stateResult.Value!;
-            var context = state.Context!;
-            int originalDrawingTime = state.Config.DrawingTimeSec;
-
-            var updatedConfig = new KnockBox.DrawnToDress.Services.State.Games.Data.DrawnToDressConfig
-            {
-                DrawingTimeSec = 999,
-            };
-
-            _engine.ProcessCommand(context, new UpdateConfigCommand("nonhost_id", updatedConfig));
-
-            // Config should not have changed.
-            Assert.AreEqual(originalDrawingTime, state.Config.DrawingTimeSec);
-        }
-
-        [TestMethod]
-        public async Task LobbyState_UpdateConfigCommand_NormalizesInvalidValues()
-        {
-            var stateResult = await _engine.CreateStateAsync(_host);
-            var state = (DrawnToDressGameState)stateResult.Value!;
-            var context = state.Context!;
-
-            var invalidConfig = new KnockBox.DrawnToDress.Services.State.Games.Data.DrawnToDressConfig
+            // The lobby page calls Normalize() on every host edit; verify it clamps
+            // out-of-range values to their minimums.
+            var invalidConfig = new KnockBox.DrawnToDress.Services.State.Games.Data.DrawnToDressSettings
             {
                 DrawingTimeSec = 1,     // below minimum of 30
                 VotingRounds = -1,      // below minimum of 0
                 BonusPointsForCompleteOutfit = -10, // negative
             };
 
-            _engine.ProcessCommand(context, new UpdateConfigCommand(_host.Id, invalidConfig));
+            var normalized = invalidConfig.Normalize();
 
-            Assert.AreEqual(30, state.Config.DrawingTimeSec);
-            Assert.AreEqual(0, state.Config.VotingRounds);
-            Assert.AreEqual(0, state.Config.BonusPointsForCompleteOutfit);
+            Assert.AreEqual(30, normalized.DrawingTimeSec);
+            Assert.AreEqual(0, normalized.VotingRounds);
+            Assert.AreEqual(0, normalized.BonusPointsForCompleteOutfit);
+            await Task.CompletedTask;
         }
 
         [TestMethod]
@@ -1662,10 +1620,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -1700,10 +1657,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -1746,10 +1702,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -1780,10 +1735,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -1865,10 +1819,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // Arrange: start with a single clothing type and one registered player.
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
-            ];
+            ] });
 
             var player = UserFactory.Create("Alice", "alice1");
             state.RegisterPlayer(player);
@@ -1897,10 +1850,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // Arrange: limit is 1 item per round.
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 1 },
-            ];
+            ] });
 
             var player = UserFactory.Create("Alice", "alice1");
             state.RegisterPlayer(player);
@@ -2104,7 +2056,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.SketchingRequired = true;
+            state.UpdateSettings(s => s with { SketchingRequired = true });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2135,7 +2087,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.SketchingRequired = true;
+            state.UpdateSettings(s => s with { SketchingRequired = true });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2160,7 +2112,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.SketchingRequired = false;
+            state.UpdateSettings(s => s with { SketchingRequired = false });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2208,7 +2160,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 SubmittedOutfit = new() { PlayerId = "p2" },
             };
 
-            context.Config.NumOutfitRounds = 2;
+            state.UpdateSettings(s => s with { NumOutfitRounds = 2 });
             context.Fsm.TransitionTo(context, new OutfitCustomizationState());
 
             _engine.ProcessCommand(context,
@@ -2348,10 +2300,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2394,10 +2345,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2482,10 +2432,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2522,10 +2471,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2565,7 +2513,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.CanReuseOutfit1Items = true;
+            state.UpdateSettings(s => s with { CanReuseOutfit1Items = true });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2602,7 +2550,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.CanReuseOutfit1Items = false;
+            state.UpdateSettings(s => s with { CanReuseOutfit1Items = false });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2710,11 +2658,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
-            ];
-            state.Config.Outfit2DistinctnessThreshold = 3;
+            ] });
+            state.UpdateSettings(s => s with { Outfit2DistinctnessThreshold = 3 });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2757,15 +2704,14 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
                 new() { Id = ClothingType.Top, DisplayName = "Top" },
                 new() { Id = ClothingType.Shoes, DisplayName = "Shoes" },
-            ];
-            state.Config.Outfit2DistinctnessThreshold = 3;
+            ] });
+            state.UpdateSettings(s => s with { Outfit2DistinctnessThreshold = 3 });
             // Allow reuse so the player still owns their Outfit 1 picks in Outfit 2.
-            state.Config.CanReuseOutfit1Items = true;
+            state.UpdateSettings(s => s with { CanReuseOutfit1Items = true });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2808,13 +2754,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
                 new() { Id = ClothingType.Top, DisplayName = "Top" },
                 new() { Id = ClothingType.Shoes, DisplayName = "Shoes" },
-            ];
-            state.Config.Outfit2DistinctnessThreshold = 3;
+            ] });
+            state.UpdateSettings(s => s with { Outfit2DistinctnessThreshold = 3 });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2868,15 +2813,14 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
                 new() { Id = ClothingType.Top, DisplayName = "Top" },
                 new() { Id = ClothingType.Shoes, DisplayName = "Shoes" },
-            ];
-            state.Config.Outfit2DistinctnessThreshold = 0; // disabled
+            ] });
+            state.UpdateSettings(s => s with { Outfit2DistinctnessThreshold = 0 }); // disabled
             // Allow reuse so the player still owns their Outfit 1 picks in Outfit 2.
-            state.Config.CanReuseOutfit1Items = true;
+            state.UpdateSettings(s => s with { CanReuseOutfit1Items = true });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2918,15 +2862,14 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
                 new() { Id = ClothingType.Top, DisplayName = "Top" },
                 new() { Id = ClothingType.Shoes, DisplayName = "Shoes" },
-            ];
-            state.Config.Outfit2DistinctnessThreshold = 3;
+            ] });
+            state.UpdateSettings(s => s with { Outfit2DistinctnessThreshold = 3 });
             // CanReuseOutfit1Items so hatId/topId/outfit1Shoes are re-owned after pool reset.
-            state.Config.CanReuseOutfit1Items = true;
+            state.UpdateSettings(s => s with { CanReuseOutfit1Items = true });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -2983,11 +2926,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
-            ];
-            state.Config.Outfit2DistinctnessThreshold = 0; // disable to simplify
+            ] });
+            state.UpdateSettings(s => s with { Outfit2DistinctnessThreshold = 0 }); // disable to simplify
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -3156,11 +3098,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
-            ];
-            state.Config.Outfit2DistinctnessThreshold = 0; // disable to keep auto-fill simple
+            ] });
+            state.UpdateSettings(s => s with { Outfit2DistinctnessThreshold = 0 }); // disable to keep auto-fill simple
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -3194,13 +3135,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat" },
-            ];
-            state.Config.Outfit2DistinctnessThreshold = 1; // any shared item is a violation
+            ] });
+            state.UpdateSettings(s => s with { Outfit2DistinctnessThreshold = 1 }); // any shared item is a violation
             // Allow reuse so p1 owns both conflictHat and distinctHat after reset.
-            state.Config.CanReuseOutfit1Items = true;
+            state.UpdateSettings(s => s with { CanReuseOutfit1Items = true });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -3509,7 +3449,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes = [new() { Id = ClothingType.Hat, DisplayName = "Hat" }];
+            state.UpdateSettings(s => s with { ClothingTypes = [new() { Id = ClothingType.Hat, DisplayName = "Hat" }] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -3551,7 +3491,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes = [new() { Id = ClothingType.Hat, DisplayName = "Hat" }];
+            state.UpdateSettings(s => s with { ClothingTypes = [new() { Id = ClothingType.Hat, DisplayName = "Hat" }] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -3650,8 +3590,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             // Config: single weight-1 criterion, +3 round leader bonus.
-            state.Config.VotingCriteria = [new() { Id = "c1", Weight = 1.0 }];
-            state.Config.RoundLeaderBonusPoints = 3;
+            state.UpdateSettings(s => s with { VotingCriteria = [new() { Id = "c1", Weight = 1.0 }] });
+            state.UpdateSettings(s => s with { RoundLeaderBonusPoints = 3 });
 
             // Set up players.
             state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
@@ -3689,8 +3629,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            state.Config.VotingCriteria = [new() { Id = "c1", Weight = 1.0 }];
-            state.Config.RoundLeaderBonusPoints = 3;
+            state.UpdateSettings(s => s with { VotingCriteria = [new() { Id = "c1", Weight = 1.0 }] });
+            state.UpdateSettings(s => s with { RoundLeaderBonusPoints = 3 });
 
             state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
             state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
@@ -3724,8 +3664,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            state.Config.VotingCriteria = [new() { Id = "c1", Weight = 1.0 }];
-            state.Config.RoundLeaderBonusPoints = 0;
+            state.UpdateSettings(s => s with { VotingCriteria = [new() { Id = "c1", Weight = 1.0 }] });
+            state.UpdateSettings(s => s with { RoundLeaderBonusPoints = 0 });
 
             state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
             state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
@@ -3758,9 +3698,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            state.Config.VotingCriteria = [new() { Id = "c1", Weight = 1.0 }];
-            state.Config.TournamentWinnerBonusPoints = 10;
-            state.Config.VotingRounds = 1;
+            state.UpdateSettings(s => s with { VotingCriteria = [new() { Id = "c1", Weight = 1.0 }] });
+            state.UpdateSettings(s => s with { TournamentWinnerBonusPoints = 10 });
+            state.UpdateSettings(s => s with { VotingRounds = 1 });
 
             state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
             state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
@@ -3793,9 +3733,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            state.Config.VotingCriteria = [new() { Id = "c1", Weight = 1.0 }];
-            state.Config.TournamentWinnerBonusPoints = 0;
-            state.Config.VotingRounds = 1;
+            state.UpdateSettings(s => s with { VotingCriteria = [new() { Id = "c1", Weight = 1.0 }] });
+            state.UpdateSettings(s => s with { TournamentWinnerBonusPoints = 0 });
+            state.UpdateSettings(s => s with { VotingRounds = 1 });
 
             state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
             state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
@@ -3825,9 +3765,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            state.Config.VotingCriteria = [new() { Id = "c1", Weight = 1.0 }];
-            state.Config.TournamentWinnerBonusPoints = 0;
-            state.Config.VotingRounds = 1;
+            state.UpdateSettings(s => s with { VotingCriteria = [new() { Id = "c1", Weight = 1.0 }] });
+            state.UpdateSettings(s => s with { TournamentWinnerBonusPoints = 0 });
+            state.UpdateSettings(s => s with { VotingRounds = 1 });
 
             state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
             state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
@@ -3856,9 +3796,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            state.Config.VotingCriteria = [new() { Id = "c1", Weight = 1.0 }];
-            state.Config.TournamentWinnerBonusPoints = 10;
-            state.Config.VotingRounds = 1;
+            state.UpdateSettings(s => s with { VotingCriteria = [new() { Id = "c1", Weight = 1.0 }] });
+            state.UpdateSettings(s => s with { TournamentWinnerBonusPoints = 10 });
+            state.UpdateSettings(s => s with { VotingRounds = 1 });
 
             state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
             state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };

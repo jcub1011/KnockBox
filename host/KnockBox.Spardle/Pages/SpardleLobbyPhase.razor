@@ -252,6 +252,13 @@
                         </label>
                     </div>
                 </section>
+
+                <div class="spd-lobby-drawer-footer">
+                    <button type="button" class="spd-btn @(_resetArmed ? "spd-btn-danger" : "spd-btn-ghost")"
+                            @onclick="ResetToDefaults">
+                        @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+                    </button>
+                </div>
             </div>
         </aside>
     }
@@ -278,6 +285,10 @@
     private readonly CancellationTokenSource _cts = new();
     private Task? _saveTask;
 
+    // True once the host has changed any setting locally. Blocks the initial localStorage
+    // load from clobbering an in-flight edit if the load returns after the user interacted.
+    private bool _userHasEdited;
+
     private bool IsHost => UserService.CurrentUser?.Id == State.Host.Id;
     private bool CanStart => State.CustomWordPool.Count > 0
         || State.Settings.WordPoolMode == WordPoolMode.NytStandard
@@ -291,14 +302,47 @@
 
     private void ToggleSettings() => SettingsOpen = !SettingsOpen;
 
-    // Every mutation below replaces the shared Settings record inside State.Execute so
-    // readers on other circuits never see a torn value and the change notification fires
-    // after the lock is released. PersistSettings then snapshots the record to the host's
-    // browser localStorage (fire-and-forget) so the rules survive across sessions.
+    // Delegates the atomic mutation to the state (which enforces Execute + change
+    // notification) and then persists. _userHasEdited blocks any in-flight localStorage
+    // load from clobbering this edit.
     private void UpdateSettings(Func<SpardleSettings, SpardleSettings> mutate)
     {
-        State.Execute(() => State.Settings = mutate(State.Settings));
+        _userHasEdited = true;
+        if (State.UpdateSettings(mutate).TryGetFailure(out var error))
+        {
+            Logger.LogError("Failed to update Spardle settings: {Error}", error.PublicMessage);
+            return;
+        }
         PersistSettings();
+    }
+
+    // Two-step confirm so an accidental click can't wipe the host's whole config.
+    // First click arms; a second click within the window resets. Auto-disarms after ~3s.
+    private bool _resetArmed;
+    private int _resetGeneration;
+
+    private void ResetToDefaults()
+    {
+        if (!_resetArmed)
+        {
+            _resetArmed = true;
+            _ = DisarmResetAfterDelay(++_resetGeneration);
+            return;
+        }
+        _resetArmed = false;
+        _resetGeneration++;                          // invalidate any pending disarm
+        UpdateSettings(_ => new SpardleSettings());
+        // Keep the "unlimited timer" toggle in sync with the default RoundTimer.
+        _unlimitedTimer = State.Settings.RoundTimer <= TimeSpan.Zero;
+    }
+
+    private async Task DisarmResetAfterDelay(int generation)
+    {
+        try { await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token); }
+        catch (OperationCanceledException) { return; }   // component disposed
+        if (generation != _resetGeneration) return;      // superseded by a newer arm/reset
+        _resetArmed = false;
+        await InvokeAsync(StateHasChanged);
     }
 
     private void SetWordPoolMode(WordPoolMode value)
@@ -307,22 +351,15 @@
         // CustomWordPool entries would silently override the built-in source. Clear them
         // on transition so the mode the user selects is the one the engine actually uses.
         bool clearCustom = value is WordPoolMode.NytStandard or WordPoolMode.FullDictionary;
-        State.Execute(() =>
-        {
-            State.Settings = State.Settings with { WordPoolMode = value };
-            if (clearCustom)
-            {
-                State.CustomWordPool = ImmutableList<string>.Empty;
-            }
-        });
+        UpdateSettings(s => s with { WordPoolMode = value });
         if (clearCustom)
         {
+            State.Execute(() => State.CustomWordPool = ImmutableList<string>.Empty);
             _customPoolText = string.Empty;
             _csvFileName = null;
             _csvWordCount = 0;
             _csvUploadError = null;
         }
-        PersistSettings();
     }
     private void SetWordOrderMode(WordOrderMode value) => UpdateSettings(s => s with { WordOrderMode = value });
     private void SetConstantWordLength(bool value) => UpdateSettings(s => s with { ConstantWordLength = value });
@@ -417,6 +454,10 @@
 
         _cts.Cancel();
         _cts.Dispose();
+        // Cancel the pending start-error auto-dismiss so its delayed StateHasChanged()
+        // can't fire on a disposed component.
+        _startErrorCts?.Cancel();
+        _startErrorCts?.Dispose();
         try
         {
             if (_csvUploadModule is not null)
@@ -460,9 +501,15 @@
         try
         {
             var saved = await LocalStorage.GetAsync<SpardleSettings>("spardle", "settings", _cts.Token);
-            if (saved is not null)
+            // If the host already edited a setting while the load was in flight,
+            // the user's edit wins — the saved snapshot would clobber it.
+            if (saved is not null && !_userHasEdited)
             {
-                State.Execute(() => State.Settings = saved);
+                if (State.UpdateSettings(_ => saved).TryGetFailure(out var error))
+                {
+                    Logger.LogError("Failed to apply saved Spardle settings: {Error}", error.PublicMessage);
+                    return;
+                }
                 _unlimitedTimer = State.Settings.RoundTimer <= TimeSpan.Zero;
                 StateHasChanged();
             }

@@ -40,7 +40,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic.States
             _stateLogic = new RoundOverState();
 
             _state.GamePlayers["p1"] = new HiddenAgendaPlayerState { PlayerId = "p1", RoundScore = 10, CumulativeScore = 5 };
-            _state.Config.TotalRounds = 3;
+            _state.UpdateSettings(s => s with { TotalRounds = 3 });
             _state.CurrentRound = 1;
         }
 

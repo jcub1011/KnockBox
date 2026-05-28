@@ -39,8 +39,8 @@ namespace KnockBox.Operator.Pages
             if (GameState.Context == null) return false;
             
             return GameState.Context.GamePlayers.TryGetValue(UserService.CurrentUser.Id, out var playerState)
-                   && (playerState.CurrentPoints == GameState.Config.InitialPointsPositive
-                       || playerState.CurrentPoints == GameState.Config.InitialPointsNegative);
+                   && (playerState.CurrentPoints == GameState.Settings.InitialPointsPositive
+                       || playerState.CurrentPoints == GameState.Settings.InitialPointsNegative);
         }
     }
 }

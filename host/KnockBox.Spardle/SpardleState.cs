@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Spardle.Models;
@@ -10,9 +11,18 @@ namespace KnockBox.Spardle;
 
 public class SpardleState(User host, ILogger logger) : AbstractGameState(host, logger)
 {
-    // Host-configurable match rules. Mutated only via `with` expressions inside Execute
-    // (see SpardleLobbyPhase). Persisted to the host's browser by the lobby page.
-    public SpardleSettings Settings { get; set; } = new();
+    // Host-configurable match rules. Always replaced atomically via UpdateSettings; the
+    // setter is private so callers can't bypass the lock. Persisted to the host's browser
+    // localStorage by the lobby page so preferred rules survive across sessions.
+    public SpardleSettings Settings { get; private set; } = new();
+
+    /// <summary>
+    /// Atomically replaces <see cref="Settings"/> with <paramref name="mutate"/>'s result
+    /// inside <see cref="AbstractGameState.Execute(Action)"/>, so subscribers observe a
+    /// single consistent transition and notification fires once after the lock releases.
+    /// </summary>
+    public Result UpdateSettings(Func<SpardleSettings, SpardleSettings> mutate) =>
+        Execute(() => { Settings = mutate(Settings); });
 
     // Game state
     public int CurrentRound { get; set; } = 0;

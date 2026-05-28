@@ -131,6 +131,13 @@
                         <input type="number" step="1" class="ctc-config-input" @bind="InformantGuessTimeoutSeconds" />
                     </label>
                 </div>
+
+                <div class="ctc-settings-drawer-footer">
+                    <button type="button" class="ctc-btn @(_resetArmed ? "ctc-btn-danger" : "ctc-btn-secondary")"
+                            @onclick="ResetToDefaults">
+                        @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+                    </button>
+                </div>
             </div>
         </div>
     }

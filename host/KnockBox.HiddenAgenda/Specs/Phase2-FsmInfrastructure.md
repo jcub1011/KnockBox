@@ -13,7 +13,7 @@ Phase 1 must be complete. The following Phase 1 types are used:
 - `EventCard`, `EventCardType`
 - `SecretTask`, `TaskCategory`, `TaskDifficulty`, `TaskDefinitions`
 - `HiddenAgendaPlayerState`, `CardPlayRecord`, `MovementRecord`
-- `HiddenAgendaGameConfig`, `TaskPoolRotation`
+- `HiddenAgendaSettings`, `TaskPoolRotation`
 - `HiddenAgendaGameState` (expanded with GamePhase enum, all properties)
 
 ---

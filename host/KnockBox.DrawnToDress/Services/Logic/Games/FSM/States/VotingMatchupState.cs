@@ -22,9 +22,9 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
-            if (context.Config.EnableTimer)
+            if (context.Settings.EnableTimer)
             {
-                context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.VotingTimeSec);
+                context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Settings.VotingTimeSec);
             }
 
             context.State.SetPhase(GamePhase.Voting);
@@ -118,7 +118,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             }
 
             // Validate that the criterion is known.
-            if (!context.Config.VotingCriteria.Any(c => c.Id == cmd.CriterionId))
+            if (!context.Settings.VotingCriteria.Any(c => c.Id == cmd.CriterionId))
             {
                 context.Logger.LogWarning(
                     "CastVote: unknown criterion [{id}].", cmd.CriterionId);
@@ -214,7 +214,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                 var round = context.State.VotingRounds[roundIndex];
                 var tiedCriteria = DrawnToDressScoringService.FindTiedCriteria(
                     round,
-                    context.Config.VotingCriteria,
+                    context.Settings.VotingCriteria,
                     context.State.Votes.Values,
                     context.State.CriterionCoinFlipResults);
 
@@ -267,7 +267,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             var round = context.State.VotingRounds[roundIndex];
             if (round.Matchups.Count == 0) return true;
 
-            var criteriaIds = context.Config.VotingCriteria.Select(c => c.Id).ToList();
+            var criteriaIds = context.Settings.VotingCriteria.Select(c => c.Id).ToList();
             if (criteriaIds.Count == 0) return true;
 
             var allPlayerIds = context.GamePlayers.Keys;

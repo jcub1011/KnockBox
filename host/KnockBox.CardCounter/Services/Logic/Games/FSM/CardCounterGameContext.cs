@@ -46,17 +46,17 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
         /// </summary>
         private int GetActionCardWeight(ActionCard card) => card.Action switch
         {
-            ActionType.FeelingLucky => State.Config.FeelingLuckyWeight,
-            ActionType.MakeMyLuck   => State.Config.MakeMyLuckWeight,
-            ActionType.Skim         => State.Config.SkimWeight,
-            ActionType.Burn         => State.Config.BurnWeight,
-            ActionType.TurnTheTable => State.Config.TurnTheTableWeight,
-            ActionType.Compd        => State.Config.CompdWeight,
-            ActionType.NotMyMoney   => State.Config.NotMyMoneyWeight,
-            ActionType.Launder      => State.Config.LaunderWeight,
-            ActionType.Tilt         => State.Config.TiltWeight,
-            ActionType.HedgeYourBet => State.Config.HedgeYourBetWeight,
-            ActionType.LetItRide    => State.Config.LetItRideWeight,
+            ActionType.FeelingLucky => State.Settings.FeelingLuckyWeight,
+            ActionType.MakeMyLuck   => State.Settings.MakeMyLuckWeight,
+            ActionType.Skim         => State.Settings.SkimWeight,
+            ActionType.Burn         => State.Settings.BurnWeight,
+            ActionType.TurnTheTable => State.Settings.TurnTheTableWeight,
+            ActionType.Compd        => State.Settings.CompdWeight,
+            ActionType.NotMyMoney   => State.Settings.NotMyMoneyWeight,
+            ActionType.Launder      => State.Settings.LaunderWeight,
+            ActionType.Tilt         => State.Settings.TiltWeight,
+            ActionType.HedgeYourBet => State.Settings.HedgeYourBetWeight,
+            ActionType.LetItRide    => State.Settings.LetItRideWeight,
             _                       => 10
         };
 
@@ -85,7 +85,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
         public Stack<BaseCard> DiscardPile => State.DiscardPile;
         public Stack<string> ForceDrawStack => State.ForceDrawStack;
         public List<string> TurnOrder => State.TurnManager.TurnOrder;
-        public GameConfig Config => State.Config;
+        public CardCounterSettings Settings => State.Settings;
 
         // ── Turn helpers ──────────────────────────────────────────────────────
 
@@ -106,12 +106,12 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
 
         /// <summary>Returns a random action card from the pool using configurable per-card weights.
         /// Cards whose weight is 0 are excluded from the pool.
-        /// When <see cref="GameConfig.ActiveOperatorMode"/> is enabled, Skim, Turn The Table,
+        /// When <see cref="CardCounterSettings.ActiveOperatorMode"/> is enabled, Skim, Turn The Table,
         /// Launder, and Not My Money are also excluded from the pool.
         /// Returns <c>null</c> if no cards remain after filtering (all weights are 0).</summary>
         public ActionCard? GetRandomActionCard()
         {
-            var basePool = State.Config.ActiveOperatorMode ? ActionCardPoolActiveOperator : ActionCardPool;
+            var basePool = State.Settings.ActiveOperatorMode ? ActionCardPoolActiveOperator : ActionCardPool;
             var pool = basePool.Where(c => GetActionCardWeight(c) > 0).ToArray();
             if (pool.Length == 0)
             {
@@ -122,15 +122,15 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
         }
 
         /// <summary>
-        /// Deals <see cref="GameConfig.ActionsDealtPerRound"/> action cards to every player.
-        /// Cards are always dealt; players with more than <see cref="GameConfig.ActionHandLimit"/>
+        /// Deals <see cref="CardCounterSettings.ActionsDealtPerRound"/> action cards to every player.
+        /// Cards are always dealt; players with more than <see cref="CardCounterSettings.ActionHandLimit"/>
         /// cards afterward must discard via <see cref="CardCounterCommand.DiscardActionCardsCommand"/>.
         /// </summary>
         public void DealActionCards()
         {
             foreach (var player in GamePlayers.Values)
             {
-                for (int i = 0; i < Config.ActionsDealtPerRound; i++)
+                for (int i = 0; i < Settings.ActionsDealtPerRound; i++)
                 {
                     var card = GetRandomActionCard();
                     if (card is not null) player.ActionHand.Add(card);
@@ -160,8 +160,8 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
         private int ComputeShoeSize()
         {
             int remaining = MainDeck.Count;
-            int min = Config.MinShoeSize;
-            int max = Config.MaxShoeSize;
+            int min = Settings.MinShoeSize;
+            int max = Settings.MaxShoeSize;
 
             if (remaining <= min) return remaining;
 
@@ -205,7 +205,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
         /// </summary>
         public void ApplyNumberCard(PlayerState player, NumberCard card)
         {
-            if (State.Config.ActiveOperatorMode && player.ActiveOperator.HasValue)
+            if (State.Settings.ActiveOperatorMode && player.ActiveOperator.HasValue)
             {
                 double cardValue = card.Value;
                 double balanceBefore = player.Balance;
@@ -244,7 +244,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
         /// </summary>
         public void ApplyOperatorCard(PlayerState player, OperatorCard card)
         {
-            if (State.Config.ActiveOperatorMode)
+            if (State.Settings.ActiveOperatorMode)
             {
                 var previousOperator = player.ActiveOperator;
                 player.ActiveOperator = card.Op;
@@ -419,7 +419,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
                     Logger.LogDebug("Div/0: player [{id}] loses a pass.", player.PlayerId);
                     break;
                 case 2:
-                    if (player.ActionHand.Count < Config.ActionHandLimit)
+                    if (player.ActionHand.Count < Settings.ActionHandLimit)
                     {
                         var card = GetRandomActionCard();
                         if (card is not null) player.ActionHand.Add(card);

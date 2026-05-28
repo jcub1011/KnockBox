@@ -29,7 +29,7 @@
         </div>
 
         <div class="dtd-drawing-round-info">
-            <span>Round @(GameState.CurrentDrawingClothingTypeIndex + 1) of @GameState.Config.ClothingTypes.Count</span>
+            <span>Round @(GameState.CurrentDrawingClothingTypeIndex + 1) of @GameState.Settings.ClothingTypes.Count</span>
             <span>|</span>
             <span>Drawing @mySubmitted@(myMax > 0 ? $" of {myMax}" : "")</span>
             @if (!canSubmit)
@@ -64,7 +64,7 @@
                 int totalSubmitted = drawings.Count;
             }
 
-            @if (GameState.Config.ShowDrawingsOnHostScreen)
+            @if (GameState.Settings.ShowDrawingsOnHostScreen)
             {
                 <div class="dtd-drawing-gallery">
                     @foreach (var drawing in drawings)

@@ -46,7 +46,7 @@ namespace KnockBox.DrawnToDress.Pages
         {
             var outfitScores = new List<OutfitRoundScore>();
             var votes = GameState.Votes.Values.ToList();
-            var criteria = GameState.Config.VotingCriteria;
+            var criteria = GameState.Settings.VotingCriteria;
             var coinFlipResults = GameState.CriterionCoinFlipResults;
 
             foreach (var round in GameState.VotingRounds)

@@ -12,7 +12,7 @@
     // Show all game players in the player list (including self; host has no player state)
     var allPlayers = GameState.GamePlayers.Values.ToList();
     // Leaderboard ranking (used by both host and player views)
-    var leaderboardRanked = GameState.Config.FlipWinCondition
+    var leaderboardRanked = GameState.Settings.FlipWinCondition
         ? GameState.GamePlayers.Values.OrderByDescending(p => Math.Abs(p.Balance)).ToList()
         : GameState.GamePlayers.Values.OrderBy(p => Math.Abs(p.Balance)).ToList();
 }
@@ -29,7 +29,7 @@
             <h3 class="cc-discard-title">⚠️ TOO MANY CARDS</h3>
             <p class="cc-discard-subtitle">
                 You have <strong>@myPlayer.ActionHand.Count</strong> cards
-                (limit: <strong>@GameState.Config.ActionHandLimit</strong>).
+                (limit: <strong>@GameState.Settings.ActionHandLimit</strong>).
                 Select <strong>@DiscardNeeded()</strong> card(s) to discard.
             </p>
             <div class="cc-discard-hand">
@@ -64,7 +64,7 @@
         </div>
     </div>
 }
-else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Config.ActionHandLimit))
+else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Settings.ActionHandLimit))
 {
     <div class="cc-discard-overlay">
         <div class="cc-discard-panel">
@@ -157,7 +157,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
     var targetPlayer = GameState.GamePlayers.TryGetValue(theTargetId, out var tp2) ? tp2 : null;
 
     var actionName = isFeelingLucky ? "Feeling Lucky" : GetActionCardName(GameState.PendingReaction!.PlayedCard.Action);
-    if (isPendingReaction && GameState.PendingReaction?.PlayedCard.Action == ActionType.NotMyMoney && GameState.Config.ShowMakeMyMoneyOperator && GameState.PendingReaction?.NotMyMoneyOperator is { } op)
+    if (isPendingReaction && GameState.PendingReaction?.PlayedCard.Action == ActionType.NotMyMoney && GameState.Settings.ShowMakeMyMoneyOperator && GameState.PendingReaction?.NotMyMoneyOperator is { } op)
     {
         actionName += $" [{GetOperatorSymbol(op)}]";
     }
@@ -366,7 +366,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                     <span>[<strong>@GetOperatorSymbol(GameState.PendingNotMyMoneyOperator.Value)</strong>]</span>
                 }
             </h3>
-            @if (GameState.Config.ActiveOperatorMode)
+            @if (GameState.Settings.ActiveOperatorMode)
             {
                 <p class="cc-nmm-subtitle">Select a player to apply this operator as their active operator, or cancel to apply it to yourself.</p>
             }
@@ -385,7 +385,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                         <span class="cc-nmm-player-balance" title="Balance">
                             <span class="cc-stat-val @(pl.Balance >= 0 ? "cc-positive" : "cc-negative")">@pl.Balance.FormatBalance()</span>
                         </span>
-                        @if (GameState.Config.ActiveOperatorMode)
+                        @if (GameState.Settings.ActiveOperatorMode)
                         {
                             <span class="cc-nmm-player-pot" title="Active Operator">
                                 @if (pl.ActiveOperator.HasValue)
@@ -437,7 +437,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
 @if (myPlayer != null && !_operatorResultDismissed && GameState.LastOperatorResult is { } opResult && opResult.PlayerId == myId)
 {
     double opDelta = opResult.BalanceAfter - opResult.BalanceBefore;
-    @if (GameState.Config.ActiveOperatorMode)
+    @if (GameState.Settings.ActiveOperatorMode)
     {
         @* Non-blocking balance-change animation that auto-dismisses *@
         <div @key="_toastKey"
@@ -533,7 +533,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
 }
 
 @* ── Operator Change Toast (Active Operator Mode — operator card drawn) ── *@
-@if (myPlayer != null && !_operatorChangeDismissed && GameState.LastOperatorChange is { } opChange && opChange.PlayerId == myId && GameState.Config.ActiveOperatorMode)
+@if (myPlayer != null && !_operatorChangeDismissed && GameState.LastOperatorChange is { } opChange && opChange.PlayerId == myId && GameState.Settings.ActiveOperatorMode)
 {
     <div @key="_opChangeToastKey"
          class="cc-op-change-toast">
@@ -609,7 +609,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                                 <span class="cc-host-player-name">@lp.DisplayName</span>
                                 <div class="cc-host-player-details">
                                     <span class="cc-host-player-balance @(lp.Balance >= 0 ? "cc-positive" : "cc-negative")">@lp.Balance.FormatBalance()</span>
-                                    @if (GameState.Config.ActiveOperatorMode)
+                                    @if (GameState.Settings.ActiveOperatorMode)
                                     {
                                         <span class="cc-host-player-op">
                                             @if (lp.ActiveOperator.HasValue)
@@ -656,7 +656,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Co
                                 <span class="cc-host-spotlight-stat-label">BALANCE</span>
                                 <span class="cc-host-spotlight-stat-val @(activePlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@activePlayer.Balance.FormatBalance()</span>
                             </div>
-                            @if (GameState.Config.ActiveOperatorMode)
+                            @if (GameState.Settings.ActiveOperatorMode)
                             {
                                 <div class="cc-host-spotlight-stat">
                                     <span class="cc-host-spotlight-stat-label">OPERATOR</span>
@@ -811,7 +811,7 @@ else
                             <span>💰</span>
                             <span class="@(pl.Balance >= 0 ? "cc-positive" : "cc-negative")">@pl.Balance.FormatBalance()</span>
                         </div>
-                        @if (GameState.Config.ActiveOperatorMode)
+                        @if (GameState.Settings.ActiveOperatorMode)
                         {
                             <div class="cc-mobile-opp-popover-stat">
                                 <span>⚡</span>
@@ -893,7 +893,7 @@ else
                         <span class="cc-stat-icon">💰</span>
                         <span class="cc-stat-val @(pl.Balance >= 0 ? "cc-positive" : "cc-negative")">@pl.Balance.FormatBalance()</span>
                     </div>
-                    @if (GameState.Config.ActiveOperatorMode)
+                    @if (GameState.Settings.ActiveOperatorMode)
                     {
                         <div class="cc-opp-stat" title="Active Operator">
                             <span class="cc-stat-icon">⚡</span>
@@ -961,7 +961,7 @@ else
                     <span class="cc-mobile-stat-label">💰</span>
                     <span class="cc-mobile-stat-val @(myPlayer.Balance >= 0 ? "cc-positive" : "cc-negative")">@myPlayer.Balance.FormatBalance()</span>
                 </div>
-                @if (GameState.Config.ActiveOperatorMode)
+                @if (GameState.Settings.ActiveOperatorMode)
                 {
                     <div class="cc-mobile-stat">
                         <span class="cc-mobile-stat-label">⚡</span>
@@ -1101,7 +1101,7 @@ else
                         @myPlayer.Balance.FormatBalance()
                     </span>
                 </div>
-                @if (!GameState.Config.ActiveOperatorMode)
+                @if (!GameState.Settings.ActiveOperatorMode)
                 {
                     <div class="cc-my-stat" title="Your pot">
                         <span class="cc-stat-icon">🎰</span>
@@ -1187,7 +1187,7 @@ else
                     </div>
                 </div>
             }
-            @if (GameState.Config.ActiveOperatorMode)
+            @if (GameState.Settings.ActiveOperatorMode)
             {
                 <div class="cc-active-op-card" title="Your active operator">
                     <span class="cc-active-op-symbol">

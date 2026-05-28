@@ -90,11 +90,11 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         [TestMethod]
         public void Tick_AutoSelectsDestinationAfterTimeout()
         {
-            _state.Config.EnableTimers = true;
+            _state.UpdateSettings(s => s with { EnableTimers = true });
             var state = new MovePhaseState();
             state.OnEnter(_context);
 
-            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.MovePhaseTimeoutMs + 100));
+            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Settings.MovePhaseTimeoutMs + 100));
 
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<DrawPhaseState>(result.Value);
@@ -107,7 +107,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new MovePhaseState();
             state.OnEnter(_context);
 
-            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Config.MovePhaseTimeoutMs + 100));
+            var result = state.Tick(_context, DateTimeOffset.UtcNow.AddMilliseconds(_state.Settings.MovePhaseTimeoutMs + 100));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsNull(result.Value);
         }

@@ -594,6 +594,19 @@ public abstract class AbstractGameState(User host, ILogger logger) : IDisposable
 
 Exceptions during `Execute` / `ExecuteAsync` are caught and the dispose race is reported as a specific `ObjectDisposedException`-class failure; the unified public error message is "State was disposed." across both already-disposed and in-flight-disposal paths. `PlayerUnregistered` and `OnStateDisposed` invocation lists are iterated with per-handler error isolation — one throwing subscriber does not short-circuit the rest.
 
+#### Game settings — record + private setter + UpdateSettings
+
+Plugins that expose host-configurable rules (round counts, timers, gameplay toggles, etc.) all follow the same recipe:
+
+- A `sealed record TSettings` with `init`-only properties and defaults. Enum properties carry `[JsonConverter(typeof(JsonStringEnumConverter))]` so persisted snapshots survive enum reordering.
+- The state exposes `public TSettings Settings { get; private set; } = new();` — the **private setter** forces all mutation through a single method.
+- That method is `public Result UpdateSettings(Func<TSettings, TSettings> mutate) => Execute(() => { Settings = mutate(Settings); });` — the `Execute` wrapper makes the swap atomic and fires `StateChanged` once after the lock releases.
+- The lobby Razor page injects `ILocalStorageService` and persists snapshots to the host's browser using key `("{plugin-route-id}", "settings")`. Writes are serialized through a chained `_saveTask`, the load on first render is guarded by a `_userHasEdited` flag so an in-flight load can't clobber a host edit, and `DisposeAsync` flushes the last pending write before circuit teardown.
+- Razor inputs use `@bind:get`/`@bind:set` pairs routed through per-property setters that call `state.UpdateSettings(s => s with { ... })`.
+- The settings UI also exposes a host-only, two-step-confirm **"Reset to Defaults"** button that calls `UpdateSettings(_ => new TSettings())`, restoring the record's declared defaults and persisting them through the same path.
+
+The reference implementation is `host/KnockBox.Codeword/CodewordSettings.cs` + `Services/State/Games/CodewordGameState.cs` + `Pages/LobbyPhase.razor{,.cs}`. The same pattern is used by every other plugin with settings (CardCounter, DndMapper, DrawnToDress, HiddenAgenda, Operator, Spardle). LocalStorage stores **per-host preferences for new sessions**; session-internal persistence (e.g., DndMapper's IndexedDB snapshot) is a separate mechanism owned by individual plugins.
+
 ### IUserService
 
 A scoped service (one per Blazor circuit) that manages the current user's identity. On `InitializeCurrentUserAsync`, loads the stored username from browser `localStorage` (falls back to "Not Set") and creates a `User` with a UUIDv7 ID. Name changes flow through `SetCurrentUserName`, which owns trimming, the 12-character cap, the `UserNameChanged` event fan-out (per-handler error isolation), and the fire-and-forget persistence back to `localStorage`.
