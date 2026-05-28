@@ -96,14 +96,16 @@ header a {
 }
 
 /* ── Atmospheric Background ─────────────────────────────────────────────── */
-/* Four muted color blobs (yellow, pink, cyan, plum-bridge) stacked as
-   radial-gradient layers on a single fixed pseudo. Each layer's
-   background-position is animated through its own 4-keyframe loop with
-   offset paths, so the blobs drift independently instead of moving as a
-   single unit — gives a lava-lamp / aurora feel rather than mechanical
-   rotation. The noise grain sits on a separate static pseudo above so the
-   texture doesn't drift with the colors. The yellow scrolling ribbon
-   still lives behind the hero in Home.razor.css. */
+/* Two faint blob layers (white = near, pink = far) over the muted-yellow page
+   color from --bg-color on <body>. Each layer has a very low-key ambient
+   drift driven by document time, plus a scroll-linked parallax keyframe that
+   translates the layer vertically as the user scrolls. The two layers move
+   at different speeds, producing a depth read. The yellow scrolling ribbon
+   still lives behind the hero in Home.razor.css.
+
+   `animation-timeline: auto, scroll(root block)` is a Chromium/Edge feature.
+   On Firefox both timelines collapse to `auto`; the parallax keyframe just
+   sits at its start state — graceful degradation, no JS required. */
 
 .main::before {
     content: "";
@@ -111,23 +113,24 @@ header a {
     inset: 0;
     z-index: -2;
     pointer-events: none;
+    /* Soft cloud falloff: low peak alpha + an intermediate stop so the gradient
+       fades over a long radius instead of revealing a hard inner core. */
     background-image:
-        radial-gradient(circle at center, rgba(255, 209, 102, 0.42) 0%, rgba(255, 209, 102, 0) 55%),
-        radial-gradient(circle at center, rgba(255, 0, 85, 0.38) 0%, rgba(255, 0, 85, 0) 55%),
-        radial-gradient(circle at center, rgba(30, 255, 188, 0.28) 0%, rgba(30, 255, 188, 0) 58%),
-        radial-gradient(circle at center, rgba(170, 100, 220, 0.32) 0%, rgba(170, 100, 220, 0) 58%);
+        radial-gradient(circle at center,
+            rgba(255, 255, 255, 0.11) 0%,
+            rgba(255, 255, 255, 0.055) 35%,
+            rgba(255, 255, 255, 0) 80%),
+        radial-gradient(circle at center,
+            rgba(255, 255, 255, 0.09) 0%,
+            rgba(255, 255, 255, 0.045) 35%,
+            rgba(255, 255, 255, 0) 80%);
     background-repeat: no-repeat;
-    background-size:
-        55vmin 55vmin,
-        60vmin 60vmin,
-        50vmin 50vmin,
-        52vmin 52vmin;
-    background-position:
-        -20% -20%,
-        120% 120%,
-        120% -20%,
-        -20% 120%;
-    animation: blobDrift 42s ease-in-out infinite;
+    background-size: 140vmin 140vmin, 115vmin 115vmin;
+    background-position: -25% 5%, 115% 75%;
+    animation:
+        whiteBlobDrift 90s ease-in-out infinite,
+        blobParallaxNear linear;
+    animation-timeline: auto, scroll(root block);
     transition: opacity 0.5s ease-in-out;
 }
 
@@ -137,43 +140,51 @@ header a {
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.35 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.22'/></svg>");
-    background-repeat: repeat;
-    background-size: 160px 160px;
+    background-image:
+        radial-gradient(circle at center,
+            rgba(255, 0, 85, 0.13) 0%,
+            rgba(255, 0, 85, 0.065) 35%,
+            rgba(255, 0, 85, 0) 80%),
+        radial-gradient(circle at center,
+            rgba(255, 0, 85, 0.10) 0%,
+            rgba(255, 0, 85, 0.05) 35%,
+            rgba(255, 0, 85, 0) 80%);
+    background-repeat: no-repeat;
+    background-size: 150vmin 150vmin, 110vmin 110vmin;
+    background-position: 115% -20%, -20% 115%;
+    animation:
+        pinkBlobDrift 110s ease-in-out infinite,
+        blobParallaxFar linear;
+    animation-timeline: auto, scroll(root block);
     transition: opacity 0.5s ease-in-out;
 }
 
-/* Each comma-separated value targets one of the four gradient layers.
-   Positions use the -20%..120% range so each blob center actually reaches
-   the viewport corners (with smaller tile sizes than the viewport, plain
-   0-100% percentages would compress motion into a narrow center band).
-   Every keyframe lands the four blobs at four different corners, on a
-   different rotation each step, so they're constantly crossing the
-   canvas. */
-@keyframes blobDrift {
-    0% {
-        background-position: -20% -20%, 120% 120%, 120% -20%, -20% 120%;
-    }
-    25% {
-        background-position: 120% -20%, -20% 120%, 120% 120%, -20% -20%;
-    }
-    50% {
-        background-position: 120% 120%, -20% -20%, -20% 120%, 120% -20%;
-    }
-    75% {
-        background-position: -20% 120%, 120% -20%, -20% -20%, 120% 120%;
-    }
-    100% {
-        background-position: -20% -20%, 120% 120%, 120% -20%, -20% 120%;
-    }
+/* Ambient drift swings only ~5% — most motion comes from scroll. */
+@keyframes whiteBlobDrift {
+    0%   { background-position: -25% 5%,  115% 75%; }
+    50%  { background-position: -20% 10%, 110% 70%; }
+    100% { background-position: -25% 5%,  115% 75%; }
+}
+
+@keyframes pinkBlobDrift {
+    0%   { background-position: 115% -20%, -20% 115%; }
+    50%  { background-position: 110% -15%, -15% 110%; }
+    100% { background-position: 115% -20%, -20% 115%; }
+}
+
+@keyframes blobParallaxNear {
+    from { translate: 0 0; }
+    to   { translate: 0 -240px; }
+}
+
+@keyframes blobParallaxFar {
+    from { translate: 0 0; }
+    to   { translate: 0 -100px; }
 }
 
 .main.in-game::before,
 .main.in-game::after {
-    opacity: 0.15;
-}
-
-.main.in-game::before {
+    opacity: 0.12;
     animation-play-state: paused;
 }
 
@@ -302,13 +313,10 @@ header.exiting-to-home {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .main::before {
-        transition: none;
-        animation: none;
-    }
-
+    .main::before,
     .main::after {
         transition: none;
+        animation: none;
     }
 
     article.entering-from-home,

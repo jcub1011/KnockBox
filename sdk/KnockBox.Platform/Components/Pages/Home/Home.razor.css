@@ -28,28 +28,72 @@
 }
 
 .hero-ribbon {
+    /* --ribbon-h, --img-w, --copies cascade to .hero-ribbon-track and
+       .hero-ribbon-tile so they can compute width and duration off the
+       same numbers. Each tile becomes exactly enough integer image copies
+       to cover the viewport, no more — narrow screens don't pay for the
+       12 copies a dual-monitor setup needs. */
+    --ribbon-h: clamp(140px, 18vw, 200px);
+    --img-w: calc(var(--ribbon-h) * 1536 / 645);
+    --copies: round(up, 100vw / var(--img-w), 1);
+
     position: absolute;
     left: -5vw;
     right: -5vw;
     top: 50%;
     transform: translateY(-50%) rotate(-2deg);
-    height: clamp(140px, 18vw, 200px);
+    height: var(--ribbon-h);
     overflow: hidden;
     z-index: 0;
     border-top: 4px solid #000;
     border-bottom: 4px solid #000;
     box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
-    background-image:
-        linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)),
-        url("/_content/KnockBox.Platform/content/backgrounds/yellow-vertical_loop_crop.webp");
-    background-repeat: repeat, repeat;
-    background-size: auto, auto 200px;
-    animation: ribbonScroll 14s linear infinite;
+}
+
+/* Dark overlay sits above the moving tiles for a subtle tint without
+   interfering with pointer events. */
+.hero-ribbon::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05));
+    pointer-events: none;
+}
+
+.hero-ribbon-track {
+    display: flex;
+    width: max-content;
+    height: 100%;
+    /* Duration scales with tile width so the scroll speed (px/s) stays
+       constant across viewports. ~32 px/s matches the prior tuning. The
+       `length / 1px` trick yields a unitless number we can multiply by 1s. */
+    animation: ribbonScroll
+        calc(var(--copies) * var(--img-w) / 1px / 32 * 1s)
+        linear infinite;
+    will-change: transform;
+}
+
+.hero-ribbon-tile {
+    flex: 0 0 auto;
+    height: 100%;
+    /* Tile width = an integer count of image copies, so background-repeat-x
+       lands cleanly on the tile boundary (no seam at the tile↔tile join).
+       Both tiles are identical width, so translateX(-50%) is seamless too. */
+    width: calc(var(--copies) * var(--img-w));
+    background-image: url("/_content/KnockBox.Platform/content/backgrounds/yellow-vertical_loop_crop_lq.webp");
+    background-repeat: repeat-x;
+    background-size: auto 100%;
 }
 
 @keyframes ribbonScroll {
-    from { background-position: 0 0, 0 0; }
-    to   { background-position: 0 0, 400px 0; }
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hero-ribbon-track {
+        animation: none;
+    }
 }
 
 .hero {
@@ -162,9 +206,7 @@
     background-color: var(--canvas-card);
     border: 1px solid var(--canvas-card-border);
     border-radius: 12px;
-    box-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.25),
-        0 8px 24px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -173,9 +215,7 @@
 
 .join-card:hover {
     transform: translateY(-2px);
-    box-shadow:
-        0 2px 4px rgba(0, 0, 0, 0.3),
-        0 12px 30px rgba(0, 0, 0, 0.32);
+    box-shadow: 0 8px 0 rgba(0, 0, 0, 0.35);
     border-color: rgba(255, 255, 255, 0.22);
 }
 

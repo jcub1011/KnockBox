@@ -8,7 +8,12 @@
 <div class="home-container @(_isTransitioning ? "transitioning" : "") @(_isReturning ? "returning" : "")">
 
     <section class="hero-banner">
-        <div class="hero-ribbon" aria-hidden="true"></div>
+        <div class="hero-ribbon" aria-hidden="true">
+            <div class="hero-ribbon-track">
+                <div class="hero-ribbon-tile"></div>
+                <div class="hero-ribbon-tile"></div>
+            </div>
+        </div>
         <div class="hero">
             <h1 class="title">
                 @foreach (var letter in PlatformOptions.Value.Branding.HomeHeroTitle)
