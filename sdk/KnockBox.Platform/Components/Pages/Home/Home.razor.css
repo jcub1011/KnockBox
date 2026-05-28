@@ -47,7 +47,7 @@
     z-index: 0;
     border-top: 4px solid #000;
     border-bottom: 4px solid #000;
-    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+    box-shadow: var(--shadow-card-rest);
 }
 
 /* Dark overlay sits above the moving tiles for a subtle tint without
@@ -206,7 +206,7 @@
     background-color: var(--canvas-card);
     border: 1px solid var(--canvas-card-border);
     border-radius: 12px;
-    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+    box-shadow: var(--shadow-card-rest);
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -215,7 +215,7 @@
 
 .join-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 0 rgba(0, 0, 0, 0.35);
+    box-shadow: var(--shadow-card-lift);
     border-color: rgba(255, 255, 255, 0.22);
 }
 

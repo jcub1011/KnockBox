@@ -28,7 +28,7 @@
 
     <form @onsubmit="() => JoinLobby(LobbyCode ?? string.Empty)" @onsubmit:preventDefault="true">
         <div class="join-section">
-            <div class="join-card join-card-name">
+            <div class="join-card">
                 <label class="join-label" for="player-name-input">Player Name</label>
                 <input id="player-name-input"
                        placeholder="Enter name"
@@ -36,7 +36,7 @@
                        @bind="PlayerName" @bind:event="oninput" style="text-transform: none;"/>
             </div>
 
-            <div class="join-card join-card-code">
+            <div class="join-card">
                 <label class="join-label" for="room-code-input">Room Code</label>
                 <div class="join-code-row">
                     <input id="room-code-input"
