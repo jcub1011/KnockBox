@@ -92,41 +92,103 @@ header a {
     width: 100%;
     height: 100%;
     overflow: hidden;
+    background-color: transparent;
 }
 
-/* ── Scrolling Diagonal Background ──────────────────────────────────────── */
+/* ── Atmospheric Background ─────────────────────────────────────────────── */
+/* Two faint blob layers (white = near, pink = far) over the muted-yellow page
+   color from --bg-color on <body>. Each layer has a very low-key ambient
+   drift driven by document time, plus a scroll-linked parallax keyframe that
+   translates the layer vertically as the user scrolls. The two layers move
+   at different speeds, producing a depth read. The yellow scrolling ribbon
+   still lives behind the hero in Home.razor.css.
+
+   `animation-timeline: auto, scroll(root block)` is a Chromium/Edge feature.
+   On Firefox both timelines collapse to `auto`; the parallax keyframe just
+   sits at its start state — graceful degradation, no JS required. */
 
 .main::before {
     content: "";
     position: fixed;
-    top: calc(50vh - 150vmax);
-    left: calc(50vw - 150vmax);
-    width: 300vmax;
-    height: 300vmax;
-    z-index: -1;
-    background-color: var(--bg-color);
-    background-image: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), url("/_content/KnockBox.Platform/content/backgrounds/yellow-vertical_loop_crop.jpg");
-    background-repeat: repeat;
-    background-size: auto, auto 400px;
-    transform: rotate(45deg);
-    animation: partyGradient 12s linear infinite;
-    opacity: 1;
-    transition: opacity 0.25s ease-in-out;
-}
-
-@keyframes partyGradient {
-    0% {
-        background-position: 0 0, 0 0;
-    }
-
-    100% {
-        background-position: 0 0, 0 -400px;
-    }
-}
-
-.main.in-game::before {
-    opacity: 0;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    /* `farthest-side` makes the gradient's 100% radius reach the nearest box
+       side (not the corner), so the inscribed gradient fades to fully
+       transparent before any box edge — no clipped "sphere" silhouette.
+       background-size is bumped to keep the visible cloud roughly the same
+       reach as before. */
+    background-image:
+        radial-gradient(circle farthest-side at center,
+            rgba(255, 255, 255, 0.11) 0%,
+            rgba(255, 255, 255, 0.055) 40%,
+            rgba(255, 255, 255, 0) 95%),
+        radial-gradient(circle farthest-side at center,
+            rgba(255, 255, 255, 0.09) 0%,
+            rgba(255, 255, 255, 0.045) 40%,
+            rgba(255, 255, 255, 0) 95%);
+    background-repeat: no-repeat;
+    background-size: 200vmin 200vmin, 170vmin 170vmin;
+    background-position: -25% 5%, 115% 75%;
+    animation:
+        whiteBlobDrift 90s ease-in-out infinite,
+        blobParallaxNear linear;
+    animation-timeline: auto, scroll(root block);
     transition: opacity 0.5s ease-in-out;
+}
+
+.main::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+        radial-gradient(circle farthest-side at center,
+            rgba(255, 0, 85, 0.13) 0%,
+            rgba(255, 0, 85, 0.065) 40%,
+            rgba(255, 0, 85, 0) 95%),
+        radial-gradient(circle farthest-side at center,
+            rgba(255, 0, 85, 0.10) 0%,
+            rgba(255, 0, 85, 0.05) 40%,
+            rgba(255, 0, 85, 0) 95%);
+    background-repeat: no-repeat;
+    background-size: 210vmin 210vmin, 160vmin 160vmin;
+    background-position: 115% -20%, -20% 115%;
+    animation:
+        pinkBlobDrift 110s ease-in-out infinite,
+        blobParallaxFar linear;
+    animation-timeline: auto, scroll(root block);
+    transition: opacity 0.5s ease-in-out;
+}
+
+/* Ambient drift swings only ~5% — most motion comes from scroll. */
+@keyframes whiteBlobDrift {
+    0%   { background-position: -25% 5%,  115% 75%; }
+    50%  { background-position: -20% 10%, 110% 70%; }
+    100% { background-position: -25% 5%,  115% 75%; }
+}
+
+@keyframes pinkBlobDrift {
+    0%   { background-position: 115% -20%, -20% 115%; }
+    50%  { background-position: 110% -15%, -15% 110%; }
+    100% { background-position: 115% -20%, -20% 115%; }
+}
+
+@keyframes blobParallaxNear {
+    from { translate: 0 0; }
+    to   { translate: 0 -240px; }
+}
+
+@keyframes blobParallaxFar {
+    from { translate: 0 0; }
+    to   { translate: 0 -100px; }
+}
+
+.main.in-game::before,
+.main.in-game::after {
+    opacity: 0.12;
+    animation-play-state: paused;
 }
 
 article {
@@ -254,9 +316,10 @@ header.exiting-to-home {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .main::before {
-        animation: none;
+    .main::before,
+    .main::after {
         transition: none;
+        animation: none;
     }
 
     article.entering-from-home,

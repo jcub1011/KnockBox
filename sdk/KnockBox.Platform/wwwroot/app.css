@@ -1,12 +1,26 @@
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=IM+Fell+DW+Pica:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Lexend:wght@100..900&family=Outfit:wght@100..900&display=swap');
 
 :root {
-    --font-primary: "Lexend", sans-serif;
+    --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+    --font-primary: "Outfit", system-ui, sans-serif;
+    --font-title: "Lexend", system-ui, sans-serif;
     --font-mono: "Google Sans Code", monospace;
-    --bg-color: #000; /* previous color: #A9CEF4*/
+    --bg-color: #1f1428;
     --accent-color: #FF0055;
     --trietary-color: #21897E;
+
+    --tile-cyan: #1EFFBC;
+    --tile-yellow: #FFD166;
+    --tile-pink: #FF0055;
+    --ink: #f4ece4;
+    --ink-soft: rgba(244, 236, 228, 0.65);
+    --paper-warm: #1a0808;
+    --canvas-dark: #1f1820;
+    --canvas-card: rgba(255, 255, 255, 0.04);
+    --canvas-card-border: rgba(255, 255, 255, 0.12);
+
+    --shadow-card-rest: 0 6px 0 rgba(0, 0, 0, 0.35);
+    --shadow-card-lift: 0 8px 0 rgba(0, 0, 0, 0.35);
 }
 
 /* Apply border-box globally to all elements and pseudo-elements */
