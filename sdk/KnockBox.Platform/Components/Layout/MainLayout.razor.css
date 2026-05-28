@@ -113,19 +113,22 @@ header a {
     inset: 0;
     z-index: -2;
     pointer-events: none;
-    /* Soft cloud falloff: low peak alpha + an intermediate stop so the gradient
-       fades over a long radius instead of revealing a hard inner core. */
+    /* `farthest-side` makes the gradient's 100% radius reach the nearest box
+       side (not the corner), so the inscribed gradient fades to fully
+       transparent before any box edge — no clipped "sphere" silhouette.
+       background-size is bumped to keep the visible cloud roughly the same
+       reach as before. */
     background-image:
-        radial-gradient(circle at center,
+        radial-gradient(circle farthest-side at center,
             rgba(255, 255, 255, 0.11) 0%,
-            rgba(255, 255, 255, 0.055) 35%,
-            rgba(255, 255, 255, 0) 80%),
-        radial-gradient(circle at center,
+            rgba(255, 255, 255, 0.055) 40%,
+            rgba(255, 255, 255, 0) 95%),
+        radial-gradient(circle farthest-side at center,
             rgba(255, 255, 255, 0.09) 0%,
-            rgba(255, 255, 255, 0.045) 35%,
-            rgba(255, 255, 255, 0) 80%);
+            rgba(255, 255, 255, 0.045) 40%,
+            rgba(255, 255, 255, 0) 95%);
     background-repeat: no-repeat;
-    background-size: 140vmin 140vmin, 115vmin 115vmin;
+    background-size: 200vmin 200vmin, 170vmin 170vmin;
     background-position: -25% 5%, 115% 75%;
     animation:
         whiteBlobDrift 90s ease-in-out infinite,
@@ -141,16 +144,16 @@ header a {
     z-index: -1;
     pointer-events: none;
     background-image:
-        radial-gradient(circle at center,
+        radial-gradient(circle farthest-side at center,
             rgba(255, 0, 85, 0.13) 0%,
-            rgba(255, 0, 85, 0.065) 35%,
-            rgba(255, 0, 85, 0) 80%),
-        radial-gradient(circle at center,
+            rgba(255, 0, 85, 0.065) 40%,
+            rgba(255, 0, 85, 0) 95%),
+        radial-gradient(circle farthest-side at center,
             rgba(255, 0, 85, 0.10) 0%,
-            rgba(255, 0, 85, 0.05) 35%,
-            rgba(255, 0, 85, 0) 80%);
+            rgba(255, 0, 85, 0.05) 40%,
+            rgba(255, 0, 85, 0) 95%);
     background-repeat: no-repeat;
-    background-size: 150vmin 150vmin, 110vmin 110vmin;
+    background-size: 210vmin 210vmin, 160vmin 160vmin;
     background-position: 115% -20%, -20% 115%;
     animation:
         pinkBlobDrift 110s ease-in-out infinite,
