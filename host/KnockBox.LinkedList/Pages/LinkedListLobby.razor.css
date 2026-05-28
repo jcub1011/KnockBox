@@ -1,0 +1,24 @@
+.content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+}
+
+.card {
+    width: 100%;
+    max-width: 32rem;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+}
+
+.player-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.start-btn {
+    margin-top: 1rem;
+}

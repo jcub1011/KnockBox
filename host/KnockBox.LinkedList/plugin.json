@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "name": "Linked List",
+  "description": "TODO: describe the Linked List game.",
+  "routeIdentifier": "linked-list",
+  "version": "1.0.0",
+  "entryAssembly": "KnockBox.LinkedList",
+  "capabilities": [],
+  "tileAsset": "tile.svg"
+}
