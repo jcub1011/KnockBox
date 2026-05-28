@@ -1,6 +1,7 @@
 /* ── Home Container ──────────────────────────────────────────────────────── */
 
 .home-container {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -9,19 +10,140 @@
     font-family: var(--font-primary);
     min-height: 100%;
     gap: 0;
+    overflow-x: clip;
 }
 
-/* ── Hero Section ───────────────────────────────────────────────────────── */
+/* ── Decorative confetti shapes (page-level atmosphere) ─────────────────── */
+
+.home-decor {
+    position: absolute;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+    filter: drop-shadow(4px 4px 0 rgba(0, 0, 0, 0.55));
+    animation: floatSoft 6s ease-in-out infinite;
+}
+
+.home-decor-star-1 {
+    width: 56px;
+    height: 56px;
+    top: 280px;
+    left: 4%;
+    transform: rotate(-14deg);
+    animation-delay: -1.2s;
+}
+
+.home-decor-star-2 {
+    width: 44px;
+    height: 44px;
+    top: 460px;
+    right: 5%;
+    transform: rotate(18deg);
+    animation-delay: -3s;
+}
+
+.home-decor-squiggle {
+    width: 120px;
+    height: 40px;
+    top: 380px;
+    right: 12%;
+    transform: rotate(-8deg);
+    animation-delay: -2s;
+}
+
+.home-decor-dots {
+    width: 80px;
+    height: 80px;
+    bottom: 80px;
+    left: 6%;
+    animation-delay: -4s;
+}
+
+@keyframes floatSoft {
+    0%, 100% { transform: translateY(0) rotate(var(--decor-rot, 0deg)); }
+    50% { transform: translateY(-6px) rotate(var(--decor-rot, 0deg)); }
+}
+
+.home-decor-star-1 { --decor-rot: -14deg; }
+.home-decor-star-2 { --decor-rot: 18deg; }
+.home-decor-squiggle { --decor-rot: -8deg; }
+.home-decor-dots { --decor-rot: 0deg; }
+
+/* ── Hero Banner (constrained scrolling ribbon + title) ─────────────────── */
+
+.hero-banner {
+    position: relative;
+    width: 100%;
+    margin: 8px 0 40px 0;
+    padding: 28px 0 36px 0;
+    min-height: clamp(140px, 22vw, 220px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+}
+
+.hero-ribbon {
+    position: absolute;
+    left: -5vw;
+    right: -5vw;
+    top: 50%;
+    transform: translateY(-50%) rotate(-2deg);
+    height: clamp(140px, 18vw, 200px);
+    overflow: hidden;
+    z-index: 0;
+    border-top: 4px solid #000;
+    border-bottom: 4px solid #000;
+    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+    background-image:
+        linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)),
+        url("/_content/KnockBox.Platform/content/backgrounds/yellow-vertical_loop_crop.webp");
+    background-repeat: repeat, repeat;
+    background-size: auto, auto 200px;
+    animation: ribbonScroll 14s linear infinite;
+}
+
+@keyframes ribbonScroll {
+    from { background-position: 0 0, 0 0; }
+    to   { background-position: 0 0, 400px 0; }
+}
+
+.hero-sparkle {
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    z-index: 2;
+    filter: drop-shadow(3px 3px 0 rgba(0, 0, 0, 0.6));
+    animation: floatSoft 5s ease-in-out infinite;
+}
+
+.hero-sparkle-left {
+    top: 8px;
+    left: 6%;
+    transform: rotate(-18deg);
+    --decor-rot: -18deg;
+}
+
+.hero-sparkle-right {
+    bottom: 6px;
+    right: 8%;
+    width: 36px;
+    height: 36px;
+    transform: rotate(22deg);
+    --decor-rot: 22deg;
+    animation-delay: -2.5s;
+}
 
 .hero {
+    position: relative;
+    z-index: 1;
     text-align: center;
-    margin-bottom: 32px;
-    padding-top: 16px;
 }
 
 .title {
+    font-family: var(--font-display);
     font-size: clamp(3rem, 8vw, 5.5rem);
-    font-weight: 900;
+    font-weight: 800;
     text-transform: uppercase;
     color: #fff;
     margin: 0;
@@ -29,11 +151,17 @@
     display: flex;
     justify-content: center;
     gap: 2px;
+    letter-spacing: -0.02em;
 }
 
 .title-letter {
     display: inline-block;
-    text-shadow: 8px 8px 0 #000;
+    text-shadow:
+        2px 2px 0 #000,
+        4px 4px 0 #000,
+        6px 6px 0 #000,
+        8px 8px 0 var(--accent-color),
+        10px 10px 0 #000;
     animation: letter-bounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
@@ -61,6 +189,27 @@
     }
 }
 
+.hero-tagline {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: clamp(0.95rem, 1.6vw, 1.2rem);
+    color: #fff;
+    background: #000;
+    display: inline-block;
+    margin: 18px 0 0 0;
+    padding: 4px 14px 6px 14px;
+    border: 3px solid #000;
+    border-radius: 999px;
+    transform: rotate(-1.5deg);
+    box-shadow: 4px 4px 0 var(--accent-color);
+    text-decoration: underline;
+    text-decoration-color: var(--accent-color);
+    text-decoration-thickness: 3px;
+    text-underline-offset: 4px;
+    animation: fade-in-up 0.6s ease-out 0.5s both;
+}
+
 .sr-only {
     position: absolute;
     width: 1px;
@@ -76,6 +225,8 @@
 /* ── Join Section (side-by-side cards) ──────────────────────────────────── */
 
 .join-section {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: row;
     gap: 20px;
@@ -115,14 +266,15 @@
 }
 
 .join-card-name {
-    background-color: #1EFFBC;
+    background-color: var(--tile-cyan);
 }
 
 .join-card-code {
-    background-color: #FFD166;
+    background-color: var(--tile-yellow);
 }
 
 .join-label {
+    font-family: var(--font-display);
     font-size: 1rem;
     font-weight: 800;
     text-transform: uppercase;
@@ -163,7 +315,7 @@
 }
 
 .join-btn {
-    font-family: var(--font-primary);
+    font-family: var(--font-display);
     font-size: 1.1rem;
     font-weight: 800;
     text-transform: uppercase;
@@ -203,6 +355,8 @@
 /* ── Games Section ──────────────────────────────────────────────────────── */
 
 .games-section {
+    position: relative;
+    z-index: 1;
     width: 100%;
     max-width: 960px;
     margin: 0 auto;
@@ -210,14 +364,15 @@
 }
 
 .games-heading {
+    font-family: var(--font-display);
     font-size: 1.6rem;
-    font-weight: 900;
+    font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 3px;
     color: #fff;
-    text-shadow: 3px 3px 0 #000;
+    text-shadow: 3px 3px 0 #000, 5px 5px 0 var(--accent-color);
     text-align: center;
-    margin: 0 0 20px 0;
+    margin: 0 0 28px 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -239,8 +394,8 @@
 .game-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 24px;
-    padding: 0 16px 16px 16px;
+    gap: 32px 28px;
+    padding: 4px 20px 24px 20px;
 }
 
 /* Structural shell only — each game plugin owns its own visual design via a
@@ -255,8 +410,51 @@
     display: block;
     font: inherit;
     color: inherit;
-    transition: transform 0.15s ease;
     position: relative;
+    transition: transform 220ms cubic-bezier(.34, 1.56, .64, 1), filter 200ms ease;
+}
+
+/* Deterministic per-index tilt in the -1.8°..+1.8° range — gives the
+   sticker-pasted feel without randomness. nth-child cycles through 5 slots
+   so the pattern repeats every fifth tile but never lines up with a row. */
+.game-tile:nth-child(5n+1) { transform: rotate(-1.8deg); }
+.game-tile:nth-child(5n+2) { transform: rotate(0.6deg); }
+.game-tile:nth-child(5n+3) { transform: rotate(1.8deg); }
+.game-tile:nth-child(5n+4) { transform: rotate(-0.9deg); }
+.game-tile:nth-child(5n+5) { transform: rotate(1.2deg); }
+
+/* Cycle the chrome shadow color across the three accents. */
+.game-tile:nth-child(3n+1) { --shadow-accent: var(--tile-pink); }
+.game-tile:nth-child(3n+2) { --shadow-accent: var(--tile-cyan); }
+.game-tile:nth-child(3n+3) { --shadow-accent: var(--tile-yellow); }
+
+/* Single colored chrome shadow — replaces app.css's black 8px shadow. The
+   tile's own `border: 5px solid #000` still provides the ink outline, so we
+   don't need a black shadow layer fighting with the accent color. */
+.game-tile > .game-tile-surface {
+    box-shadow: 10px 10px 0 var(--shadow-accent, var(--tile-pink));
+}
+
+.game-tile:hover:not(:disabled) {
+    transform: rotate(0deg) translateY(-4px) scale(1.02);
+}
+
+.game-tile:hover:not(:disabled) > .game-tile-surface {
+    transform: translate(-3px, -3px);
+    box-shadow: 14px 14px 0 var(--shadow-accent, var(--tile-pink));
+    animation: wiggle 360ms ease-in-out;
+}
+
+.game-tile:active:not(:disabled) > .game-tile-surface {
+    transform: translate(3px, 3px);
+    box-shadow: 4px 4px 0 var(--shadow-accent, var(--tile-pink));
+}
+
+@keyframes wiggle {
+    0% { rotate: 0deg; }
+    25% { rotate: 1.2deg; }
+    60% { rotate: -1deg; }
+    100% { rotate: 0deg; }
 }
 
 .game-tile:disabled {
@@ -268,9 +466,68 @@
 
 .game-tile:focus-visible {
     outline: 3px solid var(--accent-color);
-    outline-offset: 3px;
-    border-radius: 14px;
+    outline-offset: 6px;
+    border-radius: 18px;
 }
+
+/* Dashed border accent that fades in on hover. */
+.game-tile::before {
+    content: "";
+    position: absolute;
+    inset: -10px;
+    border: 3px dashed var(--accent-color);
+    border-radius: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 220ms ease;
+    z-index: -1;
+}
+
+.game-tile:hover:not(:disabled)::before {
+    opacity: 1;
+    animation: dashedPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes dashedPulse {
+    0%, 100% { transform: scale(1); opacity: 0.85; }
+    50% { transform: scale(1.02); opacity: 1; }
+}
+
+/* Sparkle marker that appears on hover at the top-right of the tile. */
+.game-tile::after {
+    content: "";
+    position: absolute;
+    top: -14px;
+    right: -14px;
+    width: 36px;
+    height: 36px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><path d='M24 2 L28 20 L46 24 L28 28 L24 46 L20 28 L2 24 L20 20 Z' fill='%23FFD166' stroke='%23000' stroke-width='3' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat;
+    background-size: contain;
+    opacity: 0;
+    transform: rotate(-20deg) scale(0.6);
+    transition: opacity 220ms ease, transform 320ms cubic-bezier(.34, 1.56, .64, 1);
+    pointer-events: none;
+    z-index: 2;
+}
+
+.game-tile:hover:not(:disabled)::after {
+    opacity: 1;
+    transform: rotate(8deg) scale(1);
+}
+
+.game-tile.is-wip::before,
+.game-tile.is-wip::after {
+    display: none;
+}
+
+/* WIP tiles keep their resting tilt on hover (no snap-to-zero), since the game
+   isn't playable. The static rotation matches the nth-child pattern above. */
+.game-tile.is-wip:nth-child(5n+1):hover { transform: rotate(-1.8deg); }
+.game-tile.is-wip:nth-child(5n+2):hover { transform: rotate(0.6deg); }
+.game-tile.is-wip:nth-child(5n+3):hover { transform: rotate(1.8deg); }
+.game-tile.is-wip:nth-child(5n+4):hover { transform: rotate(-0.9deg); }
+.game-tile.is-wip:nth-child(5n+5):hover { transform: rotate(1.2deg); }
 
 /* Renders when a plugin declares `tileAsset` in its manifest — collapses the
    former multi-element Razor tile into a single <img>. The SVG owns its own
@@ -316,6 +573,7 @@
     }
 }
 
+.home-container.transitioning .hero-tagline,
 .home-container.transitioning .join-section {
     animation: fade-out-down 0.35s ease-in 0.05s forwards;
 }
@@ -350,6 +608,7 @@
 .home-container.returning .title-letter:nth-child(7) { animation-delay: 0.35s; }
 .home-container.returning .title-letter:nth-child(8) { animation-delay: 0.40s; }
 
+.home-container.returning .hero-tagline,
 .home-container.returning .join-section {
     animation: fade-in-up 0.6s ease-out 0.1s both;
 }
@@ -404,7 +663,10 @@
     }
 
     .title-letter {
-        text-shadow: 6px 6px 0 #000;
+        text-shadow:
+            2px 2px 0 #000,
+            4px 4px 0 #000,
+            6px 6px 0 var(--accent-color);
     }
 
     .games-heading {
@@ -414,14 +676,35 @@
 
     .game-grid {
         grid-template-columns: 1fr;
-        gap: 16px;
-        padding: 0 8px 16px 8px;
+        gap: 24px 16px;
+        padding: 4px 12px 16px 12px;
     }
+
+    .home-decor-star-1 { width: 40px; height: 40px; }
+    .home-decor-star-2 { width: 32px; height: 32px; }
+    .home-decor-squiggle { width: 84px; }
+    .home-decor-dots { width: 56px; height: 56px; }
 }
 
 @media (min-width: 601px) and (max-width: 900px) {
     .game-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Tilt-snap on hover doesn't feel right on touch devices — there's no resting
+   hover state, so the tile would flicker through hover on tap. Reduce the
+   resting tilt so the static look stays sticker-ish without animation drama. */
+@media (hover: none) {
+    .game-tile:nth-child(5n+1) { transform: rotate(-0.6deg); }
+    .game-tile:nth-child(5n+2) { transform: rotate(0.2deg); }
+    .game-tile:nth-child(5n+3) { transform: rotate(0.6deg); }
+    .game-tile:nth-child(5n+4) { transform: rotate(-0.3deg); }
+    .game-tile:nth-child(5n+5) { transform: rotate(0.4deg); }
+
+    .game-tile::after,
+    .game-tile::before {
+        display: none;
     }
 }
 
@@ -435,7 +718,8 @@
     }
 
     .games-section,
-    .join-section {
+    .join-section,
+    .hero-tagline {
         animation: none;
         opacity: 1;
         transform: none;
@@ -445,19 +729,30 @@
         animation: none;
     }
 
-    .join-card {
-        transition: none;
-    }
-
+    .join-card,
     .game-tile {
         transition: none;
     }
 
-    .home-container::before {
+    .hero-ribbon {
+        animation: none;
+    }
+
+    .home-decor,
+    .hero-sparkle {
+        animation: none;
+    }
+
+    .game-tile:hover:not(:disabled) > .game-tile-surface {
+        animation: none;
+    }
+
+    .game-tile:hover:not(:disabled)::before {
         animation: none;
     }
 
     .home-container.transitioning .title-letter,
+    .home-container.transitioning .hero-tagline,
     .home-container.transitioning .join-section,
     .home-container.transitioning .games-section {
         animation: none;
@@ -465,6 +760,7 @@
     }
 
     .home-container.returning .title-letter,
+    .home-container.returning .hero-tagline,
     .home-container.returning .join-section,
     .home-container.returning .games-section {
         animation: none;
