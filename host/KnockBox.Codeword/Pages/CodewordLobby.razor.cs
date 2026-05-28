@@ -25,15 +25,15 @@ namespace KnockBox.Codeword.Pages
 
         protected int GetPhaseTotalMs()
         {
-            if (GameState?.Config is not { } config) return 1;
+            if (GameState?.Settings is not { } settings) return 1;
             return GameState.Phase switch
             {
-                CodewordGamePhase.Setup => config.SetupPhaseTimeoutMs,
-                CodewordGamePhase.CluePhase => config.CluePhaseTimeoutMs,
-                CodewordGamePhase.Discussion => config.DiscussionPhaseTimeoutMs,
-                CodewordGamePhase.Voting => config.VotePhaseTimeoutMs,
-                CodewordGamePhase.Reveal => config.RevealPhaseTimeoutMs,
-                CodewordGamePhase.ContinueOrEndRound => config.ContinueOrEndRoundPhaseTimeoutMs,
+                CodewordGamePhase.Setup => settings.SetupPhaseTimeoutMs,
+                CodewordGamePhase.CluePhase => settings.CluePhaseTimeoutMs,
+                CodewordGamePhase.Discussion => settings.DiscussionPhaseTimeoutMs,
+                CodewordGamePhase.Voting => settings.VotePhaseTimeoutMs,
+                CodewordGamePhase.Reveal => settings.RevealPhaseTimeoutMs,
+                CodewordGamePhase.ContinueOrEndRound => settings.ContinueOrEndRoundPhaseTimeoutMs,
                 _ => 1
             };
         }

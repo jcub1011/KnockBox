@@ -103,6 +103,10 @@ namespace KnockBox.Core.Services.State.Games.Shared
         // player roster — mutations rebuild it; lookups scan it.
         private volatile PlayerEntry[] _cachedPlayerEntries = [];
         private volatile PlayerEntry[] _cachedRoster;
+        // Equals _cachedPlayerEntries when HostIsParticipant is false; otherwise
+        // {hostEntry, ...players}. Rebuilt on every player-set change and on every
+        // HostIsParticipant toggle inside Execute.
+        private volatile PlayerEntry[] _cachedParticipants = [];
         private volatile User[] _cachedKickedUsers = [];
         // Ids of every user that has successfully registered (and not been kicked).
         // Used by RegisterPlayer to admit lobby members back after IsJoinable goes
@@ -126,6 +130,9 @@ namespace KnockBox.Core.Services.State.Games.Shared
             _logger = logger;
             // Roster always contains the host at index 0; players are appended on join.
             _cachedRoster = [new PlayerEntry(host, host.Name, null)];
+            // Participants default to "no host" — players-only view, identical to
+            // _cachedPlayerEntries when HostIsParticipant is false.
+            _cachedParticipants = [];
         }
 
         /// <summary>
@@ -147,6 +154,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
 
             _cachedPlayerEntries = newEntries;
             _cachedRoster = roster;
+            _cachedParticipants = _hostIsParticipant ? roster : newEntries;
         }
 
         /// <summary>
@@ -284,6 +292,52 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// allocation per read.
         /// </summary>
         public IReadOnlyList<PlayerEntry> RosterIncludingHost => _cachedRoster;
+
+        // Backing field for HostIsParticipant. Mutated only inside Execute via
+        // SetHostIsParticipant; PublishPlayerEntries reads it to choose between
+        // the players-only or host-prepended snapshot.
+        private bool _hostIsParticipant;
+
+        /// <summary>
+        /// When <c>true</c>, the host is treated as a game participant — appearing
+        /// in <see cref="Participants"/> alongside registered players, and counting
+        /// toward any participant-count check. Defaults to <c>false</c>, preserving
+        /// the "host is the shared display" behavior. Toggled via
+        /// <see cref="SetHostIsParticipant"/> from inside <see cref="Execute(Action)"/>.
+        /// </summary>
+        /// <remarks>
+        /// The host stays a synthetic <see cref="PlayerEntry"/> with a null
+        /// <c>Token</c> (just like <see cref="RosterIncludingHost"/>) — it is not
+        /// registered through <see cref="RegisterPlayer"/>, and
+        /// <see cref="PlayerUnregistered"/> never fires for the host. If the host's
+        /// circuit drops mid-game the lobby is torn down by the session-level grace
+        /// path, not by per-player disconnect handling.
+        /// </remarks>
+        public bool HostIsParticipant => _hostIsParticipant;
+
+        /// <summary>
+        /// Participants for gameplay purposes — equals <see cref="Players"/> when
+        /// <see cref="HostIsParticipant"/> is <c>false</c>; otherwise
+        /// <c>{hostEntry, ...Players}</c>. Returns a cached snapshot rebuilt on
+        /// every player-set change or <see cref="SetHostIsParticipant"/> call —
+        /// no allocation per read.
+        /// </summary>
+        public IReadOnlyList<PlayerEntry> Participants => _cachedParticipants;
+
+        /// <summary>
+        /// Sets <see cref="HostIsParticipant"/> and republishes the participant
+        /// snapshot. Must be invoked from inside an <see cref="Execute(Action)"/>
+        /// / <see cref="ExecuteAsync"/> block on this state so the transition is
+        /// serialized with other player-set mutations and notification fires
+        /// exactly once after the lock releases.
+        /// </summary>
+        protected void SetHostIsParticipant(bool value)
+        {
+            ThrowIfNotExecuting();
+            if (_hostIsParticipant == value) return;
+            _hostIsParticipant = value;
+            _cachedParticipants = value ? _cachedRoster : _cachedPlayerEntries;
+        }
 
         /// <summary>
         /// Players that have been kicked from this game. Reads return a cached

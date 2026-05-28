@@ -33,7 +33,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             }
 
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(
-                context.State.Config.ContinueOrEndRoundPhaseTimeoutMs);
+                context.State.Settings.ContinueOrEndRoundPhaseTimeoutMs);
 
             context.Logger.LogDebug(
                 "FSM → ContinueOrEndRoundPhaseState (alive={alive}, required={req})",
@@ -98,7 +98,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
         {
             if (now < _expiresAt) return null;
 
-            if (!context.State.Config.EnableTimers)
+            if (!context.State.Settings.EnableTimers)
                 return null;
 
             // Non-voters default to "continue" on timeout — keep playing unless

@@ -3,7 +3,7 @@
 
 @{
     var myId = UserService.CurrentUser?.Id ?? "";
-    var isHost = GameState.Host.Id == myId;
+    var isHost = GameState.Host.Id == myId && !GameState.HostIsParticipant;
     int aliveCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated);
     int endVotes = GameState.EndGameVoteStatus.VotedToEnd.Count;
     int castCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated && p.ContinueOrEndVote.HasValue);

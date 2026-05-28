@@ -13,7 +13,6 @@ namespace KnockBox.Codeword.Services.State.Games
         ILogger<CodewordGameState> logger)
         : AbstractGameState(host, logger),
           IPhasedGameState<CodewordGamePhase>,
-          IConfigurableGameState<CodewordGameConfig>,
           IPlayerTrackedGameState<CodewordPlayerState>,
           IFsmContextGameState<CodewordGameContext>
     {
@@ -93,9 +92,19 @@ namespace KnockBox.Codeword.Services.State.Games
         public WinConditionResult? WinResult { get; set; }
 
         /// <summary>
-        /// Game configuration (tunable playtesting values).
+        /// Host-configurable match rules. Mutated only via <c>with</c> expressions
+        /// inside <see cref="AbstractGameState.Execute(Action)"/>. Persisted to the
+        /// host's browser localStorage by the lobby page so preferred rules survive
+        /// across sessions.
         /// </summary>
-        public CodewordGameConfig Config { get; set; } = new();
+        public CodewordSettings Settings { get; set; } = new();
+
+        /// <summary>
+        /// Reflects <see cref="Settings"/>.<c>HostPlaysGame</c> into the
+        /// <see cref="AbstractGameState.HostIsParticipant"/> snapshot. Callers must
+        /// already be inside <see cref="AbstractGameState.Execute(Action)"/>.
+        /// </summary>
+        public void ApplyHostParticipation() => SetHostIsParticipant(Settings.HostPlaysGame);
 
         /// <summary>
         /// Tracking for the "vote to end game" mechanic.
@@ -163,23 +172,6 @@ namespace KnockBox.Codeword.Services.State.Games
 
     /// <summary>Tracks player votes to end the game early.</summary>
     public record EndGameVoteStatus(HashSet<string> VotedToEnd, int RequiredVotes);
-
-    #endregion
-
-    #region Configuration
-
-    public class CodewordGameConfig
-    {
-        public int SetupPhaseTimeoutMs { get; set; } = 5000;
-        public int CluePhaseTimeoutMs { get; set; } = 30000;
-        public int DiscussionPhaseTimeoutMs { get; set; } = 120000;
-        public int VotePhaseTimeoutMs { get; set; } = 15000;
-        public int RevealPhaseTimeoutMs { get; set; } = 10000;
-        public int ContinueOrEndRoundPhaseTimeoutMs { get; set; } = 30000;
-        public int InformantGuessTimeoutMs { get; set; } = 30000;
-        public bool EnableTimers { get; set; } = true;
-        public int TotalGames { get; set; } = 5;
-    }
 
     #endregion
 }

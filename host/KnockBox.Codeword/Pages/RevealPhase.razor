@@ -3,7 +3,7 @@
 
 @{
     var myId = UserService.CurrentUser?.Id ?? "";
-    var isHost = GameState.Host.Id == myId;
+    var isHost = GameState.Host.Id == myId && !GameState.HostIsParticipant;
     var elimination = GameState.LastElimination;
     var informantGuess = GameState.LastInformantGuess;
     bool awaitingGuess = GameState.AwaitingInformantGuess;

@@ -29,7 +29,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             // Set up skip-time vote tracking for this cycle.
             context.State.SkipTimeVoteStatus = new EndGameVoteStatus([], required);
 
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.DiscussionPhaseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Settings.DiscussionPhaseTimeoutMs);
 
             context.Logger.LogDebug("FSM → DiscussionPhaseState");
             return null;
@@ -56,7 +56,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
         {
             if (now < _expiresAt) return null;
 
-            if (!context.State.Config.EnableTimers)
+            if (!context.State.Settings.EnableTimers)
                 return null;
 
             // Auto-advance: tally locked-in votes and transition to reveal.

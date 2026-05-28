@@ -31,7 +31,7 @@ else
     <div class="ctc-crt-screen @(isInformant ? "ctc-state-informant" : "")">
         <div class="ctc-page">
 
-            @if (GameState.Config.EnableTimers && GameState.Context?.Fsm?.CurrentState is ITimedGameState<CodewordGameContext, CodewordCommand> timedState)
+            @if (GameState.Settings.EnableTimers && GameState.Context?.Fsm?.CurrentState is ITimedGameState<CodewordGameContext, CodewordCommand> timedState)
             {
                 var remaining = timedState.GetRemainingTime(GameState.Context!, DateTimeOffset.UtcNow);
                 if (remaining.IsSuccess && remaining.Value.TotalSeconds >= 0)

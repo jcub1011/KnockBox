@@ -185,6 +185,66 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             Assert.IsFalse(canStart, "CanStartAsync should return false with more than 8 players.");
         }
 
+        // ── Host-as-player ────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task CanStartAsync_WithThreePlayersAndHostPlays_ReturnsTrue()
+        {
+            var state = await CreateStateWithPlayersAsync(3);
+            state.Execute(() =>
+            {
+                state.Settings = state.Settings with { HostPlaysGame = true };
+                state.ApplyHostParticipation();
+            });
+
+            var canStart = await _engine.CanStartAsync(state);
+
+            Assert.IsTrue(canStart, "Host should count toward the 4-player minimum when HostPlaysGame is on.");
+        }
+
+        [TestMethod]
+        public async Task CanStartAsync_WithEightPlayersAndHostPlays_ReturnsFalse()
+        {
+            var state = await CreateStateWithPlayersAsync(8);
+            state.Execute(() =>
+            {
+                state.Settings = state.Settings with { HostPlaysGame = true };
+                state.ApplyHostParticipation();
+            });
+
+            var canStart = await _engine.CanStartAsync(state);
+
+            Assert.IsFalse(canStart, "Host should count toward the 8-player maximum when HostPlaysGame is on.");
+        }
+
+        [TestMethod]
+        public async Task StartAsync_HostPlaysGameOn_HostInGamePlayersAndTurnOrder()
+        {
+            var state = await CreateStateWithPlayersAsync(3);
+            state.Execute(() =>
+            {
+                state.Settings = state.Settings with { HostPlaysGame = true };
+                state.ApplyHostParticipation();
+            });
+
+            await _engine.StartAsync(_host, state);
+
+            Assert.HasCount(4, state.GamePlayers);
+            Assert.IsTrue(state.GamePlayers.ContainsKey(_host.Id),
+                "Host should be in GamePlayers when HostPlaysGame is on.");
+            Assert.Contains(_host.Id, state.TurnManager.TurnOrder);
+        }
+
+        [TestMethod]
+        public async Task StartAsync_HostPlaysGameOff_HostNotInGamePlayers()
+        {
+            using var state = await CreateStartedGameAsync(4);
+
+            Assert.IsFalse(state.GamePlayers.ContainsKey(_host.Id),
+                "Host should not be in GamePlayers by default.");
+            Assert.IsFalse(state.TurnManager.TurnOrder.Contains(_host.Id));
+        }
+
         // ── UI methods before game start return errors ────────────────────────
 
         [TestMethod]
@@ -327,7 +387,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         public async Task Tick_AlwaysDelegatesRegardlessOfEnableTimers()
         {
             using var state = await CreateStartedGameAsync(4);
-            state.Config.EnableTimers = false;
+            state.Settings = state.Settings with { EnableTimers = false };
             var context = state.Context!;
 
             // Tick should still succeed even with timers disabled

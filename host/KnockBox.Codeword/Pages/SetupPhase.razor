@@ -3,7 +3,7 @@
 
 @{
     var myId = UserService.CurrentUser?.Id ?? string.Empty;
-    var isHost = GameState.Host.Id == myId;
+    var isHost = GameState.Host.Id == myId && !GameState.HostIsParticipant;
 }
 
 @if (isHost)
