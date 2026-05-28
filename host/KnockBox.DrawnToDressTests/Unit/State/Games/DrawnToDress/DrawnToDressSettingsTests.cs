@@ -1,9 +1,10 @@
+using System.Text.Json;
 using KnockBox.DrawnToDress.Services.State.Games.Data;
 
 namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
 {
     [TestClass]
-    public class DrawnToDressConfigTests
+    public class DrawnToDressSettingsTests
     {
         // ── Drawing phase defaults ────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
         // ── Clothing types defaults ───────────────────────────────────────────
 
         [TestMethod]
-        public void Default_ClothingTypes_HasFiveEntries()
+        public void Default_ClothingTypes_HasFourEntries()
         {
             var config = new DrawnToDressSettings();
             Assert.HasCount(4, config.ClothingTypes);
@@ -364,6 +365,82 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
             Assert.AreEqual(120, config.HostDisconnectTimeoutSec);
             Assert.HasCount(4, config.ClothingTypes);
             Assert.HasCount(3, config.VotingCriteria);
+        }
+
+        // ── JSON persistence (localStorage uses JsonSerializerDefaults.Web) ───────
+
+        // Mirrors the options BrowserStorageService uses to persist settings.
+        private static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
+
+        [TestMethod]
+        public void RoundTrip_PreservesScalarAndEnumSettings()
+        {
+            var original = new DrawnToDressSettings
+            {
+                ShowMannequin = false,
+                EnableTimer = false,
+                DrawingTimeSec = 240,
+                ThemeSource = ThemeSource.HostPick,
+                ThemeAnnouncement = ThemeAnnouncement.AfterDrawing,
+                VoteVisibility = VoteVisibilityMode.PercentagesOnly,
+                VotingRounds = 4,
+                NumOutfitRounds = 2,
+                MannequinDimensions = new MannequinSize(1280, 1024),
+            };
+
+            var json = JsonSerializer.Serialize(original, WebOptions);
+            var restored = JsonSerializer.Deserialize<DrawnToDressSettings>(json, WebOptions)!;
+
+            Assert.AreEqual(original.ShowMannequin, restored.ShowMannequin);
+            Assert.AreEqual(original.EnableTimer, restored.EnableTimer);
+            Assert.AreEqual(original.DrawingTimeSec, restored.DrawingTimeSec);
+            Assert.AreEqual(original.ThemeSource, restored.ThemeSource);
+            Assert.AreEqual(original.ThemeAnnouncement, restored.ThemeAnnouncement);
+            Assert.AreEqual(original.VoteVisibility, restored.VoteVisibility);
+            Assert.AreEqual(original.VotingRounds, restored.VotingRounds);
+            Assert.AreEqual(original.NumOutfitRounds, restored.NumOutfitRounds);
+            // ValueTuple backing fields don't survive Web-options JSON; the record struct does.
+            Assert.AreEqual(original.MannequinDimensions, restored.MannequinDimensions);
+        }
+
+        [TestMethod]
+        public void RoundTrip_PreservesDefaultMannequinDimensions()
+        {
+            var original = new DrawnToDressSettings();
+
+            var json = JsonSerializer.Serialize(original, WebOptions);
+            var restored = JsonSerializer.Deserialize<DrawnToDressSettings>(json, WebOptions)!;
+
+            // Guards against the regression where MannequinDimensions persisted as (0,0).
+            Assert.AreEqual(new MannequinSize(1416, 1416), restored.MannequinDimensions);
+        }
+
+        [TestMethod]
+        public void RoundTrip_PreservesClothingTypeIds()
+        {
+            var original = new DrawnToDressSettings();
+
+            var json = JsonSerializer.Serialize(original, WebOptions);
+            var restored = JsonSerializer.Deserialize<DrawnToDressSettings>(json, WebOptions)!;
+
+            CollectionAssert.AreEqual(
+                original.ClothingTypes.Select(t => t.Id).ToList(),
+                restored.ClothingTypes.Select(t => t.Id).ToList());
+        }
+
+        [TestMethod]
+        public void Serialize_WritesEnumsByName_NotOrdinal()
+        {
+            var json = JsonSerializer.Serialize(new DrawnToDressSettings(), WebOptions);
+
+            // Enum-by-name persistence guards against silent remaps if enum members are ever
+            // reordered. Property names are camelCase under Web options; asserting
+            // property:value (not just the value) keeps the ClothingTypeDefinition.Id check
+            // honest — "Hat" alone would also match the unrelated DisplayName.
+            StringAssert.Contains(json, "\"themeSource\":\"Random\"");
+            StringAssert.Contains(json, "\"themeAnnouncement\":\"BeforeDrawing\"");
+            StringAssert.Contains(json, "\"voteVisibility\":\"Hidden\"");
+            StringAssert.Contains(json, "\"id\":\"Hat\"");      // ClothingTypeDefinition.Id by name
         }
     }
 }

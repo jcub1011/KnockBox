@@ -69,7 +69,11 @@ namespace KnockBox.CardCounter.Pages
         private void UpdateSettings(Func<CardCounterSettings, CardCounterSettings> mutate)
         {
             _userHasEdited = true;
-            GameState.UpdateSettings(mutate);
+            if (GameState.UpdateSettings(mutate).TryGetFailure(out var error))
+            {
+                Logger.LogError("Failed to update Card Counter settings: {Error}", error.PublicMessage);
+                return;
+            }
             PersistSettings();
         }
 
@@ -162,7 +166,11 @@ namespace KnockBox.CardCounter.Pages
                 // the user's edit wins — the saved snapshot would clobber it.
                 if (saved is not null && !_userHasEdited)
                 {
-                    GameState.UpdateSettings(_ => saved);
+                    if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
+                    {
+                        Logger.LogError("Failed to apply saved Card Counter settings: {Error}", error.PublicMessage);
+                        return;
+                    }
                     StateHasChanged();
                 }
             }

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace KnockBox.DrawnToDress.Services.State.Games.Data
 {
     /// <summary>
@@ -8,6 +10,8 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
     public record ClothingTypeDefinition
     {
         /// <summary>Identifies which clothing category this definition represents.</summary>
+        // Persisted snapshots must survive enum reordering, so serialize by name.
+        [JsonConverter(typeof(JsonStringEnumConverter))]
         public ClothingType Id { get; set; }
 
         /// <summary>Human-readable name shown in the UI (e.g. "Hat", "Top").</summary>

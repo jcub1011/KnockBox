@@ -99,7 +99,7 @@ else
     {
         case GamePhase.Lobby:
             <LobbyPhase GameState="GameState" Engine="GameEngine"
-                        UserService="UserService" Config="GameState.Config" />
+                        UserService="UserService" Settings="GameState.Settings" />
             break;
         case GamePhase.RoundSetup:
             <RoundSetupPhase GameState="GameState" UserService="UserService" />

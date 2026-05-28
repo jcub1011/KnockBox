@@ -495,7 +495,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         // ── CardCounterSettings defaults ───────────────────────────────────────────────
 
         [TestMethod]
-        public void GameConfig_ActiveOperatorMode_DefaultsToFalse()
+        public void Settings_ActiveOperatorMode_DefaultsToFalse()
         {
             var config = new CardCounterSettings();
             Assert.IsFalse(config.ActiveOperatorMode, "ActiveOperatorMode should default to false.");

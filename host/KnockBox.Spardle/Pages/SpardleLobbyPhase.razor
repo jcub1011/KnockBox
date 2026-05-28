@@ -308,7 +308,11 @@
     private void UpdateSettings(Func<SpardleSettings, SpardleSettings> mutate)
     {
         _userHasEdited = true;
-        State.UpdateSettings(mutate);
+        if (State.UpdateSettings(mutate).TryGetFailure(out var error))
+        {
+            Logger.LogError("Failed to update Spardle settings: {Error}", error.PublicMessage);
+            return;
+        }
         PersistSettings();
     }
 
@@ -450,6 +454,10 @@
 
         _cts.Cancel();
         _cts.Dispose();
+        // Cancel the pending start-error auto-dismiss so its delayed StateHasChanged()
+        // can't fire on a disposed component.
+        _startErrorCts?.Cancel();
+        _startErrorCts?.Dispose();
         try
         {
             if (_csvUploadModule is not null)
@@ -497,7 +505,11 @@
             // the user's edit wins — the saved snapshot would clobber it.
             if (saved is not null && !_userHasEdited)
             {
-                State.UpdateSettings(_ => saved);
+                if (State.UpdateSettings(_ => saved).TryGetFailure(out var error))
+                {
+                    Logger.LogError("Failed to apply saved Spardle settings: {Error}", error.PublicMessage);
+                    return;
+                }
                 _unlimitedTimer = State.Settings.RoundTimer <= TimeSpan.Zero;
                 StateHasChanged();
             }

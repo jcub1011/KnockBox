@@ -34,7 +34,7 @@ public sealed class SetupState : ITimedCodewordGameState
     {
         // Initialize state
         context.State.SetPhase(CodewordGamePhase.Setup);
-        _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.SetupPhaseTimeoutMs);
+        _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Settings.SetupPhaseTimeoutMs);
         return null; // Stay in this state
     }
 

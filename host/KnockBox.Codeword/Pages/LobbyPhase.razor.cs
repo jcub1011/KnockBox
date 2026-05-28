@@ -80,7 +80,11 @@ namespace KnockBox.Codeword.Pages
         private void UpdateSettings(Func<CodewordSettings, CodewordSettings> mutate)
         {
             _userHasEdited = true;
-            GameState.UpdateSettings(mutate);
+            if (GameState.UpdateSettings(mutate).TryGetFailure(out var error))
+            {
+                Logger.LogError("Failed to update Codeword settings: {Error}", error.PublicMessage);
+                return;
+            }
             PersistSettings();
         }
 
@@ -173,7 +177,11 @@ namespace KnockBox.Codeword.Pages
                 // the user's edit wins — the saved snapshot would clobber it.
                 if (saved is not null && !_userHasEdited)
                 {
-                    GameState.UpdateSettings(_ => saved);
+                    if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
+                    {
+                        Logger.LogError("Failed to apply saved Codeword settings: {Error}", error.PublicMessage);
+                        return;
+                    }
                     StateHasChanged();
                 }
             }

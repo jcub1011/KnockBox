@@ -48,7 +48,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
 
         public string MannequinImagePath { get; init; } = $"{AssetBase}/mannequin-blank.webp";
 
-        public (int X, int Y) MannequinDimensions { get; init; } = (1416, 1416);
+        public MannequinSize MannequinDimensions { get; init; } = new(1416, 1416);
 
         public double MannequinScaleFactor { get; init; } = 0.85;
 

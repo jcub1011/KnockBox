@@ -90,7 +90,11 @@ namespace KnockBox.DrawnToDress.Pages
         {
             if (UserService.CurrentUser?.Id != GameState.Host.Id) return;
             _userHasEdited = true;
-            GameState.UpdateSettings(s => mutate(s).Normalize());
+            if (GameState.UpdateSettings(s => mutate(s).Normalize()).TryGetFailure(out var error))
+            {
+                Logger.LogError("Failed to update Drawn To Dress settings: {Error}", error.PublicMessage);
+                return;
+            }
             PersistSettings();
         }
 
@@ -240,7 +244,11 @@ namespace KnockBox.DrawnToDress.Pages
                 // the user's edit wins — the saved snapshot would clobber it.
                 if (saved is not null && !_userHasEdited)
                 {
-                    GameState.UpdateSettings(_ => saved.Normalize());
+                    if (GameState.UpdateSettings(_ => saved.Normalize()).TryGetFailure(out var error))
+                    {
+                        Logger.LogError("Failed to apply saved Drawn To Dress settings: {Error}", error.PublicMessage);
+                        return;
+                    }
                     StateHasChanged();
                 }
             }

@@ -79,7 +79,11 @@ namespace KnockBox.Operator.Pages
         private void UpdateSettings(Func<OperatorSettings, OperatorSettings> mutate)
         {
             _userHasEdited = true;
-            GameState.UpdateSettings(mutate);
+            if (GameState.UpdateSettings(mutate).TryGetFailure(out var error))
+            {
+                Logger.LogError("Failed to update Operator settings: {Error}", error.PublicMessage);
+                return;
+            }
             PersistSettings();
         }
 
@@ -172,7 +176,11 @@ namespace KnockBox.Operator.Pages
                 // the user's edit wins — the saved snapshot would clobber it.
                 if (saved is not null && !_userHasEdited)
                 {
-                    GameState.UpdateSettings(_ => saved);
+                    if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
+                    {
+                        Logger.LogError("Failed to apply saved Operator settings: {Error}", error.PublicMessage);
+                        return;
+                    }
                     StateHasChanged();
                 }
             }
