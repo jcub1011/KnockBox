@@ -2,6 +2,7 @@ using KnockBox.Tracery.Models;
 using KnockBox.Tracery.Services.Logic.Games;
 using KnockBox.Tracery.Services.State.Games;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.WordService.Contracts;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -12,6 +13,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
     {
         private Mock<ILogger<TraceryGameEngine>> _engineLoggerMock = default!;
         private Mock<ILogger<TraceryGameState>> _stateLoggerMock = default!;
+        private Mock<IWordListService> _wordListServiceMock = default!;
         private User _host = default!;
         private TraceryGameEngine _engine = default!;
 
@@ -20,8 +22,11 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         {
             _engineLoggerMock = new Mock<ILogger<TraceryGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<TraceryGameState>>();
+            // These lifecycle tests don't build the dictionary trie, so a bare mock
+            // word service is enough — GetSolver is exercised in TracerySolverTests.
+            _wordListServiceMock = new Mock<IWordListService>();
             _host = UserFactory.Create("Host", "host1");
-            _engine = new TraceryGameEngine(_engineLoggerMock.Object, _stateLoggerMock.Object);
+            _engine = new TraceryGameEngine(_wordListServiceMock.Object, _engineLoggerMock.Object, _stateLoggerMock.Object);
         }
 
         // ── Construction / lifecycle ────────────────────────────────────────

@@ -20,6 +20,13 @@
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
     <ProjectReference Include="..\..\sdk\KnockBox.Platform\KnockBox.Platform.csproj" />
     <ProjectReference Include="..\KnockBox.Tracery\KnockBox.Tracery.csproj" />
+    <!--
+      Tests build the real trie from real data, so they need both the WordListService
+      impl and the contracts (IWordListService, WordPoolMode). The host wires these via
+      DI at runtime; tests construct WordListService directly (the SpardleTests pattern).
+    -->
+    <ProjectReference Include="..\KnockBox.WordService\KnockBox.WordService.csproj" />
+    <ProjectReference Include="..\KnockBox.WordService.Contracts\KnockBox.WordService.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

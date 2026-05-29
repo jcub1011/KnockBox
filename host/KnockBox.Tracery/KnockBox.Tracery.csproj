@@ -10,6 +10,13 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
+    <!--
+      Reference the word-service contracts assembly so Tracery can inject
+      IWordListService (to build its dictionary trie) at compile time. The runtime
+      resolves the interface via the host's DI container; the implementation lives in
+      the sibling KnockBox.WordService library plugin, loaded before any game plugin.
+    -->
+    <ProjectReference Include="..\KnockBox.WordService.Contracts\KnockBox.WordService.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

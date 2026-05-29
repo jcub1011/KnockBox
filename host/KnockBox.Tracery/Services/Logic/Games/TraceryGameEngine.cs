@@ -1,17 +1,49 @@
 using System.Collections.Immutable;
 using KnockBox.Tracery.Models;
+using KnockBox.Tracery.Services.Logic;
+using KnockBox.Tracery.Services.Logic.Dictionary;
 using KnockBox.Tracery.Services.State.Games;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.WordService.Contracts;
 
 namespace KnockBox.Tracery.Services.Logic.Games
 {
     public class TraceryGameEngine(
+        IWordListService wordListService,
         ILogger<TraceryGameEngine> logger,
         ILogger<TraceryGameState> stateLogger) : AbstractGameEngine(2, 8)
     {
+        // The trie is shared across every lobby this singleton serves, so it is built
+        // with the smallest word length the game ever allows (the settings panel clamps
+        // MinWordLength to [3, 8]). Per-round filtering by the lobby's actual minimum
+        // happens in TracerySolver.Solve; building with the global floor keeps the trie
+        // valid no matter what any individual lobby picks. A shorter floor would only
+        // bloat the trie; a longer one would silently drop legal short words.
+        internal const int MinSupportedWordLength = 3;
+
+        // Lazily built once and reused: the ~386k-word load cost is paid at the first
+        // lobby that needs a solver, not on every round. LazyInitializer guards against
+        // two concurrent first lobbies both building it.
+        private TraceryTrie? _trie;
+
+        /// <summary>
+        /// Returns a solver bound to the shared dictionary trie, building the trie on the
+        /// first call. Thread-safe; the heavy build runs at most once per engine.
+        /// </summary>
+        internal TracerySolver GetSolver()
+            => new(LazyInitializer.EnsureInitialized(ref _trie, BuildTrie));
+
+        private TraceryTrie BuildTrie()
+        {
+            logger.LogInformation("Building Tracery dictionary trie (min word length {min}).", MinSupportedWordLength);
+            var trie = TraceryTrie.BuildFrom(wordListService, MinSupportedWordLength);
+            logger.LogInformation("Tracery dictionary trie built.");
+            return trie;
+        }
+
         public override Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
             if (host is null)
