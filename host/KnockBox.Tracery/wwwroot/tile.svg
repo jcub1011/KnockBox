@@ -1,33 +1,144 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200" role="img" aria-label="Tracery">
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Tracery">
+  <!-- ════════════════════════════════════════════════════════════════════════
+       TRACERY launcher tile. The game's own letter board is the hero — a cobalt
+       word-trace spells TRACERY across it — crowned by a gilt rose-window /
+       quatrefoil frieze and ruled with gilt hairlines. Palette hardcoded to the
+       in-game tokens (tracery-theme.css). Hanken Grotesk (the in-game font) is
+       embedded below as a base64 woff2 subset (uppercase A–Z only) — external web
+       fonts don't load in <img> context, so the face must travel inside the SVG.
+       ════════════════════════════════════════════════════════════════════════ -->
   <defs>
-    <linearGradient id="tr-bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1b1230"/>
-      <stop offset="1" stop-color="#0d1a2b"/>
+    <linearGradient id="tr-stone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#211b2c"/>
+      <stop offset="0.55" stop-color="#1a1622"/>
+      <stop offset="1" stop-color="#141019"/>
     </linearGradient>
-    <radialGradient id="tr-glow" cx="0.3" cy="0.25" r="0.8">
-      <stop offset="0" stop-color="#7c5cff" stop-opacity="0.35"/>
-      <stop offset="1" stop-color="#7c5cff" stop-opacity="0"/>
+    <radialGradient id="tr-candle" cx="0.5" cy="0.42" r="0.6">
+      <stop offset="0" stop-color="#4d88cf" stop-opacity="0.26"/>
+      <stop offset="0.6" stop-color="#4d88cf" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#4d88cf" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="tr-stroke" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#9d7bff"/>
-      <stop offset="1" stop-color="#4fd1c5"/>
+    <linearGradient id="tr-glass-cobalt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a6aa8" stop-opacity="0.65"/>
+      <stop offset="1" stop-color="#1f3556" stop-opacity="0.65"/>
     </linearGradient>
+    <linearGradient id="tr-gilt" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e7c45c"/>
+      <stop offset="0.5" stop-color="#c9a227"/>
+      <stop offset="1" stop-color="#9c7a1e"/>
+    </linearGradient>
+    <filter id="tr-bloom" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <style>
+      @font-face{font-family:'Hanken Grotesk';font-style:normal;font-weight:700 800;src:url(data:font/woff2;base64,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) format('woff2');}
+      .glow   { animation: tr-candle 3.8s ease-in-out infinite; }
+      .litcur { animation: tr-litcur 3.8s ease-in-out infinite; }
+      @keyframes tr-candle { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+      @keyframes tr-litcur { 0%,100% { opacity: 0.40; } 50% { opacity: 0.90; } }
+      @media (prefers-reduced-motion: reduce) {
+        .glow, .litcur { animation: none; opacity: 0.75; }
+      }
+    </style>
   </defs>
 
-  <rect width="300" height="200" rx="16" fill="url(#tr-bg)"/>
-  <rect width="300" height="200" rx="16" fill="url(#tr-glow)"/>
+  <!-- Stone field + candle glow -->
+  <rect width="300" height="200" fill="url(#tr-stone)"/>
+  <rect width="300" height="200" fill="url(#tr-candle)" class="glow"/>
 
-  <!-- Interlacing tracery motif -->
-  <g fill="none" stroke="url(#tr-stroke)" stroke-width="2.5" stroke-linecap="round" opacity="0.9">
-    <path d="M60 150 C 60 95, 100 95, 100 60 C 100 95, 140 95, 140 150"/>
-    <path d="M100 150 C 100 95, 140 95, 140 60 C 140 95, 180 95, 180 150"/>
-    <path d="M140 150 C 140 95, 180 95, 180 60 C 180 95, 220 95, 220 150"/>
-    <circle cx="100" cy="60" r="5" fill="#9d7bff" stroke="none"/>
-    <circle cx="140" cy="60" r="5" fill="#6ec3ff" stroke="none"/>
-    <circle cx="180" cy="60" r="5" fill="#4fd1c5" stroke="none"/>
+  <!-- ── Rose-window / quatrefoil frieze ──────────────────────────────────── -->
+  <!-- rose window -->
+  <g>
+    <circle cx="150" cy="24" r="14" fill="url(#tr-glass-cobalt)" stroke="url(#tr-gilt)" stroke-width="1.6"/>
+    <circle cx="150" cy="24" r="4.5" fill="url(#tr-glass-cobalt)" stroke="url(#tr-gilt)" stroke-width="1"/>
+    <g fill="none" stroke="url(#tr-gilt)" stroke-width="0.9" opacity="0.92">
+      <circle cx="150"   cy="15"   r="3"/><circle cx="157.8" cy="19.5" r="3"/>
+      <circle cx="157.8" cy="28.5" r="3"/><circle cx="150"   cy="33"   r="3"/>
+      <circle cx="142.2" cy="28.5" r="3"/><circle cx="142.2" cy="19.5" r="3"/>
+    </g>
+  </g>
+  <!-- flanking quatrefoils -->
+  <g fill="none" stroke="url(#tr-gilt)" stroke-width="0.85" opacity="0.85">
+    <circle cx="54" cy="24" r="2.6"/><circle cx="54" cy="24" r="1.7"/>
+    <circle cx="54" cy="20" r="2.6"/><circle cx="54" cy="28" r="2.6"/>
+    <circle cx="50" cy="24" r="2.6"/><circle cx="58" cy="24" r="2.6"/>
+    <circle cx="246" cy="24" r="2.6"/><circle cx="246" cy="24" r="1.7"/>
+    <circle cx="246" cy="20" r="2.6"/><circle cx="246" cy="28" r="2.6"/>
+    <circle cx="242" cy="24" r="2.6"/><circle cx="250" cy="24" r="2.6"/>
+  </g>
+  <!-- gilt hairline rules framing the board (the gold traces) -->
+  <line x1="22" y1="44" x2="278" y2="44" stroke="url(#tr-gilt)" stroke-width="1.2" opacity="0.65"/>
+  <line x1="22" y1="180" x2="278" y2="180" stroke="url(#tr-gilt)" stroke-width="1.2" opacity="0.65"/>
+
+  <!-- ── The game board (5×5 letter grid) — the hero ──────────────────────── -->
+  <!-- Resting cells -->
+  <g fill="rgba(236,227,208,0.05)" stroke="rgba(201,162,39,0.28)" stroke-width="0.8">
+    <rect x="89"  y="52"  width="21" height="21" rx="3"/><rect x="114" y="52"  width="21" height="21" rx="3"/><rect x="139" y="52"  width="21" height="21" rx="3"/><rect x="164" y="52"  width="21" height="21" rx="3"/><rect x="189" y="52"  width="21" height="21" rx="3"/>
+    <rect x="89"  y="77"  width="21" height="21" rx="3"/><rect x="114" y="77"  width="21" height="21" rx="3"/><rect x="139" y="77"  width="21" height="21" rx="3"/><rect x="164" y="77"  width="21" height="21" rx="3"/><rect x="189" y="77"  width="21" height="21" rx="3"/>
+    <rect x="89"  y="102" width="21" height="21" rx="3"/><rect x="114" y="102" width="21" height="21" rx="3"/><rect x="139" y="102" width="21" height="21" rx="3"/><rect x="164" y="102" width="21" height="21" rx="3"/><rect x="189" y="102" width="21" height="21" rx="3"/>
+    <rect x="89"  y="127" width="21" height="21" rx="3"/><rect x="114" y="127" width="21" height="21" rx="3"/><rect x="139" y="127" width="21" height="21" rx="3"/><rect x="164" y="127" width="21" height="21" rx="3"/><rect x="189" y="127" width="21" height="21" rx="3"/>
+    <rect x="89"  y="152" width="21" height="21" rx="3"/><rect x="114" y="152" width="21" height="21" rx="3"/><rect x="139" y="152" width="21" height="21" rx="3"/><rect x="164" y="152" width="21" height="21" rx="3"/><rect x="189" y="152" width="21" height="21" rx="3"/>
   </g>
 
-  <text x="150" y="185" text-anchor="middle"
-        font-family="Segoe UI, Helvetica, Arial, sans-serif"
-        font-size="26" font-weight="700" letter-spacing="3" fill="#f2ecff">TRACERY</text>
+  <!-- Traced cells (cobalt-tinted): T R A C E R -->
+  <g fill="rgba(77,136,207,0.16)" stroke="#4d88cf" stroke-width="1">
+    <rect x="89"  y="52"  width="21" height="21" rx="3"/><!-- T -->
+    <rect x="114" y="52"  width="21" height="21" rx="3"/><!-- R -->
+    <rect x="139" y="77"  width="21" height="21" rx="3"/><!-- A -->
+    <rect x="139" y="102" width="21" height="21" rx="3"/><!-- C -->
+    <rect x="114" y="102" width="21" height="21" rx="3"/><!-- E -->
+    <rect x="114" y="127" width="21" height="21" rx="3"/><!-- R -->
+  </g>
+
+  <!-- Lit "current" cell (Y) with pulsing bloom -->
+  <rect class="litcur" x="136" y="149" width="27" height="27" rx="5" fill="#4d88cf" filter="url(#tr-bloom)" opacity="0.65"/>
+  <rect x="139" y="152" width="21" height="21" rx="3" fill="#4d88cf" stroke="#7fb0ea" stroke-width="1"/>
+
+  <!-- Connecting trace polyline (T·R·A·C·E·R·Y) — soft glow, no travelling shine -->
+  <g filter="url(#tr-bloom)">
+    <polyline points="99.5,62.5 124.5,62.5 149.5,87.5 149.5,112.5 124.5,112.5 124.5,137.5 149.5,162.5"
+              fill="none" stroke="#4d88cf" stroke-width="2.4"
+              stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+  </g>
+
+  <!-- Letters (in-game grotesque stack) -->
+  <g font-family="'Hanken Grotesk', 'Outfit', system-ui, sans-serif" font-size="13" font-weight="700" text-anchor="middle">
+    <text x="99.5"  y="62.5"  fill="#bcd4f2" dominant-baseline="central">T</text>
+    <text x="124.5" y="62.5"  fill="#bcd4f2" dominant-baseline="central">R</text>
+    <text x="149.5" y="62.5"  fill="rgba(236,227,208,0.55)" dominant-baseline="central">O</text>
+    <text x="174.5" y="62.5"  fill="rgba(236,227,208,0.55)" dominant-baseline="central">S</text>
+    <text x="199.5" y="62.5"  fill="rgba(236,227,208,0.55)" dominant-baseline="central">N</text>
+    <text x="99.5"  y="87.5"  fill="rgba(236,227,208,0.55)" dominant-baseline="central">D</text>
+    <text x="124.5" y="87.5"  fill="rgba(236,227,208,0.55)" dominant-baseline="central">L</text>
+    <text x="149.5" y="87.5"  fill="#bcd4f2" dominant-baseline="central">A</text>
+    <text x="174.5" y="87.5"  fill="rgba(236,227,208,0.55)" dominant-baseline="central">H</text>
+    <text x="199.5" y="87.5"  fill="rgba(236,227,208,0.55)" dominant-baseline="central">M</text>
+    <text x="99.5"  y="112.5" fill="rgba(236,227,208,0.55)" dominant-baseline="central">I</text>
+    <text x="124.5" y="112.5" fill="#bcd4f2" dominant-baseline="central">E</text>
+    <text x="149.5" y="112.5" fill="#bcd4f2" dominant-baseline="central">C</text>
+    <text x="174.5" y="112.5" fill="rgba(236,227,208,0.55)" dominant-baseline="central">P</text>
+    <text x="199.5" y="112.5" fill="rgba(236,227,208,0.55)" dominant-baseline="central">B</text>
+    <text x="99.5"  y="137.5" fill="rgba(236,227,208,0.55)" dominant-baseline="central">U</text>
+    <text x="124.5" y="137.5" fill="#bcd4f2" dominant-baseline="central">R</text>
+    <text x="149.5" y="137.5" fill="rgba(236,227,208,0.55)" dominant-baseline="central">K</text>
+    <text x="174.5" y="137.5" fill="rgba(236,227,208,0.55)" dominant-baseline="central">G</text>
+    <text x="199.5" y="137.5" fill="rgba(236,227,208,0.55)" dominant-baseline="central">F</text>
+    <text x="99.5"  y="162.5" fill="rgba(236,227,208,0.55)" dominant-baseline="central">O</text>
+    <text x="124.5" y="162.5" fill="rgba(236,227,208,0.55)" dominant-baseline="central">W</text>
+    <text x="149.5" y="162.5" fill="#f4ecd9" dominant-baseline="central">Y</text>
+    <text x="174.5" y="162.5" fill="rgba(236,227,208,0.55)" dominant-baseline="central">V</text>
+    <text x="199.5" y="162.5" fill="rgba(236,227,208,0.55)" dominant-baseline="central">Z</text>
+  </g>
+
+  <!-- ── Wordmark (in-game grotesque stack) ───────────────────────────────── -->
+  <text x="150" y="195" text-anchor="middle"
+        font-family="'Hanken Grotesk', 'Outfit', system-ui, sans-serif"
+        font-size="14" font-weight="800" letter-spacing="5"
+        fill="#5a4a22">TRACERY</text>
+  <text x="149.4" y="194.4" text-anchor="middle"
+        font-family="'Hanken Grotesk', 'Outfit', system-ui, sans-serif"
+        font-size="14" font-weight="800" letter-spacing="5"
+        fill="#ece3d0">TRACERY</text>
 </svg>

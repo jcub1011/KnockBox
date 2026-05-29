@@ -6,7 +6,6 @@
 @if (Reveal is null)
 {
     <div class="tr-stage tr-reveal">
-        <span class="tr-reveal-title">THE REVEAL</span>
         <p class="tr-muted">Tallying the round…</p>
         <TraceryRoundTimer State="State" Duration="State.Settings.IntermissionDuration" />
     </div>
@@ -14,8 +13,6 @@
 else
 {
     <div class="tr-stage tr-reveal">
-        <span class="tr-reveal-title">THE REVEAL</span>
-
         <div class="tr-reveal-beats">
             @if (Reveal.LongestWord is { } longest)
             {
