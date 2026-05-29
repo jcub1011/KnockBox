@@ -44,11 +44,28 @@ else
                     }
                     else
                     {
-                        <div class="tr-grid-placeholder">
-                            <p>Trace words on the @GameState.Settings.GridWidth×@GameState.Settings.GridHeight grid — coming soon.</p>
-                            <p class="tr-muted">Minimum word length: @GameState.Settings.MinWordLength.</p>
+                        <div class="tr-play-body">
+                            <p class="tr-muted tr-play-hint">Drag or tap touching tiles — min @GameState.Settings.MinWordLength letters.</p>
+                            <TraceryGrid Grid="GameState.CurrentGrid"
+                                         IsActive="GameState.IsRoundActive"
+                                         Invalid="_invalidTrace"
+                                         OnPathSubmitted="HandlePathSubmitted" />
+
+                            <div class="tr-bank">
+                                <div class="tr-bank-head">
+                                    <span class="tr-bank-label">BANKED</span>
+                                    <span class="tr-bank-count">@(CurrentPlayerState?.BankedWords.Count ?? 0)</span>
+                                </div>
+                                <div class="tr-bank-list">
+                                    @foreach (var word in BankedWords())
+                                    {
+                                        <span class="tr-bank-word">@word.ToUpperInvariant()</span>
+                                    }
+                                </div>
+                            </div>
                         </div>
                     }
+                    <TraceryToast Message="@_toastMessage" Tone="_toastTone" />
                 </div>
                 break;
 

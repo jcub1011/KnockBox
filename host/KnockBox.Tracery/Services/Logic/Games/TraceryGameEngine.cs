@@ -121,6 +121,64 @@ namespace KnockBox.Tracery.Services.Logic.Games
             => s.HostIsParticipant ? s.RosterIncludingHost : s.Players;
 
         // ═══════════════════════════════════════════════════════════════════════
+        // Player input
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Validates and banks a player's traced word. The path is an ordered list of grid
+        /// cell ids captured client-side by drag or tap; the client only previews legality —
+        /// this is the authoritative check. Mirrors <c>SpardleEngine.SubmitGuess</c>: all work
+        /// happens inside <see cref="AbstractGameState.Execute{T}(Func{T})"/> so subscribers see
+        /// one consistent transition. A word already banked this round is a silent no-op success
+        /// (GDD §4: a word scores once per player per round, regardless of path). Cells are never
+        /// consumed, so they remain available for other words.
+        /// </summary>
+        public Result SubmitTrace(TraceryGameState state, User player, IReadOnlyList<int> path)
+        {
+            var executeResult = state.Execute<Result>(() =>
+            {
+                // 1. An observing host is the shared display, not a participant.
+                if (player.Id == state.Host.Id && !state.HostIsParticipant)
+                    return Result.FromError("Host is observing and cannot submit traces.");
+
+                // 2. Input gate (Milestone 04): only the live Playing phase accepts traces, so a
+                //    submission that races a just-expired timer is rejected.
+                if (state.Phase != GamePhase.Playing || !state.IsRoundActive)
+                    return Result.FromError("Round is not active.");
+
+                // 3. Reject strangers before materializing a PlayerState entry for them.
+                if (!state.TryGetPlayerState(player.Id, out var pState))
+                    return Result.FromError("You are not a participant in this round.");
+
+                // Defensive: an active round always has a grid (EnterPlaying sets it before
+                // flipping IsRoundActive), so this is effectively unreachable.
+                if (state.CurrentGrid is null)
+                    return Result.FromError("There is no active grid.");
+
+                // 4. The solver is the single source of adjacency/length/dictionary truth.
+                var validation = GetSolver().ValidateTrace(state.CurrentGrid, path, state.Settings.MinWordLength);
+                if (!validation.TryGetSuccess(out var word))
+                {
+                    validation.TryGetFailure(out var valErr);
+                    return Result.FromError(valErr);
+                }
+
+                // 5. Already banked this round → no-op success (scores once per player per round).
+                if (pState.HasBanked(word))
+                    return Result.Success;
+
+                // 6. Bank it. The path is copied so a later client reuse of its buffer can't
+                //    mutate the stored trace. (Point value is computed at round close in M06.)
+                pState.Bank(new TracedWord(word, path.ToArray()));
+                return Result.Success;
+            });
+
+            if (executeResult.TryGetSuccess(out var inner)) return inner;
+            if (executeResult.TryGetFailure(out var err)) return Result.FromError(err);
+            return Result.FromCancellation();
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // Phase transitions — placeholder flow for Milestone 01. Real grid,
         // tracing, and scoring fill in later milestones. Every helper assumes it
         // is already inside the execute lock (either via Execute/ExecuteAsync

@@ -165,6 +165,198 @@
     background: #f5f3ff;
 }
 
+/* ── Player tracing (Milestone 05) ─────────────────────────────────────── */
+.tr-play-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+}
+.tr-play-hint {
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.tr-grid-wrap {
+    width: min(420px, 92vw);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.tr-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(var(--tr-cols), 1fr);
+    grid-template-rows: repeat(var(--tr-rows), 1fr);
+    gap: 0.4rem;
+    width: 100%;
+    /* aspect-ratio is set inline from the grid dimensions */
+    touch-action: none; /* a finger drag traces instead of scrolling */
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* The connecting line overlay sits above the cells but ignores pointer events so
+   tap hit-testing and the JS drag elementFromPoint both reach the cells beneath. */
+.tr-grid-lines {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+}
+.tr-grid-lines polyline {
+    fill: none;
+    stroke: rgba(79, 70, 229, 0.55);
+    stroke-width: 0.16;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.tr-cell {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1 / 1;
+    border: 2px solid #c7d2fe;
+    border-radius: 0.6rem;
+    background: #fff;
+    color: #1a1a2e;
+    font-size: clamp(1.1rem, 6vw, 1.9rem);
+    font-weight: 800;
+    cursor: pointer;
+    touch-action: none;
+    transition: background 0.1s, border-color 0.1s, transform 0.1s;
+}
+.tr-cell:disabled { cursor: default; opacity: 0.7; }
+.tr-cell-selected {
+    background: #c7d2fe;
+    border-color: #4f46e5;
+}
+.tr-cell-last {
+    background: #4f46e5;
+    border-color: #4338ca;
+    color: #fff;
+    transform: scale(1.05);
+    z-index: 3; /* lift the active tile above the connecting line */
+}
+.tr-cell-letter { pointer-events: none; }
+
+.tr-grid-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 2rem;
+}
+.tr-grid-current {
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    color: #4f46e5;
+    text-transform: uppercase;
+}
+.tr-grid-clear {
+    border: 1px solid #c7d2fe;
+    background: #eef2ff;
+    color: #4f46e5;
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.tr-grid-clear:hover { background: #e0e7ff; }
+
+@keyframes tr-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+}
+.tr-grid-shake { animation: tr-shake 0.4s ease-in-out; }
+
+/* ── Banked words ──────────────────────────────────────────────────────── */
+.tr-bank {
+    width: min(420px, 92vw);
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.6rem;
+    padding: 0.75rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.tr-bank-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.tr-bank-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #6b7280;
+}
+.tr-bank-count {
+    font-weight: 800;
+    color: #4f46e5;
+}
+.tr-bank-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    min-height: 1.5rem;
+}
+.tr-bank-word {
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 999px;
+    padding: 0.2rem 0.7rem;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    color: #3730a3;
+}
+
+/* ── Toast ─────────────────────────────────────────────────────────────── */
+.tr-toast-holder {
+    position: fixed;
+    top: max(72px, calc(env(safe-area-inset-top) + 64px));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    pointer-events: none;
+    width: min(92vw, 420px);
+    display: flex;
+    justify-content: center;
+}
+.tr-toast {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1.1rem;
+    background: #fff;
+    border: 2px solid #dc2626;
+    border-radius: 0.6rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+    max-width: 100%;
+    text-align: center;
+}
+.tr-toast-icon { font-weight: 900; flex-shrink: 0; }
+.tr-toast-danger { border-color: #dc2626; }
+.tr-toast-danger .tr-toast-icon { color: #dc2626; }
+.tr-toast-warn { border-color: #d97706; }
+.tr-toast-warn .tr-toast-icon { color: #d97706; }
+.tr-toast-success { border-color: #16a34a; }
+.tr-toast-success .tr-toast-icon { color: #16a34a; }
+
 /* ── Reveal / round over ───────────────────────────────────────────────── */
 .tr-reveal-title,
 .tr-roundover-title {
