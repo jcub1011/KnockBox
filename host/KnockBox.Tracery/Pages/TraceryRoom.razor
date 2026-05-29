@@ -46,23 +46,37 @@ else
                     else
                     {
                         <div class="tr-play-body">
-                            <p class="tr-muted tr-play-hint">Drag or tap touching tiles — min @GameState.Settings.MinWordLength letters.</p>
+                            @if (GameState.Settings.Mode == GameMode.Search)
+                            {
+                                <p class="tr-muted tr-play-hint">Find every listed word — drag or tap touching tiles.</p>
+                            }
+                            else
+                            {
+                                <p class="tr-muted tr-play-hint">Drag or tap touching tiles — min @GameState.Settings.MinWordLength letters.</p>
+                            }
                             <div class="tr-play-layout">
-                                <div class="tr-bank">
-                                    <div class="tr-bank-head">
-                                        <span class="tr-bank-label">FOUND</span>
-                                        <span class="tr-bank-total" title="Round score so far (provisional)">@ProvisionalRoundScore</span>
+                                @if (GameState.Settings.Mode == GameMode.Search)
+                                {
+                                    <TracerySearchList State="GameState" PlayerState="CurrentPlayerState" />
+                                }
+                                else
+                                {
+                                    <div class="tr-bank">
+                                        <div class="tr-bank-head">
+                                            <span class="tr-bank-label">FOUND</span>
+                                            <span class="tr-bank-total" title="Round score so far (provisional)">@ProvisionalRoundScore</span>
+                                        </div>
+                                        <div class="tr-bank-list">
+                                            @foreach (var entry in ScoredBankedWords())
+                                            {
+                                                <div class="tr-bank-word" @key="entry.Word">
+                                                    <span class="tr-bank-word-text">@entry.Word.ToUpperInvariant()</span>
+                                                    <span class="tr-bank-word-pts">+@entry.Points</span>
+                                                </div>
+                                            }
+                                        </div>
                                     </div>
-                                    <div class="tr-bank-list">
-                                        @foreach (var entry in ScoredBankedWords())
-                                        {
-                                            <div class="tr-bank-word" @key="entry.Word">
-                                                <span class="tr-bank-word-text">@entry.Word.ToUpperInvariant()</span>
-                                                <span class="tr-bank-word-pts">+@entry.Points</span>
-                                            </div>
-                                        }
-                                    </div>
-                                </div>
+                                }
 
                                 <TraceryGrid Grid="GameState.CurrentGrid"
                                              IsActive="GameState.IsRoundActive"
@@ -76,7 +90,14 @@ else
                 break;
 
             case GamePhase.Reveal:
-                <TraceryRevealView State="GameState" CurrentUserId="@UserService.CurrentUser?.Id" OnSkip="HandleSkipReveal" />
+                @if (GameState.Settings.Mode == GameMode.Search)
+                {
+                    <TracerySearchRevealView State="GameState" CurrentUserId="@UserService.CurrentUser?.Id" OnSkip="HandleSkipReveal" />
+                }
+                else
+                {
+                    <TraceryRevealView State="GameState" CurrentUserId="@UserService.CurrentUser?.Id" OnSkip="HandleSkipReveal" />
+                }
                 break;
 
             case GamePhase.FinalStandings:

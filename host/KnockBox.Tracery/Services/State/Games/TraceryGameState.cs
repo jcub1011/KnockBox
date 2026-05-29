@@ -60,6 +60,21 @@ namespace KnockBox.Tracery.Services.State.Games
             = ImmutableDictionary<string, TracedWord>.Empty;
         public DateTimeOffset? RoundStartTime { get; set; }
 
+        /// <summary>
+        /// Search mode: the round's shared list of target words (lower-cased), the same for every
+        /// player. Set by the engine in <c>EnterPlaying</c> from the board's findable words; empty
+        /// outside an active Search round and always empty in Standard mode. Read lock-free by the
+        /// room page to render the search checklist.
+        /// </summary>
+        public ImmutableArray<string> SearchList { get; set; } = [];
+
+        /// <summary>
+        /// Search mode: how many players have found every word on <see cref="SearchList"/> so far
+        /// this round. Incremented as each player completes to assign their
+        /// <c>TraceryPlayerState.CompletionRank</c>. Reset at the start of each round.
+        /// </summary>
+        public int SearchCompletionsThisRound { get; set; }
+
         // The input gate: true only while the Playing phase is accepting traces. M05's
         // SubmitTrace early-returns a failure unless Phase == Playing && IsRoundActive. Flipped
         // false the moment the round ends (timer fires or round completes), so late submissions

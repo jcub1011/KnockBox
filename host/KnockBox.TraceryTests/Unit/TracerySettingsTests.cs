@@ -24,6 +24,25 @@ namespace KnockBox.Tracery.Tests.Unit
             Assert.AreEqual(1.5, settings.UniqueFindMultiplier);
             Assert.IsTrue(settings.RareLetterBonusEnabled);
             Assert.IsFalse(settings.HostPlaysAlong);
+
+            // Search mode defaults: off by default, with sensible list-size / bonus knobs.
+            Assert.AreEqual(GameMode.Standard, settings.Mode);
+            Assert.AreEqual(10, settings.SearchListSize);
+            Assert.AreEqual(10, settings.SearchPlacementBonusUnit);
+        }
+
+        [TestMethod]
+        public void SearchSettings_RoundTrip_ThroughWebJson()
+        {
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            var original = new TracerySettings { Mode = GameMode.Search, SearchListSize = 7, SearchPlacementBonusUnit = 25 };
+
+            var restored = JsonSerializer.Deserialize<TracerySettings>(
+                JsonSerializer.Serialize(original, options), options)!;
+
+            Assert.AreEqual(GameMode.Search, restored.Mode);
+            Assert.AreEqual(7, restored.SearchListSize);
+            Assert.AreEqual(25, restored.SearchPlacementBonusUnit);
         }
 
         [TestMethod]

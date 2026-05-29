@@ -5,6 +5,37 @@
 
 <div class="tr-settings">
     <section class="tr-settings-section">
+        <h4 class="tr-settings-title">Mode</h4>
+        <div class="tr-settings-grid">
+            <label class="tr-field">
+                <span>Game Mode</span>
+                <select value="@State.Settings.Mode"
+                        @onchange="SetMode">
+                    @foreach (var mode in Enum.GetValues<GameMode>())
+                    {
+                        <option value="@mode">@FriendlyMode(mode)</option>
+                    }
+                </select>
+            </label>
+            @if (State.Settings.Mode == GameMode.Search)
+            {
+                <label class="tr-field">
+                    <span>Search List Size</span>
+                    <input type="number" min="3" max="25"
+                           value="@State.Settings.SearchListSize"
+                           @oninput="e => SetInt(e, v => s => s with { SearchListSize = v }, 3, 25)" />
+                </label>
+                <label class="tr-field">
+                    <span>Placement Bonus Unit</span>
+                    <input type="number" min="0" max="100" step="1"
+                           value="@State.Settings.SearchPlacementBonusUnit"
+                           @oninput="e => SetInt(e, v => s => s with { SearchPlacementBonusUnit = v }, 0, 100)" />
+                </label>
+            }
+        </div>
+    </section>
+
+    <section class="tr-settings-section">
         <h4 class="tr-settings-title">Grid</h4>
         <div class="tr-settings-grid">
             <label class="tr-field">
@@ -147,6 +178,19 @@
         if (Enum.TryParse<WordPoolMode>(e.Value?.ToString(), out var mode))
             OnUpdate(mutate(mode));
     }
+
+    private void SetMode(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<GameMode>(e.Value?.ToString(), out var mode))
+            OnUpdate(s => s with { Mode = mode });
+    }
+
+    private static string FriendlyMode(GameMode mode) => mode switch
+    {
+        GameMode.Standard => "Standard",
+        GameMode.Search => "Search (shared word list)",
+        _ => mode.ToString(),
+    };
 
     private static string FriendlyName(WordPoolMode mode) => mode switch
     {

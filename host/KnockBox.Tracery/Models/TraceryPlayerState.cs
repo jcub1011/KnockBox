@@ -43,6 +43,19 @@ namespace KnockBox.Tracery.Models
         public ImmutableList<TracedWord> BankedInOrder { get; private set; }
             = ImmutableList<TracedWord>.Empty;
 
+        /// <summary>
+        /// Search mode only: this player's 1-based finishing place this round — the order in which
+        /// they found every word on the shared search list. Null until they complete the list (or
+        /// for the whole round in Standard mode). Drives the placement bonus at round close.
+        /// </summary>
+        public int? CompletionRank { get; set; }
+
+        /// <summary>
+        /// Search mode only: the placement bonus awarded for <see cref="CompletionRank"/> at round
+        /// close (0 if the player did not complete the list). Folded into the round score.
+        /// </summary>
+        public int CompletionBonus { get; set; }
+
         /// <summary>True if <paramref name="word"/> is already banked this round.</summary>
         public bool HasBanked(string word) => BankedWords.ContainsKey(word);
 
@@ -65,6 +78,8 @@ namespace KnockBox.Tracery.Models
         {
             RoundScore = 0;
             LastRoundPoints = 0;
+            CompletionRank = null;
+            CompletionBonus = 0;
             BankedWords = BankedWords.Clear();
             BankedInOrder = BankedInOrder.Clear();
         }

@@ -87,7 +87,9 @@
             {
                 <div class="tr-exp-caption tr-exp-caption-hint">
                     @(_selectedUserId is null
-                        ? "Every word on the board — pick a player or a word"
+                        ? (State.Settings.Mode == GameMode.Search
+                            ? "The target words — pick a player or a word"
+                            : "Every word on the board — pick a player or a word")
                         : "Showing one player's finds")
                 </div>
             }

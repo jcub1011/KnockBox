@@ -93,13 +93,20 @@ namespace KnockBox.Tracery.Services.Logic.Games
             return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
         }
 
-        // Fires outside the execute lock so the handler may safely call Execute. Tracery players
-        // bank independently against the round clock — a mid-round leaver simply stops banking
-        // and the timer still ends the round, so there is no "all finished early" gate to
-        // re-open here. Hook retained for parity with the platform disconnect contract; M05/M06
-        // re-check round-end here if an early-finish optimization is ever added.
+        // Fires outside the execute lock so the handler may safely call Execute. In Standard mode a
+        // mid-round leaver simply stops banking and the timer still ends the round — nothing to do.
+        // In Search mode the round ends early once every participant has completed the list, so a
+        // disconnect (which shrinks the roster) can newly satisfy that gate: re-check it here and
+        // close the round if the remaining players have all finished.
         private void HandlePlayerLeft(TraceryGameState s, User player)
         {
+            if (s.Settings.Mode != GameMode.Search) return;
+
+            s.Execute(() =>
+            {
+                if (s.Phase == GamePhase.Playing && s.IsRoundActive && AllParticipantsCompleted(s))
+                    CompleteRound(s);
+            });
         }
 
         protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
@@ -140,6 +147,41 @@ namespace KnockBox.Tracery.Services.Logic.Games
         // The gameplay roster — registered players, plus the host when participating.
         private static IEnumerable<PlayerEntry> Roster(TraceryGameState s)
             => s.HostIsParticipant ? s.RosterIncludingHost : s.Players;
+
+        // Picks up to `size` distinct words at random from the candidate set (the board's
+        // findable words). A partial Fisher-Yates over a snapshot keeps each draw uniform and
+        // distinct; the count is clamped to what the board offers so a sparse board can't ask for
+        // more words than exist. Returns lower-cased words (the solver already lower-cases keys).
+        private ImmutableArray<string> BuildSearchList(IEnumerable<string> candidates, int size)
+        {
+            var pool = candidates.ToArray();
+            int take = Math.Min(Math.Max(size, 0), pool.Length);
+            if (take == 0) return [];
+
+            for (int i = 0; i < take; i++)
+            {
+                int j = i + rng.GetRandomInt(pool.Length - i);
+                (pool[i], pool[j]) = (pool[j], pool[i]);
+            }
+            return [.. pool.Take(take)];
+        }
+
+        // Search mode early-end gate: true once every current participant has found the whole list.
+        // Reads the live roster, so a participant who disconnects mid-round no longer blocks the
+        // gate (their re-check happens in HandlePlayerLeft). A missing/empty list never gates here
+        // because no word can be banked against it, so no completion is ever stamped.
+        private static bool AllParticipantsCompleted(TraceryGameState s)
+        {
+            if (s.SearchList.Length == 0) return false;
+            bool any = false;
+            foreach (var entry in Roster(s))
+            {
+                any = true;
+                if (!s.PlayerStates.TryGetValue(entry.User.Id, out var ps) || ps.CompletionRank is null)
+                    return false;
+            }
+            return any;
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // Player input
@@ -187,6 +229,11 @@ namespace KnockBox.Tracery.Services.Logic.Games
                     return Result.FromError(valErr);
                 }
 
+                // 4b. Search mode: only words on the shared list score. A valid word that isn't a
+                //     target is ignored (soft reject) — it's neither banked nor counted.
+                if (state.Settings.Mode == GameMode.Search && !state.SearchList.Contains(word))
+                    return Result.FromError("Not on the search list.");
+
                 // 5. Already banked this round → no-op success (scores once per player per round).
                 if (pState.HasBanked(word))
                     return Result.Success;
@@ -194,6 +241,18 @@ namespace KnockBox.Tracery.Services.Logic.Games
                 // 6. Bank it. The path is copied so a later client reuse of its buffer can't
                 //    mutate the stored trace. (Point value is computed at round close in M06.)
                 pState.Bank(new TracedWord(word, path.ToArray()));
+
+                // 7. Search mode: a player who has now found every target completes the list. Stamp
+                //    their finishing place, and if everyone has finished, end the round early rather
+                //    than waiting out the clock.
+                if (state.Settings.Mode == GameMode.Search
+                    && pState.CompletionRank is null
+                    && pState.BankedWords.Count >= state.SearchList.Length)
+                {
+                    pState.CompletionRank = ++state.SearchCompletionsThisRound;
+                    if (AllParticipantsCompleted(state))
+                        CompleteRound(state);
+                }
                 return Result.Success;
             });
 
@@ -266,6 +325,14 @@ namespace KnockBox.Tracery.Services.Logic.Games
                 s.BoardFindableWords = ImmutableDictionary<string, TracedWord>.Empty;
             }
 
+            // Search mode: draw the round's shared target list from the board's common-word set so
+            // every word is recognizable and guaranteed present on the grid. Clamped to what the
+            // board actually offers. Standard mode leaves the list empty.
+            s.SearchCompletionsThisRound = 0;
+            s.SearchList = s.Settings.Mode == GameMode.Search
+                ? BuildSearchList(s.BoardFindableWords.Keys, s.Settings.SearchListSize)
+                : [];
+
             s.RoundStartTime = DateTimeOffset.UtcNow;
             s.IsRoundActive = true;
             s.Phase = GamePhase.Playing;
@@ -302,19 +369,47 @@ namespace KnockBox.Tracery.Services.Logic.Games
             // from here on.
             s.IsRoundActive = false;
 
-            // Scoring (GDD §5, §9): unique-find can only be resolved once the round is locked and
-            // every bank is final, so it happens here rather than at submit time.
+            // Scoring (GDD §5, §9): in Standard mode unique-find can only be resolved once the round
+            // is locked and every bank is final, so scoring happens here rather than at submit time.
+            // Search mode scores flat per found word plus a placement bonus by finishing order.
             var roster = Roster(s).ToList();
 
-            // 1. Global frequency: how many players banked each word this round. A word with
-            //    count 1 is a unique find; count >= 2 earns no multiplier for anyone.
+            var outcomes = s.Settings.Mode == GameMode.Search
+                ? ScoreSearchRound(s, roster)
+                : ScoreStandardRound(s, roster);
+
+            // Persist the round so the reveal/standings screens render from it directly.
+            var result = new RoundResult
+            {
+                RoundNumber = s.CurrentRound,
+                Outcomes = outcomes
+            };
+            s.RoundResults = s.RoundResults.Add(result);
+
+            // Assemble the reveal. Standard mode builds the GDD §7 beats from the round's two
+            // findable sets (validation set drives the theoretical max + beat paths so scores never
+            // exceed it; board set drives "words nobody found"). Search mode has its own reveal view
+            // that reads the round outcomes directly, so there is nothing to pre-assemble.
+            s.CurrentReveal = s.Settings.Mode == GameMode.Search
+                ? null
+                : RevealBuilder.Build(s.FindableWords, s.BoardFindableWords, result, s.Settings);
+
+            EnterReveal(s);
+        }
+
+        // Standard scoring: base + length + rare-letter per word, with the unique-find multiplier
+        // resolved across all banks once the round is locked.
+        private static ImmutableArray<TraceryPlayerRoundOutcome> ScoreStandardRound(
+            TraceryGameState s, IReadOnlyList<PlayerEntry> roster)
+        {
+            // Global frequency: how many players banked each word this round. A word with count 1 is
+            // a unique find; count >= 2 earns no multiplier for anyone.
             var bankedByCount = new Dictionary<string, int>();
             foreach (var entry in roster)
                 if (s.PlayerStates.TryGetValue(entry.User.Id, out var ps))
                     foreach (var word in ps.BankedWords.Keys)
                         bankedByCount[word] = bankedByCount.GetValueOrDefault(word) + 1;
 
-            // 2. Score each player's banks, building the per-word breakdown the reveal reads.
             var outcomes = ImmutableArray.CreateBuilder<TraceryPlayerRoundOutcome>(roster.Count);
             foreach (var entry in roster)
             {
@@ -331,7 +426,6 @@ namespace KnockBox.Tracery.Services.Logic.Games
                     roundScore += breakdown.Points;
                 }
 
-                // 3. Roll the round into the cumulative total.
                 ps.RoundScore = roundScore;
                 ps.LastRoundPoints = roundScore;
                 ps.CumulativeScore += roundScore;
@@ -346,21 +440,61 @@ namespace KnockBox.Tracery.Services.Logic.Games
                 });
             }
 
-            // 4. Persist the round so the reveal/standings screens render from it directly.
-            var result = new RoundResult
+            return outcomes.ToImmutable();
+        }
+
+        // Search scoring: each found list-word is worth a flat amount (its length — no length, rare,
+        // or unique bonuses, since everyone shares the same list). Players who found every word earn
+        // a placement bonus by finishing order that scales with the player count: the first finisher
+        // gets unit × P, the next unit × (P-1), and so on; non-completers get no bonus.
+        private static ImmutableArray<TraceryPlayerRoundOutcome> ScoreSearchRound(
+            TraceryGameState s, IReadOnlyList<PlayerEntry> roster)
+        {
+            int participantCount = roster.Count;
+            int unit = s.Settings.SearchPlacementBonusUnit;
+            int listSize = s.SearchList.Length;
+
+            var outcomes = ImmutableArray.CreateBuilder<TraceryPlayerRoundOutcome>(roster.Count);
+            foreach (var entry in roster)
             {
-                RoundNumber = s.CurrentRound,
-                Outcomes = outcomes.ToImmutable()
-            };
-            s.RoundResults = s.RoundResults.Add(result);
+                if (!s.PlayerStates.TryGetValue(entry.User.Id, out var ps))
+                    continue;
 
-            // 5. Assemble the host reveal (GDD §7) from the round's two findable sets + the
-            //    scored round. The validation set drives the theoretical max and beat paths
-            //    (so scores never exceed it); the board set drives "words nobody found" (so
-            //    that list stays a clean common-word list). Pure projection — no recompute.
-            s.CurrentReveal = RevealBuilder.Build(s.FindableWords, s.BoardFindableWords, result, s.Settings);
+                var wordScores = ImmutableArray.CreateBuilder<TraceryWordScore>(ps.BankedWords.Count);
+                int wordPoints = 0;
+                foreach (var word in ps.BankedWords.Keys)
+                {
+                    int points = TraceryScorer.BaseScore(word);
+                    wordScores.Add(new TraceryWordScore { Word = word, BaseScore = points, Points = points });
+                    wordPoints += points;
+                }
 
-            EnterReveal(s);
+                // Placement bonus only for players who completed the whole list.
+                int bonus = ps.CompletionRank is int rank
+                    ? Math.Max(0, unit * (participantCount - rank + 1))
+                    : 0;
+                ps.CompletionBonus = bonus;
+
+                int roundScore = wordPoints + bonus;
+                ps.RoundScore = roundScore;
+                ps.LastRoundPoints = roundScore;
+                ps.CumulativeScore += roundScore;
+
+                outcomes.Add(new TraceryPlayerRoundOutcome
+                {
+                    UserId = entry.User.Id,
+                    DisplayName = entry.DisplayName,
+                    PointsAwarded = roundScore,
+                    CumulativeScore = ps.CumulativeScore,
+                    WordScores = wordScores.ToImmutable(),
+                    CompletionRank = ps.CompletionRank,
+                    CompletionBonus = bonus,
+                    WordsFound = ps.BankedWords.Count,
+                    SearchListSize = listSize
+                });
+            }
+
+            return outcomes.ToImmutable();
         }
 
         // The single post-round intermission: the reveal shows words found, round scoring, the

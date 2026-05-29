@@ -271,6 +271,55 @@
 .tr-over-exit { margin-top: 0.5rem; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   Reveal chrome — shared by every reveal view (Standard + Search). Kept here,
+   not in a component's scoped CSS, so both reveal components pick them up.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.tr-reveal-title {
+    font-family: var(--tr-font-display);
+    font-size: clamp(1.5rem, 6vw, 2.1rem);
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-indent: 0.14em;
+    color: var(--tr-ink);
+    text-shadow: 0 0 30px var(--tr-accent-glow);
+}
+
+/* The board explorer is far wider than the 640px reveal stage; let it break out and centre on
+   its own width (vw-guarded so it never forces a horizontal scrollbar). */
+.tr-reveal-explorer {
+    width: min(1040px, 92vw);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.85rem;
+    margin-top: 0.5rem;
+}
+
+.tr-reveal-subtitle {
+    font-family: var(--tr-font-display);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.42em;
+    text-indent: 0.42em;
+    text-transform: uppercase;
+    color: var(--tr-accent);
+}
+
+/* The next-round indicator below the standings — what plays after this intermission. */
+.tr-reveal-next {
+    font-family: var(--tr-font-display);
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    text-indent: 0.2em;
+    text-transform: uppercase;
+    color: var(--tr-ink-mute);
+}
+
+.tr-reveal-skip { margin-top: 0.25rem; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
    Reduced motion — kill keyframe motion, keep layout intact
    ═══════════════════════════════════════════════════════════════════════════ */
 

@@ -29,6 +29,22 @@ namespace KnockBox.Tracery.Models
 
         /// <summary>Per-word scoring breakdown for everything the player banked this round.</summary>
         public ImmutableArray<TraceryWordScore> WordScores { get; init; } = [];
+
+        // ── Search mode ──────────────────────────────────────────────────────
+        /// <summary>
+        /// Search mode: the player's 1-based finishing place (1 = first to find the whole list), or
+        /// null if they did not complete the search list this round. Null in Standard mode.
+        /// </summary>
+        public int? CompletionRank { get; init; }
+
+        /// <summary>Search mode: the placement bonus included in <see cref="PointsAwarded"/> (0 if not completed).</summary>
+        public int CompletionBonus { get; init; }
+
+        /// <summary>Search mode: how many of the search list's words this player found.</summary>
+        public int WordsFound { get; init; }
+
+        /// <summary>Search mode: the size of the round's shared search list (the target to "complete").</summary>
+        public int SearchListSize { get; init; }
     }
 
     /// <summary>

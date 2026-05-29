@@ -57,30 +57,38 @@ namespace KnockBox.Tracery.Components
         {
             var settings = State.Settings;
 
+            // Search mode shows only the round's shared target list (the subset players were asked
+            // to find), scored flat by length to match how the round actually scored. Standard mode
+            // shows every board word at its full (non-unique) value.
+            bool searchOnly = settings.Mode == GameMode.Search;
+            var allowed = searchOnly ? State.SearchList.ToHashSet(StringComparer.Ordinal) : null;
+            bool Include(string word) => allowed is null || allowed.Contains(word);
+            int Points(string word) => searchOnly
+                ? TraceryScorer.BaseScore(word)
+                : TraceryScorer.WordScore(word, isUnique: false, settings);
+
             // The recognizable common-word set the board was built from — NOT the full validation
             // dictionary (which is huge and full of obscure words, and would swamp the overlay).
             // This is the same set the reveal's "nobody found" beat uses to stay readable.
             var display = new Dictionary<string, TracedWord>(StringComparer.Ordinal);
             if (State.BoardFindableWords is { } board)
                 foreach (var tw in board.Values)
-                    display[tw.Word] = tw;
+                    if (Include(tw.Word))
+                        display[tw.Word] = tw;
 
             // …plus any exotic word a player actually banked this round (validation-valid but not
             // in the common set), so a real human find is never hidden. Its path lives in the
-            // validation superset.
+            // validation superset. (In Search mode banks are list-only, so this adds nothing.)
             var findable = State.FindableWords;
             if (findable is not null)
                 foreach (var o in round?.Outcomes ?? [])
                     foreach (var s in o.WordScores)
-                        if (!display.ContainsKey(s.Word) && findable.TryGetValue(s.Word, out var tw))
+                        if (Include(s.Word) && !display.ContainsKey(s.Word) && findable.TryGetValue(s.Word, out var tw))
                             display[s.Word] = tw;
 
-            // Every shown word, scored at its plain (non-unique) value — "what it's worth".
+            // Every shown word, scored as the round scored it — "what it's worth".
             _scoredWords = display.Values
-                .Select(tw => new ScoredWord(
-                    tw.Word,
-                    TraceryScorer.WordScore(tw.Word, isUnique: false, settings),
-                    tw.Path))
+                .Select(tw => new ScoredWord(tw.Word, Points(tw.Word), tw.Path))
                 .OrderByDescending(w => w.Points)
                 .ThenByDescending(w => w.Word.Length)
                 .ThenBy(w => w.Word, StringComparer.Ordinal)

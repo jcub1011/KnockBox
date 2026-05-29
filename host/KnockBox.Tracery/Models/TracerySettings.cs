@@ -21,6 +21,27 @@ namespace KnockBox.Tracery.Models
     /// </remarks>
     public sealed record TracerySettings
     {
+        // ── Mode ───────────────────────────────────────────────────────────────
+        /// <summary>
+        /// Which play mode the match runs in. Frozen at game start. <see cref="GameMode.Search"/>
+        /// switches the engine to the shared word-search race; the <c>Search*</c> knobs below only
+        /// apply in that mode.
+        /// </summary>
+        public GameMode Mode { get; init; } = GameMode.Standard;
+
+        /// <summary>
+        /// Search mode: how many target words the shared search list holds each round. Clamped at
+        /// generation time to the number of words actually findable on the board.
+        /// </summary>
+        public int SearchListSize { get; init; } = 10;
+
+        /// <summary>
+        /// Search mode: the per-place unit of the completion (placement) bonus. The first player to
+        /// find every list word earns <c>unit × playerCount</c>, the next <c>unit × (playerCount-1)</c>,
+        /// and so on; players who never complete the list earn no placement bonus.
+        /// </summary>
+        public int SearchPlacementBonusUnit { get; init; } = 10;
+
         // ── Grid (GDD §8) ──────────────────────────────────────────────────────
         public int GridWidth { get; init; } = 4;
         public int GridHeight { get; init; } = 4;

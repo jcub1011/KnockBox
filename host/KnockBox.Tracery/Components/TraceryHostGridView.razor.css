@@ -39,6 +39,25 @@
 }
 .tr-host-rail-sub { font-size: 0.68rem; color: var(--tr-ink-mute); }
 
+/* Search mode: the shared target words, shown as chips above the standings. */
+.tr-host-searchwords {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+}
+.tr-host-searchword {
+    font-family: var(--tr-font-mono);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--tr-ink-dim);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    padding: 0.12rem 0.45rem;
+}
+
 .tr-host-standings { display: flex; flex-direction: column; gap: 0.45rem; }
 .tr-host-row {
     display: flex;

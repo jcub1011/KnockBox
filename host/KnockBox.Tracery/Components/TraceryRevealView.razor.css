@@ -1,44 +1,12 @@
-/* The Reveal — the round's social payoff. Beats slam in one after another. The
-   standings board below uses the shared .tr-over-* classes from the theme. */
-
-.tr-reveal-title {
-    font-family: var(--tr-font-display);
-    font-size: clamp(1.5rem, 6vw, 2.1rem);
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    text-indent: 0.14em;
-    color: var(--tr-ink);
-    text-shadow: 0 0 30px var(--tr-accent-glow);
-}
+/* The Reveal — the round's social payoff. Beats slam in one after another. The shared reveal
+   chrome (.tr-reveal-title / -explorer / -subtitle / -next / -skip) and the .tr-over-* standings
+   board live in the theme so the Search reveal shares them; only the beats are owned here. */
 
 .tr-reveal-beats {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
     width: 100%;
-}
-
-/* The board explorer is far wider than the 640px reveal stage; let it break out and centre on
-   its own width (vw-guarded so it never forces a horizontal scrollbar). */
-.tr-reveal-explorer {
-    width: min(1040px, 92vw);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.85rem;
-    margin-top: 0.5rem;
-}
-
-.tr-reveal-skip { margin-top: 0.25rem; }
-
-.tr-reveal-subtitle {
-    font-family: var(--tr-font-display);
-    font-size: 0.85rem;
-    font-weight: 600;
-    letter-spacing: 0.42em;
-    text-indent: 0.42em;
-    text-transform: uppercase;
-    color: var(--tr-accent);
 }
 
 .tr-beat {
@@ -113,14 +81,3 @@
 }
 .tr-missed-word { font-family: var(--tr-font-mono); font-weight: 600; font-size: 0.98rem; letter-spacing: 0.05em; color: var(--tr-ink-dim); }
 .tr-missed-score { font-family: var(--tr-font-mono); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 0.9rem; color: var(--tr-ink-mute); }
-
-/* The next-round indicator below the standings — what plays after this intermission. */
-.tr-reveal-next {
-    font-family: var(--tr-font-display);
-    font-size: 0.8rem;
-    font-weight: 800;
-    letter-spacing: 0.2em;
-    text-indent: 0.2em;
-    text-transform: uppercase;
-    color: var(--tr-ink-mute);
-}

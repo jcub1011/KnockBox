@@ -9,16 +9,29 @@
     </div>
 
     <aside class="tr-host-rail">
+        @if (IsSearch)
+        {
+            <div class="tr-host-rail-head">
+                <span class="tr-host-rail-label">FIND THESE</span>
+                <span class="tr-host-rail-sub">@State.SearchList.Length words</span>
+            </div>
+            <div class="tr-host-searchwords">
+                @foreach (var word in State.SearchList)
+                {
+                    <span class="tr-host-searchword">@word.ToUpperInvariant()</span>
+                }
+            </div>
+        }
         <div class="tr-host-rail-head">
             <span class="tr-host-rail-label">STANDINGS</span>
-            <span class="tr-host-rail-sub">banked this round</span>
+            <span class="tr-host-rail-sub">@(IsSearch ? "found this round" : "banked this round")</span>
         </div>
         <div class="tr-host-standings">
             @foreach (var row in LiveStandings())
             {
                 <div class="tr-host-row">
                     <span class="tr-host-name">@row.DisplayName</span>
-                    <span class="tr-host-banked">@row.Banked</span>
+                    <span class="tr-host-banked">@(IsSearch ? $"{row.Banked}/{State.SearchList.Length}" : row.Banked.ToString())</span>
                     <span class="tr-host-score">@row.Cumulative</span>
                 </div>
             }
@@ -28,6 +41,8 @@
 
 @code {
     [Parameter, EditorRequired] public TraceryGameState State { get; set; } = default!;
+
+    private bool IsSearch => State.Settings.Mode == GameMode.Search;
 
     /// <summary>
     /// The frozen participant roster with each player's live banked-word count this round and
