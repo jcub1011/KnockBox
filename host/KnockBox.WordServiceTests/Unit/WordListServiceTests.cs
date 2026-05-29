@@ -84,11 +84,9 @@ public class WordListServiceTests
     }
 
     [TestMethod]
-    [DataRow(WordPoolMode.HostDefined)]
-    [DataRow(WordPoolMode.CsvUpload)]
-    public void IsInPool_UnbackedModes_ReturnFalse(WordPoolMode mode)
+    public void IsInPool_UnknownMode_ReturnsFalse()
     {
-        Assert.IsFalse(_service.IsInPool(mode, "apple"));
+        Assert.IsFalse(_service.IsInPool((WordPoolMode)(-1), "apple"));
     }
 
     [TestMethod]
@@ -112,9 +110,9 @@ public class WordListServiceTests
     }
 
     [TestMethod]
-    public void GetWordCount_UnbackedMode_ReturnsZero()
+    public void GetWordCount_UnknownMode_ReturnsZero()
     {
-        Assert.AreEqual(0, _service.GetWordCount(WordPoolMode.HostDefined, 5));
+        Assert.AreEqual(0, _service.GetWordCount((WordPoolMode)(-1), 5));
     }
 
     [TestMethod]
@@ -156,10 +154,10 @@ public class WordListServiceTests
     }
 
     [TestMethod]
-    public void GetWord_UnbackedMode_Throws()
+    public void GetWord_UnknownMode_Throws()
     {
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(
-            () => { _ = _service.GetWord(WordPoolMode.HostDefined, 5, 0); });
+            () => { _ = _service.GetWord((WordPoolMode)(-1), 5, 0); });
     }
 
     [TestMethod]
@@ -186,9 +184,8 @@ public class WordListServiceTests
     }
 
     [TestMethod]
-    public void GetAvailableLengths_UnbackedMode_ReturnsEmpty()
+    public void GetAvailableLengths_UnknownMode_ReturnsEmpty()
     {
-        Assert.IsEmpty(_service.GetAvailableLengths(WordPoolMode.HostDefined));
-        Assert.IsEmpty(_service.GetAvailableLengths(WordPoolMode.CsvUpload));
+        Assert.IsEmpty(_service.GetAvailableLengths((WordPoolMode)(-1)));
     }
 }

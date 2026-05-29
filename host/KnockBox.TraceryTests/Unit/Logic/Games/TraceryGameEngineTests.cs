@@ -67,9 +67,9 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
                 svc, new RandomNumberService(),
                 NullLogger<TraceryGameEngine>.Instance, NullLogger<TraceryGameState>.Instance);
 
-            // HostDefined is unbacked by the library plugin (no CSV), so generation must
-            // transparently fall back to the full dictionary and still produce a board.
-            var generator = engine.GetGenerator(WordPoolMode.HostDefined);
+            // An unknown/unbacked pool has no words, so generation must transparently fall
+            // back to the full dictionary and still produce a board.
+            var generator = engine.GetGenerator((WordPoolMode)(-1));
 
             Assert.IsTrue(generator.Generate(new TracerySettings()).IsSuccess);
         }

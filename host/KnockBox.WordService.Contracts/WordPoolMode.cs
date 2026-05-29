@@ -14,20 +14,4 @@ public enum WordPoolMode
 
     /// <summary>Union of NYT plus 350k+ dictionary words.</summary>
     FullDictionary,
-
-    /// <summary>
-    /// Pool defined by the host (e.g., a custom list configured by an admin).
-    /// The library plugin does not back this pool — implementations return
-    /// false / 0 / empty for queries against this mode unless an upper layer
-    /// provides the data.
-    /// </summary>
-    HostDefined,
-
-    /// <summary>
-    /// Pool sourced from a CSV upload at lobby creation time. The library
-    /// plugin does not back this pool — implementations return
-    /// false / 0 / empty for queries against this mode unless an upper layer
-    /// provides the data.
-    /// </summary>
-    CsvUpload,
 }

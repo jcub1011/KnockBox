@@ -54,8 +54,8 @@ namespace KnockBox.Tracery.Services.Logic.Games
         }
 
         // Resolves a requested pool to one that actually has words. Reduced is empty until its
-        // CSV ships, and HostDefined/CsvUpload/unknown modes are unbacked — all fall back to
-        // the full dictionary so a board is always generatable and answers always validatable.
+        // CSV ships, and unknown/unbacked modes have no pool — all fall back to the full
+        // dictionary so a board is always generatable and answers always validatable.
         private WordPoolMode ResolveMode(WordPoolMode requested)
         {
             if (requested != WordPoolMode.FullDictionary && !wordListService.GetAvailableLengths(requested).Any())
