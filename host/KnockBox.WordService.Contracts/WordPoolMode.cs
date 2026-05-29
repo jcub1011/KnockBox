@@ -9,7 +9,10 @@ public enum WordPoolMode
     /// <summary>The NYT Wordle daily answer list.</summary>
     NytStandard,
 
-    /// <summary>Union of NYT plus Google-10k common words.</summary>
+    /// <summary>Google-10k common words.</summary>
+    ReducedDictionary,
+
+    /// <summary>Union of NYT plus 350k+ dictionary words.</summary>
     FullDictionary,
 
     /// <summary>
@@ -27,13 +30,4 @@ public enum WordPoolMode
     /// provides the data.
     /// </summary>
     CsvUpload,
-
-    /// <summary>
-    /// Curated list of common, recognizable words, backed by
-    /// <c>reduced-dictionary.csv</c>. Intended for board generation so boards are
-    /// dense with words a normal player knows, while a wider pool can still
-    /// validate answers. Until the CSV ships this pool is empty and callers should
-    /// fall back to <see cref="FullDictionary"/>.
-    /// </summary>
-    Reduced,
 }
