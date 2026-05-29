@@ -7,7 +7,7 @@
 @if (_grid is { } grid)
 {
     var lit = LitCells();
-    var selectedWords = SelectedWords;
+    var listWords = VisibleWords().ToList();
 
     <div class="tr-exp">
 
@@ -61,17 +61,21 @@
 
                 <svg class="tr-exp-lines" viewBox="0 0 @grid.Width @grid.Height"
                      preserveAspectRatio="none" aria-hidden="true">
-                    @foreach (var w in VisibleWords())
+                    @* Merged web: one line per shared edge, thicker the more words use it. *@
+                    @foreach (var e in MergedEdges())
                     {
-                        bool isHot = Highlighted == w.Word;
-                        double alpha = AlphaFor(w.Word);
-                        var (sx, sy) = Start(w.Path);
-                        <g class="@(isHot ? "tr-exp-path-hot" : "")">
-                            <polyline points="@LinePoints(w.Path)"
-                                      stroke="@Stroke(w.Word, alpha)"
-                                      stroke-width="@(isHot ? "0.26" : "0.16")" />
-                            <circle cx="@sx" cy="@sy" r="@(isHot ? "0.18" : "0.13")"
-                                    fill="@Stroke(w.Word, Math.Min(1.0, alpha + 0.25))" />
+                        <line x1="@Num(e.X1)" y1="@Num(e.Y1)" x2="@Num(e.X2)" y2="@Num(e.Y2)"
+                              class="tr-exp-edge @(Highlighted is not null ? "tr-exp-edge-mute" : "")"
+                              stroke-width="@EdgeWidth(e.Count)" />
+                    }
+                    @* Spotlighted word: its single path in its own hue, drawn over the muted web. *@
+                    @if (Highlighted is { } hw && _scoredWords.FirstOrDefault(w => w.Word == hw) is { } sw)
+                    {
+                        var (sx, sy) = Start(sw.Path);
+                        <g class="tr-exp-path-hot">
+                            <polyline points="@LinePoints(sw.Path)"
+                                      stroke="@Stroke(sw.Word, 0.95)" stroke-width="0.24" />
+                            <circle cx="@sx" cy="@sy" r="0.16" fill="@Stroke(sw.Word, 1.0)" />
                         </g>
                     }
                 </svg>
@@ -95,20 +99,18 @@
             }
         </div>
 
-        @* ── Word list, richest first ────────────────────────────────────── *@
+        @* ── Word list, richest first. A selected player narrows it to just their finds. ── *@
         <div class="tr-exp-wordlist">
             <div class="tr-exp-wordlist-head">
                 <span class="tr-exp-wordlist-title">WORDS</span>
-                <span class="tr-exp-wordlist-count">@_scoredWords.Count</span>
+                <span class="tr-exp-wordlist-count">@listWords.Count</span>
             </div>
             <div class="tr-exp-wordlist-scroll">
-                @foreach (var w in _scoredWords)
+                @foreach (var w in listWords)
                 {
-                    bool found = selectedWords?.Contains(w.Word) ?? false;
-                    bool dimmed = selectedWords is not null && !found;
                     bool isHot = Highlighted == w.Word;
                     <button type="button"
-                            class="tr-exp-word @(found ? "tr-exp-word-found" : "") @(dimmed ? "tr-exp-word-dim" : "") @(isHot ? "tr-exp-word-hot" : "")"
+                            class="tr-exp-word @(isHot ? "tr-exp-word-hot" : "")"
                             @key="w.Word"
                             @onclick="() => ToggleWord(w.Word)">
                         <span class="tr-exp-word-swatch" style="background:@Swatch(w.Word);"></span>

@@ -110,10 +110,19 @@ namespace KnockBox.Tracery.Components
         }
 
         // ── Selection / spotlight state ───────────────────────────────────────
+        // Switching the player narrows the word list, so any pinned word might vanish from it —
+        // clear the spotlight on every player change so the two panes never disagree.
         private void SelectPlayer(string userId)
-            => _selectedUserId = _selectedUserId == userId ? null : userId;
+        {
+            _selectedUserId = _selectedUserId == userId ? null : userId;
+            _selectedWord = null;
+        }
 
-        private void ShowAll() => _selectedUserId = null;
+        private void ShowAll()
+        {
+            _selectedUserId = null;
+            _selectedWord = null;
+        }
 
         private void ToggleWord(string word) => _selectedWord = _selectedWord == word ? null : word;
 
@@ -155,14 +164,44 @@ namespace KnockBox.Tracery.Components
             return (Num(c + 0.5), Num(r + 0.5));
         }
 
-        // Stroke opacity: kept low so the letters read through the lines. A single spotlight fades
-        // everything else right back; otherwise paths are faintest when the whole board is shown
-        // and a touch bolder once a player narrows it down.
-        private double AlphaFor(string word)
+        // ── Merged edges ──────────────────────────────────────────────────────
+        // Drawing every word's full path stacks dozens of polylines on the same cells and the
+        // overlap becomes unreadable. Instead we break all visible paths into undirected
+        // cell-to-cell edges and draw each edge once, its thickness growing with how many words
+        // share it — so a busy corridor reads as one bold line rather than a tangle.
+        private sealed record MergedEdge(double X1, double Y1, double X2, double Y2, int Count);
+
+        private IReadOnlyList<MergedEdge> MergedEdges()
         {
-            if (Highlighted is { } hw) return word == hw ? 0.85 : 0.05;
-            return _selectedUserId is null ? 0.28 : 0.5;
+            var grid = _grid!;
+            var counts = new Dictionary<(int Lo, int Hi), int>();
+            foreach (var w in VisibleWords())
+            {
+                var path = w.Path;
+                for (int i = 1; i < path.Count; i++)
+                {
+                    int a = path[i - 1], b = path[i];
+                    var key = a < b ? (a, b) : (b, a);
+                    counts[key] = counts.GetValueOrDefault(key) + 1;
+                }
+            }
+
+            var list = new List<MergedEdge>(counts.Count);
+            foreach (var (key, count) in counts)
+            {
+                var (ra, ca) = grid.FromCellId(key.Lo);
+                var (rb, cb) = grid.FromCellId(key.Hi);
+                list.Add(new MergedEdge(ca + 0.5, ra + 0.5, cb + 0.5, rb + 0.5, count));
+            }
+            return list;
         }
+
+        // Logarithmic thickness with a hard cap so a line never spills past its 1.0-unit cell:
+        // count == 1 → Log(1) == 0 → EdgeBase (thin), and growth tapers as more words pile on.
+        private const double EdgeBase = 0.08, EdgeScale = 0.06, EdgeMax = 0.28;
+
+        private static string EdgeWidth(int count)
+            => Num(Math.Min(EdgeMax, EdgeBase + EdgeScale * Math.Log(count)));
 
         private string Stroke(string word, double alpha)
             => $"hsla({_hueByWord.GetValueOrDefault(word):0}, 72%, 62%, {Num(alpha)})";
