@@ -1,0 +1,118 @@
+/* The traceable letter grid — the centerpiece. Dark tiles, a glowing neon trace
+   polyline, and a lit + pulsing "current" tile. Grid sizing comes from the inline
+   --tr-cols/--tr-rows custom props and aspect-ratio set by the component; don't
+   override those here. */
+
+.tr-grid-wrap {
+    width: min(420px, 92vw);
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+/* No padding/border here: the SVG trace overlay maps its 0..W/0..H viewBox to
+   this exact box (cell centres at c+0.5, r+0.5), so changing the box geometry
+   or gap would shift the line off the tiles. Keep gap at 0.4rem (original). */
+.tr-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(var(--tr-cols), 1fr);
+    grid-template-rows: repeat(var(--tr-rows), 1fr);
+    gap: 0.4rem;
+    width: 100%;
+    /* aspect-ratio is set inline from the grid dimensions */
+    touch-action: none; /* a finger drag traces instead of scrolling */
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* Connecting trace line. Above the cells but transparent to pointer events so
+   tap hit-testing and the JS drag elementFromPoint reach the cells beneath. */
+.tr-grid-lines {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+    overflow: visible;
+    filter: drop-shadow(0 0 5px var(--tr-accent-glow));
+}
+.tr-grid-lines polyline {
+    fill: none;
+    stroke: var(--tr-accent);
+    stroke-width: 0.18;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.9;
+}
+
+.tr-cell {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1 / 1;
+    border: 1.5px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--tr-ink);
+    font-family: var(--tr-font-mono);
+    font-size: clamp(1.1rem, 6vw, 1.9rem);
+    font-weight: 800;
+    cursor: pointer;
+    touch-action: none;
+    transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease, color 0.12s ease;
+}
+.tr-cell:disabled { cursor: default; opacity: 0.55; }
+
+.tr-cell-selected {
+    background: var(--tr-accent-dim);
+    border-color: var(--tr-accent);
+    color: var(--tr-accent);
+}
+.tr-cell-last {
+    background: var(--tr-accent);
+    border-color: var(--tr-accent);
+    color: var(--tr-accent-ink);
+    transform: scale(1.06);
+    z-index: 3; /* lift the active tile above the connecting line */
+    animation: tr-pulse-accent 1.1s ease-in-out infinite;
+}
+.tr-cell-letter { pointer-events: none; }
+
+.tr-grid-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 2.2rem;
+}
+.tr-grid-current {
+    font-family: var(--tr-font-mono);
+    font-weight: 800;
+    font-size: 1.15rem;
+    letter-spacing: 0.18em;
+    color: var(--tr-accent);
+    text-transform: uppercase;
+    text-shadow: 0 0 14px var(--tr-accent-glow);
+    min-height: 1.2em;
+}
+.tr-grid-clear {
+    font-family: var(--tr-font-display);
+    border: 1px solid var(--tr-border-strong);
+    background: var(--tr-panel-2);
+    color: var(--tr-ink);
+    border-radius: var(--tr-radius-sm);
+    padding: 0.35rem 1rem;
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+.tr-grid-clear:hover { background: rgba(255, 255, 255, 0.12); border-color: var(--tr-accent); }
+
+.tr-grid-shake { animation: tr-shake 0.4s ease-in-out; }

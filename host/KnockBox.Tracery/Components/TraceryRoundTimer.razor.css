@@ -1,0 +1,52 @@
+/* Countdown bar. Neon fill that drains; flushes red and pulses under 10s. The
+   .tr-timer markup is this component's ChildContent, so it carries this scope. */
+
+.tr-timer { width: min(280px, 100%); }
+
+.tr-timer-bar {
+    height: 9px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--tr-border);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.tr-timer-fill {
+    height: 100%;
+    background: var(--tr-accent);
+    box-shadow: 0 0 12px var(--tr-accent-glow);
+    transition: width 0.25s linear, background 0.3s ease;
+}
+
+.tr-timer-digits {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
+    font-family: var(--tr-font-mono);
+    font-weight: 800;
+    font-size: 1.05rem;
+    color: var(--tr-ink);
+}
+.tr-timer-icon { opacity: 0.85; }
+
+.tr-timer-urgent .tr-timer-fill {
+    background: var(--tr-danger);
+    box-shadow: 0 0 14px var(--tr-danger-glow);
+    animation: tr-flash-danger 0.9s ease-in-out infinite;
+}
+.tr-timer-urgent .tr-timer-value {
+    color: var(--tr-danger);
+}
+
+.tr-timer-unlimited {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    font-family: var(--tr-font-mono);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--tr-ink-mute);
+}
+.tr-timer-unlimited .tr-timer-icon { font-size: 1.2rem; color: var(--tr-accent); opacity: 1; }

@@ -1,0 +1,97 @@
+/* The room's custom header bar. Renders OUTSIDE .tr-page, but the :root tokens
+   in tracery-theme.css are global so they're available here too.
+
+   NOTE: .tr-header-code* are applied to elements rendered by the shared
+   <RoomCodeButton> child component, so they live in a different CSS scope —
+   they must be reached with ::deep, not plain scoped selectors. */
+
+.tr-header-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.7rem 1.25rem;
+    background: rgba(7, 7, 13, 0.72);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--tr-border);
+    font-family: var(--tr-font-body);
+}
+
+.tr-header-brand {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}
+.tr-header-text {
+    font-family: var(--tr-font-display);
+    font-weight: 800;
+    font-size: 1.4rem;
+    letter-spacing: 0.34em;
+    text-indent: 0.34em;
+    color: var(--tr-ink);
+    transition: color 0.2s ease, text-shadow 0.2s ease;
+}
+.tr-header-brand:hover .tr-header-text {
+    color: var(--tr-accent);
+    text-shadow: 0 0 20px var(--tr-accent-glow);
+}
+
+.tr-header-actions { display: flex; align-items: center; gap: 0.6rem; }
+
+/* Session-code pill (rendered by RoomCodeButton → reached via ::deep). */
+.tr-header-actions ::deep .tr-header-code {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.05rem;
+    min-width: 7.5rem;
+    padding: 0.35rem 0.9rem;
+    background: var(--tr-panel-2);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-ink);
+    cursor: pointer;
+    transition: border-color 0.18s ease, background 0.18s ease;
+}
+.tr-header-actions ::deep .tr-header-code:hover {
+    border-color: var(--tr-accent);
+    background: rgba(30, 255, 188, 0.08);
+}
+.tr-header-actions ::deep .tr-header-code-cover {
+    font-family: var(--tr-font-display);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-indent: 0.22em;
+    color: var(--tr-ink-mute);
+    text-transform: uppercase;
+}
+.tr-header-actions ::deep .tr-header-code-value {
+    font-family: var(--tr-font-mono);
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    color: var(--tr-accent);
+}
+
+.tr-header-leave {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--tr-panel-2);
+    border: 1px solid var(--tr-border);
+    color: var(--tr-ink-dim);
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.tr-header-leave:hover {
+    color: var(--tr-danger);
+    border-color: var(--tr-danger);
+    background: rgba(255, 59, 107, 0.12);
+}

@@ -1,0 +1,145 @@
+/* Room shell + the phase markup TraceryRoom renders inline (RoundIntro, the
+   Playing wrapper + banked list, RoundOver title). Shared classes (.tr-stage,
+   .tr-muted, .tr-over-*) live in tracery-theme.css; the dark backdrop and these
+   phase-specific bits are owned here. */
+
+.tr-page {
+    position: relative;
+    min-height: 100%;
+    padding: 1.5rem 1rem 3rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    color: var(--tr-ink);
+    font-family: var(--tr-font-body);
+}
+
+/* Full-viewport dark backdrop with two soft neon glows. Fixed + behind content
+   so it covers regardless of how short a phase's content is. */
+.tr-page::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+        radial-gradient(900px 620px at 50% -12%, rgba(30, 255, 188, 0.10), transparent 60%),
+        radial-gradient(760px 520px at 100% 108%, rgba(255, 59, 107, 0.07), transparent 55%),
+        var(--tr-bg-0);
+}
+
+.tr-loading {
+    padding: 3rem;
+    text-align: center;
+    font-family: var(--tr-font-display);
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    text-indent: 0.25em;
+    text-transform: uppercase;
+    color: var(--tr-ink-dim);
+}
+
+/* ── Round intro ───────────────────────────────────────────────────────── */
+.tr-intro { gap: 0.4rem; }
+.tr-intro-label {
+    font-family: var(--tr-font-display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.5em;
+    text-indent: 0.5em;
+    color: var(--tr-accent);
+}
+.tr-intro-number {
+    font-family: var(--tr-font-display);
+    font-size: clamp(3.5rem, 16vw, 6rem);
+    font-weight: 800;
+    line-height: 1;
+    color: var(--tr-ink);
+    text-shadow: 0 0 44px var(--tr-accent-glow);
+    animation: tr-pop 0.5s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+.tr-intro-of { font-size: 0.32em; color: var(--tr-ink-mute); font-weight: 700; letter-spacing: 0; }
+.tr-intro-getready {
+    font-family: var(--tr-font-display);
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.38em;
+    text-indent: 0.38em;
+    color: var(--tr-ink-dim);
+}
+
+/* ── Playing ───────────────────────────────────────────────────────────── */
+.tr-playing { width: min(640px, 100%); gap: 1.25rem; }
+.tr-playing-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 1rem;
+}
+.tr-playing-round {
+    font-family: var(--tr-font-display);
+    font-weight: 800;
+    font-size: 0.95rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--tr-ink);
+}
+.tr-play-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    width: 100%;
+}
+.tr-play-hint { font-size: 0.85rem; text-align: center; }
+
+/* ── Banked words ──────────────────────────────────────────────────────── */
+.tr-bank {
+    width: min(440px, 92vw);
+    background: var(--tr-panel);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius);
+    padding: 0.85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+.tr-bank-head { display: flex; align-items: center; justify-content: space-between; }
+.tr-bank-label {
+    font-family: var(--tr-font-display);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.25em;
+    text-indent: 0.25em;
+    color: var(--tr-ink-mute);
+}
+.tr-bank-count {
+    font-family: var(--tr-font-mono);
+    font-weight: 800;
+    font-size: 1.05rem;
+    color: var(--tr-accent);
+}
+.tr-bank-list { display: flex; flex-wrap: wrap; gap: 0.4rem; min-height: 1.6rem; }
+.tr-bank-word {
+    font-family: var(--tr-font-mono);
+    background: var(--tr-accent-dim);
+    border: 1px solid rgba(30, 255, 188, 0.32);
+    border-radius: 999px;
+    padding: 0.2rem 0.7rem;
+    font-weight: 700;
+    font-size: 0.82rem;
+    letter-spacing: 0.05em;
+    color: var(--tr-accent);
+    animation: tr-pop 0.3s ease both;
+}
+
+/* ── Round over ────────────────────────────────────────────────────────── */
+.tr-roundover-title {
+    font-family: var(--tr-font-display);
+    font-size: clamp(1.3rem, 5vw, 1.8rem);
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--tr-ink);
+    text-shadow: 0 0 26px var(--tr-accent-glow);
+}
