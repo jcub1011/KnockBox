@@ -33,6 +33,7 @@ namespace KnockBox.Tracery.Components
         [Parameter] public EventCallback<IReadOnlyList<int>> OnPathSubmitted { get; set; }
 
         private readonly List<int> _path = new();
+        private int _rotationQuarterTurns; // 0..3; * 90 = clockwise degrees of the player's view
         private ElementReference _gridEl;
         private IJSObjectReference? _module;
         private DotNetObjectReference<TraceryGrid>? _dotNetRef;
@@ -46,6 +47,7 @@ namespace KnockBox.Tracery.Components
             {
                 _renderedGrid = Grid;
                 _path.Clear();
+                _rotationQuarterTurns = 0; // each new round starts at the default orientation
             }
 
             // The round ended (timer/complete) — clear the preview so the locked grid is clean.
@@ -131,6 +133,18 @@ namespace KnockBox.Tracery.Components
             else ExtendPath(cellId);
             StateHasChanged();
         }
+
+        // ── View rotation (client-only) ─────────────────────────────────────
+
+        /// <summary>Clockwise degrees the player has rotated their own view of the board.</summary>
+        private int RotationDegrees => _rotationQuarterTurns * 90;
+
+        /// <summary>
+        /// Turn the player's view 90° clockwise. Purely visual: cell ids, the trace path,
+        /// adjacency, and scoring are untouched, so no new words can be formed. Synchronous
+        /// Blazor handler, so the re-render is automatic.
+        /// </summary>
+        private void RotateGrid() => _rotationQuarterTurns = (_rotationQuarterTurns + 1) % 4;
 
         // ── Shared path model ───────────────────────────────────────────────
 
