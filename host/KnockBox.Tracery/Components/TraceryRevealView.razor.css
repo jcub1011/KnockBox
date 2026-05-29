@@ -18,6 +18,29 @@
     width: 100%;
 }
 
+/* The board explorer is far wider than the 640px reveal stage; let it break out and centre on
+   its own width (vw-guarded so it never forces a horizontal scrollbar). */
+.tr-reveal-explorer {
+    width: min(1040px, 92vw);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.85rem;
+    margin-top: 0.5rem;
+}
+
+.tr-reveal-skip { margin-top: 0.25rem; }
+
+.tr-reveal-subtitle {
+    font-family: var(--tr-font-display);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.42em;
+    text-indent: 0.42em;
+    text-transform: uppercase;
+    color: var(--tr-accent);
+}
+
 .tr-beat {
     display: flex;
     flex-direction: column;

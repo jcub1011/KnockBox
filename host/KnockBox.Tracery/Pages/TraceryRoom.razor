@@ -76,7 +76,7 @@ else
                 break;
 
             case GamePhase.Reveal:
-                <TraceryRevealView State="GameState" />
+                <TraceryRevealView State="GameState" CurrentUserId="@UserService.CurrentUser?.Id" OnSkip="HandleSkipReveal" />
                 break;
 
             case GamePhase.FinalStandings:

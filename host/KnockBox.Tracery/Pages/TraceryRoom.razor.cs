@@ -77,6 +77,18 @@ namespace KnockBox.Tracery.Pages
             StateHasChanged();
         }
 
+        /// <summary>
+        /// Host-only: skip the remaining round-transition (reveal) time and advance immediately.
+        /// The engine rejects the call for non-hosts, so this is safe even though the button is
+        /// only rendered for the host.
+        /// </summary>
+        private void HandleSkipReveal()
+        {
+            if (GameState is null || UserService.CurrentUser is null) return;
+            GameEngine.SkipReveal(GameState, UserService.CurrentUser);
+            StateHasChanged();
+        }
+
         private async Task ShowToast(string message, TraceryToast.ToastTone tone)
         {
             _toastCts?.Cancel();

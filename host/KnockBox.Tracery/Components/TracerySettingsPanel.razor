@@ -75,10 +75,18 @@
                 <input type="checkbox" @bind="_unlimitedTimer" @bind:after="OnUnlimitedToggled" />
             </label>
             <label class="tr-field">
-                <span>Transition (seconds)</span>
+                <span>Get Ready (seconds)</span>
                 <input type="number" min="2" max="15" step="1"
                        value="@((int)State.Settings.TransitionDuration.TotalSeconds)"
-                       @oninput="OnTransitionChanged" />
+                       @oninput="OnTransitionChanged"
+                       title="The one-time 'get ready' countdown before the first round begins." />
+            </label>
+            <label class="tr-field">
+                <span>Round Transition (seconds)</span>
+                <input type="number" min="5" max="180" step="5"
+                       value="@((int)State.Settings.IntermissionDuration.TotalSeconds)"
+                       @oninput="OnIntermissionChanged"
+                       title="The results/board screen shown between rounds. The host can skip the remaining time." />
             </label>
         </div>
     </section>
@@ -167,6 +175,12 @@
     {
         if (int.TryParse(e.Value?.ToString(), out int seconds))
             OnUpdate(s => s with { TransitionDuration = TimeSpan.FromSeconds(Math.Clamp(seconds, 2, 15)) });
+    }
+
+    private void OnIntermissionChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int seconds))
+            OnUpdate(s => s with { IntermissionDuration = TimeSpan.FromSeconds(Math.Clamp(seconds, 5, 180)) });
     }
 
     private void OnMultiplierChanged(ChangeEventArgs e)
