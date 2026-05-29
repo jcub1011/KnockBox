@@ -1,0 +1,121 @@
+@* End-of-round board explorer (GDD §7 extension). Pure renderer of reveal-time state: a player
+   rail ordered by round points · the letter matrix with one translucent coloured path per word ·
+   a list of every detectable word by value. No selection → every word's path; a player → only
+   theirs. Hover (desktop) or tap (touch) a word to spotlight its single path. Each word's list
+   swatch shares the hue of its board path so the two read as one. *@
+
+@if (_grid is { } grid)
+{
+    var lit = LitCells();
+    var selectedWords = SelectedWords;
+
+    <div class="tr-exp">
+
+        @* ── Player rail ─────────────────────────────────────────────────── *@
+        <div class="tr-exp-players" role="listbox" aria-label="Players by round score">
+            <button type="button"
+                    class="tr-exp-allbtn @(_selectedUserId is null ? "tr-exp-allbtn-on" : "")"
+                    @onclick="ShowAll">
+                <span class="tr-exp-all-dot"></span>
+                <span class="tr-exp-all-text">All words</span>
+                <span class="tr-exp-all-count">@_scoredWords.Count</span>
+            </button>
+
+            @{ int rank = 0; }
+            @foreach (var p in _playerRows)
+            {
+                rank++;
+                bool isSel = p.UserId == _selectedUserId;
+                bool isMe = CurrentUserId is not null && p.UserId == CurrentUserId;
+                <button type="button"
+                        class="tr-exp-player @(isSel ? "tr-exp-player-on" : "") @(isMe ? "tr-exp-player-me" : "")"
+                        @onclick="() => SelectPlayer(p.UserId)">
+                    <span class="tr-exp-rank">@rank</span>
+                    <span class="tr-exp-name">
+                        @p.DisplayName
+                        @if (isMe)
+                        {
+                            <span class="tr-exp-you">YOU</span>
+                        }
+                    </span>
+                    <span class="tr-exp-words" title="words found">@p.Words.Count</span>
+                    <span class="tr-exp-pts">+@p.RoundPoints</span>
+                </button>
+            }
+        </div>
+
+        @* ── Letter matrix with path overlay ─────────────────────────────── *@
+        <div class="tr-exp-stage">
+            <div class="tr-exp-grid"
+                 style="--tr-cols:@grid.Width;--tr-rows:@grid.Height;aspect-ratio:@grid.Width / @grid.Height;">
+
+                @for (int id = 0; id < grid.CellCount; id++)
+                {
+                    var (r, c) = grid.FromCellId(id);
+                    bool isLit = lit.Contains(id);
+                    <div class="tr-exp-cell @(isLit ? "tr-exp-cell-lit" : "")"
+                         style="grid-column:@(c + 1);grid-row:@(r + 1);">
+                        <span class="tr-exp-letter">@char.ToUpperInvariant(grid[id])</span>
+                    </div>
+                }
+
+                <svg class="tr-exp-lines" viewBox="0 0 @grid.Width @grid.Height"
+                     preserveAspectRatio="none" aria-hidden="true">
+                    @foreach (var w in VisibleWords())
+                    {
+                        bool isHot = Highlighted == w.Word;
+                        double alpha = AlphaFor(w.Word);
+                        var (sx, sy) = Start(w.Path);
+                        <g class="@(isHot ? "tr-exp-path-hot" : "")">
+                            <polyline points="@LinePoints(w.Path)"
+                                      stroke="@Stroke(w.Word, alpha)"
+                                      stroke-width="@(isHot ? "0.26" : "0.16")" />
+                            <circle cx="@sx" cy="@sy" r="@(isHot ? "0.18" : "0.13")"
+                                    fill="@Stroke(w.Word, Math.Min(1.0, alpha + 0.25))" />
+                        </g>
+                    }
+                </svg>
+            </div>
+
+            @if (Highlighted is { } hot)
+            {
+                <div class="tr-exp-caption">
+                    <span class="tr-exp-caption-word">@hot.ToUpperInvariant()</span>
+                </div>
+            }
+            else
+            {
+                <div class="tr-exp-caption tr-exp-caption-hint">
+                    @(_selectedUserId is null
+                        ? "Every word on the board — pick a player or a word"
+                        : "Showing one player's finds")
+                </div>
+            }
+        </div>
+
+        @* ── Word list, richest first ────────────────────────────────────── *@
+        <div class="tr-exp-wordlist">
+            <div class="tr-exp-wordlist-head">
+                <span class="tr-exp-wordlist-title">WORDS</span>
+                <span class="tr-exp-wordlist-count">@_scoredWords.Count</span>
+            </div>
+            <div class="tr-exp-wordlist-scroll">
+                @foreach (var w in _scoredWords)
+                {
+                    bool found = selectedWords?.Contains(w.Word) ?? false;
+                    bool dimmed = selectedWords is not null && !found;
+                    bool isHot = Highlighted == w.Word;
+                    <button type="button"
+                            class="tr-exp-word @(found ? "tr-exp-word-found" : "") @(dimmed ? "tr-exp-word-dim" : "") @(isHot ? "tr-exp-word-hot" : "")"
+                            @key="w.Word"
+                            @onclick="() => ToggleWord(w.Word)">
+                        <span class="tr-exp-word-swatch" style="background:@Swatch(w.Word);"></span>
+                        <span class="tr-exp-word-text">@w.Word.ToUpperInvariant()</span>
+                        <span class="tr-exp-word-pts">@w.Points</span>
+                    </button>
+                }
+            </div>
+        </div>
+
+    </div>
+}

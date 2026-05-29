@@ -93,6 +93,14 @@ else
             </div>
         }
 
+        @if (State.CurrentGrid is not null)
+        {
+            <div class="tr-reveal-explorer">
+                <span class="tr-reveal-subtitle">THE BOARD</span>
+                <TraceryBoardExplorer State="State" CurrentUserId="@CurrentUserId" />
+            </div>
+        }
+
         @if (State.CurrentRound < State.Settings.TotalRounds)
         {
             <span class="tr-reveal-next">NEXT · ROUND @((State.CurrentRound + 1).ToString("00")) / @State.Settings.TotalRounds.ToString("00")</span>
@@ -103,11 +111,26 @@ else
         }
 
         <TraceryRoundTimer State="State" Duration="State.Settings.IntermissionDuration" />
+
+        @if (IsHost)
+        {
+            <button type="button" class="tr-btn tr-reveal-skip" @onclick="OnSkip">
+                @(State.CurrentRound < State.Settings.TotalRounds ? "Skip to next round" : "Skip to standings") →
+            </button>
+        }
     </div>
 }
 
 @code {
     [Parameter, EditorRequired] public TraceryGameState State { get; set; } = default!;
+
+    /// <summary>The viewer's user id, forwarded to the board explorer to tag their row.</summary>
+    [Parameter] public string? CurrentUserId { get; set; }
+
+    /// <summary>Invoked when the host skips the remaining intermission. Host-only in the UI.</summary>
+    [Parameter] public EventCallback OnSkip { get; set; }
+
+    private bool IsHost => CurrentUserId is not null && CurrentUserId == State.Host.Id;
 
     private RevealData? Reveal => State.CurrentReveal;
 

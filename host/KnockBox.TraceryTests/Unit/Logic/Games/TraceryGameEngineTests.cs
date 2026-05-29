@@ -367,6 +367,102 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             Assert.IsTrue(state.IsRoundActive);
         }
 
+        // ── SkipReveal: host-only early advance ─────────────────────────────
+
+        [TestMethod]
+        public async Task SkipReveal_AsHost_AdvancesToNextRoundImmediately()
+        {
+            var state = await DriveIntoReveal();
+            int revealRound = state.CurrentRound;     // default TotalRounds = 3, so room to advance
+
+            var result = _engine.SkipReveal(state, _host);
+
+            Assert.IsTrue((bool)result.IsSuccess);
+            Assert.AreEqual(GamePhase.Playing, state.Phase);
+            Assert.AreEqual(revealRound + 1, state.CurrentRound);
+            Assert.IsTrue(state.IsRoundActive);
+        }
+
+        [TestMethod]
+        public async Task SkipReveal_OnFinalRound_AdvancesToFinalStandings()
+        {
+            var state = await CreateStateAsync();
+            state.UpdateSettings(s => s with
+            {
+                TotalRounds = 1,
+                RoundTimer = TimeSpan.FromMinutes(5),
+                TransitionDuration = TimeSpan.FromMinutes(5)
+            });
+            await _engine.StartAsync(_host, state);
+            state.Execute(() => _engine.EnterPlaying(state));   // round 1 (the last)
+            state.Execute(() => _engine.CompleteRound(state));  // → Reveal
+            Assert.AreEqual(GamePhase.Reveal, state.Phase);
+
+            var result = _engine.SkipReveal(state, _host);
+
+            Assert.IsTrue((bool)result.IsSuccess);
+            Assert.AreEqual(GamePhase.FinalStandings, state.Phase);
+            Assert.IsNull(state.PhaseExpiresAtUtc);
+        }
+
+        [TestMethod]
+        public async Task SkipReveal_NonHost_ReturnsError_AndStaysInReveal()
+        {
+            var state = await DriveIntoReveal();
+            var stranger = UserFactory.Create("Other", "other1");
+
+            var result = _engine.SkipReveal(state, stranger);
+
+            Assert.IsTrue((bool)result.IsFailure);
+            Assert.AreEqual(GamePhase.Reveal, state.Phase);
+        }
+
+        [TestMethod]
+        public async Task SkipReveal_OutsideReveal_ReturnsError()
+        {
+            // Still in Playing — there is no intermission to skip.
+            var state = await DriveIntoPlaying();
+
+            var result = _engine.SkipReveal(state, _host);
+
+            Assert.IsTrue((bool)result.IsFailure);
+            Assert.AreEqual(GamePhase.Playing, state.Phase);
+        }
+
+        [TestMethod]
+        public async Task AdvanceAfterResultsIfStillRevealing_WhenStillRevealing_Advances()
+        {
+            // The happy path the scheduled intermission timer takes when nobody skipped.
+            var state = await DriveIntoReveal();
+            int revealRound = state.CurrentRound;
+
+            state.Execute(() => _engine.AdvanceAfterResultsIfStillRevealing(state, revealRound));
+
+            Assert.AreEqual(GamePhase.Playing, state.Phase);
+            Assert.AreEqual(revealRound + 1, state.CurrentRound);
+        }
+
+        [TestMethod]
+        public async Task SkipReveal_ThenStaleIntermissionTimer_DoesNotDoubleAdvance()
+        {
+            var state = await DriveIntoReveal();
+            int staleRound = state.CurrentRound;
+
+            // Host skips → already advanced into the next Playing round.
+            Assert.IsTrue((bool)_engine.SkipReveal(state, _host).IsSuccess);
+            var phaseAfterSkip = state.Phase;
+            var roundAfterSkip = state.CurrentRound;
+            Assert.AreEqual(GamePhase.Playing, phaseAfterSkip);
+            Assert.AreNotEqual(staleRound, roundAfterSkip);
+
+            // The intermission timer captured for the skipped round now fires late — it must no-op,
+            // not advance the match a second time.
+            state.Execute(() => _engine.AdvanceAfterResultsIfStillRevealing(state, staleRound));
+
+            Assert.AreEqual(phaseAfterSkip, state.Phase);
+            Assert.AreEqual(roundAfterSkip, state.CurrentRound);
+        }
+
         // ── Disconnect mid-round ────────────────────────────────────────────
 
         [TestMethod]
@@ -429,6 +525,15 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             });
             await _engine.StartAsync(_host, state);
             state.Execute(() => _engine.EnterPlaying(state));
+            return state;
+        }
+
+        // Drives into the first round's Reveal (intermission) with long timers so no scheduled
+        // callback fires mid-assert. Uses default TotalRounds (3) unless the test overrides it.
+        private async Task<TraceryGameState> DriveIntoReveal()
+        {
+            var state = await DriveIntoPlaying();
+            state.Execute(() => _engine.CompleteRound(state));
             return state;
         }
 

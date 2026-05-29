@@ -372,11 +372,45 @@ namespace KnockBox.Tracery.Services.Logic.Games
             s.Phase = GamePhase.Reveal;
             s.PhaseExpiresAtUtc = DateTimeOffset.UtcNow + duration;
 
+            int capturedRound = s.CurrentRound;
             s.ScheduleCallback(duration, () =>
             {
-                AdvanceAfterResults(s);
+                AdvanceAfterResultsIfStillRevealing(s, capturedRound);
                 return Task.CompletedTask;
             });
+        }
+
+        /// <summary>
+        /// Host-only: ends the post-round reveal immediately, advancing to the next round (or
+        /// final standings) without waiting out the intermission timer. The still-pending
+        /// intermission callback is rendered inert by the round/phase guard in
+        /// <see cref="AdvanceAfterResultsIfStillRevealing"/>, so there is no double-advance.
+        /// </summary>
+        public Result SkipReveal(TraceryGameState state, User caller)
+        {
+            var executeResult = state.Execute<Result>(() =>
+            {
+                if (caller is null || caller.Id != state.Host.Id)
+                    return Result.FromError("Only the host can skip the round transition.");
+                if (state.Phase != GamePhase.Reveal)
+                    return Result.FromError("There is no round transition to skip.");
+
+                AdvanceAfterResults(state);
+                return Result.Success;
+            });
+
+            if (executeResult.TryGetSuccess(out var inner)) return inner;
+            if (executeResult.TryGetFailure(out var err)) return Result.FromError(err);
+            return Result.FromCancellation();
+        }
+
+        // Guards the scheduled intermission timer against a host who skipped early: once the host
+        // advances, the captured round (or the phase) no longer matches, so the stale callback
+        // no-ops instead of double-advancing. Mirrors EndRoundIfStillActive's staleness check.
+        internal void AdvanceAfterResultsIfStillRevealing(TraceryGameState s, int roundNum)
+        {
+            if (s.Phase != GamePhase.Reveal || s.CurrentRound != roundNum) return;
+            AdvanceAfterResults(s);
         }
 
         internal void AdvanceAfterResults(TraceryGameState s)
