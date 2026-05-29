@@ -21,6 +21,7 @@
 
     --shadow-card-rest: 4px 4px 0 rgba(0, 0, 0, 0.35);
     --shadow-card-lift: 8px 8px 0 rgba(0, 0, 0, 0.35);
+    --shadow-card-press: 2px 2px 0 rgba(0, 0, 0, 0.35);
 }
 
 /* Apply border-box globally to all elements and pseudo-elements */
@@ -130,7 +131,7 @@ h1:focus {
 .game-tile-surface:active,
 .game-tile:active > .game-tile-surface {
     transform: translate(3px, 3px);
-    box-shadow: var(--shadow-card-lift);
+    box-shadow: var(--shadow-card-press);
 }
 
 /* Work-in-progress overlay applied when a plugin sets `workInProgress: true`
@@ -166,7 +167,7 @@ h1:focus {
 .game-tile.is-wip:hover > .game-tile-surface,
 .game-tile.is-wip:active > .game-tile-surface {
     transform: none;
-    box-shadow: var(--shadow-card-lift);
+    box-shadow: var(--shadow-card-rest);
 }
 
 /* Default tile shown when a plugin's manifest has no `tileAsset` declared.
