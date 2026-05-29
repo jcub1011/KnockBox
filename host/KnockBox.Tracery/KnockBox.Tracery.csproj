@@ -16,6 +16,10 @@
     <Using Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="KnockBox.TraceryTests" />
+  </ItemGroup>
+
   <Import Project="..\Directory.Plugin.targets" />
 
 </Project>

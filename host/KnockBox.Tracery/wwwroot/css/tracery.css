@@ -1,0 +1,239 @@
+/* Tracery — placeholder skeleton styling (Milestone 01).
+   Functional and readable; visual polish lands with the real views in later milestones. */
+
+.tr-page {
+    min-height: 100%;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    color: #1a1a2e;
+}
+
+.tr-loading {
+    padding: 2rem;
+    text-align: center;
+    font-weight: 600;
+    color: #555;
+}
+
+/* ── Shared ────────────────────────────────────────────────────────────── */
+.tr-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: min(640px, 100%);
+    text-align: center;
+}
+
+.tr-muted { color: #6b7280; }
+
+.tr-btn {
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.65rem 1.4rem;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.tr-btn-primary {
+    background: #4f46e5;
+    color: #fff;
+}
+.tr-btn-primary:hover { background: #4338ca; }
+
+/* ── Lobby ─────────────────────────────────────────────────────────────── */
+.tr-lobby {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: min(680px, 100%);
+}
+
+.tr-lobby-brand {
+    font-size: 2.5rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    color: #4f46e5;
+}
+
+.tr-lobby-tagline {
+    font-size: 0.8rem;
+    letter-spacing: 0.15em;
+    color: #6b7280;
+}
+
+.tr-lobby-players { width: 100%; }
+.tr-lobby-players-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #6b7280;
+    margin-bottom: 0.4rem;
+}
+.tr-lobby-players-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tr-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 999px;
+    padding: 0.35rem 0.85rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+.tr-chip-me { outline: 2px solid #4f46e5; }
+.tr-chip-kick { cursor: pointer; color: inherit; }
+.tr-chip-kick:hover { background: #fee2e2; border-color: #fca5a5; }
+
+.tr-lobby-waiting { color: #6b7280; }
+.tr-lobby-start { margin-top: 0.5rem; }
+.tr-lobby-error { color: #dc2626; font-size: 0.9rem; }
+
+/* ── Settings panel ────────────────────────────────────────────────────── */
+.tr-settings {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+}
+.tr-settings-title {
+    margin: 0 0 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #374151;
+}
+.tr-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.6rem 1rem;
+}
+.tr-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.85rem;
+    color: #374151;
+}
+.tr-field-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+.tr-field input[type="number"] {
+    padding: 0.3rem 0.4rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.35rem;
+}
+
+/* ── Round intro ───────────────────────────────────────────────────────── */
+.tr-intro-label { font-size: 1rem; letter-spacing: 0.3em; color: #6b7280; }
+.tr-intro-number { font-size: 3rem; font-weight: 800; color: #4f46e5; }
+.tr-intro-of { font-size: 1.25rem; color: #9ca3af; }
+.tr-intro-getready { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.2em; }
+
+/* ── Playing ───────────────────────────────────────────────────────────── */
+.tr-playing { width: min(640px, 100%); }
+.tr-playing-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 1rem;
+}
+.tr-playing-round { font-weight: 700; }
+.tr-grid-placeholder {
+    width: 100%;
+    border: 2px dashed #c7d2fe;
+    border-radius: 0.75rem;
+    padding: 2rem 1rem;
+    background: #f5f3ff;
+}
+
+/* ── Reveal / round over ───────────────────────────────────────────────── */
+.tr-reveal-title,
+.tr-roundover-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    color: #4f46e5;
+}
+
+/* ── Standings / final ─────────────────────────────────────────────────── */
+.tr-over {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: min(520px, 100%);
+}
+.tr-over-banner { text-align: center; }
+.tr-over-banner-main { display: block; font-size: 2rem; font-weight: 800; color: #4f46e5; }
+.tr-over-banner-sub { display: block; font-size: 0.85rem; letter-spacing: 0.2em; color: #6b7280; }
+
+.tr-over-board {
+    width: min(420px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+.tr-over-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.85rem;
+}
+.tr-over-row-me { outline: 2px solid #4f46e5; }
+.tr-over-rank { font-weight: 800; color: #9ca3af; min-width: 1.5rem; }
+.tr-over-name { flex: 1; font-weight: 600; }
+.tr-over-score { font-weight: 800; color: #4f46e5; }
+
+/* ── Timer ─────────────────────────────────────────────────────────────── */
+.tr-timer { width: min(260px, 100%); }
+.tr-timer-bar {
+    height: 8px;
+    background: #e5e7eb;
+    border-radius: 999px;
+    overflow: hidden;
+}
+.tr-timer-fill {
+    height: 100%;
+    background: #4f46e5;
+    transition: width 0.25s linear;
+}
+.tr-timer-digits {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    margin-top: 0.25rem;
+    font-weight: 700;
+}
+.tr-timer-urgent .tr-timer-fill { background: #dc2626; }
+.tr-timer-urgent .tr-timer-value { color: #dc2626; }
+.tr-timer-unlimited {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    font-weight: 700;
+    color: #6b7280;
+}

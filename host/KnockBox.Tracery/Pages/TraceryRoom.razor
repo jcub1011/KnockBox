@@ -1,0 +1,84 @@
+@page "/room/tracery/{ObfuscatedRoomCode}"
+@inherits LobbyPageBase<TraceryGameState>
+
+<PageTitle>Tracery</PageTitle>
+
+<HeadContent>
+    <link href="_content/KnockBox.Tracery/css/tracery.css" rel="stylesheet" />
+</HeadContent>
+
+@if (GameState is null || UserService.CurrentUser is null)
+{
+    <div class="tr-loading">Loading…</div>
+}
+else
+{
+    <div class="tr-page">
+        @switch (GameState.Phase)
+        {
+            case GamePhase.Lobby:
+                <TraceryLobbyView State="GameState" RoomCode="@RoomCode" />
+                break;
+
+            case GamePhase.RoundIntro:
+                <div class="tr-stage tr-intro">
+                    <span class="tr-intro-label">ROUND</span>
+                    <span class="tr-intro-number">@GameState.CurrentRound.ToString("00") <span class="tr-intro-of">/ @GameState.Settings.TotalRounds.ToString("00")</span></span>
+                    <span class="tr-intro-getready">GET READY</span>
+                    <TraceryRoundTimer State="GameState" Duration="GameState.Settings.TransitionDuration" />
+                </div>
+                break;
+
+            case GamePhase.Playing:
+                <div class="tr-stage tr-playing">
+                    <div class="tr-playing-head">
+                        <span class="tr-playing-round">Round @GameState.CurrentRound / @GameState.Settings.TotalRounds</span>
+                        <TraceryRoundTimer State="GameState" Duration="GameState.Settings.RoundTimer" />
+                    </div>
+                    @if (IsHostObserver)
+                    {
+                        <div class="tr-grid-placeholder">
+                            <p>Shared grid (@GameState.Settings.GridWidth×@GameState.Settings.GridHeight) — coming soon.</p>
+                            <p class="tr-muted">Players are tracing on their phones.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="tr-grid-placeholder">
+                            <p>Trace words on the @GameState.Settings.GridWidth×@GameState.Settings.GridHeight grid — coming soon.</p>
+                            <p class="tr-muted">Minimum word length: @GameState.Settings.MinWordLength.</p>
+                        </div>
+                    }
+                </div>
+                break;
+
+            case GamePhase.Reveal:
+                <div class="tr-stage tr-reveal">
+                    <span class="tr-reveal-title">THE REVEAL</span>
+                    <p class="tr-muted">Notable words, words nobody found, and scores — coming soon.</p>
+                    <TraceryRoundTimer State="GameState" Duration="GameState.Settings.TransitionDuration" />
+                </div>
+                break;
+
+            case GamePhase.RoundOver:
+                <div class="tr-stage tr-roundover">
+                    <span class="tr-roundover-title">ROUND @GameState.CurrentRound STANDINGS</span>
+                    <div class="tr-over-board">
+                        @foreach (var row in Standings())
+                        {
+                            <div class="tr-over-row">
+                                <span class="tr-over-name">@row.DisplayName</span>
+                                <span class="tr-over-score">@row.Score</span>
+                            </div>
+                        }
+                    </div>
+                    <TraceryRoundTimer State="GameState" Duration="GameState.Settings.TransitionDuration" />
+                </div>
+                break;
+
+            case GamePhase.FinalStandings:
+                <TraceryFinalStandingsView State="GameState" />
+                break;
+        }
+    </div>
+}
