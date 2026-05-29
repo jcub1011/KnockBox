@@ -31,8 +31,13 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             // word service is enough — GetSolver/GetGenerator are exercised separately.
             _wordListServiceMock = new Mock<IWordListService>();
             _host = UserFactory.Create("Host", "host1");
+            // A real RNG (not an empty SequentialRng): EnterPlaying now draws letters during
+            // board generation. With the bare mock word service the trie is empty, so Generate
+            // fails gracefully to the empty-board branch — exactly what these phase/lifecycle
+            // tests exercise. Tests needing a real board build their own engine with the real
+            // WordListService.
             _engine = new TraceryGameEngine(
-                _wordListServiceMock.Object, new SequentialRng(), _engineLoggerMock.Object, _stateLoggerMock.Object);
+                _wordListServiceMock.Object, new RandomNumberService(), _engineLoggerMock.Object, _stateLoggerMock.Object);
         }
 
         // ── Generator wiring ────────────────────────────────────────────────
@@ -202,7 +207,168 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             Assert.HasCount(2, state.RoundResults);
         }
 
+        // ── Round activation: board generation & input gate ─────────────────
+
+        [TestMethod]
+        public async Task EnterPlaying_PopulatesGridFindableWordsAndActivatesRound()
+        {
+            // Real services so the trie/solver/generator actually produce a board.
+            var svc = new WordListService(NullLogger<WordListService>.Instance);
+            var engine = new TraceryGameEngine(
+                svc, new RandomNumberService(),
+                NullLogger<TraceryGameEngine>.Instance, NullLogger<TraceryGameState>.Instance);
+
+            var createResult = await engine.CreateStateAsync(_host);
+            Assert.IsTrue(createResult.TryGetSuccess(out var created));
+            var state = (TraceryGameState)created!;
+            state.UpdateSettings(s => s with
+            {
+                TransitionDuration = TimeSpan.FromMinutes(5),
+                RoundTimer = TimeSpan.FromMinutes(5)
+            });
+
+            await engine.StartAsync(_host, state);
+
+            var start = DateTimeOffset.UtcNow;
+            state.Execute(() => engine.EnterPlaying(state));
+
+            Assert.AreEqual(GamePhase.Playing, state.Phase);
+            Assert.IsTrue(state.IsRoundActive);
+            Assert.IsNotNull(state.CurrentGrid);
+            Assert.AreEqual(state.Settings.GridWidth, state.CurrentGrid!.Width);
+            Assert.AreEqual(state.Settings.GridHeight, state.CurrentGrid.Height);
+            Assert.IsTrue(state.FindableWords.Count > 0, "Generated board should expose findable words.");
+            Assert.IsNotNull(state.RoundStartTime);
+            Assert.IsTrue(state.RoundStartTime!.Value >= start.AddSeconds(-1));
+        }
+
+        [TestMethod]
+        public async Task EnterPlaying_TimedRound_SetsPhaseExpiry()
+        {
+            var state = await CreateStateAsync();
+            state.UpdateSettings(s => s with
+            {
+                RoundTimer = TimeSpan.FromMinutes(5),
+                TransitionDuration = TimeSpan.FromMinutes(5)
+            });
+            await _engine.StartAsync(_host, state);
+
+            state.Execute(() => _engine.EnterPlaying(state));
+
+            Assert.AreEqual(GamePhase.Playing, state.Phase);
+            Assert.IsTrue(state.IsRoundActive);
+            Assert.IsNotNull(state.PhaseExpiresAtUtc);
+        }
+
+        [TestMethod]
+        public async Task EnterPlaying_UnlimitedTimer_LeavesPhaseExpiryNull()
+        {
+            var state = await CreateStateAsync();
+            state.UpdateSettings(s => s with
+            {
+                RoundTimer = TimeSpan.Zero,
+                TransitionDuration = TimeSpan.FromMinutes(5)
+            });
+            await _engine.StartAsync(_host, state);
+
+            state.Execute(() => _engine.EnterPlaying(state));
+
+            Assert.AreEqual(GamePhase.Playing, state.Phase);
+            Assert.IsTrue(state.IsRoundActive);
+            Assert.IsNull(state.PhaseExpiresAtUtc);
+        }
+
+        [TestMethod]
+        public async Task RoundIntro_HasInputGateClosed()
+        {
+            var state = await CreateStateAsync();
+            state.UpdateSettings(s => s with { TransitionDuration = TimeSpan.FromMinutes(5) });
+
+            await _engine.StartAsync(_host, state);
+
+            Assert.AreEqual(GamePhase.RoundIntro, state.Phase);
+            Assert.IsFalse(state.IsRoundActive);
+        }
+
+        [TestMethod]
+        public async Task CompleteRound_ClosesInputGate()
+        {
+            var state = await DriveIntoPlaying();
+            Assert.IsTrue(state.IsRoundActive);
+
+            state.Execute(() => _engine.CompleteRound(state));
+
+            Assert.IsFalse(state.IsRoundActive);
+            Assert.AreEqual(GamePhase.Reveal, state.Phase);
+        }
+
+        [TestMethod]
+        public async Task FinalStandings_HasInputGateClosed()
+        {
+            var state = await CreateStateAsync();
+            state.UpdateSettings(s => s with { TransitionDuration = TimeSpan.FromMinutes(5) });
+            await _engine.StartAsync(_host, state);
+
+            state.Execute(() => _engine.EnterFinalStandings(state));
+
+            Assert.AreEqual(GamePhase.FinalStandings, state.Phase);
+            Assert.IsFalse(state.IsRoundActive);
+        }
+
+        // ── EndRoundIfStillActive: timer-fire guard ─────────────────────────
+
+        [TestMethod]
+        public async Task EndRoundIfStillActive_CompletesRound_WhenStillActive()
+        {
+            var state = await DriveIntoPlaying();
+            int round = state.CurrentRound;
+
+            state.Execute(() => _engine.EndRoundIfStillActive(state, round));
+
+            Assert.AreEqual(GamePhase.Reveal, state.Phase);
+            Assert.IsFalse(state.IsRoundActive);
+        }
+
+        [TestMethod]
+        public async Task EndRoundIfStillActive_NoOps_WhenRoundAlreadyAdvanced()
+        {
+            var state = await DriveIntoPlaying();
+            int staleRound = state.CurrentRound;
+
+            // Advance to the next Playing round (default TotalRounds = 3, so there's room).
+            state.Execute(() => _engine.CompleteRound(state));      // → Reveal
+            state.Execute(() => _engine.EnterRoundOver(state));     // → RoundOver
+            state.Execute(() => _engine.AdvanceAfterResults(state));// → RoundIntro
+            state.Execute(() => _engine.EnterPlaying(state));       // → Playing (next round)
+
+            var phaseBefore = state.Phase;
+            var roundBefore = state.CurrentRound;
+            Assert.AreNotEqual(staleRound, roundBefore);
+
+            // A stale timer captured for the earlier round must not end the current one.
+            state.Execute(() => _engine.EndRoundIfStillActive(state, staleRound));
+
+            Assert.AreEqual(phaseBefore, state.Phase);
+            Assert.AreEqual(roundBefore, state.CurrentRound);
+            Assert.IsTrue(state.IsRoundActive);
+        }
+
         // ── Helpers ─────────────────────────────────────────────────────────
+
+        // Starts a match (mock word service → fail-safe empty board) and drives into the
+        // first Playing round with long timers so no scheduled callback fires mid-assert.
+        private async Task<TraceryGameState> DriveIntoPlaying()
+        {
+            var state = await CreateStateAsync();
+            state.UpdateSettings(s => s with
+            {
+                RoundTimer = TimeSpan.FromMinutes(5),
+                TransitionDuration = TimeSpan.FromMinutes(5)
+            });
+            await _engine.StartAsync(_host, state);
+            state.Execute(() => _engine.EnterPlaying(state));
+            return state;
+        }
 
         private async Task<TraceryGameState> CreateStateAsync()
         {

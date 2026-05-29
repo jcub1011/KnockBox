@@ -65,8 +65,20 @@ namespace KnockBox.Tracery.Services.Logic.Games
 
             var gameState = new TraceryGameState(host, stateLogger);
             gameState.Execute(() => gameState.SetJoinable(true));
+            // Disconnect hook (Spardle precedent). The token is intentionally not stored: the
+            // subscription is scoped to this state's lifetime and released when it is disposed.
+            gameState.SubscribePlayerUnregistered(player => HandlePlayerLeft(gameState, player));
             logger.LogInformation("Created Tracery gameState with user [{userId}] as host.", host.Id);
             return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
+        }
+
+        // Fires outside the execute lock so the handler may safely call Execute. Tracery players
+        // bank independently against the round clock — a mid-round leaver simply stops banking
+        // and the timer still ends the round, so there is no "all finished early" gate to
+        // re-open here. Hook retained for parity with the platform disconnect contract; M05/M06
+        // re-check round-end here if an early-finish optimization is ever added.
+        private void HandlePlayerLeft(TraceryGameState s, User player)
+        {
         }
 
         protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
@@ -127,6 +139,7 @@ namespace KnockBox.Tracery.Services.Logic.Games
 
             var duration = s.Settings.TransitionDuration;
             s.Phase = GamePhase.RoundIntro;
+            s.IsRoundActive = false;
             s.PhaseExpiresAtUtc = DateTimeOffset.UtcNow + duration;
 
             s.ScheduleCallback(duration, () =>
@@ -142,19 +155,39 @@ namespace KnockBox.Tracery.Services.Logic.Games
             foreach (var entry in Roster(s))
                 s.CreatePlayerState(entry.User.Id).ResetRound();
 
+            // Generate the round's board and reuse the solve the generator already computed
+            // while clearing the quality bar — never re-solve the same grid.
+            var gen = GetGenerator().Generate(s.Settings);
+            if (gen.TryGetSuccess(out var board))
+            {
+                s.CurrentGrid = board.Grid;
+                s.FindableWords = board.FindableWords;
+            }
+            else
+            {
+                // Settings clamp MinWordLength <= cell count and the generator has a seed
+                // fallback, so this is effectively unreachable in production. Fail safe rather
+                // than crash the scheduled callback: log, leave an empty board, and let the
+                // round time out normally.
+                gen.TryGetFailure(out var err);
+                logger.LogError("Tracery board generation failed for round {Round}: {Error}", s.CurrentRound, err.InternalMessage);
+                s.CurrentGrid = null;
+                s.FindableWords = ImmutableDictionary<string, TracedWord>.Empty;
+            }
+
+            s.RoundStartTime = DateTimeOffset.UtcNow;
+            s.IsRoundActive = true;
             s.Phase = GamePhase.Playing;
 
-            // TimeSpan.Zero = unlimited: no auto-advance. With a real game the round ends
-            // when players finish; in this placeholder an unlimited round simply waits.
+            // TimeSpan.Zero = unlimited: no auto-advance — host-advanced (full host-advance UI
+            // is a later milestone). Otherwise the timer ends the round on expiry.
             if (s.Settings.RoundTimer > TimeSpan.Zero)
             {
                 s.PhaseExpiresAtUtc = DateTimeOffset.UtcNow + s.Settings.RoundTimer;
                 int capturedRound = s.CurrentRound;
                 s.ScheduleCallback(s.Settings.RoundTimer, () =>
                 {
-                    // Guard against a stale timer firing after the phase already moved on.
-                    if (s.Phase == GamePhase.Playing && s.CurrentRound == capturedRound)
-                        CompleteRound(s);
+                    EndRoundIfStillActive(s, capturedRound);
                     return Task.CompletedTask;
                 });
             }
@@ -164,8 +197,20 @@ namespace KnockBox.Tracery.Services.Logic.Games
             }
         }
 
+        internal void EndRoundIfStillActive(TraceryGameState s, int roundNum)
+        {
+            // A timer captured for a prior round must not end a later one (a stale callback
+            // firing after a manual/early advance). The round number is the discriminator.
+            if (s.Phase != GamePhase.Playing || s.CurrentRound != roundNum) return;
+            CompleteRound(s);
+        }
+
         internal void CompleteRound(TraceryGameState s)
         {
+            // Close the input gate before any reveal/scoring work — late traces are rejected
+            // from here on. (Milestone 06 inserts unique-find resolution + scoring here.)
+            s.IsRoundActive = false;
+
             // Placeholder outcome: no scoring yet (Milestone 06). Record the round so the
             // results/standings screens have something to render and the history grows.
             var outcomes = Roster(s)
@@ -232,6 +277,7 @@ namespace KnockBox.Tracery.Services.Logic.Games
         internal void EnterFinalStandings(TraceryGameState s)
         {
             s.Phase = GamePhase.FinalStandings;
+            s.IsRoundActive = false;
             s.PhaseExpiresAtUtc = null;
         }
     }

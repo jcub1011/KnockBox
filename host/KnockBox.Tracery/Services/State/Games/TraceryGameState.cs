@@ -32,6 +32,20 @@ namespace KnockBox.Tracery.Services.State.Games
         public int CurrentRound { get; set; } = 0;
         public ImmutableList<RoundResult> RoundResults { get; set; } = [];
 
+        // Per-round board + authoritative solve, set by the engine on entering Playing and
+        // read lock-free by the room page (M05) for rendering/validation. Null/empty outside
+        // an active round.
+        public Grid? CurrentGrid { get; set; }
+        public IReadOnlyDictionary<string, TracedWord> FindableWords { get; set; }
+            = ImmutableDictionary<string, TracedWord>.Empty;
+        public DateTimeOffset? RoundStartTime { get; set; }
+
+        // The input gate: true only while the Playing phase is accepting traces. M05's
+        // SubmitTrace early-returns a failure unless Phase == Playing && IsRoundActive. Flipped
+        // false the moment the round ends (timer fires or round completes), so late submissions
+        // are rejected with no separate lock flag.
+        public bool IsRoundActive { get; set; }
+
         // Player tracking. Writes are owned by TraceryGameEngine and only ever happen inside
         // Execute/ExecuteAsync. Render-thread callers read via TryGetPlayerState — they must
         // never invoke CreatePlayerState, which would mutate the dictionary unlocked.
