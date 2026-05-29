@@ -77,7 +77,7 @@ namespace KnockBox.Core.Services.Logic.Games.Engines.Shared
         /// </summary>
         protected bool HasValidPlayerCount(AbstractGameState state)
         {
-            var count = state.Players.Count;
+            var count = state.Players.Length;
             return MinPlayerCount <= count && count <= MaxPlayerCount;
         }
 

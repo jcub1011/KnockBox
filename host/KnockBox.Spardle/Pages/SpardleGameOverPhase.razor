@@ -7,8 +7,9 @@
 @inject INavigationService NavigationService
 
 @{
-    IEnumerable<PlayerEntry> rosterSource =
-        State.HostIsParticipant ? State.RosterIncludingHost : State.Players;
+    // Render from the frozen start-of-match snapshot, not the live Players roster,
+    // so players who have disconnected still appear in the final standings.
+    IEnumerable<PlayerEntry> rosterSource = State.MatchParticipants;
     var roster = rosterSource
         .Select(u => new
         {

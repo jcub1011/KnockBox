@@ -1,6 +1,6 @@
 using KnockBox.Core.Plugins;
 using KnockBox.Core.Services.Logic.RandomGeneration;
-using KnockBox.Platform.Filtering;
+using KnockBox.Core.Services.Logic.Filtering;
 using KnockBox.Platform.Games;
 using KnockBox.Platform.Plugins;
 using KnockBox.Platform.Storage;

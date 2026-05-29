@@ -3,7 +3,7 @@ namespace KnockBox.Services.State.Users
     using KnockBox.Core.Primitives.Returns;
     using KnockBox.Core.Services.State.Shared;
     using KnockBox.Core.Services.State.Users;
-    using KnockBox.Platform.ClientStorage;
+    using KnockBox.Core.Services.Storage.ClientStorage;
 
     public class UserService(ILocalStorageService localStorageService, ISessionTokenProvider sessionTokenProvider, ILogger<UserService> logger) : IUserService, IDisposable
     {

@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using KnockBox.Core.Primitives.Returns;
-using KnockBox.Platform.Filtering;
+using KnockBox.Core.Services.Logic.Filtering;
 using KnockBox.Platform.Games;
 
 namespace KnockBox.Services.Logic.Games.Shared

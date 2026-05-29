@@ -3,11 +3,15 @@
 @using KnockBox.Spardle.Models
 @using KnockBox.Spardle
 @using KnockBox.WordService.Contracts
+@using KnockBox.Core.Services.Storage.ClientStorage
+@using Microsoft.Extensions.Logging
 @using Microsoft.JSInterop
 @inject IUserService UserService
 @inject SpardleEngine GameEngine
 @inject IWordListService WordList
 @inject IJSRuntime JSRuntime
+@inject ILocalStorageService LocalStorage
+@inject ILogger<SpardleLobbyPhase> Logger
 @implements IAsyncDisposable
 
 <div class="spd-lobby">
@@ -82,14 +86,14 @@
                     <div class="spd-lobby-field-grid">
                         <label class="spd-lobby-field">
                             <span>Source</span>
-                            <select @bind:get="State.WordPoolMode" @bind:set="SetWordPoolMode">
+                            <select @bind:get="State.Settings.WordPoolMode" @bind:set="SetWordPoolMode">
                                 <option value="@WordPoolMode.NytStandard">NYT Standard</option>
                                 <option value="@WordPoolMode.FullDictionary">Full Dictionary</option>
                                 <option value="@WordPoolMode.HostDefined">Host Defined</option>
                                 <option value="@WordPoolMode.CsvUpload">CSV Upload</option>
                             </select>
                         </label>
-                        @if (State.WordPoolMode == WordPoolMode.CsvUpload)
+                        @if (State.Settings.WordPoolMode == WordPoolMode.CsvUpload)
                         {
                             <label class="spd-lobby-field spd-lobby-field-full">
                                 <span>CSV File (max 1MB)</span>
@@ -113,25 +117,25 @@
                         }
                         <label class="spd-lobby-field">
                             <span>Order</span>
-                            <select @bind:get="State.WordOrderMode" @bind:set="SetWordOrderMode">
+                            <select @bind:get="State.Settings.WordOrderMode" @bind:set="SetWordOrderMode">
                                 <option value="@WordOrderMode.RandomNoRepeats">Random (No Repeats)</option>
                                 <option value="@WordOrderMode.RandomWithRepeats">Random (With Repeats)</option>
                                 <option value="@WordOrderMode.ListOrder">List Order</option>
                                 <option value="@WordOrderMode.ReverseListOrder">Reverse List Order</option>
                             </select>
                         </label>
-                        @if (State.WordPoolMode == WordPoolMode.FullDictionary)
+                        @if (State.Settings.WordPoolMode == WordPoolMode.FullDictionary)
                         {
                             <label class="spd-lobby-field spd-lobby-field-row">
                                 <span>Constant Word Length</span>
-                                <input type="checkbox" @bind:get="State.ConstantWordLength" @bind:set="SetConstantWordLength" />
+                                <input type="checkbox" @bind:get="State.Settings.ConstantWordLength" @bind:set="SetConstantWordLength" />
                             </label>
 
-                            @if (State.ConstantWordLength)
+                            @if (State.Settings.ConstantWordLength)
                             {
                                 <label class="spd-lobby-field">
                                     <span>Word Length</span>
-                                    <select @bind:get="State.TargetWordLength" @bind:set="SetTargetWordLength">
+                                    <select @bind:get="State.Settings.TargetWordLength" @bind:set="SetTargetWordLength">
                                         @foreach (var len in WordList.GetAvailableLengths(WordPoolMode.FullDictionary))
                                         {
                                             <option value="@len">@len</option>
@@ -143,7 +147,7 @@
                             {
                                 <label class="spd-lobby-field">
                                     <span>Min Length</span>
-                                    <select @bind:get="State.MinWordLength" @bind:set="SetMinWordLength">
+                                    <select @bind:get="State.Settings.MinWordLength" @bind:set="SetMinWordLength">
                                         @foreach (var len in WordList.GetAvailableLengths(WordPoolMode.FullDictionary))
                                         {
                                             <option value="@len">@len</option>
@@ -152,7 +156,7 @@
                                 </label>
                                 <label class="spd-lobby-field">
                                     <span>Max Length</span>
-                                    <select @bind:get="State.MaxWordLength" @bind:set="SetMaxWordLength">
+                                    <select @bind:get="State.Settings.MaxWordLength" @bind:set="SetMaxWordLength">
                                         @foreach (var len in WordList.GetAvailableLengths(WordPoolMode.FullDictionary))
                                         {
                                             <option value="@len">@len</option>
@@ -161,7 +165,7 @@
                                 </label>
                             }
                         }
-                        @if (State.WordPoolMode == WordPoolMode.HostDefined)
+                        @if (State.Settings.WordPoolMode == WordPoolMode.HostDefined)
                         {
                             <label class="spd-lobby-field spd-lobby-field-full">
                                 <span>Custom Words (one per line)</span>
@@ -179,12 +183,12 @@
                     <div class="spd-lobby-field-grid">
                         <label class="spd-lobby-field">
                             <span>Total Rounds</span>
-                            <input type="number" min="1" max="50" @bind:get="State.TotalRounds" @bind:set="SetTotalRounds" />
+                            <input type="number" min="1" max="50" @bind:get="State.Settings.TotalRounds" @bind:set="SetTotalRounds" />
                         </label>
                         <label class="spd-lobby-field">
                             <span>Round Timer (seconds)</span>
                             <input type="number" min="30" max="600" step="5"
-                                   value="@((int)State.RoundTimer.TotalSeconds)"
+                                   value="@((int)State.Settings.RoundTimer.TotalSeconds)"
                                    @oninput="OnRoundTimerChanged"
                                    disabled="@_unlimitedTimer" />
                         </label>
@@ -195,7 +199,7 @@
                         <label class="spd-lobby-field">
                             <span>Transition Between Rounds</span>
                             <input type="number" min="2" max="15" step="1"
-                                   value="@((int)State.TransitionDuration.TotalSeconds)"
+                                   value="@((int)State.Settings.TransitionDuration.TotalSeconds)"
                                    @oninput="OnTransitionChanged" />
                         </label>
                     </div>
@@ -206,41 +210,55 @@
                     <div class="spd-lobby-field-grid">
                         <label class="spd-lobby-field">
                             <span>Mode</span>
-                            <select @bind:get="State.WinCondition" @bind:set="SetWinCondition">
+                            <select @bind:get="State.Settings.WinCondition" @bind:set="SetWinCondition">
                                 <option value="@WinConditionMode.Sprinter">Sprinter (first to solve)</option>
                                 <option value="@WinConditionMode.Tactician">Tactician (fewest guesses)</option>
                             </select>
                         </label>
                         <label class="spd-lobby-field">
                             <span>Difficulty Multiplier (k)</span>
-                            <select @bind:get="State.DifficultyMultiplier" @bind:set="SetDifficultyMultiplier">
-                                <option value="1.0">Gentle (k = 1)</option>
-                                <option value="2.0">Standard (k = 2)</option>
-                                <option value="3.0">Brutal (k = 3)</option>
+                            <select @bind:get="State.Settings.DifficultyMultiplier" @bind:set="SetDifficultyMultiplier">
+                                @* Option values must match BindConverter's double formatting
+                                   (2.0 → "2", not "2.0") or the re-render finds no matching
+                                   option and clears the selection. *@
+                                <option value="1">Gentle (k = 1)</option>
+                                <option value="2">Standard (k = 2)</option>
+                                <option value="3">Brutal (k = 3)</option>
                             </select>
                         </label>
                         <label class="spd-lobby-field spd-lobby-field-row">
                             <span>Hard Mode</span>
-                            <input type="checkbox" @bind:get="State.HardModeEnabled" @bind:set="SetHardModeEnabled" />
+                            <input type="checkbox" @bind:get="State.Settings.HardModeEnabled" @bind:set="SetHardModeEnabled" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Host Plays Along</span>
+                            <input type="checkbox" @bind:get="State.Settings.HostPlaysAlong" @bind:set="SetHostPlaysAlong" />
                         </label>
                         <label class="spd-lobby-field spd-lobby-field-row">
                             <span>Wait For All Players</span>
-                            <input type="checkbox" @bind:get="State.WaitForAll" @bind:set="SetWaitForAll" />
+                            <input type="checkbox" @bind:get="State.Settings.WaitForAll" @bind:set="SetWaitForAll" />
                         </label>
                         <label class="spd-lobby-field spd-lobby-field-row">
                             <span>Reveal Answer</span>
-                            <input type="checkbox" @bind:get="State.RevealAnswer" @bind:set="SetRevealAnswer" />
+                            <input type="checkbox" @bind:get="State.Settings.RevealAnswer" @bind:set="SetRevealAnswer" />
                         </label>
                         <label class="spd-lobby-field spd-lobby-field-row">
                             <span>Dictionary Fallback</span>
-                            <input type="checkbox" @bind:get="State.AllowDictionaryFallback" @bind:set="SetAllowDictionaryFallback" />
+                            <input type="checkbox" @bind:get="State.Settings.AllowDictionaryFallback" @bind:set="SetAllowDictionaryFallback" />
                         </label>
                         <label class="spd-lobby-field spd-lobby-field-row">
                             <span>Allow Compound Words</span>
-                            <input type="checkbox" @bind:get="State.AllowCompoundWords" @bind:set="SetAllowCompoundWords" />
+                            <input type="checkbox" @bind:get="State.Settings.AllowCompoundWords" @bind:set="SetAllowCompoundWords" />
                         </label>
                     </div>
                 </section>
+
+                <div class="spd-lobby-drawer-footer">
+                    <button type="button" class="spd-btn @(_resetArmed ? "spd-btn-danger" : "spd-btn-ghost")"
+                            @onclick="ResetToDefaults">
+                        @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+                    </button>
+                </div>
             </div>
         </aside>
     }
@@ -264,68 +282,104 @@
     private string? _csvFileName;
     private int _csvWordCount;
 
+    private readonly CancellationTokenSource _cts = new();
+    private Task? _saveTask;
+
+    // True once the host has changed any setting locally. Blocks the initial localStorage
+    // load from clobbering an in-flight edit if the load returns after the user interacted.
+    private bool _userHasEdited;
+
     private bool IsHost => UserService.CurrentUser?.Id == State.Host.Id;
     private bool CanStart => State.CustomWordPool.Count > 0
-        || State.WordPoolMode == WordPoolMode.NytStandard
-        || State.WordPoolMode == WordPoolMode.FullDictionary;
+        || State.Settings.WordPoolMode == WordPoolMode.NytStandard
+        || State.Settings.WordPoolMode == WordPoolMode.FullDictionary;
 
     protected override void OnInitialized()
     {
         _customPoolText = string.Join('\n', State.CustomWordPool);
-        _unlimitedTimer = State.RoundTimer <= TimeSpan.Zero;
+        _unlimitedTimer = State.Settings.RoundTimer <= TimeSpan.Zero;
     }
 
     private void ToggleSettings() => SettingsOpen = !SettingsOpen;
 
-    // Every setter below mutates shared server state; each wraps the assignment in
-    // State.Execute so readers on other circuits never see a torn value, and so the
-    // notification fires after the lock is released.
+    // Delegates the atomic mutation to the state (which enforces Execute + change
+    // notification) and then persists. _userHasEdited blocks any in-flight localStorage
+    // load from clobbering this edit.
+    private void UpdateSettings(Func<SpardleSettings, SpardleSettings> mutate)
+    {
+        _userHasEdited = true;
+        if (State.UpdateSettings(mutate).TryGetFailure(out var error))
+        {
+            Logger.LogError("Failed to update Spardle settings: {Error}", error.PublicMessage);
+            return;
+        }
+        PersistSettings();
+    }
+
+    // Two-step confirm so an accidental click can't wipe the host's whole config.
+    // First click arms; a second click within the window resets. Auto-disarms after ~3s.
+    private bool _resetArmed;
+    private int _resetGeneration;
+
+    private void ResetToDefaults()
+    {
+        if (!_resetArmed)
+        {
+            _resetArmed = true;
+            _ = DisarmResetAfterDelay(++_resetGeneration);
+            return;
+        }
+        _resetArmed = false;
+        _resetGeneration++;                          // invalidate any pending disarm
+        UpdateSettings(_ => new SpardleSettings());
+        // Keep the "unlimited timer" toggle in sync with the default RoundTimer.
+        _unlimitedTimer = State.Settings.RoundTimer <= TimeSpan.Zero;
+    }
+
+    private async Task DisarmResetAfterDelay(int generation)
+    {
+        try { await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token); }
+        catch (OperationCanceledException) { return; }   // component disposed
+        if (generation != _resetGeneration) return;      // superseded by a newer arm/reset
+        _resetArmed = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
     private void SetWordPoolMode(WordPoolMode value)
     {
         // NYT and Full Dictionary have no visible custom-words editor, so any leftover
         // CustomWordPool entries would silently override the built-in source. Clear them
         // on transition so the mode the user selects is the one the engine actually uses.
         bool clearCustom = value is WordPoolMode.NytStandard or WordPoolMode.FullDictionary;
-        State.Execute(() =>
-        {
-            State.WordPoolMode = value;
-            if (clearCustom)
-            {
-                State.CustomWordPool = ImmutableList<string>.Empty;
-            }
-        });
+        UpdateSettings(s => s with { WordPoolMode = value });
         if (clearCustom)
         {
+            State.Execute(() => State.CustomWordPool = ImmutableList<string>.Empty);
             _customPoolText = string.Empty;
             _csvFileName = null;
             _csvWordCount = 0;
             _csvUploadError = null;
         }
     }
-    private void SetWordOrderMode(WordOrderMode value) => State.Execute(() => State.WordOrderMode = value);
-    private void SetConstantWordLength(bool value) => State.Execute(() => State.ConstantWordLength = value);
-    private void SetTargetWordLength(int value) => State.Execute(() => State.TargetWordLength = value);
-    private void SetWinCondition(WinConditionMode value) => State.Execute(() => State.WinCondition = value);
-    private void SetDifficultyMultiplier(double value) => State.Execute(() => State.DifficultyMultiplier = value);
-    private void SetHardModeEnabled(bool value) => State.Execute(() => State.HardModeEnabled = value);
-    private void SetWaitForAll(bool value) => State.Execute(() => State.WaitForAll = value);
-    private void SetRevealAnswer(bool value) => State.Execute(() => State.RevealAnswer = value);
-    private void SetAllowDictionaryFallback(bool value) => State.Execute(() => State.AllowDictionaryFallback = value);
-    private void SetAllowCompoundWords(bool value) => State.Execute(() => State.AllowCompoundWords = value);
-    private void SetTotalRounds(int value) => State.Execute(() => State.TotalRounds = value);
+    private void SetWordOrderMode(WordOrderMode value) => UpdateSettings(s => s with { WordOrderMode = value });
+    private void SetConstantWordLength(bool value) => UpdateSettings(s => s with { ConstantWordLength = value });
+    private void SetTargetWordLength(int value) => UpdateSettings(s => s with { TargetWordLength = value });
+    private void SetWinCondition(WinConditionMode value) => UpdateSettings(s => s with { WinCondition = value });
+    private void SetDifficultyMultiplier(double value) => UpdateSettings(s => s with { DifficultyMultiplier = value });
+    private void SetHardModeEnabled(bool value) => UpdateSettings(s => s with { HardModeEnabled = value });
+    private void SetHostPlaysAlong(bool value) => UpdateSettings(s => s with { HostPlaysAlong = value });
+    private void SetWaitForAll(bool value) => UpdateSettings(s => s with { WaitForAll = value });
+    private void SetRevealAnswer(bool value) => UpdateSettings(s => s with { RevealAnswer = value });
+    private void SetAllowDictionaryFallback(bool value) => UpdateSettings(s => s with { AllowDictionaryFallback = value });
+    private void SetAllowCompoundWords(bool value) => UpdateSettings(s => s with { AllowCompoundWords = value });
+    private void SetTotalRounds(int value) => UpdateSettings(s => s with { TotalRounds = value });
 
     // Min/max clamping keeps min ≤ max by pushing the other bound along with the edit.
-    // Both ends of the clamp are committed inside the same Execute so the pair is atomic.
-    private void SetMinWordLength(int value) => State.Execute(() =>
-    {
-        State.MinWordLength = value;
-        if (State.MaxWordLength < value) State.MaxWordLength = value;
-    });
-    private void SetMaxWordLength(int value) => State.Execute(() =>
-    {
-        State.MaxWordLength = value;
-        if (State.MinWordLength > value) State.MinWordLength = value;
-    });
+    // Both ends are set in the same `with` so the pair updates atomically.
+    private void SetMinWordLength(int value) => UpdateSettings(s =>
+        s with { MinWordLength = value, MaxWordLength = s.MaxWordLength < value ? value : s.MaxWordLength });
+    private void SetMaxWordLength(int value) => UpdateSettings(s =>
+        s with { MaxWordLength = value, MinWordLength = s.MinWordLength > value ? value : s.MinWordLength });
 
     private void OnCustomPoolChanged(ChangeEventArgs e)
     {
@@ -340,7 +394,15 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        bool shouldBeAttached = State.WordPoolMode == WordPoolMode.CsvUpload;
+        // localStorage needs JS interop, so the host's saved rules load here (not in
+        // OnInitialized, which also runs during prerender). Host-only: only the host edits
+        // and persists these, so only the host's browser has anything to restore.
+        if (firstRender && IsHost)
+        {
+            await LoadSettingsAsync();
+        }
+
+        bool shouldBeAttached = State.Settings.WordPoolMode == WordPoolMode.CsvUpload;
 
         if (shouldBeAttached && !_csvModuleAttached)
         {
@@ -381,6 +443,21 @@
 
     public async ValueTask DisposeAsync()
     {
+        // Flush the last pending save before tearing down so a change made right before
+        // navigating away isn't lost. A dead circuit makes SetAsync throw
+        // JSDisconnectedException, which SaveSettingsAsync swallows, so this returns
+        // promptly rather than hanging.
+        if (_saveTask is not null)
+        {
+            try { await _saveTask; } catch { /* best-effort flush */ }
+        }
+
+        _cts.Cancel();
+        _cts.Dispose();
+        // Cancel the pending start-error auto-dismiss so its delayed StateHasChanged()
+        // can't fire on a disposed component.
+        _startErrorCts?.Cancel();
+        _startErrorCts?.Dispose();
         try
         {
             if (_csvUploadModule is not null)
@@ -397,14 +474,14 @@
         if (int.TryParse(e.Value?.ToString(), out int seconds))
         {
             var timer = TimeSpan.FromSeconds(Math.Clamp(seconds, 30, 600));
-            State.Execute(() => State.RoundTimer = timer);
+            UpdateSettings(s => s with { RoundTimer = timer });
         }
     }
 
     private void OnUnlimitedToggled()
     {
         var timer = _unlimitedTimer ? TimeSpan.Zero : TimeSpan.FromMinutes(3);
-        State.Execute(() => State.RoundTimer = timer);
+        UpdateSettings(s => s with { RoundTimer = timer });
     }
 
     private void OnTransitionChanged(ChangeEventArgs e)
@@ -412,7 +489,66 @@
         if (int.TryParse(e.Value?.ToString(), out int seconds))
         {
             var span = TimeSpan.FromSeconds(Math.Clamp(seconds, 2, 15));
-            State.Execute(() => State.TransitionDuration = span);
+            UpdateSettings(s => s with { TransitionDuration = span });
+        }
+    }
+
+    // Restore the host's previously saved match rules. Missing key → GetAsync returns null,
+    // leaving the engine defaults in place. CustomWordPool is intentionally not persisted,
+    // so CSV/Host-defined pools start empty and must be re-entered.
+    private async Task LoadSettingsAsync()
+    {
+        try
+        {
+            var saved = await LocalStorage.GetAsync<SpardleSettings>("spardle", "settings", _cts.Token);
+            // If the host already edited a setting while the load was in flight,
+            // the user's edit wins — the saved snapshot would clobber it.
+            if (saved is not null && !_userHasEdited)
+            {
+                if (State.UpdateSettings(_ => saved).TryGetFailure(out var error))
+                {
+                    Logger.LogError("Failed to apply saved Spardle settings: {Error}", error.PublicMessage);
+                    return;
+                }
+                _unlimitedTimer = State.Settings.RoundTimer <= TimeSpan.Zero;
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException) { /* component disposed */ }
+        catch (ObjectDisposedException) { /* circuit gone */ }
+        catch (JSDisconnectedException) { /* circuit gone */ }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading Spardle settings.");
+        }
+    }
+
+    // Snapshot the current settings and chain this save off the previous one. Chaining
+    // serializes the localStorage writes so rapid edits can't complete out of order and
+    // leave a stale snapshot as the last writer; the snapshot makes the final edit the
+    // final write.
+    private void PersistSettings()
+    {
+        var snapshot = State.Settings;
+        _saveTask = SaveSettingsAsync(snapshot, _saveTask, _cts.Token);
+    }
+
+    private async Task SaveSettingsAsync(SpardleSettings settings, Task? prior, CancellationToken ct)
+    {
+        if (prior is not null)
+        {
+            try { await prior; } catch { /* prior failure already logged */ }
+        }
+        try
+        {
+            await LocalStorage.SetAsync("spardle", "settings", settings, ct);
+        }
+        catch (OperationCanceledException) { /* component disposed */ }
+        catch (ObjectDisposedException) { /* circuit gone */ }
+        catch (JSDisconnectedException) { /* circuit gone */ }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving Spardle settings.");
         }
     }
 

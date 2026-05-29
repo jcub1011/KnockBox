@@ -18,7 +18,7 @@
             <span class="spd-results-head-status spd-display">COMPLETE</span>
         </header>
 
-        @if (State.RevealAnswer && !string.IsNullOrEmpty(State.LastCompletedAnswer))
+        @if (State.Settings.RevealAnswer && !string.IsNullOrEmpty(State.LastCompletedAnswer))
         {
             <div class="spd-results-answer-wrap">
                 <span class="spd-results-answer-label spd-display">THE WORD</span>
@@ -84,7 +84,7 @@
 
         @if (State.PhaseExpiresAtUtc is { } expires)
         {
-            <CountdownClock EndTimeUtc="expires" Duration="State.TransitionDuration" Context="countdown">
+            <CountdownClock EndTimeUtc="expires" Duration="State.Settings.TransitionDuration" Context="countdown">
                 @{
                     int sec = Math.Max(0, (int)Math.Ceiling(countdown.RemainingSeconds));
                 }

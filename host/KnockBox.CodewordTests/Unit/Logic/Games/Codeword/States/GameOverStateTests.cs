@@ -90,7 +90,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void HandleCommand_StartNextGame_HostOnly()
         {
-            _state.Config.TotalGames = 5;
+            _state.UpdateSettings(s => s with { TotalGames = 5 });
             _state.WinResult = new WinConditionResult(true, Role.Agent, "Test");
 
             var gameOver = new GameOverState();
@@ -104,7 +104,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void HandleCommand_StartNextGame_RejectsNonHost()
         {
-            _state.Config.TotalGames = 5;
+            _state.UpdateSettings(s => s with { TotalGames = 5 });
             _state.WinResult = new WinConditionResult(true, Role.Agent, "Test");
 
             var gameOver = new GameOverState();
@@ -117,7 +117,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void HandleCommand_StartNextGame_IncrementsGameNumber()
         {
-            _state.Config.TotalGames = 5;
+            _state.UpdateSettings(s => s with { TotalGames = 5 });
             _state.CurrentGameNumber = 1;
             _state.WinResult = new WinConditionResult(true, Role.Agent, "Test");
 
@@ -131,7 +131,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void HandleCommand_StartNextGame_ClearsPlayerState()
         {
-            _state.Config.TotalGames = 5;
+            _state.UpdateSettings(s => s with { TotalGames = 5 });
             _state.WinResult = new WinConditionResult(true, Role.Agent, "Test");
 
             var gameOver = new GameOverState();
@@ -155,7 +155,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void HandleCommand_StartNextGame_ClearsGameLevelState()
         {
-            _state.Config.TotalGames = 5;
+            _state.UpdateSettings(s => s with { TotalGames = 5 });
             _state.UsedClues["test"] = "SomePlayer";
             _state.CurrentRoundClues.Add(new ClueEntry("p0", "P0", "test"));
             _state.CurrentRoundVotes.Add(new VoteEntry("p0", "P0", "p1", "P1"));
@@ -180,7 +180,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void HandleCommand_StartNextGame_PreservesUsedWordPairIndices()
         {
-            _state.Config.TotalGames = 5;
+            _state.UpdateSettings(s => s with { TotalGames = 5 });
             _context.UsedWordPairIndices.Add(0);
             _context.UsedWordPairIndices.Add(1);
             _state.WinResult = new WinConditionResult(true, Role.Agent, "Test");
@@ -195,7 +195,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void HandleCommand_StartNextGame_PreservesGameScores()
         {
-            _state.Config.TotalGames = 5;
+            _state.UpdateSettings(s => s with { TotalGames = 5 });
             _state.WinResult = new WinConditionResult(true, Role.Agent, "Test");
 
             var gameOver = new GameOverState();
@@ -212,7 +212,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void HandleCommand_StartNextGame_RejectsWhenAllGamesPlayed()
         {
-            _state.Config.TotalGames = 1;
+            _state.UpdateSettings(s => s with { TotalGames = 1 });
             _state.CurrentGameNumber = 1;
             _state.WinResult = new WinConditionResult(true, Role.Agent, "Test");
 
@@ -266,7 +266,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void MultiGame_CumulativeScoresTrackedCorrectly()
         {
-            _state.Config.TotalGames = 3;
+            _state.UpdateSettings(s => s with { TotalGames = 3 });
             _state.WinResult = new WinConditionResult(true, Role.Agent, "Test");
 
             // Game 1: Apply scoring.

@@ -27,7 +27,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             context.State.VotingRounds.Add(round);
 
             int totalRounds = SwissTournamentService.ResolveRoundCount(
-                context.GetTournamentEntrantIds().Count, context.Config.VotingRounds);
+                context.GetTournamentEntrantIds().Count, context.Settings.VotingRounds);
             context.Logger.LogDebug(
                 "FSM → VotingRoundSetupState. Round {n} of {total}. {count} matchup(s), {byes} bye(s) generated.",
                 round.RoundNumber, totalRounds, round.Matchups.Count, round.Byes.Count);
@@ -59,7 +59,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             var wins = roundNumber > 1
                 ? DrawnToDressScoringService.CalculateMatchupWins(
                     context.State.VotingRounds,
-                    context.Config.VotingCriteria,
+                    context.Settings.VotingCriteria,
                     context.State.Votes.Values,
                     context.State.CriterionCoinFlipResults)
                 : [];

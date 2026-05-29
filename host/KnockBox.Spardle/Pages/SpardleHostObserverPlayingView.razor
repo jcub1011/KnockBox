@@ -27,7 +27,7 @@
     @{
         int wordLen = State.TargetWord.Length;
         int maxGuesses = wordLen > 0
-            ? SpardleEngine.CalculateMaxGuesses(wordLen, State.DifficultyMultiplier)
+            ? SpardleEngine.CalculateMaxGuesses(wordLen, State.Settings.DifficultyMultiplier)
             : 6;
         var accents = new[] { "spd-obs-a", "spd-obs-b", "spd-obs-c", "spd-obs-d" };
         int accentIdx = 0;

@@ -32,7 +32,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             }
 
             context.State.SetPhase(CodewordGamePhase.Setup);
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.SetupPhaseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Settings.SetupPhaseTimeoutMs);
 
             context.Logger.LogDebug(
                 "FSM → SetupState (cycle {cycle})", context.State.CurrentEliminationCycle);

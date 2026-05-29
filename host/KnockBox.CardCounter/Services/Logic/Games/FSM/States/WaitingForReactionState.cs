@@ -19,7 +19,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
 
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.WaitingForReactionTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Settings.WaitingForReactionTimeoutMs);
             context.State.PendingReaction = new PendingReactionInfo(
                 _sourceId,
                 context.GetPlayer(_sourceId)?.DisplayName ?? _sourceId,
@@ -135,14 +135,14 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             switch (_pendingCard.Action)
             {
                 case ActionType.TurnTheTable:
-                    if (context.State.Config.ActiveOperatorMode)
+                    if (context.State.Settings.ActiveOperatorMode)
                         target.Balance = CardCounterGameContext.ReverseBalanceDigits(target.Balance);
                     else
                         target.Pot.Reverse();
                     break;
 
                 case ActionType.Launder:
-                    if (context.State.Config.ActiveOperatorMode)
+                    if (context.State.Settings.ActiveOperatorMode)
                     {
                         double temp = source.Balance;
                         source.Balance = target.Balance;

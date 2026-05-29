@@ -3,15 +3,15 @@
 
 @{
     var myId = UserService.CurrentUser?.Id ?? "";
-    var isHost = GameState.Host.Id == myId;
+    var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
     var winResult = GameState.WinResult;
-    bool isFinalGame = GameState.CurrentGameNumber >= GameState.Config.TotalGames;
+    bool isFinalGame = GameState.CurrentGameNumber >= GameState.Settings.TotalGames;
     var rankedPlayers = GameState.GamePlayers.Values
         .OrderByDescending(p => GameState.GameScores.TryGetValue(p.PlayerId, out var s) ? s : 0)
         .ToList();
 }
 
-@if (isHost)
+@if (isHostSpectator)
 {
     @* ══════ HOST SPECTATOR VIEW ══════ *@
     <div class="ctc-gameover-area">
@@ -27,7 +27,7 @@
                 </div>
             }
 
-            <p class="ctc-game-progress">Game @GameState.CurrentGameNumber of @GameState.Config.TotalGames</p>
+            <p class="ctc-game-progress">Game @GameState.CurrentGameNumber of @GameState.Settings.TotalGames</p>
 
             @* ── Scoreboard ── *@
             <div class="ctc-scoreboard">
@@ -101,7 +101,7 @@ else
                 </div>
             }
 
-            <p class="ctc-game-progress">Game @GameState.CurrentGameNumber of @GameState.Config.TotalGames</p>
+            <p class="ctc-game-progress">Game @GameState.CurrentGameNumber of @GameState.Settings.TotalGames</p>
 
             @* ── Scoreboard with roles revealed ── *@
             <div class="ctc-scoreboard">

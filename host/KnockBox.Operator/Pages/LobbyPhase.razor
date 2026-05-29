@@ -36,16 +36,16 @@
                 }
             </div>
 
-            <p class="op-lobby-player-count">@GameState.Players.Count players</p>
+            <p class="op-lobby-player-count">@GameState.Players.Length players</p>
 
             @if (UserService.CurrentUser?.Id == GameState.Host.Id)
             {
                 <button class="op-btn op-btn-primary op-btn-lg"
-                        disabled="@(GameState.Players.Count < 2)"
+                        disabled="@(GameState.Players.Length < 2)"
                         @onclick="StartGame">
                     START GAME
                 </button>
-                @if (GameState.Players.Count < 2)
+                @if (GameState.Players.Length < 2)
                 {
                     <p class="op-waiting-text">⚠️ Need at least 2 players</p>
                 }
@@ -105,6 +105,13 @@
                     <span>Flip Win Condition</span>
                     <input type="checkbox" @bind="FlipWinCondition" />
                 </label>
+            </div>
+
+            <div class="op-settings-drawer-footer">
+                <button type="button" class="op-btn @(_resetArmed ? "op-btn-danger" : "op-btn-secondary")"
+                        @onclick="ResetToDefaults">
+                    @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+                </button>
             </div>
         </div>
     </div>

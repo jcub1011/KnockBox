@@ -413,7 +413,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             };
 
             var totals = DrawnToDressScoringService.CalculatePlayerTotals(
-                rounds, criteria, votes, [], players, new DrawnToDressConfig());
+                rounds, criteria, votes, [], players, new DrawnToDressSettings());
 
             // pA: outfit1=2 + outfit2=3 + bonus=2 = 7
             Assert.AreEqual(7.0, totals["pA"], "pA: 2 + 3 + 2 bonus = 7.");
@@ -455,7 +455,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var players = MakePlayers("pA", "pB", "pC");
 
             var (entries, _) = DrawnToDressScoringService.BuildLeaderboard(
-                rounds, criteria, votes, [], players, new DrawnToDressConfig());
+                rounds, criteria, votes, [], players, new DrawnToDressSettings());
 
             // pA: round1=3 + round2=2 = 5 total, matchup wins=1.5 (win+tie)
             // pC: round2=2, matchup wins=0.5 (tie)
@@ -490,7 +490,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var players = MakePlayers("pA", "pB");
 
             var (entries, tiedPairs) = DrawnToDressScoringService.BuildLeaderboard(
-                rounds, criteria, votes, [], players, new DrawnToDressConfig());
+                rounds, criteria, votes, [], players, new DrawnToDressSettings());
 
             Assert.AreEqual(entries[0].Rank, entries[1].Rank, "Tied players should share the same rank.");
             Assert.HasCount(1, tiedPairs, "Tied pair should be reported.");

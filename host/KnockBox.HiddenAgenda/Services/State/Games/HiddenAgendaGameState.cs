@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Games.Shared.Components;
 using KnockBox.Core.Services.State.Games.Shared.Interfaces;
@@ -14,7 +15,6 @@ namespace KnockBox.HiddenAgenda.Services.State.Games;
 public class HiddenAgendaGameState(User host, ILogger<HiddenAgendaGameState> logger)
     : AbstractGameState(host, logger),
       IPhasedGameState<GamePhase>,
-      IConfigurableGameState<HiddenAgendaGameConfig>,
       IPlayerTrackedGameState<HiddenAgendaPlayerState>,
       IFsmContextGameState<HiddenAgendaGameContext>
 {
@@ -30,8 +30,18 @@ public class HiddenAgendaGameState(User host, ILogger<HiddenAgendaGameState> log
     // FSM context (set when game starts)
     public HiddenAgendaGameContext? Context { get; set; }
 
-    // Configuration
-    public HiddenAgendaGameConfig Config { get; set; } = new();
+    // Host-configurable match rules. Always replaced atomically via UpdateSettings; the
+    // setter is private so callers can't bypass the lock. Persisted to the host's browser
+    // localStorage by the lobby page so preferred rules survive across sessions.
+    public HiddenAgendaSettings Settings { get; private set; } = new();
+
+    /// <summary>
+    /// Atomically replaces <see cref="Settings"/> with <paramref name="mutate"/>'s result
+    /// inside <see cref="AbstractGameState.Execute(Action)"/>, so subscribers observe a
+    /// single consistent transition and notification fires once after the lock releases.
+    /// </summary>
+    public Result UpdateSettings(Func<HiddenAgendaSettings, HiddenAgendaSettings> mutate) =>
+        Execute(() => { Settings = mutate(Settings); });
 
     // Player state
     public ConcurrentDictionary<string, HiddenAgendaPlayerState> GamePlayers { get; } = new();

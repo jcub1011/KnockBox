@@ -16,7 +16,7 @@
         .SelectMany(p => p.SubmittedOutfits.Keys)
         .Count();
     int totalConfiguredRounds = SwissTournamentService.ResolveRoundCount(
-        entrantCount, GameState.Config.VotingRounds);
+        entrantCount, GameState.Settings.VotingRounds);
 }
 
 <div class="dtd-voting">
@@ -47,7 +47,7 @@
                     <h3 class="dtd-voting-section-title">Current Matchups</h3>
                     
                     @{
-                        int totalPossibleVotes = GameState.GamePlayers.Count * currentRound.Matchups.Count * GameState.Config.VotingCriteria.Count;
+                        int totalPossibleVotes = GameState.GamePlayers.Count * currentRound.Matchups.Count * GameState.Settings.VotingCriteria.Count;
                         int totalCastVotes = GameState.Votes.Count;
                     }
                     <div class="dtd-voting-progress-container">
@@ -70,10 +70,10 @@
                                         <div class="dtd-voting-vs" aria-hidden="true">VS</div>
                                         @RenderEntrant(matchup.EntrantBId, "B")
                                     </div>
-                                    @if (GameState.Config.VoteVisibility != VoteVisibilityMode.Hidden)
+                                    @if (GameState.Settings.VoteVisibility != VoteVisibilityMode.Hidden)
                                     {
                                         <div class="dtd-voting-matchup-breakdown">
-                                            @foreach (var criterion in GameState.Config.VotingCriteria)
+                                            @foreach (var criterion in GameState.Settings.VotingCriteria)
                                             {
                                                 int votesA = GameState.Votes.Values.Count(v => v.MatchupId == matchup.Id && v.CriterionId == criterion.Id && v.ChosenEntrantId == matchup.EntrantAId);
                                                 int votesB = GameState.Votes.Values.Count(v => v.MatchupId == matchup.Id && v.CriterionId == criterion.Id && v.ChosenEntrantId == matchup.EntrantBId);
@@ -121,7 +121,7 @@
                             @if (!isCompeting)
                             {
                                 <div class="dtd-voting-criteria">
-                                    @foreach (var criterion in GameState.Config.VotingCriteria)
+                                    @foreach (var criterion in GameState.Settings.VotingCriteria)
                                     {
                                         var key = (matchup.Id, criterion.Id);
                                         _selectedVotes.TryGetValue(key, out var selected);
@@ -185,11 +185,11 @@
                      role="img" aria-label="@($"{label} outfit by {GetEntrantLabel(entrantId)}: {(string.IsNullOrWhiteSpace(outfit.Customization.OutfitName) ? "Unnamed outfit" : outfit.Customization.OutfitName)}")">
                     @if (outfit.Customization.ShowMannequin)
                     {
-                        @((MarkupString)MannequinSvgHelper.Build(TotalOutfitWidth, TotalOutfitHeight, GameState.Config.MannequinDimensions.Y / 2,
-                            GameState.Config.MannequinDimensions.X, GameState.Config.MannequinScaleFactor,
-                            new MannequinDisplayOptions(GameState.Config.MannequinImagePath, OverrideDisplaySize: MannequinDisplaySize, Opacity: 1.0, FaceType: outfit.Customization.SelectedFace)))
+                        @((MarkupString)MannequinSvgHelper.Build(TotalOutfitWidth, TotalOutfitHeight, GameState.Settings.MannequinDimensions.Y / 2,
+                            GameState.Settings.MannequinDimensions.X, GameState.Settings.MannequinScaleFactor,
+                            new MannequinDisplayOptions(GameState.Settings.MannequinImagePath, OverrideDisplaySize: MannequinDisplaySize, Opacity: 1.0, FaceType: outfit.Customization.SelectedFace)))
                     }
-                    @foreach (var ct in GameState.Config.ClothingTypes)
+                    @foreach (var ct in GameState.Settings.ClothingTypes)
                     {
                         if (outfit.SelectedItemsByType.TryGetValue(ct.Id, out var itemId)
                             && GameState.ClothingPool.TryGetValue(itemId, out var item))
@@ -198,7 +198,7 @@
                             {
                                 var (itemX, itemY) = CompositeCanvasLayout.GetItemPosition(
                                     ct, TotalOutfitWidth, TotalOutfitHeight,
-                                    GameState.Config.MannequinDimensions.X, outfit);
+                                    GameState.Settings.MannequinDimensions.X, outfit);
                                 <g transform="translate(@itemX,@itemY)">@((MarkupString)safeSvg)</g>
                             }
                         }

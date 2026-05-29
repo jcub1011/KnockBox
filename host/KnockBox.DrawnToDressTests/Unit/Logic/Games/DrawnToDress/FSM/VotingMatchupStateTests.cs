@@ -49,7 +49,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var state = (DrawnToDressGameState)stateResult.Value!;
 
             if (criteria is not null)
-                state.Config.VotingCriteria = criteria;
+                state.UpdateSettings(s => s with { VotingCriteria = criteria });
 
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
@@ -186,7 +186,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // Use a negative VotingTimeSec so OnEnter sets the deadline in the past.
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.VotingTimeSec = -10; // deadline will be 10 s in the past on entry
+            state.UpdateSettings(s => s with { VotingTimeSec = -10 }); // deadline will be 10 s in the past on entry
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
@@ -279,7 +279,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             };
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.VotingCriteria = criteria;
+            state.UpdateSettings(s => s with { VotingCriteria = criteria });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
@@ -348,7 +348,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         [TestMethod]
         public void VoteVisibilityMode_DefaultIsHidden()
         {
-            var config = new DrawnToDressConfig();
+            var config = new DrawnToDressSettings();
             Assert.AreEqual(VoteVisibilityMode.Hidden, config.VoteVisibility,
                 "Default VoteVisibility must be Hidden.");
         }
@@ -356,14 +356,14 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         [TestMethod]
         public void VoteVisibilityMode_CanBeSetToPercentagesOnly()
         {
-            var config = new DrawnToDressConfig { VoteVisibility = VoteVisibilityMode.PercentagesOnly };
+            var config = new DrawnToDressSettings { VoteVisibility = VoteVisibilityMode.PercentagesOnly };
             Assert.AreEqual(VoteVisibilityMode.PercentagesOnly, config.VoteVisibility);
         }
 
         [TestMethod]
         public void VoteVisibilityMode_CanBeSetToIndividualVotes()
         {
-            var config = new DrawnToDressConfig { VoteVisibility = VoteVisibilityMode.IndividualVotes };
+            var config = new DrawnToDressSettings { VoteVisibility = VoteVisibilityMode.IndividualVotes };
             Assert.AreEqual(VoteVisibilityMode.IndividualVotes, config.VoteVisibility);
         }
     }

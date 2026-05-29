@@ -1,13 +1,17 @@
+using System.Text.Json.Serialization;
+
 namespace KnockBox.DrawnToDress.Services.State.Games.Data
 {
     /// <summary>
     /// Defines a category of clothing that players can draw (e.g. Hat, Top, Shoes).
-    /// These definitions are part of <see cref="DrawnToDressConfig"/> and drive which
+    /// These definitions are part of <see cref="DrawnToDressSettings"/> and drive which
     /// drawing slots are available and how outfits are assembled.
     /// </summary>
     public record ClothingTypeDefinition
     {
         /// <summary>Identifies which clothing category this definition represents.</summary>
+        // Persisted snapshots must survive enum reordering, so serialize by name.
+        [JsonConverter(typeof(JsonStringEnumConverter))]
         public ClothingType Id { get; set; }
 
         /// <summary>Human-readable name shown in the UI (e.g. "Hat", "Top").</summary>

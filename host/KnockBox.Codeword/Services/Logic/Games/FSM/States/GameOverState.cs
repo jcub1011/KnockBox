@@ -50,7 +50,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             if (cmd.PlayerId != context.State.Host.Id)
                 return new ResultError("Only the host can start the next game.");
 
-            if (context.State.CurrentGameNumber >= context.State.Config.TotalGames)
+            if (context.State.CurrentGameNumber >= context.State.Settings.TotalGames)
                 return new ResultError("All games have been played.");
 
             context.State.CurrentGameNumber++;

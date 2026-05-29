@@ -149,7 +149,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void Tick_WithTimersEnabled_AutoAdvancesOnTimeout()
         {
-            _state.Config.EnableTimers = true;
+            _state.UpdateSettings(s => s with { EnableTimers = true });
             var discussion = new DiscussionPhaseState();
             discussion.OnEnter(_context);
 
@@ -161,7 +161,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void Tick_WithTimersDisabled_DoesNotAutoAdvance()
         {
-            _state.Config.EnableTimers = false;
+            _state.UpdateSettings(s => s with { EnableTimers = false });
             var discussion = new DiscussionPhaseState();
             discussion.OnEnter(_context);
 
@@ -173,7 +173,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void Tick_BeforeTimeout_ReturnsNull()
         {
-            _state.Config.EnableTimers = true;
+            _state.UpdateSettings(s => s with { EnableTimers = true });
             var discussion = new DiscussionPhaseState();
             discussion.OnEnter(_context);
 

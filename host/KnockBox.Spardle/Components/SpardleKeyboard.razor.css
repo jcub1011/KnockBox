@@ -32,7 +32,10 @@
     border-radius: 5px;
     box-shadow: 3px 3px 0 #000;
     cursor: pointer;
+    -webkit-user-select: none;
+    -ms-user-select: none;
     user-select: none;
+    -webkit-touch-callout: none; /* suppress iOS long-press callout on the glyph */
     transition: transform 0.08s, box-shadow 0.08s, background-color 0.2s;
 }
 
@@ -78,10 +81,10 @@
 }
 
 .spd-key-absent {
-    background: var(--spd-absent);
+    background: #1a0608; /* dark red-tinted so spent letters read clearly as "wrong" */
     color: var(--spd-absent-ink);
     box-shadow: 2px 2px 0 #000;
-    opacity: 0.85;
+    opacity: 0.35;
 }
 
 @media (max-width: 1024px) {

@@ -32,7 +32,7 @@ internal static class SpardleOpponentsRanking
 
         IOrderedEnumerable<(User User, string DisplayName, PlayerState Ps, int CorrectPos, int WrongPos)> sorted;
 
-        if (state.WinCondition == WinConditionMode.Sprinter)
+        if (state.Settings.WinCondition == WinConditionMode.Sprinter)
         {
             // Three-state grouping: solved → still-guessing → DNF. DNF players (max-guess
             // exhaustion or voluntary give-up) carry a FinishedAt timestamp; without the
@@ -98,7 +98,7 @@ internal static class SpardleOpponentsRanking
         if (ps.Dnf) return "DNF";
         if (!ps.HasFinishedRound) return ps.Guesses.Count.ToString();
 
-        if (state.WinCondition == WinConditionMode.Sprinter
+        if (state.Settings.WinCondition == WinConditionMode.Sprinter
             && state.RoundStartTime is DateTime start
             && ps.FinishedAt is DateTime finish)
         {

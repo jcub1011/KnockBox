@@ -219,7 +219,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void Tick_WithTimersEnabled_AutoSubmitsOnTimeout()
         {
-            _state.Config.EnableTimers = true;
+            _state.UpdateSettings(s => s with { EnableTimers = true });
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
@@ -237,7 +237,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void Tick_WithTimersDisabled_DoesNotAutoSubmit()
         {
-            _state.Config.EnableTimers = false;
+            _state.UpdateSettings(s => s with { EnableTimers = false });
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
@@ -280,7 +280,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void Tick_WithPendingClue_AutoSubmitsPendingText()
         {
-            _state.Config.EnableTimers = true;
+            _state.UpdateSettings(s => s with { EnableTimers = true });
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
@@ -297,7 +297,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void Tick_WithEmptyPendingClue_FallsBackToEllipsis()
         {
-            _state.Config.EnableTimers = true;
+            _state.UpdateSettings(s => s with { EnableTimers = true });
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
@@ -314,7 +314,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void Tick_WithPendingClueMatchingSecretWord_FallsBackToEllipsis()
         {
-            _state.Config.EnableTimers = true;
+            _state.UpdateSettings(s => s with { EnableTimers = true });
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
@@ -331,7 +331,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void Tick_WithPendingClueAlreadyUsed_FallsBackToEllipsis()
         {
-            _state.Config.EnableTimers = true;
+            _state.UpdateSettings(s => s with { EnableTimers = true });
             _state.UsedClues["wave"] = "SomePlayer";
 
             var clueState = new CluePhaseState();
@@ -350,7 +350,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void Tick_WithNoPendingClue_FallsBackToEllipsis()
         {
-            _state.Config.EnableTimers = true;
+            _state.UpdateSettings(s => s with { EnableTimers = true });
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 

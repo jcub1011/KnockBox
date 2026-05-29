@@ -21,9 +21,9 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<DrawnToDressGameContext, DrawnToDressCommand>?> OnEnter(
             DrawnToDressGameContext context)
         {
-            if (context.Config.EnableTimer)
+            if (context.Settings.EnableTimer)
             {
-                context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.OutfitBuildingTimeSec);
+                context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Settings.OutfitBuildingTimeSec);
             }
 
             context.State.SetPhase(GamePhase.OutfitBuilding);
@@ -123,7 +123,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             }
 
             // Players may not claim items they drew themselves (unless the config allows it).
-            if (!context.Config.AllowSelectOwnDrawings
+            if (!context.Settings.AllowSelectOwnDrawings
                 && string.Equals(item.CreatorPlayerId, cmd.PlayerId, StringComparison.Ordinal))
             {
                 context.Logger.LogWarning(
@@ -229,7 +229,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             // Distinctness check for round > 1.
             if (_outfitRound > 1)
             {
-                int threshold = context.Config.Outfit2DistinctnessThreshold;
+                int threshold = context.Settings.Outfit2DistinctnessThreshold;
                 if (threshold > 0)
                 {
                     var candidate = new OutfitSubmission
@@ -310,7 +310,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                         .Select(kv => kv.Value))]
                 : new List<OutfitSubmission>();
 
-            int threshold = context.Config.Outfit2DistinctnessThreshold;
+            int threshold = context.Settings.Outfit2DistinctnessThreshold;
 
             // Pre-index pool items by clothing type for efficient lookup.
             // Use dictionary key (not item.Id) since callers may store items with mismatched keys.
@@ -332,7 +332,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                 var ownedSet = player.OwnedClothingItemIds.ToHashSet();
                 var selectedItems = new Dictionary<ClothingType, Guid>();
 
-                foreach (var clothingType in context.Config.ClothingTypes)
+                foreach (var clothingType in context.Settings.ClothingTypes)
                 {
                     // Gather all items of this type owned by the player using the pre-indexed pool.
                     if (!poolByType.TryGetValue(clothingType.Id, out var typeItems)) continue;

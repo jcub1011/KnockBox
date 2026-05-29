@@ -92,19 +92,6 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                     context.Logger.LogDebug("Host [{id}] started the game.", cmd.PlayerId);
                     return new ThemeSelectionState();
 
-                case UpdateConfigCommand cmd:
-                    // Only the host can change configuration.
-                    if (cmd.PlayerId != context.State.Host.Id)
-                    {
-                        context.Logger.LogWarning(
-                            "UpdateConfig rejected: player [{id}] is not the host.", cmd.PlayerId);
-                        return null;
-                    }
-                    cmd.Config.Normalize();
-                    context.State.Config = cmd.Config;
-                    context.Logger.LogDebug("Host [{id}] updated config.", cmd.PlayerId);
-                    return null;
-
                 case PauseGameCommand:
                     return new PausedState(this);
 

@@ -1,7 +1,7 @@
 @using KnockBox.Core.Components.Shared
 @using KnockBox.Spardle
 
-@if (State.PhaseExpiresAtUtc is null || State.RoundTimer <= TimeSpan.Zero)
+@if (State.PhaseExpiresAtUtc is null || State.Settings.RoundTimer <= TimeSpan.Zero)
 {
     <div class="spd-timer spd-timer-unlimited">
         <span class="spd-timer-icon">∞</span>
@@ -10,7 +10,7 @@
 }
 else
 {
-    <CountdownClock EndTimeUtc="State.PhaseExpiresAtUtc.Value" Duration="State.RoundTimer" Context="countdown">
+    <CountdownClock EndTimeUtc="State.PhaseExpiresAtUtc.Value" Duration="State.Settings.RoundTimer" Context="countdown">
         @{
             int totalSec = (int)Math.Ceiling(countdown.RemainingSeconds);
             int mins = totalSec / 60;

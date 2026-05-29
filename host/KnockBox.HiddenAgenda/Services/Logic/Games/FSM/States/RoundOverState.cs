@@ -32,7 +32,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
                 return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromError("Only the host can start the next round.");
 
             // Check if match is over
-            if (context.State.CurrentRound >= context.State.Config.TotalRounds)
+            if (context.State.CurrentRound >= context.State.Settings.TotalRounds)
                 return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromValue(new MatchOverState());
 
             // Reset for new round and start

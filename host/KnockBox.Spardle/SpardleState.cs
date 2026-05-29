@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Spardle.Models;
@@ -10,50 +11,24 @@ namespace KnockBox.Spardle;
 
 public class SpardleState(User host, ILogger logger) : AbstractGameState(host, logger)
 {
-    // Settings
-    public WordPoolMode WordPoolMode { get; set; } = WordPoolMode.NytStandard;
-    public WordOrderMode WordOrderMode { get; set; } = WordOrderMode.RandomNoRepeats;
-    public WinConditionMode WinCondition { get; set; } = WinConditionMode.Sprinter;
+    // Host-configurable match rules. Always replaced atomically via UpdateSettings; the
+    // setter is private so callers can't bypass the lock. Persisted to the host's browser
+    // localStorage by the lobby page so preferred rules survive across sessions.
+    public SpardleSettings Settings { get; private set; } = new();
 
     /// <summary>
-    /// When true, the engine picks all round words at a single fixed
-    /// <see cref="TargetWordLength"/>. When false, words are sampled across
-    /// <see cref="MinWordLength"/>–<see cref="MaxWordLength"/> inclusive.
-    /// Only consulted when <see cref="WordPoolMode"/> is
-    /// <see cref="WordPoolMode.FullDictionary"/>.
+    /// Atomically replaces <see cref="Settings"/> with <paramref name="mutate"/>'s result
+    /// inside <see cref="AbstractGameState.Execute(Action)"/>, so subscribers observe a
+    /// single consistent transition and notification fires once after the lock releases.
     /// </summary>
-    public bool ConstantWordLength { get; set; } = true;
+    public Result UpdateSettings(Func<SpardleSettings, SpardleSettings> mutate) =>
+        Execute(() => { Settings = mutate(Settings); });
 
-    /// <summary>
-    /// Target word length when <see cref="ConstantWordLength"/> is true.
-    /// Forced to 5 by the engine when <see cref="WordPoolMode"/> is
-    /// <see cref="WordPoolMode.NytStandard"/>. Ignored when
-    /// <see cref="CustomWordPool"/> is non-empty.
-    /// </summary>
-    public int TargetWordLength { get; set; } = 5;
-
-    /// <summary>
-    /// Minimum word length (inclusive) when <see cref="ConstantWordLength"/> is false.
-    /// </summary>
-    public int MinWordLength { get; set; } = 3;
-
-    /// <summary>
-    /// Maximum word length (inclusive) when <see cref="ConstantWordLength"/> is false.
-    /// </summary>
-    public int MaxWordLength { get; set; } = 8;
-
-    public bool HardModeEnabled { get; set; } = false;
-    public TimeSpan RoundTimer { get; set; } = TimeSpan.FromMinutes(3);
-    public bool AllowDictionaryFallback { get; set; } = true;
-    public bool AllowCompoundWords { get; set; } = false;
-    public double DifficultyMultiplier { get; set; } = 2.0;
-    
-    // Dynamic defaults
-    public bool WaitForAll { get; set; } = true;
-    public bool RevealAnswer { get; set; } = true;
+    // Spardle treats the host as a participant by default before the game starts;
+    // StartAsync re-fixes HostIsParticipant based on whether other players joined.
+    protected override bool DefaultHostIsParticipant => true;
 
     // Game state
-    public int TotalRounds { get; set; } = 5;
     public int CurrentRound { get; set; } = 0;
     public string TargetWord { get; set; } = string.Empty;
     public DateTime? RoundStartTime { get; set; }
@@ -63,7 +38,6 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     // Phase / transition
     public GamePhase Phase { get; set; } = GamePhase.Lobby;
     public DateTimeOffset? PhaseExpiresAtUtc { get; set; }
-    public TimeSpan TransitionDuration { get; set; } = TimeSpan.FromSeconds(5);
     public ImmutableList<RoundResult> RoundHistory { get; set; } = [];
     public string? LastCompletedAnswer { get; set; }
 
@@ -89,12 +63,23 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     private readonly ConcurrentDictionary<string, PlayerState> _playerStates = new();
     public IReadOnlyDictionary<string, PlayerState> PlayerStates => _playerStates;
 
-    // True when the host is playing alongside everyone else; false when the host is a
-    // display-only observer (set at StartAsync time based on whether any other players
-    // joined, then locked for the duration of the game).
-    public bool HostIsParticipant { get; private set; } = true;
+    // The participant roster captured at game start, frozen for the match. Used by
+    // the final standings screen so players who disconnect (and are dropped from the
+    // live Players roster) still appear on the end-screen leaderboard. PlayerStates
+    // already persists their TotalScore, so leavers keep their final score.
+    //
+    // Distinct from the base AbstractGameState.Participants (which tracks the live
+    // roster and prunes leavers); this is the immutable match snapshot. The base's
+    // HostIsParticipant toggle drives whether the host is included — set once at
+    // StartAsync time and never changed, so it is effectively frozen for the match.
+    public ImmutableArray<PlayerEntry> MatchParticipants { get; private set; } = [];
 
-    internal void SetHostIsParticipant(bool value) => HostIsParticipant = value;
+    internal void SetMatchParticipants(IEnumerable<PlayerEntry> participants) =>
+        // Drop the unsubscriber token so the long-lived snapshot doesn't retain
+        // registration handles; only User + DisplayName are needed for display.
+        MatchParticipants = participants
+            .Select(e => new PlayerEntry(e.User, e.DisplayName, null))
+            .ToImmutableArray();
 
     /// <summary>
     /// Creates (or returns the existing) <see cref="PlayerState"/> for <paramref name="userId"/>.

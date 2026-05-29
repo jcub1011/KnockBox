@@ -16,7 +16,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<CodewordGameContext, CodewordCommand>?> OnEnter(CodewordGameContext context)
         {
             context.State.SetPhase(CodewordGamePhase.Voting);
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.VotePhaseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Settings.VotePhaseTimeoutMs);
 
             context.Logger.LogDebug("FSM → VotePhaseState");
             return null;
@@ -82,7 +82,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
         {
             if (now < _expiresAt) return null;
 
-            if (!context.State.Config.EnableTimers)
+            if (!context.State.Settings.EnableTimers)
                 return null;
 
             // Abstain non-voters on timeout.

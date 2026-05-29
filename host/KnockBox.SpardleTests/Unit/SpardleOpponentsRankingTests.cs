@@ -531,11 +531,11 @@ public class SpardleOpponentsRankingTests
         var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
         var state = new SpardleState(host, NullLogger.Instance);
         state.Execute(() => state.SetJoinable(true));
-        state.WinCondition = WinConditionMode.Sprinter;
+        state.UpdateSettings(s => s with { WinCondition = WinConditionMode.Sprinter });
         state.TargetWord = "apple";
         state.RoundStartTime = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc);
         // Host plays alongside the registered players — exercises the observer filter.
-        state.SetHostIsParticipant(true);
+        state.Execute(() => state.SetHostIsParticipant(true));
 
         var alice = AddPlayer(state, "Alice");
         var bob = AddPlayer(state, "Bob");
@@ -580,11 +580,11 @@ public class SpardleOpponentsRankingTests
         var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
         var state = new SpardleState(host, NullLogger.Instance);
         state.Execute(() => state.SetJoinable(true));
-        state.WinCondition = mode;
+        state.UpdateSettings(s => s with { WinCondition = mode });
         state.TargetWord = targetWord;
         // Treat host as a non-participating observer so the roster contains
         // only the registered players we add in each test.
-        state.SetHostIsParticipant(false);
+        state.Execute(() => state.SetHostIsParticipant(false));
         return state;
     }
 

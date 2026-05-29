@@ -15,7 +15,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> OnEnter(HiddenAgendaGameContext context)
         {
             context.State.SetPhase(GamePhase.RoundSetup);
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.RoundSetupTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Settings.RoundSetupTimeoutMs);
             context.State.PhaseEndTime = _expiresAt;
 
             context.State.CurrentRound++;
@@ -24,7 +24,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
             if (context.State.CurrentRound > 1)
             {
                 int poolSize = context.GamePlayers.Count <= 3 ? 25 : 30;
-                context.State.CurrentTaskPool = context.State.Config.PoolRotation switch
+                context.State.CurrentTaskPool = context.State.Settings.PoolRotation switch
                 {
                     TaskPoolRotation.Full => TaskPool.GetPoolForPlayerCount(context.GamePlayers.Count),
                     TaskPoolRotation.Partial => TaskPool.AllTasks.OrderBy(_ => context.Rng.GetRandomInt(10000)).Take(poolSize).ToList(),

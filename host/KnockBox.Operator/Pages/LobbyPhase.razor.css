@@ -151,6 +151,11 @@
     gap: 20px;
 }
 
+.op-settings-drawer-footer {
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.12);
+}
+
 .op-settings-backdrop {
     position: fixed;
     top: 0;

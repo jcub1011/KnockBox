@@ -4,7 +4,7 @@
 
 @{
     var isHost = IsHost();
-    var ranked = GameState.Config.FlipWinCondition
+    var ranked = GameState.Settings.FlipWinCondition
         ? GameState.GamePlayers.Values.OrderByDescending(p => Math.Abs(p.Balance)).ToList()
         : GameState.GamePlayers.Values.OrderBy(p => Math.Abs(p.Balance)).ToList();
     var ranks = new int[ranked.Count];
@@ -21,7 +21,7 @@
     <div class="cc-gameover-area">
         <div class="cc-gameover-panel cc-gameover-host-panel">
             <h2 class="cc-gameover-title cc-gameover-host-title">♠ GAME OVER ♠</h2>
-            <p class="cc-gameover-subtitle">@(GameState.Config.FlipWinCondition ? "Highest magnitude wins!" : "Closest to zero wins!")</p>
+            <p class="cc-gameover-subtitle">@(GameState.Settings.FlipWinCondition ? "Highest magnitude wins!" : "Closest to zero wins!")</p>
 
             <div class="cc-gameover-host-leaderboard">
                 @for (int i = 0; i < ranked.Count; i++)
@@ -60,7 +60,7 @@ else
     <div class="cc-gameover-area">
         <div class="cc-gameover-panel">
             <h2 class="cc-gameover-title">♠ GAME OVER ♠</h2>
-            <p class="cc-gameover-subtitle">@(GameState.Config.FlipWinCondition ? "Highest magnitude wins!" : "Closest to zero wins!")</p>
+            <p class="cc-gameover-subtitle">@(GameState.Settings.FlipWinCondition ? "Highest magnitude wins!" : "Closest to zero wins!")</p>
             <div class="cc-leaderboard">
                 @for (int i = 0; i < ranked.Count; i++)
                 {

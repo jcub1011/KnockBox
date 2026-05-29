@@ -195,7 +195,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             IEnumerable<VoteSubmission> votes,
             IReadOnlyList<CriterionCoinFlipResult> coinFlipResults,
             IReadOnlyDictionary<string, DrawnToDressPlayerState> players,
-            DrawnToDressConfig config)
+            DrawnToDressSettings config)
         {
             var voteList = votes.ToList();
             var playerTotals = new Dictionary<string, double>();
@@ -230,7 +230,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
                 IEnumerable<VoteSubmission> votes,
                 IReadOnlyList<CriterionCoinFlipResult> coinFlipResults,
                 IReadOnlyDictionary<string, DrawnToDressPlayerState> players,
-                DrawnToDressConfig config)
+                DrawnToDressSettings config)
         {
             var voteList = votes.ToList();
             var playerTotals = CalculatePlayerTotals(rounds, criteria, voteList, coinFlipResults, players, config);

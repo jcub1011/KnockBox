@@ -1,48 +1,20 @@
 using KnockBox.Core.Primitives.Disposable;
+using System.Collections.Immutable;
 
 namespace KnockBox.Core.Primitives.Events
 {
     /// <summary>
-    /// Shared dispatch helpers for <see cref="ThreadSafeEventManager"/> /
-    /// <see cref="ThreadSafeEventManager{TEventArgs}"/>. Snapshot reads are lock-free;
-    /// subscribe/unsubscribe build the new snapshot via <see cref="Array.Copy"/> to
-    /// avoid intermediate List/enumerator allocations from spread expressions.
+    /// Shared dispatch helper for <see cref="ThreadSafeEventManager"/> /
+    /// <see cref="ThreadSafeEventManager{TEventArgs}"/>. Iterates a snapshot of
+    /// listeners and awaits only the listeners that didn't complete synchronously,
+    /// avoiding <see cref="Task.WhenAll(Task[])"/> overhead when every handler is
+    /// already done. Subscribe/unsubscribe is handled by each manager directly via
+    /// <see cref="ImmutableArray{T}"/> Add/Remove under the manager's own lock.
     /// </summary>
     internal static class ThreadSafeEventManagerHelper
     {
-        public static T[] AddListener<T>(T[] listeners, T callback) where T : Delegate
-        {
-            var newListeners = new T[listeners.Length + 1];
-            if (listeners.Length > 0)
-                Array.Copy(listeners, newListeners, listeners.Length);
-            newListeners[listeners.Length] = callback;
-            return newListeners;
-        }
-
-        /// <summary>
-        /// Removes the first matching listener and returns a fresh snapshot.
-        /// </summary>
-        /// <remarks>
-        /// O(n) in the subscriber count: both the <see cref="Array.IndexOf{T}(T[], T)"/> scan
-        /// and the <see cref="Array.Copy(Array, int, Array, int, int)"/> traverse the list.
-        /// Callers with hot subscribe/unsubscribe churn on large subscriber counts should batch.
-        /// </remarks>
-        public static T[] RemoveListener<T>(T[] listeners, T callback) where T : Delegate
-        {
-            int index = Array.IndexOf(listeners, callback);
-            if (index < 0) return listeners;
-            if (listeners.Length == 1) return [];
-
-            var newListeners = new T[listeners.Length - 1];
-            if (index > 0)
-                Array.Copy(listeners, 0, newListeners, 0, index);
-            if (index < listeners.Length - 1)
-                Array.Copy(listeners, index + 1, newListeners, index, listeners.Length - index - 1);
-            return newListeners;
-        }
-
         public static Task DispatchAsync<TListener>(
-            TListener[] snapshot,
+            ImmutableArray<TListener> snapshot,
             Func<TListener, Task> invoker)
         {
             if (snapshot.Length == 0) return Task.CompletedTask;
@@ -72,9 +44,9 @@ namespace KnockBox.Core.Primitives.Events
 
     /// <summary>
     /// Default <see cref="IThreadSafeEventManager"/> implementation. Subscribers
-    /// are held in an immutable snapshot array swapped under a lock; notifications
-    /// read the snapshot without holding the lock, so handlers can safely
-    /// re-enter (subscribe / unsubscribe / notify) without deadlocking.
+    /// are held in an <see cref="ImmutableArray{T}"/> snapshot swapped under a lock;
+    /// notifications read the snapshot without holding the lock, so handlers can
+    /// safely re-enter (subscribe / unsubscribe / notify) without deadlocking.
     /// </summary>
     /// <remarks>
     /// <see cref="Notify"/> is fire-and-forget: it dispatches to all subscribers
@@ -84,33 +56,32 @@ namespace KnockBox.Core.Primitives.Events
     public sealed class ThreadSafeEventManager(ILogger? logger = null)
         : IThreadSafeEventManager
     {
-        private readonly Lock _lock = new();
-        private Func<ValueTask>[] _listeners = [];
+        private ImmutableArray<Func<ValueTask>> _listeners = [];
 
         public IDisposable Subscribe(Func<ValueTask> callback)
         {
             ArgumentNullException.ThrowIfNull(callback);
 
-            lock (_lock)
-            {
-                _listeners = ThreadSafeEventManagerHelper.AddListener(_listeners, callback);
-            }
+            ImmutableInterlocked.Update(ref _listeners, static (list, cb) => list.Add(cb), callback);
 
             return new DisposableAction(() =>
-            {
-                lock (_lock)
-                {
-                    _listeners = ThreadSafeEventManagerHelper.RemoveListener(_listeners, callback);
-                }
-            });
+                ImmutableInterlocked.Update(ref _listeners, static (list, cb) => list.Remove(cb), callback));
         }
 
-        public Task NotifyAsync()
-        {
-            Func<ValueTask>[] snapshot;
-            lock (_lock) { snapshot = _listeners; }
-            return ThreadSafeEventManagerHelper.DispatchAsync(snapshot, SafeInvokeAsync);
-        }
+        /// <summary>
+        /// Drops every subscriber. Owners (e.g. <c>AbstractGameState.Dispose</c>) call
+        /// this to release captured component/engine references promptly instead of
+        /// waiting for GC to break the owner↔subscriber cycle. Atomic against concurrent
+        /// <see cref="Subscribe"/> / <see cref="Notify"/>.
+        /// </summary>
+        public void Clear() =>
+            ImmutableInterlocked.InterlockedExchange(ref _listeners, ImmutableArray<Func<ValueTask>>.Empty);
+
+        // Bare read is safe: ImmutableArray<T> is a single-reference struct and writes
+        // via ImmutableInterlocked.Update use Interlocked.CompareExchange (full barrier).
+        // We can't Volatile.Read directly — its T : class constraint excludes value types.
+        public Task NotifyAsync() =>
+            ThreadSafeEventManagerHelper.DispatchAsync(_listeners, SafeInvokeAsync);
 
         /// <summary>
         /// Dispatches the notification. Sync handlers run on the calling thread;
@@ -127,7 +98,8 @@ namespace KnockBox.Core.Primitives.Events
         /// </summary>
         public void Notify()
         {
-            var snapshot = Volatile.Read(ref _listeners);
+            // See NotifyAsync for the bare-read rationale.
+            var snapshot = _listeners;
             if (snapshot.Length == 0) return;
 
             for (int i = 0; i < snapshot.Length; i++)
@@ -171,33 +143,28 @@ namespace KnockBox.Core.Primitives.Events
     /// <typeparam name="TEventArgs">Type of the payload passed to each subscriber.</typeparam>
     public sealed class ThreadSafeEventManager<TEventArgs>(ILogger? logger = null) : IThreadSafeEventManager<TEventArgs>
     {
-        private readonly Lock _lock = new();
-        private Func<TEventArgs, ValueTask>[] _listeners = [];
+        private ImmutableArray<Func<TEventArgs, ValueTask>> _listeners = [];
 
         public IDisposable Subscribe(Func<TEventArgs, ValueTask> callback)
         {
             ArgumentNullException.ThrowIfNull(callback);
 
-            lock (_lock)
-            {
-                _listeners = ThreadSafeEventManagerHelper.AddListener(_listeners, callback);
-            }
+            ImmutableInterlocked.Update(ref _listeners, static (list, cb) => list.Add(cb), callback);
 
             return new DisposableAction(() =>
-            {
-                lock (_lock)
-                {
-                    _listeners = ThreadSafeEventManagerHelper.RemoveListener(_listeners, callback);
-                }
-            });
+                ImmutableInterlocked.Update(ref _listeners, static (list, cb) => list.Remove(cb), callback));
         }
 
-        public Task NotifyAsync(TEventArgs args)
-        {
-            Func<TEventArgs, ValueTask>[] snapshot;
-            lock (_lock) { snapshot = _listeners; }
-            return ThreadSafeEventManagerHelper.DispatchAsync(snapshot, cb => SafeInvokeAsync(cb, args));
-        }
+        /// <summary>
+        /// Drops every subscriber. See the non-generic <see cref="ThreadSafeEventManager.Clear"/>
+        /// for the rationale.
+        /// </summary>
+        public void Clear() =>
+            ImmutableInterlocked.InterlockedExchange(ref _listeners, ImmutableArray<Func<TEventArgs, ValueTask>>.Empty);
+
+        // See the non-generic ThreadSafeEventManager for the bare-read rationale.
+        public Task NotifyAsync(TEventArgs args) =>
+            ThreadSafeEventManagerHelper.DispatchAsync(_listeners, cb => SafeInvokeAsync(cb, args));
 
         /// <summary>
         /// Dispatches the notification. Sync handlers run on the calling thread;
@@ -207,7 +174,8 @@ namespace KnockBox.Core.Primitives.Events
         /// </summary>
         public void Notify(TEventArgs args)
         {
-            var snapshot = Volatile.Read(ref _listeners);
+            // See the non-generic ThreadSafeEventManager for the bare-read rationale.
+            var snapshot = _listeners;
             if (snapshot.Length == 0) return;
 
             for (int i = 0; i < snapshot.Length; i++)

@@ -7,7 +7,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 {
     /// <summary>
     /// Timed display state that shows the results of a single Swiss voting round.
-    /// Auto-advances after <see cref="Data.DrawnToDressConfig.VotingRoundResultsTimeSec"/>
+    /// Auto-advances after <see cref="Data.DrawnToDressSettings.VotingRoundResultsTimeSec"/>
     /// seconds to the next round or final results. No player interaction is required.
     ///
     /// Transition ownership:
@@ -23,23 +23,23 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             context.State.SetPhase(GamePhase.VotingRoundResults);
             context.ResetReadyFlags();
 
-            context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.VotingRoundResultsTimeSec);
+            context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Settings.VotingRoundResultsTimeSec);
 
             int totalRounds = SwissTournamentService.ResolveRoundCount(
-                context.GetTournamentEntrantIds().Count, context.Config.VotingRounds);
+                context.GetTournamentEntrantIds().Count, context.Settings.VotingRounds);
             context.Logger.LogDebug(
                 "FSM → VotingRoundResultsState. Round {n} of {total} complete. Auto-advance in {sec}s.",
                 context.State.CurrentVotingRoundIndex + 1, totalRounds,
-                context.Config.VotingRoundResultsTimeSec);
+                context.Settings.VotingRoundResultsTimeSec);
 
             // Compute round scores and award round leader bonus.
             int roundIndex = context.State.CurrentVotingRoundIndex;
-            if (roundIndex < context.State.VotingRounds.Count && context.Config.RoundLeaderBonusPoints > 0)
+            if (roundIndex < context.State.VotingRounds.Count && context.Settings.RoundLeaderBonusPoints > 0)
             {
                 var round = context.State.VotingRounds[roundIndex];
                 var roundScores = DrawnToDressScoringService.CalculateRoundScores(
                     round,
-                    context.Config.VotingCriteria,
+                    context.Settings.VotingCriteria,
                     context.State.Votes.Values,
                     context.State.CriterionCoinFlipResults);
 
@@ -50,10 +50,10 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                     var player = context.GetPlayer(playerId);
                     if (player is not null)
                     {
-                        player.BonusPoints += context.Config.RoundLeaderBonusPoints;
+                        player.BonusPoints += context.Settings.RoundLeaderBonusPoints;
                         context.Logger.LogDebug(
                             "Round leader bonus (+{bonus}) awarded to player [{playerId}] via entrant [{entrantId}].",
-                            context.Config.RoundLeaderBonusPoints, playerId, entrantId);
+                            context.Settings.RoundLeaderBonusPoints, playerId, entrantId);
                     }
                 }
             }
@@ -105,7 +105,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             DrawnToDressGameContext context)
         {
             int entrantCount = context.GetTournamentEntrantIds().Count;
-            int totalRounds = SwissTournamentService.ResolveRoundCount(entrantCount, context.Config.VotingRounds);
+            int totalRounds = SwissTournamentService.ResolveRoundCount(entrantCount, context.Settings.VotingRounds);
             bool moreRounds = context.State.VotingRounds.Count < totalRounds;
             if (moreRounds)
             {

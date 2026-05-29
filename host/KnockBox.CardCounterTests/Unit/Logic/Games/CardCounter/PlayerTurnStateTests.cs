@@ -55,7 +55,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             SetCurrentPlayer(0);
             _state.CurrentShoe.Push(new NumberCard(3)); // stays after draw
             _state.CurrentShoe.Push(new NumberCard(7)); // auto-drawn
-            _state.Config.EnableActionTimer = true;
+            _state.UpdateSettings(s => s with { EnableActionTimer = true });
 
             var fsmState = new PlayerTurnState();
             fsmState.OnEnter(_context);

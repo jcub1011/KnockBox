@@ -85,8 +85,8 @@ The order matters: `AddKnockBoxPlatform` uses `TryAddSingleton` so a pre-existin
 - **Platform pages:** `Home`, `Error`, `NotFound`, `MainLayout`, `ReconnectModal` (served at `/`, `/error`, `/not-found`).
 - **Lobby management:** `LobbyService`, `LobbyCodeService` (6-character profanity-filtered codes).
 - **Session infrastructure:** `SessionServiceProvider`, `SessionTokenProvider`, `UserService`, `TickService`.
-- **Client storage:** `ILocalStorageService`, `ISessionStorageService` (JS-interop browser storage wrappers).
-- **Profanity filter:** Aho-Corasick automaton over an embedded English word list; used by `LobbyCodeService`.
+- **Client storage:** `LocalStorageService`, `SessionStorageService` — JS-interop browser storage wrappers implementing the `ILocalStorageService` / `ISessionStorageService` contracts defined in `KnockBox.Core`.
+- **Profanity filter:** Aho-Corasick automaton over an embedded English word list, implementing the `IProfanityFilter` contract defined in `KnockBox.Core`; used by `LobbyCodeService`.
 
 ## Developer reference
 

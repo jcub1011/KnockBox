@@ -152,6 +152,11 @@
 }
 .dndm-panel-section:first-child { border-top: 0; }
 
+.dndm-permp-reset {
+    margin-top: 0.25rem;
+    border-top: 1px solid var(--dndm-ink-soft);
+}
+
 .dndm-panel-empty {
     padding: 1rem 0.5rem;
     color: var(--dndm-text-muted);

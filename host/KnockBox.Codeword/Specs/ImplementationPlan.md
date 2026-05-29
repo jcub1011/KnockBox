@@ -114,7 +114,7 @@ KnockBox.CodewordTests/
 - `HasVotedToEndGame` — tracks whether this player has voted to end the game this elimination cycle (reset each cycle, one vote per cycle per player to prevent spam)
 - `Score`
 
-### CodewordGameConfig
+### CodewordSettings
 - `SetupPhaseTimeoutMs` (5000), `CluePhaseTimeoutMs` (30000), `DiscussionPhaseTimeoutMs` (120000), `VotePhaseTimeoutMs` (15000), `RevealPhaseTimeoutMs` (10000), `InformantGuessTimeoutMs` (15000)
 - `EnableTimers`, `TotalGames` (for multi-game scoring, default 5)
 

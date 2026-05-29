@@ -30,14 +30,14 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             // 1. Calculate player totals (before tournament winner bonus).
             var playerTotals = DrawnToDressScoringService.CalculatePlayerTotals(
                 context.State.VotingRounds,
-                context.Config.VotingCriteria,
+                context.Settings.VotingCriteria,
                 context.State.Votes.Values,
                 context.State.CriterionCoinFlipResults,
                 players,
-                context.Config);
+                context.Settings);
 
             // 2. Award tournament winner bonus to highest-scoring player(s).
-            if (context.Config.TournamentWinnerBonusPoints > 0 && playerTotals.Count > 0)
+            if (context.Settings.TournamentWinnerBonusPoints > 0 && playerTotals.Count > 0)
             {
                 double maxScore = playerTotals.Values.Max();
                 foreach (var (playerId, score) in playerTotals)
@@ -47,10 +47,10 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                         var player = context.GetPlayer(playerId);
                         if (player is not null)
                         {
-                            player.BonusPoints += context.Config.TournamentWinnerBonusPoints;
+                            player.BonusPoints += context.Settings.TournamentWinnerBonusPoints;
                             context.Logger.LogDebug(
                                 "Tournament winner bonus (+{bonus}) awarded to player [{playerId}].",
-                                context.Config.TournamentWinnerBonusPoints, playerId);
+                                context.Settings.TournamentWinnerBonusPoints, playerId);
                         }
                     }
                 }
@@ -59,11 +59,11 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             // 3. Build leaderboard (includes the tournament winner bonus in totals).
             var (entries, tiedPairs) = DrawnToDressScoringService.BuildLeaderboard(
                 context.State.VotingRounds,
-                context.Config.VotingCriteria,
+                context.Settings.VotingCriteria,
                 context.State.Votes.Values,
                 context.State.CriterionCoinFlipResults,
                 players,
-                context.Config);
+                context.Settings);
 
             // 4. Store in state.
             context.State.Leaderboard = entries;

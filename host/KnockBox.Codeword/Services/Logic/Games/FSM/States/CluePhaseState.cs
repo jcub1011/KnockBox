@@ -29,7 +29,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
                 return new GameOverState();
             }
 
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.CluePhaseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Settings.CluePhaseTimeoutMs);
 
             context.Logger.LogDebug(
                 "FSM → CluePhaseState (current player index: {idx}, player: {pid})",
@@ -94,7 +94,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             // Advance to next eligible player and reset timer.
             context.State.TurnManager.NextTurn();
             AdvanceToNextEligibleClueGiver(context);
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.CluePhaseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Settings.CluePhaseTimeoutMs);
 
             return null;
         }
@@ -104,7 +104,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
         {
             if (now < _expiresAt) return null;
 
-            if (!context.State.Config.EnableTimers)
+            if (!context.State.Settings.EnableTimers)
                 return null;
 
             // Auto-submit for the timed-out player. Use pending clue text if valid, otherwise "...".
@@ -131,7 +131,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             // Advance to next eligible player and reset timer.
             context.State.TurnManager.NextTurn();
             AdvanceToNextEligibleClueGiver(context);
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.CluePhaseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Settings.CluePhaseTimeoutMs);
 
             return null;
         }

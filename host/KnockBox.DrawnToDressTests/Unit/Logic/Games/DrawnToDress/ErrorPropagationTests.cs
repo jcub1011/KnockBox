@@ -39,10 +39,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 3 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -93,10 +92,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             // Arrange: create a game in the drawing phase.
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 10 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -141,10 +139,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             // Arrange: create a game in the drawing phase.
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 10 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
@@ -166,10 +163,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             // Arrange: create a game in the drawing phase.
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
-            state.Config.ClothingTypes =
-            [
+            state.UpdateSettings(s => s with { ClothingTypes = [
                 new() { Id = ClothingType.Hat, DisplayName = "Hat", MaxItemsPerRound = 10 },
-            ];
+            ] });
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));

@@ -7,7 +7,7 @@ using KnockBox.Core.Services.Navigation;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Core.Primitives.Returns;
-using KnockBox.Platform.Filtering;
+using KnockBox.Core.Services.Logic.Filtering;
 using KnockBox.Platform.Plugins;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

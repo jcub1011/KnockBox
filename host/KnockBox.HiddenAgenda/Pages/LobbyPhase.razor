@@ -12,7 +12,7 @@
     </div>
 
     <div class="ha-lobby-players">
-        <h4 class="ha-subheading">Curators (@GameState.Players.Count / 6)</h4>
+        <h4 class="ha-subheading">Curators (@GameState.Players.Length / 6)</h4>
         <div class="ha-lobby-player-grid">
             @foreach (var entry in GameState.Players)
             {
@@ -29,7 +29,7 @@
                 </div>
             }
         </div>
-        @if (GameState.Players.Count < 3)
+        @if (GameState.Players.Length < 3)
         {
             <p class="ha-text-warning">Need at least 3 curators to begin the exhibition.</p>
         }
@@ -38,21 +38,33 @@
     <div class="ha-lobby-config">
         <h4 class="ha-subheading">Exhibition Settings</h4>
         <div class="ha-form-group">
-            <label>Rounds: @Config.TotalRounds</label>
-            <input type="range" min="3" max="5" step="1" @bind="Config.TotalRounds" disabled="@(!IsHost)" class="ha-range" />
+            <label>Rounds: @GameState.Settings.TotalRounds</label>
+            <input type="range" min="3" max="5" step="1"
+                   @bind:get="GameState.Settings.TotalRounds" @bind:set="SetTotalRounds"
+                   disabled="@(!IsHost)" class="ha-range" />
         </div>
         <div class="ha-checkbox-row">
-            <input type="checkbox" id="timerToggle" @bind="Config.EnableTimers" disabled="@(!IsHost)" class="ha-checkbox" />
+            <input type="checkbox" id="timerToggle"
+                   @bind:get="GameState.Settings.EnableTimers" @bind:set="SetEnableTimers"
+                   disabled="@(!IsHost)" class="ha-checkbox" />
             <label class="ha-checkbox-label" for="timerToggle">Enable Timers</label>
         </div>
         <div class="ha-form-group">
             <label for="poolRotation">Pool Rotation</label>
-            <select id="poolRotation" class="ha-select" @bind="Config.PoolRotation" disabled="@(!IsHost)">
+            <select id="poolRotation" class="ha-select"
+                    @bind:get="GameState.Settings.PoolRotation" @bind:set="SetPoolRotation"
+                    disabled="@(!IsHost)">
                 @foreach (var type in Enum.GetValues<TaskPoolRotation>())
                 {
                     <option value="@type">@type</option>
                 }
             </select>
+        </div>
+        <div class="ha-config-reset">
+            <button type="button" class="ha-btn @(_resetArmed ? "ha-btn-danger" : "ha-btn-secondary") ha-btn-sm"
+                    disabled="@(!IsHost)" @onclick="ResetToDefaults">
+                @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+            </button>
         </div>
     </div>
 
@@ -60,7 +72,7 @@
     {
         <div class="ha-actions">
             <button class="ha-btn ha-btn-primary ha-btn-lg"
-                    disabled="@(GameState.Players.Count < 3)"
+                    disabled="@(GameState.Players.Length < 3)"
                     @onclick="StartGame">Open the Exhibition</button>
         </div>
     }

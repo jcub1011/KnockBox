@@ -16,7 +16,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
 
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
         {
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Config.MakeMyLuckTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Settings.MakeMyLuckTimeoutMs);
             context.Logger.LogDebug(
                 "FSM → MakeMyLuckState for [{id}]. Expires {exp}.", _playerId, _expiresAt);
             return null;

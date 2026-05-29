@@ -7,7 +7,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 {
     /// <summary>
     /// Handles the case where two or more outfits share an item in the same clothing-type
-    /// slot and <see cref="DrawnToDressConfig.RequireDistinctItemsPerSlot"/> is enabled.
+    /// slot and <see cref="DrawnToDressSettings.RequireDistinctItemsPerSlot"/> is enabled.
     ///
     /// Each affected player must submit a <see cref="ResolveDistinctnessCommand"/> with a
     /// replacement item before voting can begin.

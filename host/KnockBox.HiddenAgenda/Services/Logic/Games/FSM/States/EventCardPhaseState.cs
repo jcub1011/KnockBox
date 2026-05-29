@@ -26,7 +26,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
             }
 
             context.State.SetPhase(GamePhase.EventCardPhase);
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.EventCardPhaseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Settings.EventCardPhaseTimeoutMs);
             return null;
         }
 
@@ -122,7 +122,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> Tick(HiddenAgendaGameContext context, DateTimeOffset now)
         {
             if (now < _expiresAt) return null;
-            if (!context.State.Config.EnableTimers) return null;
+            if (!context.State.Settings.EnableTimers) return null;
             return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromValue(new SpinPhaseState());
         }
 

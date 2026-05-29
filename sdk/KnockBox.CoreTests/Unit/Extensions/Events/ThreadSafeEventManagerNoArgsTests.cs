@@ -161,4 +161,58 @@ public sealed class ThreadSafeEventManagerNoArgsTests
         Assert.AreEqual(0, firstCalled);
         Assert.AreEqual(1, secondCalled);
     }
+
+    [TestMethod]
+    public async Task Subscribe_Unsubscribe_Notify_UnderConcurrency_DoesNotThrow()
+    {
+        // Exercises the lock-free ImmutableInterlocked.Update path: N tasks
+        // churn subscribe/unsubscribe while another runs Notify in a loop.
+        // No exception should escape; the surviving-subscriber count must
+        // match what we hold onto at the end.
+        var manager = new ThreadSafeEventManager();
+        var survivorCount = 0;
+        const int churnTasks = 8;
+        const int churnIterations = 500;
+
+        // Hold a fixed set of subscribers that should never be disposed.
+        var survivors = new List<IDisposable>();
+        for (int i = 0; i < 4; i++)
+        {
+            survivors.Add(manager.Subscribe(() =>
+            {
+                Interlocked.Increment(ref survivorCount);
+                return ValueTask.CompletedTask;
+            }));
+        }
+
+        using var cts = new CancellationTokenSource();
+        var notifier = Task.Run(async () =>
+        {
+            while (!cts.IsCancellationRequested)
+            {
+                await manager.NotifyAsync();
+            }
+        });
+
+        var churn = Enumerable.Range(0, churnTasks).Select(_ => Task.Run(() =>
+        {
+            for (int i = 0; i < churnIterations; i++)
+            {
+                var sub = manager.Subscribe(() => ValueTask.CompletedTask);
+                sub.Dispose();
+            }
+        })).ToArray();
+
+        await Task.WhenAll(churn);
+        cts.Cancel();
+        await notifier;
+
+        // Reset the counter so the post-churn Notify gives us a clean read.
+        Volatile.Write(ref survivorCount, 0);
+        await manager.NotifyAsync();
+        Assert.AreEqual(survivors.Count, survivorCount,
+            "Only the held survivors should remain after the churn settles.");
+
+        foreach (var s in survivors) s.Dispose();
+    }
 }

@@ -30,7 +30,7 @@ namespace KnockBox.DrawnToDress.Pages
         {
             return DrawnToDressScoringService.CalculateMatchupTotals(
                 matchup,
-                GameState.Config.VotingCriteria,
+                GameState.Settings.VotingCriteria,
                 GameState.Votes.Values,
                 GameState.CriterionCoinFlipResults);
         }
@@ -39,7 +39,7 @@ namespace KnockBox.DrawnToDress.Pages
         {
             return DrawnToDressScoringService.CalculateRoundScores(
                 round,
-                GameState.Config.VotingCriteria,
+                GameState.Settings.VotingCriteria,
                 GameState.Votes.Values,
                 GameState.CriterionCoinFlipResults);
         }

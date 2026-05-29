@@ -111,5 +111,12 @@
                         @onclick="@(() => SetLoadedDicePlayerIndicator(LoadedDicePlayerIndicator.RedDotInLog))">Red dot in log</button>
             </div>
         </div>
+
+        <div class="dndm-panel-section dndm-permp-reset">
+            <button class="dndm-btn @(_resetArmed ? "dndm-btn--danger" : "dndm-btn--ghost")" type="button"
+                    @onclick="ResetToDefaults" title="Restore all settings to their defaults">
+                @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+            </button>
+        </div>
     </div>
 </section>

@@ -92,7 +92,7 @@ KnockBox.Platform/
 │       └── NotFound.razor
 ├── Services/
 │   ├── Logic/
-│   │   ├── Filtering/ (IProfanityFilter, ProfanityFilter)
+│   │   ├── Filtering/ (ProfanityFilter; IProfanityFilter contract lives in KnockBox.Core)
 │   │   └── Games/ (ILobbyService, LobbyService, ILobbyCodeService, LobbyCodeService, IGameAvailabilityService)
 │   ├── State/ (TickService, SessionServiceProvider, SessionTokenProvider)
 │   ├── Users/ (UserService)

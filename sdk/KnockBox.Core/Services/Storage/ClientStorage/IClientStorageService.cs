@@ -1,4 +1,4 @@
-namespace KnockBox.Platform.ClientStorage
+namespace KnockBox.Core.Services.Storage.ClientStorage
 {
     public readonly record struct StorageResult<TValue>(TValue Value, bool Exists);
 

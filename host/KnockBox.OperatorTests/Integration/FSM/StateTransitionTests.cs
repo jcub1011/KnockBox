@@ -111,15 +111,15 @@ public class SetupStateTests
         var result = _setupState.Tick(_context, DateTimeOffset.UtcNow);
 
         // Both players should have been defaulted to positive
-        Assert.AreEqual(_state.Config.InitialPointsPositive, _state.GamePlayers["p1"].CurrentPoints);
-        Assert.AreEqual(_state.Config.InitialPointsPositive, _state.GamePlayers["p2"].CurrentPoints);
+        Assert.AreEqual(_state.Settings.InitialPointsPositive, _state.GamePlayers["p1"].CurrentPoints);
+        Assert.AreEqual(_state.Settings.InitialPointsPositive, _state.GamePlayers["p2"].CurrentPoints);
         Assert.IsInstanceOfType(result.Value, typeof(PlayPhaseState));
     }
 
     [TestMethod]
     public void Tick_TimersDisabled_DoesNotTimeout()
     {
-        _state.Config.TimersEnabled = false;
+        _state.UpdateSettings(s => s with { TimersEnabled = false });
         _state.StateStartTime = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(120);
         var result = _setupState.Tick(_context, DateTimeOffset.UtcNow);
 
@@ -389,7 +389,7 @@ public class PlayPhaseTimeoutTests
     [TestMethod]
     public void Tick_TimersDisabled_DoesNotTimeout()
     {
-        _state.Config.TimersEnabled = false;
+        _state.UpdateSettings(s => s with { TimersEnabled = false });
         _state.GamePlayers["p1"].Hand.Add(new NumberCard(5m));
         _state.StateStartTime = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(60);
 

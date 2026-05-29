@@ -92,41 +92,140 @@ header a {
     width: 100%;
     height: 100%;
     overflow: hidden;
+    background-color: transparent;
+    /* Hoist the page scroll timeline into this subtree so the fixed background
+       pseudo-layers can reference it. The actual scroller is <article> below,
+       which declares `scroll-timeline: --page-scroll`. Needed because the
+       document root never scrolls here (body is locked to 100vh, .main is
+       overflow:hidden) — so `scroll(root)` would have no range. */
+    timeline-scope: --page-scroll;
 }
 
-/* ── Scrolling Diagonal Background ──────────────────────────────────────── */
+/* ── Atmospheric Background ─────────────────────────────────────────────── */
+/* Two fixed pseudo-layers sit behind all content (::before at z-index -2,
+   ::after at -1). Their look is gated on the route class MainLayout sets:
+     • Home (.main, no .in-game) → bold scrolling diagonal "candy" stripes
+       (::before) plus a static halftone-dot texture and a centre readability
+       scrim (::after). Pure CSS gradients animated only via `transform`, so
+       there's no bitmap in video memory and the motion runs on the compositor
+       — dynamic and fun, but cheap on low-end devices.
+     • In-game (.main.in-game) → the calm, dimmed blob glow (unchanged), so a
+       loud scrolling background never competes with active gameplay.
+   The yellow scrolling ribbon still lives behind the hero in Home.razor.css. */
 
-.main::before {
+/* Shared layout for both layers. `inset: -96px` overscans the viewport so the
+   stripe layer's diagonal translate (≈79px/axis, below) never exposes an
+   uncovered edge as it scrolls. */
+.main::before,
+.main::after {
     content: "";
     position: fixed;
-    top: calc(50vh - 150vmax);
-    left: calc(50vw - 150vmax);
-    width: 300vmax;
-    height: 300vmax;
-    z-index: -1;
-    background-color: var(--bg-color);
-    background-image: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), url("/_content/KnockBox.Platform/content/backgrounds/yellow-vertical_loop_crop.jpg");
-    background-repeat: repeat;
-    background-size: auto, auto 400px;
-    transform: rotate(45deg);
-    animation: partyGradient 12s linear infinite;
-    opacity: 1;
-    transition: opacity 0.25s ease-in-out;
+    inset: -96px;
+    pointer-events: none;
 }
 
-@keyframes partyGradient {
-    0% {
-        background-position: 0 0, 0 0;
-    }
+.main::before { z-index: -2; }
+.main::after  { z-index: -1; }
 
-    100% {
-        background-position: 0 0, 0 -400px;
-    }
+/* ── Home: scrolling diagonal stripes (the lively layer) ─────────────────── */
+.main:not(.in-game)::before {
+    background-color: #5d3a8c;   /* vibrant violet — yellow's complement; brighter cousin of the brand plum */
+    /* Two-tone stripes with thin pink + cyan brand-colour pops. Every tint is
+       low-alpha over the violet base so foreground text/cards stay readable.
+       The pattern repeats every 112px along its 45° axis — see the keyframe. */
+    background-image: repeating-linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.035) 0 28px,         /* light plum stripe          */
+        rgba(0, 0, 0, 0.10)       28px 56px,        /* dark plum stripe           */
+        rgba(255, 0, 85, 0.10)    56px 60px,        /* thin pink pop (--accent)   */
+        rgba(0, 0, 0, 0.10)       60px 84px,
+        rgba(30, 255, 188, 0.08)  84px 88px,        /* thin cyan pop (--tile-cyan) */
+        rgba(0, 0, 0, 0.10)       88px 112px
+    );
+    animation: stripeScroll 7s linear infinite;
+    will-change: transform;
 }
 
+/* Translating by exactly one 112px period along the 45° axis lands on an
+   identical pattern → seamless loop, transform only (no repaint). CSS 45deg
+   points to top-right = (sin45, −cos45); 112 × 0.707 ≈ 79.2 per axis. */
+@keyframes stripeScroll {
+    from { transform: translate(0, 0); }
+    to   { transform: translate(79.2px, -79.2px); }
+}
+
+/* ── Home: static halftone texture + centre readability scrim ────────────── */
+.main:not(.in-game)::after {
+    inset: -96px -96px -300px -96px;   /* bottom overscan covers one loop's 198px rise */
+    background-image:
+        radial-gradient(rgba(255, 255, 255, 0.12) 1.1px, transparent 1.6px);
+    background-size: 22px 22px;
+    /* The halftone dots are the parallax layer, bound to the --page-scroll
+       timeline (the <article> scroller). Two tricks combine here:
+
+       1. Constant rate on every display. A normalised 0%–100% progress timeline
+          moves the dots the full amplitude across whatever scroll exists — so a
+          tall mobile page felt gentle while a barely-scrolling desktop page
+          raced. Instead each loop is mapped to a fixed *pixel* span of scroll
+          (1400px), so the rate is constant (~0.141px of dot rise per px
+          scrolled) regardless of page/viewport height.
+
+       2. It never stops. Rather than one finite ramp that clamps once you scroll
+          past its end, the animation LOOPS: each iteration drifts the dots by
+          198px — exactly 9 dot-cells (9 × 22px) — so the wrap from -198px back
+          to 0 is pixel-identical and invisible. animation-range (56000px) =
+          iteration-count (40) × the 1400px-per-loop span, i.e. ~40 loops of
+          headroom — far more scroll than this page can ever have, so the
+          parallax effectively continues forever.
+       Chrome/Edge 115+; Firefox (flagged off) falls back to the static start. */
+    animation: dotParallax linear;
+    animation-timeline: --page-scroll;
+    animation-range: 0px 56000px;
+    animation-iteration-count: 40;
+    will-change: translate;
+}
+
+@keyframes dotParallax {
+    from { translate: 0 0; }
+    to   { translate: 0 -198px; }   /* 9 dot-cells (22px) → seamless wrap */
+}
+
+/* ── In-game: calm dimmed blob glow (unchanged look) ─────────────────────── */
+/* `inset` reset to 0 so the blobs render exactly as they did pre-redesign.
+   `farthest-side` keeps each radial gradient fading to transparent before any
+   box edge — no clipped "sphere" silhouette. */
 .main.in-game::before {
-    opacity: 0;
-    transition: opacity 0.5s ease-in-out;
+    inset: 0;
+    opacity: 0.12;
+    background-image:
+        radial-gradient(circle farthest-side at center,
+            rgba(255, 255, 255, 0.11) 0%,
+            rgba(255, 255, 255, 0.055) 40%,
+            rgba(255, 255, 255, 0) 95%),
+        radial-gradient(circle farthest-side at center,
+            rgba(255, 255, 255, 0.09) 0%,
+            rgba(255, 255, 255, 0.045) 40%,
+            rgba(255, 255, 255, 0) 95%);
+    background-repeat: no-repeat;
+    background-size: 200vmin 200vmin, 170vmin 170vmin;
+    background-position: -25% 5%, 115% 75%;
+}
+
+.main.in-game::after {
+    inset: 0;
+    opacity: 0.12;
+    background-image:
+        radial-gradient(circle farthest-side at center,
+            rgba(255, 0, 85, 0.13) 0%,
+            rgba(255, 0, 85, 0.065) 40%,
+            rgba(255, 0, 85, 0) 95%),
+        radial-gradient(circle farthest-side at center,
+            rgba(255, 0, 85, 0.10) 0%,
+            rgba(255, 0, 85, 0.05) 40%,
+            rgba(255, 0, 85, 0) 95%);
+    background-repeat: no-repeat;
+    background-size: 210vmin 210vmin, 160vmin 160vmin;
+    background-position: 115% -20%, -20% 115%;
 }
 
 article {
@@ -137,6 +236,9 @@ article {
     overflow: auto;
     padding: 0px;
     margin: 0px;
+    /* The real scroll container. Names the vertical scroll timeline the home
+       background's dot layer parallaxes against (scoped via .main above). */
+    scroll-timeline: --page-scroll block;
 }
 
 .header-actions ::deep .room-code-btn {
@@ -254,9 +356,15 @@ header.exiting-to-home {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .main::before {
-        animation: none;
+    /* The gated home selectors out-specify `.main::before/after`, so list them
+       explicitly or the stripe animation would survive. Stripes stay visible,
+       just frozen. */
+    .main::before,
+    .main::after,
+    .main:not(.in-game)::before,
+    .main:not(.in-game)::after {
         transition: none;
+        animation: none;
     }
 
     article.entering-from-home,

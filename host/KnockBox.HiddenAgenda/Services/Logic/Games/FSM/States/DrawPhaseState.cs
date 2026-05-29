@@ -24,7 +24,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
 
             var space = context.Board.Spaces[player.CurrentSpaceId];
             context.State.SetPhase(GamePhase.DrawPhase);
-            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Config.DrawPhaseTimeoutMs);
+            _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.State.Settings.DrawPhaseTimeoutMs);
 
             if (space.SpotType == SpotType.Curation)
             {
@@ -149,7 +149,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> Tick(HiddenAgendaGameContext context, DateTimeOffset now)
         {
             if (now < _expiresAt) return null;
-            if (!context.State.Config.EnableTimers) return null;
+            if (!context.State.Settings.EnableTimers) return null;
 
             var currentPlayerId = context.State.TurnManager.CurrentPlayer;
             if (currentPlayerId != null && context.GamePlayers.TryGetValue(currentPlayerId, out var player))

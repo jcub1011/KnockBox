@@ -89,7 +89,27 @@ Then add a Razor page at `/room/my-game/{ObfuscatedRoomCode}` that injects the e
 | `IThreadSafeEventManager` / `ThreadSafeEventManager` | Snapshot-based event dispatch used by `AbstractGameState.StateChangedEventManager`. |
 | `FiniteStateMachine<TContext,TCommand>`, `IGameState<,>`, `ITimedGameState<,>` | Optional FSM scaffolding for phase-driven games. |
 | `TurnManager` | Helper for games that take strict turns. |
-| `IPhasedGameState<T>`, `IConfigurableGameState<T>`, `IFsmContextGameState<T>`, `IPlayerTrackedGameState<T>` | Marker interfaces for advanced state patterns. |
+| `IPhasedGameState<T>`, `IFsmContextGameState<T>`, `IPlayerTrackedGameState<T>` | Marker interfaces for advanced state patterns. |
+
+## Configurable settings
+
+Plugins that expose host-configurable rules (round counts, timers, gameplay toggles, etc.) follow a uniform recipe:
+
+1. **Define a `sealed record TSettings`** with `init`-only properties and defaults. Add `[JsonConverter(typeof(JsonStringEnumConverter))]` on any enum properties so persisted snapshots survive enum reordering.
+2. **On the state**, expose `public TSettings Settings { get; private set; } = new();` and a single mutator:
+   ```csharp
+   public Result UpdateSettings(Func<TSettings, TSettings> mutate) =>
+       Execute(() => { Settings = mutate(Settings); });
+   ```
+   The private setter forces all mutation through `UpdateSettings`, which wraps the change in `Execute` so subscribers observe a single atomic transition.
+3. **In the lobby Razor page**, inject `ILocalStorageService`, persist on every successful edit (task-chained writes), and load on first render with a `_userHasEdited` guard so an in-flight load can't clobber a host edit. Mirror the wiring in `host/KnockBox.Codeword/Pages/LobbyPhase.razor.cs` (`LoadSettingsAsync`, `PersistSettings`, `SaveSettingsAsync`, `DisposeAsync` flush). Storage key: `("{plugin-route-id}", "settings")`.
+4. **Razor bindings** route each input through a per-property setter that calls `state.UpdateSettings(s => s with { ... })`:
+   ```razor
+   <input type="checkbox" @bind:get="GameState.Settings.EnableTimers" @bind:set="SetEnableTimers" />
+   ```
+5. **Reset to defaults** is a two-step-confirm button in the same settings UI that calls `UpdateSettings(_ => new TSettings())` — restoring the record's declared defaults and persisting them through the same path.
+
+The reference implementation is `KnockBox.Codeword` (`CodewordSettings.cs`, `CodewordGameState.cs`, `Pages/LobbyPhase.razor.cs`).
 
 ## The concurrency contract
 

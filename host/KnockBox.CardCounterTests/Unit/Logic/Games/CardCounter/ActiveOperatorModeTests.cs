@@ -34,7 +34,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             var host = UserFactory.Create("Host", "host-id");
             _state = new CardCounterGameState(host, _stateLoggerMock.Object);
-            _state.Config.ActiveOperatorMode = true;
+            _state.UpdateSettings(s => s with { ActiveOperatorMode = true });
             _context = new CardCounterGameContext(_state, _randomMock.Object, _loggerMock.Object);
         }
 
@@ -136,7 +136,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyNumberCard_NormalMode_StillAppendsToPot()
         {
-            _state.Config.ActiveOperatorMode = false;
+            _state.UpdateSettings(s => s with { ActiveOperatorMode = false });
             var player = new PlayerState { PlayerId = "p1", DisplayName = "P1", Balance = 100 };
             player.Pot.Add(1);
             _state.GamePlayers["p1"] = player;
@@ -174,7 +174,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyOperatorCard_NormalMode_StillAppliesFromPot()
         {
-            _state.Config.ActiveOperatorMode = false;
+            _state.UpdateSettings(s => s with { ActiveOperatorMode = false });
             var player = new PlayerState { PlayerId = "p1", DisplayName = "P1", Balance = 100 };
             player.Pot.AddRange([2, 5]); // pot = 25
             _state.GamePlayers["p1"] = player;
@@ -216,7 +216,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void GetRandomActionCard_NormalMode_UsesFullPool_IncludingSkimAndTurnTheTable()
         {
-            _state.Config.ActiveOperatorMode = false;
+            _state.UpdateSettings(s => s with { ActiveOperatorMode = false });
             int capturedMax = -1;
             _randomMock.Setup(r => r.GetRandomInt(0, It.IsAny<int>(), RandomType.Secure))
                 .Callback<int, int, RandomType>((_, max, _) => capturedMax = max)
@@ -250,8 +250,8 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void GetRandomActionCard_ZeroWeightCard_IsExcludedFromPool()
         {
-            _state.Config.ActiveOperatorMode = false;
-            _state.Config.TiltWeight = 0; // exclude Tilt from pool
+            _state.UpdateSettings(s => s with { ActiveOperatorMode = false });
+            _state.UpdateSettings(s => s with { TiltWeight = 0 }); // exclude Tilt from pool
 
             int capturedMax = -1;
             _randomMock.Setup(r => r.GetRandomInt(0, It.IsAny<int>(), RandomType.Secure))
@@ -270,19 +270,19 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void GetRandomActionCard_AllWeightsZero_ReturnsNull()
         {
-            _state.Config.ActiveOperatorMode = false;
+            _state.UpdateSettings(s => s with { ActiveOperatorMode = false });
             // Set all weights to 0
-            _state.Config.FeelingLuckyWeight = 0;
-            _state.Config.MakeMyLuckWeight = 0;
-            _state.Config.SkimWeight = 0;
-            _state.Config.BurnWeight = 0;
-            _state.Config.TurnTheTableWeight = 0;
-            _state.Config.CompdWeight = 0;
-            _state.Config.NotMyMoneyWeight = 0;
-            _state.Config.LaunderWeight = 0;
-            _state.Config.TiltWeight = 0;
-            _state.Config.HedgeYourBetWeight = 0;
-            _state.Config.LetItRideWeight = 0;
+            _state.UpdateSettings(s => s with { FeelingLuckyWeight = 0 });
+            _state.UpdateSettings(s => s with { MakeMyLuckWeight = 0 });
+            _state.UpdateSettings(s => s with { SkimWeight = 0 });
+            _state.UpdateSettings(s => s with { BurnWeight = 0 });
+            _state.UpdateSettings(s => s with { TurnTheTableWeight = 0 });
+            _state.UpdateSettings(s => s with { CompdWeight = 0 });
+            _state.UpdateSettings(s => s with { NotMyMoneyWeight = 0 });
+            _state.UpdateSettings(s => s with { LaunderWeight = 0 });
+            _state.UpdateSettings(s => s with { TiltWeight = 0 });
+            _state.UpdateSettings(s => s with { HedgeYourBetWeight = 0 });
+            _state.UpdateSettings(s => s with { LetItRideWeight = 0 });
 
             var card = _context.GetRandomActionCard();
 
@@ -292,19 +292,19 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void DealActionCards_ZeroWeightCard_NeverDealtToPlayer()
         {
-            _state.Config.ActiveOperatorMode = false;
+            _state.UpdateSettings(s => s with { ActiveOperatorMode = false });
             // Set all weights to 0 except Burn
-            _state.Config.FeelingLuckyWeight = 0;
-            _state.Config.MakeMyLuckWeight = 0;
-            _state.Config.SkimWeight = 0;
-            _state.Config.BurnWeight = 10;
-            _state.Config.TurnTheTableWeight = 0;
-            _state.Config.CompdWeight = 0;
-            _state.Config.NotMyMoneyWeight = 0;
-            _state.Config.LaunderWeight = 0;
-            _state.Config.TiltWeight = 0;
-            _state.Config.HedgeYourBetWeight = 0;
-            _state.Config.LetItRideWeight = 0;
+            _state.UpdateSettings(s => s with { FeelingLuckyWeight = 0 });
+            _state.UpdateSettings(s => s with { MakeMyLuckWeight = 0 });
+            _state.UpdateSettings(s => s with { SkimWeight = 0 });
+            _state.UpdateSettings(s => s with { BurnWeight = 10 });
+            _state.UpdateSettings(s => s with { TurnTheTableWeight = 0 });
+            _state.UpdateSettings(s => s with { CompdWeight = 0 });
+            _state.UpdateSettings(s => s with { NotMyMoneyWeight = 0 });
+            _state.UpdateSettings(s => s with { LaunderWeight = 0 });
+            _state.UpdateSettings(s => s with { TiltWeight = 0 });
+            _state.UpdateSettings(s => s with { HedgeYourBetWeight = 0 });
+            _state.UpdateSettings(s => s with { LetItRideWeight = 0 });
 
             _randomMock.Setup(r => r.GetRandomInt(0, It.IsAny<int>(), RandomType.Secure)).Returns(0);
 
@@ -318,18 +318,18 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void DealActionCards_AllWeightsZero_NothingDealt()
         {
-            _state.Config.ActiveOperatorMode = false;
-            _state.Config.FeelingLuckyWeight = 0;
-            _state.Config.MakeMyLuckWeight = 0;
-            _state.Config.SkimWeight = 0;
-            _state.Config.BurnWeight = 0;
-            _state.Config.TurnTheTableWeight = 0;
-            _state.Config.CompdWeight = 0;
-            _state.Config.NotMyMoneyWeight = 0;
-            _state.Config.LaunderWeight = 0;
-            _state.Config.TiltWeight = 0;
-            _state.Config.HedgeYourBetWeight = 0;
-            _state.Config.LetItRideWeight = 0;
+            _state.UpdateSettings(s => s with { ActiveOperatorMode = false });
+            _state.UpdateSettings(s => s with { FeelingLuckyWeight = 0 });
+            _state.UpdateSettings(s => s with { MakeMyLuckWeight = 0 });
+            _state.UpdateSettings(s => s with { SkimWeight = 0 });
+            _state.UpdateSettings(s => s with { BurnWeight = 0 });
+            _state.UpdateSettings(s => s with { TurnTheTableWeight = 0 });
+            _state.UpdateSettings(s => s with { CompdWeight = 0 });
+            _state.UpdateSettings(s => s with { NotMyMoneyWeight = 0 });
+            _state.UpdateSettings(s => s with { LaunderWeight = 0 });
+            _state.UpdateSettings(s => s with { TiltWeight = 0 });
+            _state.UpdateSettings(s => s with { HedgeYourBetWeight = 0 });
+            _state.UpdateSettings(s => s with { LetItRideWeight = 0 });
 
             var p1 = MakePlayer("p1", "P1");
             _context.DealActionCards();
@@ -492,12 +492,12 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
                 "Self-targeted TurnTheTable in Active Operator Mode should reverse own balance digits.");
         }
 
-        // ── GameConfig defaults ───────────────────────────────────────────────
+        // ── CardCounterSettings defaults ───────────────────────────────────────────────
 
         [TestMethod]
-        public void GameConfig_ActiveOperatorMode_DefaultsToFalse()
+        public void Settings_ActiveOperatorMode_DefaultsToFalse()
         {
-            var config = new GameConfig();
+            var config = new CardCounterSettings();
             Assert.IsFalse(config.ActiveOperatorMode, "ActiveOperatorMode should default to false.");
         }
     }

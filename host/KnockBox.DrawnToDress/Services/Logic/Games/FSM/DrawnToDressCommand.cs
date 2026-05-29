@@ -14,14 +14,6 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
     /// <summary>Host starts the game, triggering the transition out of the lobby.</summary>
     public record StartGameCommand(string PlayerId) : DrawnToDressCommand(PlayerId);
 
-    /// <summary>
-    /// Host updates the game configuration while still in the lobby.
-    /// The supplied <paramref name="Config"/> is normalized and validated before being applied.
-    /// </summary>
-    public record UpdateConfigCommand(
-        string PlayerId,
-        DrawnToDressConfig Config) : DrawnToDressCommand(PlayerId);
-
     // ── Theme selection ───────────────────────────────────────────────────────
 
     /// <summary>
@@ -85,7 +77,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
     /// <summary>
     /// Player finalizes the custom name and optional sketch overlay for their outfit.
     /// <paramref name="OutfitName"/> is required; <paramref name="SketchSvgContent"/> is
-    /// optional unless <see cref="DrawnToDressConfig.SketchingRequired"/> is enabled.
+    /// optional unless <see cref="DrawnToDressSettings.SketchingRequired"/> is enabled.
     /// </summary>
     public record SubmitCustomizationCommand(
         string PlayerId,

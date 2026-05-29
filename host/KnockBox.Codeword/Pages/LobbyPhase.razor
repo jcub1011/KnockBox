@@ -15,7 +15,7 @@
             <div class="ctc-lobby-players">
                 @{
                     bool isUserHost = GameState.Host.Id == UserService.CurrentUser?.Id;
-                    int playerCount = GameState.Players.Count;
+                    int participantCount = GameState.Participants.Length;
                 }
 
                 @foreach (var entry in GameState.RosterIncludingHost)
@@ -48,11 +48,11 @@
                 }
             </div>
 
-            <p class="ctc-lobby-player-count">@playerCount / 8 players (need 4–8)</p>
+            <p class="ctc-lobby-player-count">@participantCount / 8 players (need 4–8)</p>
 
             @if (isUserHost)
             {
-                bool canStart = playerCount >= 4 && playerCount <= 8;
+                bool canStart = participantCount >= 4 && participantCount <= 8;
                 <button class="ctc-btn ctc-btn-primary ctc-btn-lg" @onclick="StartGame" disabled="@(!canStart)"
                         title="@(!canStart ? "Need 4-8 players to start" : "Start the game")">
                     🔍 START GAME
@@ -82,11 +82,29 @@
             </div>
             <div class="ctc-settings-drawer-body">
 
+                <h4 class="ctc-config-section-title">🎮 Gameplay</h4>
+                <div class="ctc-config-grid">
+                    <label class="ctc-config-label ctc-config-label-row">
+                        <span>Host Plays Game:</span>
+                        <input type="checkbox" class="ctc-config-checkbox"
+                               @bind:get="GameState.Settings.HostPlaysGame"
+                               @bind:set="SetHostPlaysGame" />
+                    </label>
+                    <label class="ctc-config-label">
+                        Total Games:
+                        <input type="number" min="1" class="ctc-config-input"
+                               @bind:get="GameState.Settings.TotalGames"
+                               @bind:set="SetTotalGames" />
+                    </label>
+                </div>
+
                 <h4 class="ctc-config-section-title">⏱️ Timers</h4>
                 <div class="ctc-config-grid">
                     <label class="ctc-config-label ctc-config-label-row">
                         <span>Enable Timers:</span>
-                        <input type="checkbox" class="ctc-config-checkbox" @bind="GameState.Config.EnableTimers" @bind:after="NotifyConfigChanged" />
+                        <input type="checkbox" class="ctc-config-checkbox"
+                               @bind:get="GameState.Settings.EnableTimers"
+                               @bind:set="SetEnableTimers" />
                     </label>
                     <label class="ctc-config-label">
                         Setup Timeout (s):
@@ -114,12 +132,11 @@
                     </label>
                 </div>
 
-                <h4 class="ctc-config-section-title">🎮 Gameplay</h4>
-                <div class="ctc-config-grid">
-                    <label class="ctc-config-label">
-                        Total Games:
-                        <input type="number" min="1" class="ctc-config-input" @bind="GameState.Config.TotalGames" @bind:after="NotifyConfigChanged" />
-                    </label>
+                <div class="ctc-settings-drawer-footer">
+                    <button type="button" class="ctc-btn @(_resetArmed ? "ctc-btn-danger" : "ctc-btn-secondary")"
+                            @onclick="ResetToDefaults">
+                        @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+                    </button>
                 </div>
             </div>
         </div>

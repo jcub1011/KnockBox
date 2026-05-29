@@ -27,7 +27,7 @@ Properties:
 - `HasVotedToEndGame` -- one vote per elimination cycle per player
 - `Score`
 
-### 2.4 CodewordGameConfig
+### 2.4 CodewordSettings
 - `SetupPhaseTimeoutMs` (5000), `CluePhaseTimeoutMs` (30000), `DiscussionPhaseTimeoutMs` (120000)
 - `VotePhaseTimeoutMs` (15000), `RevealPhaseTimeoutMs` (10000), `InformantGuessTimeoutMs` (15000)
 - `EnableTimers`, `TotalGames` (default 5)
@@ -48,6 +48,6 @@ Properties:
 - [ ] All enums compile and have the correct values
 - [ ] All records are defined with correct properties and types
 - [ ] `CodewordPlayerState` has all required properties
-- [ ] `CodewordGameConfig` has all timeout and configuration fields with correct defaults
+- [ ] `CodewordSettings` has all timeout and configuration fields with correct defaults
 - [ ] `CodewordGameState` extends `AbstractGameState` and has all required properties
 - [ ] `dotnet build` succeeds for `KnockBox.Codeword`

@@ -11,7 +11,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
     ///
     /// Processes entries in <see cref="DrawnToDressGameState.PendingCoinFlipQueue"/> one at a time.
     /// For each flip, a caller is randomly selected from the two affected players and given
-    /// <see cref="DrawnToDressConfig.CoinFlipTimeSec"/> seconds to choose heads or tails.
+    /// <see cref="DrawnToDressSettings.CoinFlipTimeSec"/> seconds to choose heads or tails.
     /// If the timer expires, the choice is made randomly.
     ///
     /// Transition ownership:
@@ -207,7 +207,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             flip.CallerPlayerId = context.Random.GetRandomInt(2) == 0 ? playerA : playerB;
 
-            context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Config.CoinFlipTimeSec);
+            context.State.PhaseDeadlineUtc = DateTimeOffset.UtcNow.AddSeconds(context.Settings.CoinFlipTimeSec);
 
             context.Logger.LogDebug(
                 "Coin flip {index} of {total}: caller is [{caller}]. Deadline: {deadline}.",
