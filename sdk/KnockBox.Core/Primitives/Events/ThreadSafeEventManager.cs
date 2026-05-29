@@ -68,6 +68,15 @@ namespace KnockBox.Core.Primitives.Events
                 ImmutableInterlocked.Update(ref _listeners, static (list, cb) => list.Remove(cb), callback));
         }
 
+        /// <summary>
+        /// Drops every subscriber. Owners (e.g. <c>AbstractGameState.Dispose</c>) call
+        /// this to release captured component/engine references promptly instead of
+        /// waiting for GC to break the owner↔subscriber cycle. Atomic against concurrent
+        /// <see cref="Subscribe"/> / <see cref="Notify"/>.
+        /// </summary>
+        public void Clear() =>
+            ImmutableInterlocked.InterlockedExchange(ref _listeners, ImmutableArray<Func<ValueTask>>.Empty);
+
         // Bare read is safe: ImmutableArray<T> is a single-reference struct and writes
         // via ImmutableInterlocked.Update use Interlocked.CompareExchange (full barrier).
         // We can't Volatile.Read directly — its T : class constraint excludes value types.
@@ -145,6 +154,13 @@ namespace KnockBox.Core.Primitives.Events
             return new DisposableAction(() =>
                 ImmutableInterlocked.Update(ref _listeners, static (list, cb) => list.Remove(cb), callback));
         }
+
+        /// <summary>
+        /// Drops every subscriber. See the non-generic <see cref="ThreadSafeEventManager.Clear"/>
+        /// for the rationale.
+        /// </summary>
+        public void Clear() =>
+            ImmutableInterlocked.InterlockedExchange(ref _listeners, ImmutableArray<Func<TEventArgs, ValueTask>>.Empty);
 
         // See the non-generic ThreadSafeEventManager for the bare-read rationale.
         public Task NotifyAsync(TEventArgs args) =>
