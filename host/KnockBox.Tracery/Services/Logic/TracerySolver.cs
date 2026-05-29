@@ -48,34 +48,35 @@ namespace KnockBox.Tracery.Services.Logic
             var chars = new char[n];
 
             for (int start = 0; start < n; start++)
-                Dfs(grid, start, 0, onPath, pathCells, chars, results, minWordLength);
+                Dfs(grid, start, 0, TraceryTrie.Root, onPath, pathCells, chars, results, minWordLength);
 
             return results;
         }
 
         private void Dfs(
-            Grid grid, int cell, int depth,
+            Grid grid, int cell, int depth, int node,
             bool[] onPath, int[] pathCells, char[] chars,
             Dictionary<string, TracedWord> results, int minWordLength)
         {
             LastSolveVisitedCells++;
 
+            // One transition from the node reached by the path so far, instead of re-walking
+            // the whole accumulated string from the root every step. A negative result means
+            // nothing extends this prefix, so neither this cell nor any descendant can be a
+            // word — bail before recursing. This is the pruning the solver hinges on.
+            int child = _trie.Transition(node, grid[cell]);
+            if (child < 0)
+                return;
+
             onPath[cell] = true;
             pathCells[depth] = cell;
             chars[depth] = grid[cell];
             int len = depth + 1;
-            var word = chars.AsSpan(0, len);
 
-            // Dead prefix: nothing extends this, so neither this nor any descendant can
-            // be a word. Bail before recursing — this is the pruning the solver hinges on.
-            if (!_trie.IsPrefix(word))
+            // The reached node's own end-of-word flag answers IsWord directly — no second walk.
+            if (len >= minWordLength && _trie.IsWordNode(child))
             {
-                onPath[cell] = false;
-                return;
-            }
-
-            if (len >= minWordLength && _trie.IsWord(word))
-            {
+                var word = chars.AsSpan(0, len);
                 string key = new(word);
                 if (!results.ContainsKey(key))
                     results[key] = new TracedWord(key, pathCells.AsSpan(0, len).ToArray());
@@ -84,7 +85,7 @@ namespace KnockBox.Tracery.Services.Logic
             foreach (int next in grid.Neighbors(cell))
             {
                 if (!onPath[next])
-                    Dfs(grid, next, depth + 1, onPath, pathCells, chars, results, minWordLength);
+                    Dfs(grid, next, depth + 1, child, onPath, pathCells, chars, results, minWordLength);
             }
 
             onPath[cell] = false;

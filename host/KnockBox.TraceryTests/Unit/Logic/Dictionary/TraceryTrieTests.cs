@@ -66,6 +66,47 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Dictionary
             Assert.IsFalse(trie.IsPrefix("café"));
         }
 
+        // ── Threaded transitions agree with the span queries ────────────────────
+        // The solver walks the trie one letter at a time via Transition/IsWordNode rather
+        // than re-walking from the root with IsPrefix/IsWord. The two paths must agree, which
+        // also exercises the CSR packing (edge slices, ascending-letter order).
+
+        [TestMethod]
+        public void Transition_FollowsEdges_AndAgreesWithSpanQueries()
+        {
+            var trie = TraceryTrie.FromWords("cat", "cats", "dog", "tracery");
+
+            foreach (var word in new[] { "cat", "cats", "dog", "tracery", "trace", "catz", "x" })
+            {
+                int node = TraceryTrie.Root;
+                bool prefixAlive = true;
+                for (int i = 0; i < word.Length; i++)
+                {
+                    node = trie.Transition(node, word[i]);
+                    if (node < 0) { prefixAlive = false; break; }
+                }
+
+                Assert.AreEqual(trie.IsPrefix(word), prefixAlive,
+                    $"Transition walk disagreed with IsPrefix for \"{word}\".");
+                Assert.AreEqual(trie.IsWord(word), prefixAlive && trie.IsWordNode(node),
+                    $"Transition walk disagreed with IsWord for \"{word}\".");
+            }
+        }
+
+        [TestMethod]
+        public void Transition_RejectsNonLetters_AndUnknownEdges()
+        {
+            var trie = TraceryTrie.FromWords("cat");
+
+            int c = trie.Transition(TraceryTrie.Root, 'c');
+            Assert.IsTrue(c >= 0);
+            Assert.IsTrue(trie.Transition(TraceryTrie.Root, 'C') >= 0, "Transition should fold case.");
+
+            Assert.AreEqual(-1, trie.Transition(TraceryTrie.Root, 'z'), "No edge for an absent letter.");
+            Assert.AreEqual(-1, trie.Transition(TraceryTrie.Root, '7'), "No edge for a digit.");
+            Assert.AreEqual(-1, trie.Transition(c, '7'), "No edge for a digit mid-walk.");
+        }
+
         // ── Real dictionary build via the word service ──────────────────────────
 
         [TestMethod]
