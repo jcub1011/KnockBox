@@ -26,12 +26,17 @@
 
     <div class="tr-over-board">
         @{
+            // A clear winner only when the top score is strictly ahead of the runner-up; a tie at
+            // the top crowns nobody so the board reads honestly.
+            bool hasWinner = roster.Count > 0
+                && (roster.Count == 1 || roster[0].Score > roster[1].Score);
             int rank = 1;
             foreach (var row in roster)
             {
                 bool isMe = row.User.Id == UserService.CurrentUser?.Id;
-                <div class="tr-over-row @(isMe ? "tr-over-row-me" : "")">
-                    <span class="tr-over-rank">@rank</span>
+                bool isWinner = hasWinner && rank == 1;
+                <div class="tr-over-row @(isWinner ? "tr-over-row-winner" : "") @(isMe ? "tr-over-row-me" : "")">
+                    <span class="tr-over-rank">@(isWinner ? "👑" : rank.ToString())</span>
                     <span class="tr-over-name">@row.DisplayName</span>
                     <span class="tr-over-score">@row.Score</span>
                 </div>

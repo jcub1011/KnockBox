@@ -357,6 +357,61 @@
 .tr-toast-success { border-color: #16a34a; }
 .tr-toast-success .tr-toast-icon { color: #16a34a; }
 
+/* ── Host observer (shared grid + live standings) ──────────────────────── */
+.tr-host {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 1.5rem;
+    width: 100%;
+}
+.tr-host-board { width: min(480px, 92vw); }
+.tr-host-rail {
+    flex: 1 1 220px;
+    min-width: 220px;
+    max-width: 360px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 0.85rem 1rem;
+}
+.tr-host-rail-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.6rem;
+}
+.tr-host-rail-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #6b7280;
+}
+.tr-host-rail-sub { font-size: 0.7rem; color: #9ca3af; }
+.tr-host-standings { display: flex; flex-direction: column; gap: 0.35rem; }
+.tr-host-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.7rem;
+}
+.tr-host-name { flex: 1; font-weight: 600; }
+.tr-host-banked {
+    min-width: 1.6rem;
+    text-align: center;
+    font-weight: 700;
+    color: #6b7280;
+    background: #eef2ff;
+    border-radius: 999px;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.85rem;
+}
+.tr-host-score { font-weight: 800; color: #4f46e5; min-width: 2rem; text-align: right; }
+
 /* ── Reveal / round over ───────────────────────────────────────────────── */
 .tr-reveal-title,
 .tr-roundover-title {
@@ -364,6 +419,75 @@
     font-weight: 800;
     letter-spacing: 0.15em;
     color: #4f46e5;
+}
+
+.tr-reveal-beats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+}
+.tr-beat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 0.85rem 1rem;
+}
+.tr-beat-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: #6b7280;
+}
+.tr-beat-word {
+    font-size: 1.75rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: #4f46e5;
+}
+.tr-beat-meta { font-size: 0.85rem; color: #374151; }
+.tr-beat-top { border-color: #c7d2fe; background: #eef2ff; }
+
+.tr-beat-rare-list,
+.tr-beat-missed-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem;
+}
+.tr-rare-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    background: #fff;
+    border: 1px solid #c7d2fe;
+    border-radius: 0.5rem;
+    padding: 0.2rem 0.55rem;
+}
+.tr-rare-letter { font-weight: 800; font-size: 1.1rem; color: #4338ca; }
+.tr-rare-bonus { font-size: 0.75rem; font-weight: 700; color: #16a34a; }
+.tr-missed-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    padding: 0.2rem 0.7rem;
+}
+.tr-missed-word { font-weight: 700; font-size: 0.85rem; letter-spacing: 0.05em; color: #374151; }
+.tr-missed-score { font-weight: 800; font-size: 0.8rem; color: #9ca3af; }
+.tr-beat-max .tr-beat-word { color: #d97706; }
+
+.tr-over-delta { font-weight: 700; color: #16a34a; min-width: 2.5rem; text-align: right; }
+.tr-over-row-winner {
+    border-color: #fbbf24;
+    background: #fffbeb;
+    outline: 2px solid #fbbf24;
 }
 
 /* ── Standings / final ─────────────────────────────────────────────────── */

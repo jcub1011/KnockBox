@@ -41,6 +41,13 @@ namespace KnockBox.Tracery.Models
         public bool RareLetterBonusEnabled { get; init; } = true;
 
         /// <summary>
+        /// When true, the reveal shows the board's theoretical maximum score (GDD §7) — the total
+        /// one player would earn by banking every findable word as a unique find. A benchmark only;
+        /// it never affects gameplay or scoring, so it is purely a display toggle.
+        /// </summary>
+        public bool ShowTheoreticalMax { get; init; } = true;
+
+        /// <summary>
         /// Superlinear length-bonus table (GDD §5.2), indexed by word length: entry
         /// <c>[len]</c> is the bonus added on top of the base score for a word of that length.
         /// Lengths below the minimum are zero; lengths at or above the table's last index clamp

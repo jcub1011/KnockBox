@@ -37,10 +37,7 @@ else
                     </div>
                     @if (IsHostObserver)
                     {
-                        <div class="tr-grid-placeholder">
-                            <p>Shared grid (@GameState.Settings.GridWidth×@GameState.Settings.GridHeight) — coming soon.</p>
-                            <p class="tr-muted">Players are tracing on their phones.</p>
-                        </div>
+                        <TraceryHostGridView State="GameState" />
                     }
                     else
                     {
@@ -70,11 +67,7 @@ else
                 break;
 
             case GamePhase.Reveal:
-                <div class="tr-stage tr-reveal">
-                    <span class="tr-reveal-title">THE REVEAL</span>
-                    <p class="tr-muted">Notable words, words nobody found, and scores — coming soon.</p>
-                    <TraceryRoundTimer State="GameState" Duration="GameState.Settings.TransitionDuration" />
-                </div>
+                <TraceryRevealView State="GameState" />
                 break;
 
             case GamePhase.RoundOver:

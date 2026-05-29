@@ -32,6 +32,11 @@ namespace KnockBox.Tracery.Services.State.Games
         public int CurrentRound { get; set; } = 0;
         public ImmutableList<RoundResult> RoundResults { get; set; } = [];
 
+        // The assembled reveal beats for the most recently completed round (Milestone 07), set by
+        // the engine in CompleteRound and read lock-free by the host reveal view. Null until the
+        // first round closes; replaced each round so the Reveal phase always renders the latest.
+        public RevealData? CurrentReveal { get; set; }
+
         // Per-round board + authoritative solve, set by the engine on entering Playing and
         // read lock-free by the room page (M05) for rendering/validation. Null/empty outside
         // an active round.

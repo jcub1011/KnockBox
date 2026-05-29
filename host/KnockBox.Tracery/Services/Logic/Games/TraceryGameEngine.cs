@@ -314,11 +314,16 @@ namespace KnockBox.Tracery.Services.Logic.Games
             }
 
             // 4. Persist the round so the reveal/standings screens render from it directly.
-            s.RoundResults = s.RoundResults.Add(new RoundResult
+            var result = new RoundResult
             {
                 RoundNumber = s.CurrentRound,
                 Outcomes = outcomes.ToImmutable()
-            });
+            };
+            s.RoundResults = s.RoundResults.Add(result);
+
+            // 5. Assemble the host reveal (GDD §7) from the solver's findable set + the scored
+            //    round. Pure projection — no recompute — stored for the Reveal-phase view.
+            s.CurrentReveal = RevealBuilder.Build(s.FindableWords, result, s.Settings);
 
             EnterReveal(s);
         }
