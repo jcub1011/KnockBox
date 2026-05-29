@@ -1,6 +1,7 @@
 using KnockBox.Core.Components.Shared;
 using KnockBox.Tracery.Components;
 using KnockBox.Tracery.Models;
+using KnockBox.Tracery.Services.Logic;
 using KnockBox.Tracery.Services.Logic.Games;
 using KnockBox.Tracery.Services.State.Games;
 using Microsoft.AspNetCore.Components;
@@ -30,11 +31,24 @@ namespace KnockBox.Tracery.Pages
         private TraceryPlayerState? CurrentPlayerState =>
             UserService.CurrentUser is { Id: var id } && GameState.TryGetPlayerState(id, out var ps) ? ps : null;
 
-        /// <summary>This player's banked words, longest first then alphabetical, for the list.</summary>
-        private IEnumerable<string> BankedWords()
-            => CurrentPlayerState is { } ps
-                ? ps.BankedWords.Keys.OrderByDescending(w => w.Length).ThenBy(w => w, StringComparer.Ordinal)
+        /// <summary>
+        /// This player's banked words, most-recent first, each with its provisional point value.
+        /// "Provisional" = base + length + rare-letter, WITHOUT the unique-find ×1.5 (that can't be
+        /// resolved until round close once every player's banks are known). The authoritative score
+        /// still comes from the reveal via <c>TraceryGameEngine.CompleteRound</c>.
+        /// </summary>
+        private IEnumerable<(string Word, int Points)> ScoredBankedWords()
+            => CurrentPlayerState is { } ps && GameState is not null
+                ? ps.BankedInOrder
+                    .Select(t => (t.Word, TraceryScorer.Score(t.Word, isUnique: false, GameState.Settings).Points))
+                    .Reverse()
                 : [];
+
+        /// <summary>Sum of the provisional per-word points banked this round (live running total).</summary>
+        private int ProvisionalRoundScore
+            => CurrentPlayerState is { } ps && GameState is not null
+                ? ps.BankedInOrder.Sum(t => TraceryScorer.Score(t.Word, isUnique: false, GameState.Settings).Points)
+                : 0;
 
         /// <summary>
         /// Submit handler shared by drag and tap: routes the captured path through the engine

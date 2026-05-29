@@ -29,11 +29,19 @@ namespace KnockBox.Tracery.Models
         /// re-trace of the same word is a cheap O(1) duplicate check (GDD §4: a word scores once
         /// per player per round, regardless of which path spelled it). The stored
         /// <see cref="TracedWord"/> carries the accepted path for the reveal animation; Milestone
-        /// 06 attaches the point value at round close. Insertion order is not tracked — the UI
-        /// orders the banked list itself.
+        /// 06 attaches the point value at round close. See <see cref="BankedInOrder"/> for the
+        /// acceptance-ordered view the in-game list renders.
         /// </summary>
         public ImmutableDictionary<string, TracedWord> BankedWords { get; private set; }
             = ImmutableDictionary<string, TracedWord>.Empty;
+
+        /// <summary>
+        /// The same banks as <see cref="BankedWords"/>, kept in the order they were accepted this
+        /// round so the in-game list can show them most-recent-first. The dictionary remains the
+        /// O(1) duplicate check; this is purely for ordered display.
+        /// </summary>
+        public ImmutableList<TracedWord> BankedInOrder { get; private set; }
+            = ImmutableList<TracedWord>.Empty;
 
         /// <summary>True if <paramref name="word"/> is already banked this round.</summary>
         public bool HasBanked(string word) => BankedWords.ContainsKey(word);
@@ -46,7 +54,10 @@ namespace KnockBox.Tracery.Models
         public void Bank(TracedWord traced)
         {
             if (!BankedWords.ContainsKey(traced.Word))
+            {
                 BankedWords = BankedWords.Add(traced.Word, traced);
+                BankedInOrder = BankedInOrder.Add(traced);
+            }
         }
 
         /// <summary>Clears the round-scoped fields. Call at the start of each round.</summary>
@@ -55,6 +66,7 @@ namespace KnockBox.Tracery.Models
             RoundScore = 0;
             LastRoundPoints = 0;
             BankedWords = BankedWords.Clear();
+            BankedInOrder = BankedInOrder.Clear();
         }
     }
 }

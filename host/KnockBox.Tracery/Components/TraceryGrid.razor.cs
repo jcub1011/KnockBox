@@ -171,6 +171,16 @@ namespace KnockBox.Tracery.Components
             // else: not adjacent — ignore (illegal preview)
         }
 
+        /// <summary>
+        /// Submit button handler — ships the current trace for players who built it by tapping
+        /// and don't know the tap-the-last-tile / double-tap shortcut. The engine validates length.
+        /// </summary>
+        private async Task SubmitWord()
+        {
+            if (!IsActive || _path.Count == 0) return;
+            await SubmitPath();
+        }
+
         private async Task SubmitPath()
         {
             var path = _path.ToArray();

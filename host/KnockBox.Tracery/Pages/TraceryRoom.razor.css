@@ -71,7 +71,7 @@
 }
 
 /* ── Playing ───────────────────────────────────────────────────────────── */
-.tr-playing { width: min(640px, 100%); gap: 1.25rem; }
+.tr-playing { width: min(900px, 100%); gap: 1.25rem; }
 .tr-playing-head {
     display: flex;
     align-items: center;
@@ -96,9 +96,26 @@
 }
 .tr-play-hint { font-size: 0.85rem; text-align: center; }
 
-/* ── Banked words ──────────────────────────────────────────────────────── */
+/* Two panes: the FOUND list to the LEFT of the board on desktop, stacked BELOW it on
+   mobile. align-items:start so the sidebar doesn't stretch to the board's height. */
+.tr-play-layout {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 1.25rem;
+    width: 100%;
+}
+@media (max-width: 640px) {
+    .tr-play-layout { flex-direction: column-reverse; align-items: center; }
+    .tr-bank { width: min(440px, 92vw); max-height: none; }
+}
+
+/* ── Found words ───────────────────────────────────────────────────────── */
 .tr-bank {
-    width: min(440px, 92vw);
+    flex: 0 0 auto;
+    width: 12.5rem;
+    max-height: 28rem;
+    overflow-y: auto;
     background: var(--tr-panel);
     border: 1px solid var(--tr-border);
     border-radius: var(--tr-radius);
@@ -107,7 +124,13 @@
     flex-direction: column;
     gap: 0.6rem;
 }
-.tr-bank-head { display: flex; align-items: center; justify-content: space-between; }
+.tr-bank-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+}
 .tr-bank-label {
     font-family: var(--tr-font-display);
     font-size: 0.72rem;
@@ -116,23 +139,37 @@
     text-indent: 0.25em;
     color: var(--tr-ink-mute);
 }
-.tr-bank-count {
+.tr-bank-total {
     font-family: var(--tr-font-mono);
     font-variant-numeric: tabular-nums;
     font-weight: 700;
-    font-size: 1.25rem;
+    font-size: 1.35rem;
     color: var(--tr-accent);
+    text-shadow: 0 0 12px var(--tr-accent-glow);
 }
-.tr-bank-list { display: flex; flex-wrap: wrap; gap: 0.4rem; min-height: 1.6rem; }
+/* Vertical list, most-recent at the top. */
+.tr-bank-list { display: flex; flex-direction: column; gap: 0.4rem; min-height: 1.6rem; }
 .tr-bank-word {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
     font-family: var(--tr-font-mono);
     background: var(--tr-accent-dim);
     border: 1px solid rgba(77, 136, 207, 0.34);
     border-radius: var(--tr-radius-sm);
-    padding: 0.18rem 0.7rem;
+    padding: 0.22rem 0.7rem;
+    animation: tr-pop 0.3s ease both;
+}
+.tr-bank-word-text {
     font-weight: 600;
     font-size: 1rem;
     letter-spacing: 0.06em;
     color: var(--tr-accent);
-    animation: tr-pop 0.3s ease both;
+}
+.tr-bank-word-pts {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--tr-ink-mute);
 }
