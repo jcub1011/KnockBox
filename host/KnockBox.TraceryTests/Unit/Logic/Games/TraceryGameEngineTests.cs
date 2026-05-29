@@ -1,9 +1,14 @@
 using KnockBox.Tracery.Models;
+using KnockBox.Tracery.Services.Logic;
 using KnockBox.Tracery.Services.Logic.Games;
 using KnockBox.Tracery.Services.State.Games;
+using KnockBox.Tracery.Tests.Helpers;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.Services.Logic.RandomGeneration;
 using KnockBox.WordService.Contracts;
+using KnockBox.WordService.Services;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace KnockBox.Tracery.Tests.Unit.Logic.Games
@@ -23,10 +28,29 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             _engineLoggerMock = new Mock<ILogger<TraceryGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<TraceryGameState>>();
             // These lifecycle tests don't build the dictionary trie, so a bare mock
-            // word service is enough — GetSolver is exercised in TracerySolverTests.
+            // word service is enough — GetSolver/GetGenerator are exercised separately.
             _wordListServiceMock = new Mock<IWordListService>();
             _host = UserFactory.Create("Host", "host1");
-            _engine = new TraceryGameEngine(_wordListServiceMock.Object, _engineLoggerMock.Object, _stateLoggerMock.Object);
+            _engine = new TraceryGameEngine(
+                _wordListServiceMock.Object, new SequentialRng(), _engineLoggerMock.Object, _stateLoggerMock.Object);
+        }
+
+        // ── Generator wiring ────────────────────────────────────────────────
+
+        [TestMethod]
+        public void GetGenerator_BuildsOnce_AndReusesTheSameInstance()
+        {
+            // Use the real word service so the trie/solver the generator depends on actually build.
+            var svc = new WordListService(NullLogger<WordListService>.Instance);
+            var engine = new TraceryGameEngine(
+                svc, new RandomNumberService(),
+                NullLogger<TraceryGameEngine>.Instance, NullLogger<TraceryGameState>.Instance);
+
+            GridGenerator first = engine.GetGenerator();
+            GridGenerator second = engine.GetGenerator();
+
+            Assert.IsNotNull(first);
+            Assert.AreSame(first, second);
         }
 
         // ── Construction / lifecycle ────────────────────────────────────────

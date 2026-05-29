@@ -5,6 +5,7 @@ using KnockBox.Tracery.Services.Logic.Dictionary;
 using KnockBox.Tracery.Services.State.Games;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
+using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.WordService.Contracts;
@@ -13,6 +14,7 @@ namespace KnockBox.Tracery.Services.Logic.Games
 {
     public class TraceryGameEngine(
         IWordListService wordListService,
+        IRandomNumberService rng,
         ILogger<TraceryGameEngine> logger,
         ILogger<TraceryGameState> stateLogger) : AbstractGameEngine(2, 8)
     {
@@ -29,12 +31,24 @@ namespace KnockBox.Tracery.Services.Logic.Games
         // two concurrent first lobbies both building it.
         private TraceryTrie? _trie;
 
+        // The generator depends on the lazily-built solver, so build it lazily too: the
+        // trie cost is still paid at most once, on the first lobby that needs a board.
+        private GridGenerator? _generator;
+
         /// <summary>
         /// Returns a solver bound to the shared dictionary trie, building the trie on the
         /// first call. Thread-safe; the heavy build runs at most once per engine.
         /// </summary>
         internal TracerySolver GetSolver()
             => new(LazyInitializer.EnsureInitialized(ref _trie, BuildTrie));
+
+        /// <summary>
+        /// Returns the board generator, constructing it (and, transitively, the shared
+        /// solver/trie) on first use. Thread-safe and reused across every lobby and round.
+        /// </summary>
+        internal GridGenerator GetGenerator()
+            => LazyInitializer.EnsureInitialized(ref _generator,
+                () => new GridGenerator(GetSolver(), rng, wordListService, logger));
 
         private TraceryTrie BuildTrie()
         {
