@@ -1,3 +1,4 @@
+using System.Text.Json;
 using KnockBox.Tracery.Models;
 using KnockBox.Tracery.Services.State.Games;
 using KnockBox.Core.Services.State.Users;
@@ -50,6 +51,23 @@ namespace KnockBox.Tracery.Tests.Unit
 
             Assert.IsTrue(result.IsFailure);
             Assert.AreSame(before, state.Settings);
+        }
+
+        [TestMethod]
+        public void ScoringTables_RoundTrip_ThroughWebJson()
+        {
+            // The room page persists settings to localStorage as Web-defaults JSON, so the
+            // length-bonus array and rare-letter map (char keys) must survive a round-trip.
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+            var original = new TracerySettings();
+
+            var restored = JsonSerializer.Deserialize<TracerySettings>(
+                JsonSerializer.Serialize(original, options), options)!;
+
+            CollectionAssert.AreEqual(original.LengthBonusTable, restored.LengthBonusTable);
+            CollectionAssert.AreEquivalent(
+                original.RareLetterBonusTable.ToArray(), restored.RareLetterBonusTable.ToArray());
+            Assert.AreEqual(5, restored.RareLetterBonusTable['Q']);
         }
 
         private static TraceryGameState NewState()

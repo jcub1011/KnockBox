@@ -266,34 +266,59 @@ namespace KnockBox.Tracery.Services.Logic.Games
         internal void CompleteRound(TraceryGameState s)
         {
             // Close the input gate before any reveal/scoring work — late traces are rejected
-            // from here on. (Milestone 06 inserts unique-find resolution + scoring here.)
+            // from here on.
             s.IsRoundActive = false;
 
-            // Placeholder outcome: no scoring yet (Milestone 06). Record the round so the
-            // results/standings screens have something to render and the history grows.
-            var outcomes = Roster(s)
-                .Select(entry => new TraceryPlayerRoundOutcome
+            // Scoring (GDD §5, §9): unique-find can only be resolved once the round is locked and
+            // every bank is final, so it happens here rather than at submit time.
+            var roster = Roster(s).ToList();
+
+            // 1. Global frequency: how many players banked each word this round. A word with
+            //    count 1 is a unique find; count >= 2 earns no multiplier for anyone.
+            var bankedByCount = new Dictionary<string, int>();
+            foreach (var entry in roster)
+                if (s.PlayerStates.TryGetValue(entry.User.Id, out var ps))
+                    foreach (var word in ps.BankedWords.Keys)
+                        bankedByCount[word] = bankedByCount.GetValueOrDefault(word) + 1;
+
+            // 2. Score each player's banks, building the per-word breakdown the reveal reads.
+            var outcomes = ImmutableArray.CreateBuilder<TraceryPlayerRoundOutcome>(roster.Count);
+            foreach (var entry in roster)
+            {
+                if (!s.PlayerStates.TryGetValue(entry.User.Id, out var ps))
+                    continue;
+
+                var wordScores = ImmutableArray.CreateBuilder<TraceryWordScore>(ps.BankedWords.Count);
+                int roundScore = 0;
+                foreach (var word in ps.BankedWords.Keys)
+                {
+                    bool isUnique = bankedByCount.GetValueOrDefault(word) == 1;
+                    var breakdown = TraceryScorer.Score(word, isUnique, s.Settings);
+                    wordScores.Add(breakdown);
+                    roundScore += breakdown.Points;
+                }
+
+                // 3. Roll the round into the cumulative total.
+                ps.RoundScore = roundScore;
+                ps.LastRoundPoints = roundScore;
+                ps.CumulativeScore += roundScore;
+
+                outcomes.Add(new TraceryPlayerRoundOutcome
                 {
                     UserId = entry.User.Id,
                     DisplayName = entry.DisplayName,
-                    PointsAwarded = 0
-                })
-                .ToImmutableArray();
+                    PointsAwarded = roundScore,
+                    CumulativeScore = ps.CumulativeScore,
+                    WordScores = wordScores.ToImmutable()
+                });
+            }
 
+            // 4. Persist the round so the reveal/standings screens render from it directly.
             s.RoundResults = s.RoundResults.Add(new RoundResult
             {
                 RoundNumber = s.CurrentRound,
-                Outcomes = outcomes
+                Outcomes = outcomes.ToImmutable()
             });
-
-            foreach (var outcome in outcomes)
-            {
-                if (s.PlayerStates.TryGetValue(outcome.UserId, out var ps))
-                {
-                    ps.LastRoundPoints = outcome.PointsAwarded;
-                    ps.CumulativeScore += outcome.PointsAwarded;
-                }
-            }
 
             EnterReveal(s);
         }
