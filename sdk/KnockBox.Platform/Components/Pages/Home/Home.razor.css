@@ -40,7 +40,7 @@
        with no seam. Deriving width from a constant (not the element height)
        also sidesteps the global border-box + 4px top/bottom border shrink,
        which previously made the rendered image width disagree with --img-w. */
-    --ribbon-h: clamp(140px, 18vw, 200px);
+    --ribbon-h: clamp(140px, 18vw, 180px);
     --img-w: 1536px;
     --copies: round(up, 100vw / var(--img-w), 1);
 
@@ -128,12 +128,7 @@
 
 .title-letter {
     display: inline-block;
-    text-shadow:
-        2px 2px 0 #000,
-        4px 4px 0 #000,
-        6px 6px 0 #000,
-        8px 8px 0 var(--accent-color),
-        10px 10px 0 #000;
+    text-shadow: 8px 8px 0 #000;
     animation: letter-bounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
@@ -197,7 +192,12 @@
     width: 100%;
     max-width: 680px;
     padding: 0 8px;
-    animation: fade-in-up 0.6s ease-out 0.6s both;
+    /* `backwards` (not `both`): `both` keeps the final keyframe's transform
+       (translateY(0)) applied forever, and a transformed ancestor forms a
+       backdrop root that defeats the cards' backdrop-filter. The final keyframe
+       equals the resting state, so dropping `forwards` changes nothing visually
+       but removes the lingering transform → the cards can blur the page again. */
+    animation: fade-in-up 0.6s ease-out 0.6s backwards;
 }
 
 @keyframes fade-in-up {
@@ -214,10 +214,17 @@
 .join-card {
     flex: 1;
     padding: 18px 20px;
-    background-color: var(--canvas-card);
-    border: 1px solid var(--canvas-card-border);
+    /* Brand-pink tint (near --accent #FF0055), fairly opaque so the cards read as
+       a solid pink panel against the violet background. */
+    background-color: rgba(255, 45, 110, 0.4);
+    border: 1px solid rgba(255, 45, 110, 0.7);
     border-radius: 12px;
     box-shadow: var(--shadow-card-rest);
+    /* Frosts the violet/dots showing through the 40%-opaque pink. (-webkit- for
+       Safari.) Only takes effect because .join-section no longer retains a
+       transform — see the note there. */
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -227,7 +234,7 @@
 .join-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-card-lift);
-    border-color: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 45, 110, 0.9);
 }
 
 .join-label {
@@ -236,7 +243,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    color: var(--ink-soft);
+    color: var(--ink);
     margin: 0;
 }
 
@@ -262,7 +269,7 @@
 }
 
 .join-card input::placeholder {
-    color: rgba(244, 236, 228, 0.32);
+    color: rgba(244, 236, 228, 0.55);
 }
 
 .join-card input:focus {
@@ -492,7 +499,9 @@
 
 .home-container.returning .hero-tagline,
 .home-container.returning .join-section {
-    animation: fade-in-up 0.6s ease-out 0.1s both;
+    /* `backwards` not `both` — same reason as the base .join-section rule: a
+       retained transform would re-break the cards' backdrop-filter. */
+    animation: fade-in-up 0.6s ease-out 0.1s backwards;
 }
 
 .home-container.returning .games-section {
@@ -545,10 +554,7 @@
     }
 
     .title-letter {
-        text-shadow:
-            2px 2px 0 #000,
-            4px 4px 0 #000,
-            6px 6px 0 var(--accent-color);
+        text-shadow: 6px 6px 0 #000;
     }
 
     .games-heading {
