@@ -326,7 +326,7 @@ public class SpardleEngineTests
         // Host observes (others present), so the snapshot is the two players.
         CollectionAssert.AreEquivalent(
             new[] { p1.Id, p2.Id },
-            state.Participants.Select(e => e.User.Id).ToList());
+            state.MatchParticipants.Select(e => e.User.Id).ToList());
 
         // P1 leaves: disposing the registration token drops them from the live roster.
         token1!.Dispose();
@@ -336,7 +336,7 @@ public class SpardleEngineTests
         Assert.IsFalse(state.Players.Any(e => e.User.Id == p1.Id));
         CollectionAssert.AreEquivalent(
             new[] { p1.Id, p2.Id },
-            state.Participants.Select(e => e.User.Id).ToList());
+            state.MatchParticipants.Select(e => e.User.Id).ToList());
         Assert.IsTrue(state.PlayerStates.ContainsKey(p1.Id));
     }
 

@@ -51,7 +51,7 @@ public class SpardleEngine(
             s.SetHostIsParticipant(s.Players.Length == 0 || s.Settings.HostPlaysAlong);
             // Freeze the participant roster now so the final standings screen can show
             // everyone even after disconnects prune them from the live Players roster.
-            s.SetParticipants(s.HostIsParticipant ? s.RosterIncludingHost : s.Players);
+            s.SetMatchParticipants(s.HostIsParticipant ? s.RosterIncludingHost : s.Players);
             s.CurrentRound = 0;
             s.IsGameOver = false;
             s.RoundHistory = s.RoundHistory.Clear();
