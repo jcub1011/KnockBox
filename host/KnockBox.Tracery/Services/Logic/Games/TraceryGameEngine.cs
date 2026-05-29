@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using KnockBox.Tracery.Models;
 using KnockBox.Tracery.Services.Logic;
@@ -26,35 +27,55 @@ namespace KnockBox.Tracery.Services.Logic.Games
         // bloat the trie; a longer one would silently drop legal short words.
         internal const int MinSupportedWordLength = 3;
 
-        // Lazily built once and reused: the ~386k-word load cost is paid at the first
-        // lobby that needs a solver, not on every round. LazyInitializer guards against
-        // two concurrent first lobbies both building it.
-        private TraceryTrie? _trie;
-
-        // The generator depends on the lazily-built solver, so build it lazily too: the
-        // trie cost is still paid at most once, on the first lobby that needs a board.
-        private GridGenerator? _generator;
+        // One trie per word pool, built lazily and reused for the engine's lifetime: the
+        // host can pick different dictionaries for board generation and answer validation,
+        // so up to a handful of tries may be cached (Full ~10 MB, Reduced small, NYT tiny).
+        // Lazy<T> values guarantee each pool's heavy build runs at most once even when two
+        // first lobbies race — the same guarantee the old single-trie LazyInitializer gave.
+        private readonly ConcurrentDictionary<WordPoolMode, Lazy<TraceryTrie>> _tries = new();
 
         /// <summary>
-        /// Returns a solver bound to the shared dictionary trie, building the trie on the
-        /// first call. Thread-safe; the heavy build runs at most once per engine.
+        /// Returns a solver bound to the trie for <paramref name="mode"/>, building that trie
+        /// on first use. The mode is resolved first (an empty pool — e.g. the curated common
+        /// list before its CSV ships — falls back to the full dictionary). Thread-safe.
         /// </summary>
-        internal TracerySolver GetSolver()
-            => new(LazyInitializer.EnsureInitialized(ref _trie, BuildTrie));
+        internal TracerySolver GetSolver(WordPoolMode mode)
+            => new(GetTrie(ResolveMode(mode)));
 
         /// <summary>
-        /// Returns the board generator, constructing it (and, transitively, the shared
-        /// solver/trie) on first use. Thread-safe and reused across every lobby and round.
+        /// Returns a board generator that judges/seeds candidates against
+        /// <paramref name="generationMode"/>. Cheap to construct (holds only references), so
+        /// it is built per call rather than cached — the heavy trie behind it is cached.
         /// </summary>
-        internal GridGenerator GetGenerator()
-            => LazyInitializer.EnsureInitialized(ref _generator,
-                () => new GridGenerator(GetSolver(), rng, wordListService, logger));
-
-        private TraceryTrie BuildTrie()
+        internal GridGenerator GetGenerator(WordPoolMode generationMode)
         {
-            logger.LogInformation("Building Tracery dictionary trie (min word length {min}).", MinSupportedWordLength);
-            var trie = TraceryTrie.BuildFrom(wordListService, MinSupportedWordLength);
-            logger.LogInformation("Tracery dictionary trie built.");
+            var effective = ResolveMode(generationMode);
+            return new GridGenerator(new TracerySolver(GetTrie(effective)), rng, wordListService, logger, effective);
+        }
+
+        // Resolves a requested pool to one that actually has words. Reduced is empty until its
+        // CSV ships, and HostDefined/CsvUpload/unknown modes are unbacked — all fall back to
+        // the full dictionary so a board is always generatable and answers always validatable.
+        private WordPoolMode ResolveMode(WordPoolMode requested)
+        {
+            if (requested != WordPoolMode.FullDictionary && !wordListService.GetAvailableLengths(requested).Any())
+            {
+                logger.LogWarning(
+                    "Tracery dictionary pool {Mode} is empty; falling back to FullDictionary.", requested);
+                return WordPoolMode.FullDictionary;
+            }
+            return requested;
+        }
+
+        private TraceryTrie GetTrie(WordPoolMode mode)
+            => _tries.GetOrAdd(mode, m => new Lazy<TraceryTrie>(() => BuildTrie(m))).Value;
+
+        private TraceryTrie BuildTrie(WordPoolMode mode)
+        {
+            logger.LogInformation(
+                "Building Tracery dictionary trie for {Mode} (min word length {min}).", mode, MinSupportedWordLength);
+            var trie = TraceryTrie.BuildFrom(wordListService, MinSupportedWordLength, mode);
+            logger.LogInformation("Tracery dictionary trie built for {Mode}.", mode);
             return trie;
         }
 
@@ -156,7 +177,10 @@ namespace KnockBox.Tracery.Services.Logic.Games
                     return Result.FromError("There is no active grid.");
 
                 // 4. The solver is the single source of adjacency/length/dictionary truth.
-                var validation = GetSolver().ValidateTrace(state.CurrentGrid, path, state.Settings.MinWordLength);
+                //    Validate against the answer dictionary so a player can bank any word it
+                //    accepts — even obscure ones absent from the board (generation) dictionary.
+                var validation = GetSolver(state.Settings.ValidationDictionary)
+                    .ValidateTrace(state.CurrentGrid, path, state.Settings.MinWordLength);
                 if (!validation.TryGetSuccess(out var word))
                 {
                     validation.TryGetFailure(out var valErr);
@@ -213,13 +237,21 @@ namespace KnockBox.Tracery.Services.Logic.Games
             foreach (var entry in Roster(s))
                 s.CreatePlayerState(entry.User.Id).ResetRound();
 
-            // Generate the round's board and reuse the solve the generator already computed
-            // while clearing the quality bar — never re-solve the same grid.
-            var gen = GetGenerator().Generate(s.Settings);
+            // Generate the round's board against the board (generation) dictionary; the solve
+            // the generator already computed while clearing the quality bar is the board's
+            // common-word set. Then derive the validation set (everything bankable) — re-solving
+            // the accepted grid with the answer dictionary only when the two dictionaries differ.
+            var gen = GetGenerator(s.Settings.GenerationDictionary).Generate(s.Settings);
             if (gen.TryGetSuccess(out var board))
             {
                 s.CurrentGrid = board.Grid;
-                s.FindableWords = board.FindableWords;
+                s.BoardFindableWords = board.FindableWords;
+
+                var genMode = ResolveMode(s.Settings.GenerationDictionary);
+                var valMode = ResolveMode(s.Settings.ValidationDictionary);
+                s.FindableWords = valMode == genMode
+                    ? board.FindableWords // same dictionary → reuse, no second solve
+                    : GetSolver(valMode).Solve(board.Grid, s.Settings.MinWordLength);
             }
             else
             {
@@ -231,6 +263,7 @@ namespace KnockBox.Tracery.Services.Logic.Games
                 logger.LogError("Tracery board generation failed for round {Round}: {Error}", s.CurrentRound, err.InternalMessage);
                 s.CurrentGrid = null;
                 s.FindableWords = ImmutableDictionary<string, TracedWord>.Empty;
+                s.BoardFindableWords = ImmutableDictionary<string, TracedWord>.Empty;
             }
 
             s.RoundStartTime = DateTimeOffset.UtcNow;
@@ -321,9 +354,11 @@ namespace KnockBox.Tracery.Services.Logic.Games
             };
             s.RoundResults = s.RoundResults.Add(result);
 
-            // 5. Assemble the host reveal (GDD §7) from the solver's findable set + the scored
-            //    round. Pure projection — no recompute — stored for the Reveal-phase view.
-            s.CurrentReveal = RevealBuilder.Build(s.FindableWords, result, s.Settings);
+            // 5. Assemble the host reveal (GDD §7) from the round's two findable sets + the
+            //    scored round. The validation set drives the theoretical max and beat paths
+            //    (so scores never exceed it); the board set drives "words nobody found" (so
+            //    that list stays a clean common-word list). Pure projection — no recompute.
+            s.CurrentReveal = RevealBuilder.Build(s.FindableWords, s.BoardFindableWords, result, s.Settings);
 
             EnterReveal(s);
         }

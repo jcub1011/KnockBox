@@ -7,6 +7,7 @@ using KnockBox.Tracery.Services.State.Games;
 using KnockBox.Tracery.Tests.Helpers;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.WordService.Contracts;
 using KnockBox.WordService.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -102,8 +103,8 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             // requests, plus several full rounds (EnterPlaying generates a board each time).
             for (int i = 0; i < 5; i++)
             {
-                _ = engine.GetSolver();
-                _ = engine.GetGenerator();
+                _ = engine.GetSolver(WordPoolMode.FullDictionary);
+                _ = engine.GetGenerator(WordPoolMode.FullDictionary);
             }
 
             var host = UserFactory.Create("Host", "host1");

@@ -20,21 +20,30 @@ namespace KnockBox.Tracery.Services.Logic
         private const int MaxRareLetters = 5;
 
         /// <summary>
-        /// Assembles the reveal for one completed round.
+        /// Assembles the reveal for one completed round from the round's two findable sets.
         /// </summary>
-        /// <param name="findableSet">
-        /// The solver's complete set of findable words for the round's board (keyed by word, value
-        /// carries a representative path). The single source of truth for "words nobody found" and
-        /// the theoretical maximum.
+        /// <param name="validationSet">
+        /// Every word findable under the answer (validation) dictionary — the complete bankable
+        /// set. Source of truth for the theoretical maximum and for the path of any banked beat
+        /// (a banked word is always answer-valid, so its path lives here). A player's score can
+        /// never exceed the theoretical max derived from it.
+        /// </param>
+        /// <param name="boardSet">
+        /// Words findable under the board (generation) dictionary — the common-word set the board
+        /// was built from. Source for "words nobody found", so that list stays recognizable even
+        /// when answers allow obscure words. Equals <paramref name="validationSet"/> when the two
+        /// dictionaries resolve to the same pool.
         /// </param>
         /// <param name="roundResult">The scored outcomes for the round (per-player banked words + points).</param>
         /// <param name="settings">Match settings — supplies the scoring tables and the theoretical-max toggle.</param>
         public static RevealData Build(
-            IReadOnlyDictionary<string, TracedWord> findableSet,
+            IReadOnlyDictionary<string, TracedWord> validationSet,
+            IReadOnlyDictionary<string, TracedWord> boardSet,
             RoundResult roundResult,
             TracerySettings settings)
         {
-            ArgumentNullException.ThrowIfNull(findableSet);
+            ArgumentNullException.ThrowIfNull(validationSet);
+            ArgumentNullException.ThrowIfNull(boardSet);
             ArgumentNullException.ThrowIfNull(roundResult);
             ArgumentNullException.ThrowIfNull(settings);
 
@@ -46,12 +55,12 @@ namespace KnockBox.Tracery.Services.Logic
             return new RevealData
             {
                 RoundNumber = roundResult.RoundNumber,
-                LongestWord = BuildLongestWord(bankedEntries, findableSet),
-                HighestScoringWord = BuildHighestScoringWord(bankedEntries, findableSet),
-                WordsNobodyFound = BuildWordsNobodyFound(bankedEntries, findableSet, settings),
+                LongestWord = BuildLongestWord(bankedEntries, validationSet),
+                HighestScoringWord = BuildHighestScoringWord(bankedEntries, validationSet),
+                WordsNobodyFound = BuildWordsNobodyFound(bankedEntries, boardSet, settings),
                 RarestLetters = BuildRarestLetters(bankedEntries, settings),
                 TheoreticalMax = settings.ShowTheoreticalMax
-                    ? TheoreticalMaximum(findableSet, settings)
+                    ? TheoreticalMaximum(validationSet, settings)
                     : null,
                 Standings = BuildStandings(roundResult),
             };

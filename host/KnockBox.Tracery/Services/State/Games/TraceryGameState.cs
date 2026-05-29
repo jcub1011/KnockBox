@@ -41,7 +41,22 @@ namespace KnockBox.Tracery.Services.State.Games
         // read lock-free by the room page (M05) for rendering/validation. Null/empty outside
         // an active round.
         public Grid? CurrentGrid { get; set; }
+
+        /// <summary>
+        /// Every word findable on the board under the <em>answer</em> (validation) dictionary —
+        /// the complete set a player may bank. Drives the reveal's theoretical maximum and the
+        /// word-beat path lookups, so a player's score can never exceed it.
+        /// </summary>
         public IReadOnlyDictionary<string, TracedWord> FindableWords { get; set; }
+            = ImmutableDictionary<string, TracedWord>.Empty;
+
+        /// <summary>
+        /// Words findable under the <em>board</em> (generation) dictionary — the common-word
+        /// set the board was built from. Drives the reveal's "words nobody found" list so it
+        /// stays a clean list of recognizable words. Equals <see cref="FindableWords"/> when the
+        /// generation and validation dictionaries resolve to the same pool.
+        /// </summary>
+        public IReadOnlyDictionary<string, TracedWord> BoardFindableWords { get; set; }
             = ImmutableDictionary<string, TracedWord>.Empty;
         public DateTimeOffset? RoundStartTime { get; set; }
 

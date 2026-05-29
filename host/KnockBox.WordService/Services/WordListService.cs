@@ -7,16 +7,21 @@ public sealed class WordListService : IWordListService
 {
     private readonly IReadOnlyDictionary<int, WordPool> _nytStandardByLength;
     private readonly IReadOnlyDictionary<int, WordPool> _fullDictionaryByLength;
+    private readonly IReadOnlyDictionary<int, WordPool> _reducedByLength;
 
     public WordListService(ILogger<WordListService> logger)
     {
         var dataDir = ResolveDataDir();
         var nyWords = LoadCsv(Path.Combine(dataDir, "ny-dictionary.csv"), logger);
         var fullWords = LoadCsv(Path.Combine(dataDir, "full-dictionary.csv"), logger);
+        // Curated common-word list for board generation. Ships later; an absent file
+        // yields an empty pool (LoadCsv warns + returns []) so callers fall back to Full.
+        var reducedWords = LoadCsv(Path.Combine(dataDir, "reduced-dictionary.csv"), logger);
 
         _nytStandardByLength = BuildByLength(nyWords);
         // Full pool must include every NY word too — preserves prior UnionWith semantics.
         _fullDictionaryByLength = BuildByLength(fullWords.Concat(nyWords));
+        _reducedByLength = BuildByLength(reducedWords);
     }
 
     // Assembly.Location returns the on-disk path for plugins loaded via
@@ -70,6 +75,7 @@ public sealed class WordListService : IWordListService
     {
         WordPoolMode.NytStandard => _nytStandardByLength,
         WordPoolMode.FullDictionary => _fullDictionaryByLength,
+        WordPoolMode.Reduced => _reducedByLength,
         _ => null,
     };
 

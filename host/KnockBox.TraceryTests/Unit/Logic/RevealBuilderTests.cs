@@ -28,7 +28,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             var round = ScoreRound(1, Default,
                 ("Alice", "a", new[] { "trace", "cat" }));
 
-            var reveal = RevealBuilder.Build(findable, round, Default);
+            var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
             Assert.IsNotNull(reveal.LongestWord);
             Assert.AreEqual("trace", reveal.LongestWord!.Word);
@@ -46,7 +46,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
                 ("Bob", "b", new[] { "trace" }),
                 ("Alice", "a", new[] { "trace", "cat" }));
 
-            var reveal = RevealBuilder.Build(findable, round, Default);
+            var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
             Assert.AreEqual("trace", reveal.LongestWord!.Word);
             // Finders are ordered alphabetically, regardless of player order.
@@ -63,7 +63,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
                 ("Alice", "a", new[] { "table" }),
                 ("Bob", "b", new[] { "trace" }));
 
-            var reveal = RevealBuilder.Build(findable, round, Default);
+            var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
             Assert.AreEqual("table", reveal.LongestWord!.Word);
         }
@@ -79,7 +79,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
                 ("Alice", "a", new[] { "quartz", "table" }),
                 ("Bob", "b", new[] { "table" }));
 
-            var reveal = RevealBuilder.Build(findable, round, Default);
+            var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
             Assert.IsNotNull(reveal.HighestScoringWord);
             Assert.AreEqual("quartz", reveal.HighestScoringWord!.Word);
@@ -104,7 +104,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             // Alice banks two of the eight findable words; the rest are "nobody found".
             var round = ScoreRound(1, Default, ("Alice", "a", new[] { "cab", "car" }));
 
-            var reveal = RevealBuilder.Build(findable, round, Default);
+            var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
             var nobody = reveal.WordsNobodyFound.Select(m => m.Word).ToArray();
             // Exactly the solver set minus the banked words (a pure set difference).
@@ -125,7 +125,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             var findable = Findable("quartz", "milky");
             var round = ScoreRound(1, Default, ("Alice", "a", new[] { "quartz", "milky" }));
 
-            var reveal = RevealBuilder.Build(findable, round, Default);
+            var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
             // Q(+5), Z(+5), K(+1), Y(+1) — ordered by bonus desc then letter.
             var letters = reveal.RarestLetters.Select(r => r.Letter).ToArray();
@@ -141,7 +141,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             var findable = Findable("quartz");
             var round = ScoreRound(1, settings, ("Alice", "a", new[] { "quartz" }));
 
-            var reveal = RevealBuilder.Build(findable, round, settings);
+            var reveal = RevealBuilder.Build(findable, findable, round, settings);
 
             Assert.AreEqual(0, reveal.RarestLetters.Length);
         }
@@ -155,7 +155,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             var findable = Findable("trace", "cat");
             var round = ScoreRound(1, Default, ("Alice", "a", new[] { "cat" }));
 
-            var reveal = RevealBuilder.Build(findable, round, Default);
+            var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
             Assert.AreEqual(14, reveal.TheoreticalMax);
         }
@@ -167,7 +167,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             var findable = Findable("trace", "cat");
             var round = ScoreRound(1, settings, ("Alice", "a", new[] { "cat" }));
 
-            var reveal = RevealBuilder.Build(findable, round, settings);
+            var reveal = RevealBuilder.Build(findable, findable, round, settings);
 
             Assert.IsNull(reveal.TheoreticalMax);
         }
@@ -188,7 +188,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
                 ]
             };
 
-            var reveal = RevealBuilder.Build(Findable(), round, Default);
+            var reveal = RevealBuilder.Build(Findable(), Findable(), round, Default);
 
             // Bob & Cara tie on cumulative (25); Bob's higher round points break the tie ahead of
             // Cara, and Alice (10) trails.
@@ -211,7 +211,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
                 Outcomes = [Outcome("a", "Alice", points: 0, cumulative: 0)]
             };
 
-            var reveal = RevealBuilder.Build(findable, round, Default);
+            var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
             Assert.IsNull(reveal.LongestWord);
             Assert.IsNull(reveal.HighestScoringWord);
@@ -219,6 +219,34 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             // The board's findable words are all "nobody found" when no one banked anything.
             CollectionAssert.AreEqual(new[] { "trace" }, reveal.WordsNobodyFound.Select(m => m.Word).ToArray());
             Assert.AreEqual(1, reveal.Standings.Length);
+        }
+
+        // ── Hybrid: distinct validation vs board sets ───────────────────────
+
+        [TestMethod]
+        public void Hybrid_NobodyFoundFromBoardSet_ButTheoreticalMaxFromValidationSet()
+        {
+            // Board (generation) set = common words only. Validation (answer) set additionally
+            // contains an obscure word "quartz" a player could still bank. Nobody banks anything.
+            var boardSet = Findable("cat", "table");
+            var validationSet = Findable("cat", "table", "quartz");
+            var round = ScoreRound(1, Default, ("Alice", "a", System.Array.Empty<string>()));
+
+            var reveal = RevealBuilder.Build(validationSet, boardSet, round, Default);
+
+            // "words nobody found" is drawn from the board set, so the obscure "quartz" never
+            // clutters it even though it was findable under the answer dictionary.
+            var nobody = reveal.WordsNobodyFound.Select(m => m.Word).ToArray();
+            CollectionAssert.AreEquivalent(new[] { "cat", "table" }, nobody);
+            CollectionAssert.DoesNotContain(nobody, "quartz");
+
+            // The theoretical maximum is computed from the validation set, so it includes
+            // "quartz" — a player who finds it can reach the max rather than exceed it.
+            int expectedMax = validationSet.Keys.Sum(w => TraceryScorer.WordScore(w, isUnique: true, Default));
+            Assert.AreEqual(expectedMax, reveal.TheoreticalMax);
+            int boardOnlyMax = boardSet.Keys.Sum(w => TraceryScorer.WordScore(w, isUnique: true, Default));
+            Assert.IsTrue(reveal.TheoreticalMax > boardOnlyMax,
+                "Theoretical max must reflect the wider answer dictionary, not just the board words.");
         }
 
         // ── Helpers ─────────────────────────────────────────────────────────

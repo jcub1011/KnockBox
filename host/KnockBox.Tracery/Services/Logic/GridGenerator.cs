@@ -31,6 +31,7 @@ namespace KnockBox.Tracery.Services.Logic
         private readonly IRandomNumberService _rng;
         private readonly IWordListService _wordList;
         private readonly ILogger _logger;
+        private readonly WordPoolMode _plantPoolMode;
 
         // Engine defaults applied when the matching TracerySettings knob is left at 0.
         private const int DefaultMaxAttempts = 50;
@@ -41,12 +42,14 @@ namespace KnockBox.Tracery.Services.Logic
             TracerySolver solver,
             IRandomNumberService rng,
             IWordListService wordList,
-            ILogger logger)
+            ILogger logger,
+            WordPoolMode plantPoolMode = WordPoolMode.FullDictionary)
         {
             _solver = solver;
             _rng = rng;
             _wordList = wordList;
             _logger = logger;
+            _plantPoolMode = plantPoolMode;
         }
 
         /// <summary>
@@ -169,19 +172,21 @@ namespace KnockBox.Tracery.Services.Logic
         }
 
         /// <summary>
-        /// Picks a random full-dictionary word of <paramref name="preferredLength"/>, walking
-        /// the length down to <paramref name="minWordLength"/> if a length has no entries (only
-        /// happens with tiny test dictionaries — the real one is dense at every length).
+        /// Picks a random word of <paramref name="preferredLength"/> from the board (plant)
+        /// pool, walking the length down to <paramref name="minWordLength"/> if a length has no
+        /// entries (only happens with tiny test dictionaries — the real one is dense at every
+        /// length). The pool matches the dictionary the board is generated against, so the
+        /// planted big find is itself a common word when generation uses the reduced pool.
         /// </summary>
         private bool TryPickPlantWord(int preferredLength, int minWordLength, out string word, out int length)
         {
             for (int len = preferredLength; len >= minWordLength; len--)
             {
-                int count = _wordList.GetWordCount(WordPoolMode.FullDictionary, len);
+                int count = _wordList.GetWordCount(_plantPoolMode, len);
                 if (count <= 0) continue;
 
                 int index = _rng.GetRandomInt(count);
-                word = Encoding.ASCII.GetString(_wordList.GetWord(WordPoolMode.FullDictionary, len, index));
+                word = Encoding.ASCII.GetString(_wordList.GetWord(_plantPoolMode, len, index));
                 length = len;
                 return true;
             }

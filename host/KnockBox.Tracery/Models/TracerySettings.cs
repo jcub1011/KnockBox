@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using KnockBox.WordService.Contracts;
 
 namespace KnockBox.Tracery.Models
 {
@@ -40,6 +41,20 @@ namespace KnockBox.Tracery.Models
 
         // ── Word rules (GDD §4, §8) ────────────────────────────────────────────
         public int MinWordLength { get; init; } = 4;
+
+        // ── Dictionaries ───────────────────────────────────────────────────────
+        /// <summary>
+        /// The pool a board is generated and judged against — keep boards dense with
+        /// recognizable words. Defaults to the curated common-word list; until that list
+        /// ships, the engine transparently falls back to <see cref="WordPoolMode.FullDictionary"/>.
+        /// </summary>
+        public WordPoolMode GenerationDictionary { get; init; } = WordPoolMode.Reduced;
+
+        /// <summary>
+        /// The pool a player's submitted word is validated against. Defaults to the full
+        /// dictionary so players can still find obscure words even on a common-word board.
+        /// </summary>
+        public WordPoolMode ValidationDictionary { get; init; } = WordPoolMode.FullDictionary;
 
         // ── Scoring toggles & tunables (GDD §5, §10) ───────────────────────────
         public bool UniqueFindBonusEnabled { get; init; } = true;

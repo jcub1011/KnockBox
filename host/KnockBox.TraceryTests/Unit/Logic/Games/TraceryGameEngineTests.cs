@@ -43,7 +43,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         // ── Generator wiring ────────────────────────────────────────────────
 
         [TestMethod]
-        public void GetGenerator_BuildsOnce_AndReusesTheSameInstance()
+        public void GetGenerator_ReturnsAWorkingGenerator()
         {
             // Use the real word service so the trie/solver the generator depends on actually build.
             var svc = new WordListService(NullLogger<WordListService>.Instance);
@@ -51,11 +51,27 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
                 svc, new RandomNumberService(),
                 NullLogger<TraceryGameEngine>.Instance, NullLogger<TraceryGameState>.Instance);
 
-            GridGenerator first = engine.GetGenerator();
-            GridGenerator second = engine.GetGenerator();
+            // The generator is now constructed per call (cheap — it only holds references; the
+            // heavy trie behind it is cached per pool), so instances need not be the same.
+            GridGenerator generator = engine.GetGenerator(WordPoolMode.FullDictionary);
 
-            Assert.IsNotNull(first);
-            Assert.AreSame(first, second);
+            Assert.IsNotNull(generator);
+            Assert.IsTrue(generator.Generate(new TracerySettings()).IsSuccess);
+        }
+
+        [TestMethod]
+        public void GetGenerator_WithEmptyReducedPool_FallsBackToFull_AndGenerates()
+        {
+            var svc = new WordListService(NullLogger<WordListService>.Instance);
+            var engine = new TraceryGameEngine(
+                svc, new RandomNumberService(),
+                NullLogger<TraceryGameEngine>.Instance, NullLogger<TraceryGameState>.Instance);
+
+            // Reduced is empty until its CSV ships, so generation must transparently fall back to
+            // the full dictionary and still produce a board (the default board dictionary path).
+            var generator = engine.GetGenerator(WordPoolMode.Reduced);
+
+            Assert.IsTrue(generator.Generate(new TracerySettings()).IsSuccess);
         }
 
         // ── Construction / lifecycle ────────────────────────────────────────

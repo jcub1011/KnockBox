@@ -1,6 +1,7 @@
 @* Host-only match-rules editor. Presentational: every edit is routed back through the
    OnUpdate delegate supplied by the parent (TraceryLobbyView), which performs the atomic
    state mutation and localStorage persistence. *@
+@using KnockBox.WordService.Contracts
 
 <div class="tr-settings">
     <section class="tr-settings-section">
@@ -23,6 +24,32 @@
                 <input type="number" min="3" max="8"
                        value="@State.Settings.MinWordLength"
                        @oninput="e => SetInt(e, v => s => s with { MinWordLength = v }, 3, 8)" />
+            </label>
+        </div>
+    </section>
+
+    <section class="tr-settings-section">
+        <h4 class="tr-settings-title">Dictionary</h4>
+        <div class="tr-settings-grid">
+            <label class="tr-field">
+                <span>Board Words</span>
+                <select value="@State.Settings.GenerationDictionary"
+                        @onchange="e => SetDictionary(e, v => s => s with { GenerationDictionary = v })">
+                    @foreach (var mode in OfferedDictionaries)
+                    {
+                        <option value="@mode">@FriendlyName(mode)</option>
+                    }
+                </select>
+            </label>
+            <label class="tr-field">
+                <span>Allowed Answers</span>
+                <select value="@State.Settings.ValidationDictionary"
+                        @onchange="e => SetDictionary(e, v => s => s with { ValidationDictionary = v })">
+                    @foreach (var mode in OfferedDictionaries)
+                    {
+                        <option value="@mode">@FriendlyName(mode)</option>
+                    }
+                </select>
             </label>
         </div>
     </section>
@@ -99,8 +126,27 @@
 
     private bool _unlimitedTimer;
 
+    // The board-sensible pools, in display order. NytStandard (5-letter only) and the
+    // unbacked modes are intentionally excluded from the host's choices.
+    private static readonly WordPoolMode[] OfferedDictionaries =
+        [WordPoolMode.Reduced, WordPoolMode.FullDictionary];
+
     protected override void OnParametersSet()
         => _unlimitedTimer = State.Settings.RoundTimer <= TimeSpan.Zero;
+
+    private void SetDictionary(ChangeEventArgs e, Func<WordPoolMode, Func<TracerySettings, TracerySettings>> mutate)
+    {
+        if (Enum.TryParse<WordPoolMode>(e.Value?.ToString(), out var mode))
+            OnUpdate(mutate(mode));
+    }
+
+    private static string FriendlyName(WordPoolMode mode) => mode switch
+    {
+        WordPoolMode.Reduced => "Common words",
+        WordPoolMode.FullDictionary => "Full dictionary",
+        WordPoolMode.NytStandard => "NYT answers",
+        _ => mode.ToString(),
+    };
 
     private void SetInt(ChangeEventArgs e, Func<int, Func<TracerySettings, TracerySettings>> mutate, int min, int max)
     {

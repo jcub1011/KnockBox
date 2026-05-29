@@ -104,15 +104,15 @@ namespace KnockBox.Tracery.Services.Logic.Dictionary
         }
 
         /// <summary>
-        /// Builds the trie from the full dictionary, inserting only words of length
-        /// ≥ <paramref name="minWordLength"/> so the solver's search space is pruned at
-        /// the source. Words come back as raw lowercase ASCII bytes and are inserted
-        /// immediately (the spans alias the service's internal buffer).
+        /// Builds the trie from the <paramref name="mode"/> word pool (default the full
+        /// dictionary), inserting only words of length ≥ <paramref name="minWordLength"/> so
+        /// the solver's search space is pruned at the source. Words come back as raw lowercase
+        /// ASCII bytes and are inserted immediately (the spans alias the service's internal
+        /// buffer). An empty pool yields an empty trie (no words, no prefixes).
         /// </summary>
-        public static TraceryTrie BuildFrom(IWordListService svc, int minWordLength)
+        public static TraceryTrie BuildFrom(
+            IWordListService svc, int minWordLength, WordPoolMode mode = WordPoolMode.FullDictionary)
         {
-            const WordPoolMode mode = WordPoolMode.FullDictionary;
-
             // Pre-size the builder from the word count to dodge doubling-resize churn during
             // the large full-dictionary load. The trie has ~2.8 nodes per word on this
             // dictionary, so ×3 lands just above the real node count without over-allocating;

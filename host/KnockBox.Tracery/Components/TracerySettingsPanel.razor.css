@@ -70,6 +70,23 @@
 }
 .tr-field input[type="number"]:disabled { opacity: 0.4; }
 
+.tr-field select {
+    padding: 0.45rem 0.55rem;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    color: var(--tr-ink);
+    font-family: var(--tr-font-mono);
+    font-size: 1.05rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.tr-field select:focus {
+    outline: none;
+    border-color: var(--tr-accent);
+    box-shadow: 0 0 0 3px var(--tr-accent-dim);
+}
+.tr-field select:disabled { opacity: 0.4; }
+
 .tr-field input[type="checkbox"] {
     width: 1.15rem;
     height: 1.15rem;

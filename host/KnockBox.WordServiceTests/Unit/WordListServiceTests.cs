@@ -69,6 +69,16 @@ public class WordListServiceTests
     }
 
     [TestMethod]
+    public void Reduced_IsEmptyUntilItsCsvShips_AndQueriesAreGraceful()
+    {
+        // reduced-dictionary.csv is not in the repo yet; an absent file yields an empty pool
+        // (LoadCsv warns + returns []) rather than a crash. Adjust/remove once the list ships.
+        Assert.AreEqual(0, _service.GetWordCount(WordPoolMode.Reduced, 5));
+        Assert.IsFalse(_service.GetAvailableLengths(WordPoolMode.Reduced).Any());
+        Assert.IsFalse(_service.IsInPool(WordPoolMode.Reduced, "about"));
+    }
+
+    [TestMethod]
     [DataRow(WordPoolMode.HostDefined)]
     [DataRow(WordPoolMode.CsvUpload)]
     public void IsInPool_UnbackedModes_ReturnFalse(WordPoolMode mode)

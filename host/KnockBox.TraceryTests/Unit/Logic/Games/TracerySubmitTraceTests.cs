@@ -4,6 +4,7 @@ using KnockBox.Tracery.Services.Logic.Games;
 using KnockBox.Tracery.Services.State.Games;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.WordService.Contracts;
 using KnockBox.WordService.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -203,7 +204,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         // that the returned path is legal — no reliance on which specific words are present.
         private static (string word, int[] path) FirstFindable()
         {
-            var solver = _engine.GetSolver();
+            var solver = _engine.GetSolver(WordPoolMode.FullDictionary);
             var found = solver.Solve(MakeBoard(), minWordLength: 3);
             var entry = found.Values.First();
             return (entry.Word, entry.Path.ToArray());
@@ -211,7 +212,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
 
         private static (TracedWord a, TracedWord b) TwoFindableSharingACell()
         {
-            var solver = _engine.GetSolver();
+            var solver = _engine.GetSolver(WordPoolMode.FullDictionary);
             var found = solver.Solve(MakeBoard(), minWordLength: 3).Values.ToList();
             for (int i = 0; i < found.Count; i++)
                 for (int j = i + 1; j < found.Count; j++)
