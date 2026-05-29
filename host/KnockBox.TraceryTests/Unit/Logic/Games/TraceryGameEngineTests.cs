@@ -370,17 +370,21 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         // ── SkipReveal: host-only early advance ─────────────────────────────
 
         [TestMethod]
-        public async Task SkipReveal_AsHost_AdvancesToNextRoundImmediately()
+        public async Task SkipReveal_AsHost_ShowsRoundTransition()
         {
             var state = await DriveIntoReveal();
             int revealRound = state.CurrentRound;     // default TotalRounds = 3, so room to advance
 
             var result = _engine.SkipReveal(state, _host);
 
+            // Skipping the reveal hands off to the round-intro transition view, not straight into
+            // play: the round number hasn't advanced yet (EnterPlaying does that when the intro ends)
+            // and the transition timer is armed.
             Assert.IsTrue((bool)result.IsSuccess);
-            Assert.AreEqual(GamePhase.Playing, state.Phase);
-            Assert.AreEqual(revealRound + 1, state.CurrentRound);
-            Assert.IsTrue(state.IsRoundActive);
+            Assert.AreEqual(GamePhase.RoundIntro, state.Phase);
+            Assert.AreEqual(revealRound, state.CurrentRound);
+            Assert.IsFalse(state.IsRoundActive);
+            Assert.IsNotNull(state.PhaseExpiresAtUtc);
         }
 
         [TestMethod]
@@ -448,12 +452,12 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             var state = await DriveIntoReveal();
             int staleRound = state.CurrentRound;
 
-            // Host skips → already advanced into the next Playing round.
+            // Host skips → handed off to the round-intro transition (round not yet advanced).
             Assert.IsTrue((bool)_engine.SkipReveal(state, _host).IsSuccess);
             var phaseAfterSkip = state.Phase;
             var roundAfterSkip = state.CurrentRound;
-            Assert.AreEqual(GamePhase.Playing, phaseAfterSkip);
-            Assert.AreNotEqual(staleRound, roundAfterSkip);
+            Assert.AreEqual(GamePhase.RoundIntro, phaseAfterSkip);
+            Assert.AreEqual(staleRound, roundAfterSkip);
 
             // The intermission timer captured for the skipped round now fires late — it must no-op,
             // not advance the match a second time.

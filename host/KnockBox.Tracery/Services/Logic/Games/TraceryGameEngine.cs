@@ -515,10 +515,11 @@ namespace KnockBox.Tracery.Services.Logic.Games
         }
 
         /// <summary>
-        /// Host-only: ends the post-round reveal immediately, advancing to the next round (or
-        /// final standings) without waiting out the intermission timer. The still-pending
-        /// intermission callback is rendered inert by the round/phase guard in
-        /// <see cref="AdvanceAfterResultsIfStillRevealing"/>, so there is no double-advance.
+        /// Host-only: ends the post-round reveal early without waiting out the intermission timer.
+        /// Rather than jumping straight into the next round, it hands off to the round-intro
+        /// transition view (<see cref="EnterRoundIntro"/>) — or, on the final round, to final
+        /// standings. The still-pending intermission callback is rendered inert by the round/phase
+        /// guard in <see cref="AdvanceAfterResultsIfStillRevealing"/>, so there is no double-advance.
         /// </summary>
         public Result SkipReveal(TraceryGameState state, User caller)
         {
@@ -529,7 +530,7 @@ namespace KnockBox.Tracery.Services.Logic.Games
                 if (state.Phase != GamePhase.Reveal)
                     return Result.FromError("There is no round transition to skip.");
 
-                AdvanceAfterResults(state);
+                EnterRoundIntro(state);
                 return Result.Success;
             });
 
