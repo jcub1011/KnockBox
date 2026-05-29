@@ -15,16 +15,18 @@
     font-family: var(--tr-font-body);
 }
 
-/* Full-viewport dark backdrop with two soft neon glows. Fixed + behind content
-   so it covers regardless of how short a phase's content is. */
+/* Full-viewport backdrop: warm candlelight from above, a faint cobalt glass-glow
+   from below, and a vignette that draws the eye to the centre — like dusk in the
+   nave. Fixed + behind content so it covers however short a phase's content is. */
 .tr-page::before {
     content: "";
     position: fixed;
     inset: 0;
     z-index: -1;
     background:
-        radial-gradient(900px 620px at 50% -12%, rgba(30, 255, 188, 0.10), transparent 60%),
-        radial-gradient(760px 520px at 100% 108%, rgba(255, 59, 107, 0.07), transparent 55%),
+        radial-gradient(1100px 720px at 50% -18%, rgba(217, 178, 74, 0.08), transparent 60%),
+        radial-gradient(820px 620px at 50% 118%, rgba(77, 136, 207, 0.07), transparent 58%),
+        radial-gradient(120% 120% at 50% 36%, transparent 52%, rgba(0, 0, 0, 0.42)),
         var(--tr-bg-0);
 }
 
@@ -116,20 +118,21 @@
 }
 .tr-bank-count {
     font-family: var(--tr-font-mono);
-    font-weight: 800;
-    font-size: 1.05rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 1.25rem;
     color: var(--tr-accent);
 }
 .tr-bank-list { display: flex; flex-wrap: wrap; gap: 0.4rem; min-height: 1.6rem; }
 .tr-bank-word {
     font-family: var(--tr-font-mono);
     background: var(--tr-accent-dim);
-    border: 1px solid rgba(30, 255, 188, 0.32);
-    border-radius: 999px;
-    padding: 0.2rem 0.7rem;
-    font-weight: 700;
-    font-size: 0.82rem;
-    letter-spacing: 0.05em;
+    border: 1px solid rgba(77, 136, 207, 0.34);
+    border-radius: var(--tr-radius-sm);
+    padding: 0.18rem 0.7rem;
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.06em;
     color: var(--tr-accent);
     animation: tr-pop 0.3s ease both;
 }

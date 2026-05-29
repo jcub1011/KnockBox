@@ -24,6 +24,14 @@
     touch-action: none; /* a finger drag traces instead of scrolling */
     user-select: none;
     -webkit-user-select: none;
+    /* The leaded-window frame is drawn with box-shadow only — it sits OUTSIDE the
+       grid box, so it adds a gilt double-rule + stone reveal without touching the
+       0..W/0..H geometry the SVG trace overlay depends on. */
+    box-shadow:
+        0 0 0 1px rgba(201, 162, 39, 0.50),
+        0 0 0 7px var(--tr-bg-1),
+        0 0 0 8px rgba(201, 162, 39, 0.28),
+        0 22px 50px -24px rgba(0, 0, 0, 0.7);
 }
 
 /* Connecting trace line. Above the cells but transparent to pointer events so
@@ -54,13 +62,14 @@
     align-items: center;
     justify-content: center;
     aspect-ratio: 1 / 1;
-    border: 1.5px solid var(--tr-border);
+    border: 1px solid var(--tr-border);
     border-radius: var(--tr-radius-sm);
-    background: rgba(255, 255, 255, 0.04);
+    background: linear-gradient(180deg, rgba(236, 227, 208, 0.07), rgba(236, 227, 208, 0.02));
     color: var(--tr-ink);
     font-family: var(--tr-font-mono);
-    font-size: clamp(1.1rem, 6vw, 1.9rem);
-    font-weight: 800;
+    font-size: clamp(1.3rem, 6.5vw, 2.2rem);
+    font-weight: 700;
+    text-transform: uppercase;
     cursor: pointer;
     touch-action: none;
     transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease, color 0.12s ease;
@@ -91,8 +100,8 @@
 }
 .tr-grid-current {
     font-family: var(--tr-font-mono);
-    font-weight: 800;
-    font-size: 1.15rem;
+    font-weight: 600;
+    font-size: 1.4rem;
     letter-spacing: 0.18em;
     color: var(--tr-accent);
     text-transform: uppercase;
@@ -105,14 +114,15 @@
     background: var(--tr-panel-2);
     color: var(--tr-ink);
     border-radius: var(--tr-radius-sm);
-    padding: 0.35rem 1rem;
-    font-weight: 700;
-    font-size: 0.8rem;
-    letter-spacing: 0.06em;
+    padding: 0.35rem 1.1rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.16em;
+    text-indent: 0.16em;
     text-transform: uppercase;
     cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
-.tr-grid-clear:hover { background: rgba(255, 255, 255, 0.12); border-color: var(--tr-accent); }
+.tr-grid-clear:hover { background: rgba(236, 227, 208, 0.10); border-color: var(--tr-gold); color: #f3ecda; }
 
 .tr-grid-shake { animation: tr-shake 0.4s ease-in-out; }

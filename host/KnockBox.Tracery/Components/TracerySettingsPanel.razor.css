@@ -54,12 +54,13 @@
 
 .tr-field input[type="number"] {
     padding: 0.45rem 0.55rem;
-    background: rgba(0, 0, 0, 0.32);
+    background: rgba(0, 0, 0, 0.28);
     border: 1px solid var(--tr-border);
     border-radius: var(--tr-radius-sm);
     color: var(--tr-ink);
     font-family: var(--tr-font-mono);
-    font-size: 0.95rem;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.05rem;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .tr-field input[type="number"]:focus {

@@ -56,7 +56,7 @@
 .tr-beat-meta { font-size: 0.85rem; color: var(--tr-ink-dim); }
 
 /* Highlight the headline beats. */
-.tr-beat-top { border-color: var(--tr-accent); background: rgba(30, 255, 188, 0.07); }
+.tr-beat-top { border-color: var(--tr-accent); background: rgba(77, 136, 207, 0.08); }
 .tr-beat-max .tr-beat-word { color: var(--tr-gold); text-shadow: 0 0 22px var(--tr-gold-glow); }
 
 .tr-beat-rare-list,
@@ -71,22 +71,22 @@
     display: inline-flex;
     align-items: baseline;
     gap: 0.3rem;
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(236, 227, 208, 0.05);
     border: 1px solid var(--tr-border-strong);
     border-radius: var(--tr-radius-sm);
-    padding: 0.25rem 0.6rem;
+    padding: 0.25rem 0.65rem;
 }
-.tr-rare-letter { font-family: var(--tr-font-mono); font-weight: 800; font-size: 1.15rem; color: var(--tr-ink); }
-.tr-rare-bonus { font-family: var(--tr-font-mono); font-size: 0.75rem; font-weight: 700; color: var(--tr-accent); }
+.tr-rare-letter { font-family: var(--tr-font-mono); font-weight: 700; font-size: 1.35rem; color: var(--tr-ink); }
+.tr-rare-bonus { font-family: var(--tr-font-mono); font-variant-numeric: tabular-nums; font-size: 0.85rem; font-weight: 600; color: var(--tr-accent); }
 
 .tr-missed-chip {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(236, 227, 208, 0.04);
     border: 1px solid var(--tr-border);
-    border-radius: 999px;
+    border-radius: var(--tr-radius-sm);
     padding: 0.2rem 0.75rem;
 }
-.tr-missed-word { font-family: var(--tr-font-mono); font-weight: 700; font-size: 0.82rem; letter-spacing: 0.05em; color: var(--tr-ink-dim); }
-.tr-missed-score { font-family: var(--tr-font-mono); font-weight: 800; font-size: 0.8rem; color: var(--tr-ink-mute); }
+.tr-missed-word { font-family: var(--tr-font-mono); font-weight: 600; font-size: 0.98rem; letter-spacing: 0.05em; color: var(--tr-ink-dim); }
+.tr-missed-score { font-family: var(--tr-font-mono); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 0.9rem; color: var(--tr-ink-mute); }

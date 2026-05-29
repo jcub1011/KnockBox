@@ -16,12 +16,13 @@
     display: inline-flex;
     align-items: center;
     gap: 0.55rem;
-    padding: 0.6rem 1.15rem;
-    background: rgba(13, 13, 24, 0.94);
+    padding: 0.6rem 1.2rem;
+    background: rgba(22, 19, 29, 0.94);
     border: 1.5px solid var(--tr-danger);
     border-radius: var(--tr-radius-sm);
     font-family: var(--tr-font-body);
-    font-weight: 700;
+    font-weight: 600;
+    font-size: 1.05rem;
     color: var(--tr-ink);
     box-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
     max-width: 100%;

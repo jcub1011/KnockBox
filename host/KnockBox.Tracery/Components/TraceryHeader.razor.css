@@ -13,10 +13,10 @@
     width: 100%;
     box-sizing: border-box;
     padding: 0.7rem 1.25rem;
-    background: rgba(7, 7, 13, 0.72);
+    background: rgba(22, 19, 29, 0.82);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--tr-border);
+    border-bottom: 1px solid var(--tr-border-strong);
     font-family: var(--tr-font-body);
 }
 
@@ -27,10 +27,11 @@
 }
 .tr-header-text {
     font-family: var(--tr-font-display);
-    font-weight: 800;
-    font-size: 1.4rem;
+    font-weight: 700;
+    font-size: 1.6rem;
     letter-spacing: 0.34em;
     text-indent: 0.34em;
+    text-transform: uppercase;
     color: var(--tr-ink);
     transition: color 0.2s ease, text-shadow 0.2s ease;
 }
@@ -58,7 +59,7 @@
 }
 .tr-header-actions ::deep .tr-header-code:hover {
     border-color: var(--tr-accent);
-    background: rgba(30, 255, 188, 0.08);
+    background: rgba(77, 136, 207, 0.10);
 }
 .tr-header-actions ::deep .tr-header-code-cover {
     font-family: var(--tr-font-display);
@@ -71,8 +72,9 @@
 }
 .tr-header-actions ::deep .tr-header-code-value {
     font-family: var(--tr-font-mono);
-    font-size: 1.05rem;
-    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.2rem;
+    font-weight: 700;
     letter-spacing: 0.14em;
     color: var(--tr-accent);
 }
@@ -83,7 +85,7 @@
     justify-content: center;
     width: 40px;
     height: 40px;
-    border-radius: 10px;
+    border-radius: var(--tr-radius-sm);
     background: var(--tr-panel-2);
     border: 1px solid var(--tr-border);
     color: var(--tr-ink-dim);
@@ -93,5 +95,5 @@
 .tr-header-leave:hover {
     color: var(--tr-danger);
     border-color: var(--tr-danger);
-    background: rgba(255, 59, 107, 0.12);
+    background: rgba(177, 65, 78, 0.14);
 }
