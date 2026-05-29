@@ -13,7 +13,8 @@ namespace KnockBox.Tracery.Tests.Unit
             Assert.AreEqual("Tracery", module.Manifest.Name);
             Assert.AreEqual("tracery", module.Manifest.RouteIdentifier);
             Assert.AreEqual("KnockBox.Tracery", module.Manifest.EntryAssembly);
-            Assert.IsTrue(module.Manifest.WorkInProgress);
+            // Shippable as of Milestone 08 — the game is no longer work-in-progress.
+            Assert.IsFalse(module.Manifest.WorkInProgress);
         }
 
         [TestMethod]

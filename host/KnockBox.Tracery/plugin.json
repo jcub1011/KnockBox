@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "name": "Tracery",
-  "description": "A Tracery placeholder game.",
+  "description": "Trace as many words as you can across a shared letter grid before the timer runs out.",
   "routeIdentifier": "tracery",
   "version": "1.0.0",
   "entryAssembly": "KnockBox.Tracery",
   "capabilities": [],
-  "workInProgress": true,
+  "workInProgress": false,
   "tileAsset": "tile.svg"
 }

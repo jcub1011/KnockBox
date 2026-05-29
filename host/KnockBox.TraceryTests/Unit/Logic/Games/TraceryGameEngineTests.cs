@@ -353,6 +353,54 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             Assert.IsTrue(state.IsRoundActive);
         }
 
+        // ── Disconnect mid-round ────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task PlayerDisconnectMidRound_DoesNotHang_AndRoundStillCompletes()
+        {
+            var state = await CreateStateAsync();
+            // Two players join → host observes. Keep p1's registration token so we can drop it.
+            var p1 = UserFactory.Create("P1", "p1");
+            var p2 = UserFactory.Create("P2", "p2");
+            var p1Token = state.RegisterPlayer(p1);
+            Assert.IsTrue(p1Token.TryGetSuccess(out var p1Registration));
+            Assert.IsTrue(state.RegisterPlayer(p2).IsSuccess);
+
+            state.UpdateSettings(s => s with
+            {
+                RoundTimer = TimeSpan.FromMinutes(5),
+                TransitionDuration = TimeSpan.FromMinutes(5)
+            });
+            await _engine.StartAsync(_host, state);
+            state.Execute(() => _engine.EnterPlaying(state));
+
+            // Both bank a word, then p1 drops mid-round (circuit lost → registration token disposed,
+            // which fires PlayerUnregistered and removes p1 from the live roster).
+            state.Execute(() =>
+            {
+                state.CreatePlayerState(p1.Id).Bank(new TracedWord("rate", [0]));
+                state.CreatePlayerState(p2.Id).Bank(new TracedWord("table", [0]));
+            });
+            p1Registration!.Dispose();
+
+            // The round must still close cleanly off the timer path — no "wait for everyone" gate
+            // can hang on the missing player.
+            state.Execute(() => _engine.CompleteRound(state));
+
+            Assert.AreEqual(GamePhase.Reveal, state.Phase);
+            Assert.IsFalse(state.IsRoundActive);
+
+            // The surviving player is scored; the round result is built from the live roster, so the
+            // leaver simply isn't in this round's outcomes — and the round didn't hang waiting on them.
+            var outcomes = state.RoundResults[^1].Outcomes;
+            Assert.IsTrue(outcomes.Any(o => o.UserId == p2.Id), "The remaining player must be scored.");
+
+            // The match can still be driven to its end despite the disconnect.
+            state.Execute(() => _engine.EnterRoundOver(state));
+            state.Execute(() => _engine.AdvanceAfterResults(state));
+            Assert.AreNotEqual(GamePhase.Playing, state.Phase);
+        }
+
         // ── Helpers ─────────────────────────────────────────────────────────
 
         // Starts a match (mock word service → fail-safe empty board) and drives into the
