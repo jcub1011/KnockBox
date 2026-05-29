@@ -89,10 +89,10 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
                 $"Generating {boards} 8×8 boards took {sw.ElapsedMilliseconds} ms — generate-and-test may have regressed.");
         }
 
-        // ── Trie is built once, cached on the singleton engine ──────────────
+        // ── Each pool's trie is built once, cached on the singleton engine ──
 
         [TestMethod]
-        public void Engine_BuildsTrieOnce_AcrossManySolversAndRounds()
+        public void Engine_BuildsEachPoolTrieOnce_AcrossManySolversAndRounds()
         {
             // A real word service so the trie genuinely builds (and logs) on first use.
             var engineLogger = new ListLogger<TraceryGameEngine>();
@@ -100,7 +100,9 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
                 _wordList, new RandomNumberService(), engineLogger, NullLogger<TraceryGameState>.Instance);
 
             // Hammer every entry point that could trigger a build: repeated solver/generator
-            // requests, plus several full rounds (EnterPlaying generates a board each time).
+            // requests, plus several full rounds (EnterPlaying generates a board each time). The
+            // default settings split board generation (ReducedDictionary) from answer validation
+            // (FullDictionary), so a round touches both pools — each must still build at most once.
             for (int i = 0; i < 5; i++)
             {
                 _ = engine.GetSolver(WordPoolMode.FullDictionary);
@@ -120,8 +122,13 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             for (int round = 0; round < 3; round++)
                 state.Execute(() => engine.EnterPlaying(state));
 
-            Assert.AreEqual(1, engineLogger.CountContaining("Building Tracery dictionary trie"),
-                "The dictionary trie must be built exactly once and cached on the singleton engine.");
+            // Built once per distinct pool and cached thereafter — never rebuilt per call or round.
+            Assert.AreEqual(1, engineLogger.CountContaining("Building Tracery dictionary trie for FullDictionary"),
+                "The full-dictionary trie must be built exactly once and cached on the singleton engine.");
+            Assert.AreEqual(1, engineLogger.CountContaining("Building Tracery dictionary trie for ReducedDictionary"),
+                "The reduced-dictionary trie must be built exactly once and cached on the singleton engine.");
+            Assert.AreEqual(2, engineLogger.CountContaining("Building Tracery dictionary trie"),
+                "Only the two pools the default settings touch should ever build a trie.");
         }
 
         // Cycles the seed string to exactly the 64 cells of an 8×8 grid so the board is dense and

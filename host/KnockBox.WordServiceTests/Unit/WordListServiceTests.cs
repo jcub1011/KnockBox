@@ -69,13 +69,18 @@ public class WordListServiceTests
     }
 
     [TestMethod]
-    public void Reduced_IsEmptyUntilItsCsvShips_AndQueriesAreGraceful()
+    public void Reduced_ShipsCommonWords_AndIsAStrictSubsetOfFull()
     {
-        // reduced-dictionary.csv is not in the repo yet; an absent file yields an empty pool
-        // (LoadCsv warns + returns []) rather than a crash. Adjust/remove once the list ships.
-        Assert.AreEqual(0, _service.GetWordCount(WordPoolMode.Reduced, 5));
-        Assert.IsFalse(_service.GetAvailableLengths(WordPoolMode.Reduced).Any());
-        Assert.IsFalse(_service.IsInPool(WordPoolMode.Reduced, "about"));
+        // reduced-dictionary.csv ships the curated common-word (Google-10k) list, so the pool
+        // is populated and answers lookups directly.
+        Assert.IsTrue(_service.GetAvailableLengths(WordPoolMode.ReducedDictionary).Any());
+        Assert.IsGreaterThan(0, _service.GetWordCount(WordPoolMode.ReducedDictionary, 5));
+        Assert.IsTrue(_service.IsInPool(WordPoolMode.ReducedDictionary, "about"));
+
+        // It is a common-word subset: fewer five-letter words than the full dictionary.
+        Assert.IsLessThan(
+            _service.GetWordCount(WordPoolMode.FullDictionary, 5),
+            _service.GetWordCount(WordPoolMode.ReducedDictionary, 5));
     }
 
     [TestMethod]

@@ -43,16 +43,23 @@ namespace KnockBox.Tracery.Models
         public int MinWordLength { get; init; } = 4;
 
         // ── Dictionaries ───────────────────────────────────────────────────────
+        // The intended relationship is board ⊆ answers: generate from a common-word pool, then
+        // let players bank anything from a wider validation pool. A host *may* invert this
+        // (validation narrower than generation), but the result is deliberately confusing — the
+        // board can contain (and the reveal's "words nobody found" can list) words that no player
+        // is allowed to submit, and the theoretical maximum can fall below the visible board's
+        // worth. We allow it rather than constrain the dropdowns; that's a host's choice to make.
         /// <summary>
         /// The pool a board is generated and judged against — keep boards dense with
-        /// recognizable words. Defaults to the curated common-word list; until that list
-        /// ships, the engine transparently falls back to <see cref="WordPoolMode.FullDictionary"/>.
+        /// recognizable words. Defaults to the curated common-word list; for any unbacked pool
+        /// the engine transparently falls back to <see cref="WordPoolMode.FullDictionary"/>.
         /// </summary>
         public WordPoolMode GenerationDictionary { get; init; } = WordPoolMode.ReducedDictionary;
 
         /// <summary>
         /// The pool a player's submitted word is validated against. Defaults to the full
         /// dictionary so players can still find obscure words even on a common-word board.
+        /// Best set to a superset of <see cref="GenerationDictionary"/> (see note above).
         /// </summary>
         public WordPoolMode ValidationDictionary { get; init; } = WordPoolMode.FullDictionary;
 

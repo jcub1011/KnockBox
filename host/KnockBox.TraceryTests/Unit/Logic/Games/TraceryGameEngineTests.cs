@@ -60,16 +60,16 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         }
 
         [TestMethod]
-        public void GetGenerator_WithEmptyReducedPool_FallsBackToFull_AndGenerates()
+        public void GetGenerator_WithUnbackedPool_FallsBackToFull_AndGenerates()
         {
             var svc = new WordListService(NullLogger<WordListService>.Instance);
             var engine = new TraceryGameEngine(
                 svc, new RandomNumberService(),
                 NullLogger<TraceryGameEngine>.Instance, NullLogger<TraceryGameState>.Instance);
 
-            // Reduced is empty until its CSV ships, so generation must transparently fall back to
-            // the full dictionary and still produce a board (the default board dictionary path).
-            var generator = engine.GetGenerator(WordPoolMode.Reduced);
+            // HostDefined is unbacked by the library plugin (no CSV), so generation must
+            // transparently fall back to the full dictionary and still produce a board.
+            var generator = engine.GetGenerator(WordPoolMode.HostDefined);
 
             Assert.IsTrue(generator.Generate(new TracerySettings()).IsSuccess);
         }
