@@ -72,3 +72,17 @@
     color: var(--tr-ink-mute);
     text-align: right;
 }
+
+/* On narrow phones the four-column row squeezes the name to nothing — drop to three columns and
+   stack the score detail under the name so nothing overflows. */
+@media (max-width: 480px) {
+    .tr-result-row {
+        grid-template-columns: 2.25rem 1fr auto;
+        grid-template-areas:
+            "place name delta"
+            "place detail total";
+        column-gap: 0.5rem;
+        padding: 0.5rem 0.7rem;
+    }
+    .tr-result-detail { align-items: flex-start; }
+}

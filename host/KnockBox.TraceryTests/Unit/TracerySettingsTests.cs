@@ -73,6 +73,36 @@ namespace KnockBox.Tracery.Tests.Unit
         }
 
         [TestMethod]
+        public void Normalize_ClampsGridDimensions_ToSupportedRange()
+        {
+            // Over the ceiling on both axes, and under the floor.
+            var tooBig = new TracerySettings { GridWidth = 20, GridHeight = 12 }.Normalize();
+            Assert.AreEqual(TracerySettings.MaxGridDimension, tooBig.GridWidth);
+            Assert.AreEqual(TracerySettings.MaxGridDimension, tooBig.GridHeight);
+
+            var tooSmall = new TracerySettings { GridWidth = 1, GridHeight = 0 }.Normalize();
+            Assert.AreEqual(TracerySettings.MinGridDimension, tooSmall.GridWidth);
+            Assert.AreEqual(TracerySettings.MinGridDimension, tooSmall.GridHeight);
+
+            // In range → the same instance is returned (no allocation, no change).
+            var inRange = new TracerySettings { GridWidth = 5, GridHeight = 6 };
+            Assert.AreSame(inRange, inRange.Normalize());
+        }
+
+        [TestMethod]
+        public void UpdateSettings_EnforcesGridCap_EvenWhenMutationBypassesTheUi()
+        {
+            var state = NewState();
+
+            // Simulate a restored-localStorage / deserialized value that skipped the panel's clamp.
+            var result = state.UpdateSettings(s => s with { GridWidth = 99, GridHeight = 99 });
+
+            Assert.IsTrue(result.IsSuccess);
+            Assert.AreEqual(TracerySettings.MaxGridDimension, state.Settings.GridWidth);
+            Assert.AreEqual(TracerySettings.MaxGridDimension, state.Settings.GridHeight);
+        }
+
+        [TestMethod]
         public void ScoringTables_RoundTrip_ThroughWebJson()
         {
             // The room page persists settings to localStorage as Web-defaults JSON, so the

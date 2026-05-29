@@ -39,9 +39,9 @@ and its intended effect, so playtesters can retune without touching code (GDD §
 | `RareLetterBonusTable` | K,F,H,V,W,Y → +1; J,X → +3; Q,Z → +5 | Per-occurrence bonus keyed by upper-case letter (repeats count). Retune to change which letters feel valuable. |
 
 > The generator's notion of which letters are "rare" for the generation quality gate
-> (`RequireRareLetterWord`) comes from `LetterDistribution.RareLetters` (j,k,q,v,w,x,y,z), the single
-> source of truth shared by generation and the rare-letter weighting. The *scoring* table above is
-> independent and may differ.
+> (`RequireRareLetterWord`) comes from `LetterDistribution.RareLetters` (f,h,j,k,q,v,w,x,y,z) — the
+> same letters as the keys of the scoring table above, so a word that earns a rare-letter bonus is
+> exactly one that satisfies the gate. Retune both together if you change which letters are rare.
 
 ## Scoring — unique-find multiplier (GDD §5.4)
 

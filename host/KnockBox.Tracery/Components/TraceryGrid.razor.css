@@ -8,6 +8,14 @@
     display: flex;
     flex-direction: column;
     gap: 0.85rem;
+    /* Suppress browser touch gestures across the WHOLE component, not just .tr-grid: a trace
+       can begin on the topbar (rotate/clear/submit) and drift onto the board, and the drag layer
+       only captures the pointer once it crosses into a second cell. Without this the initial swipe
+       on the gap above the board can be claimed as a page scroll / pull-to-refresh and reload the
+       page mid-round. overscroll-behavior stops a downward drag that escapes the grid bounds from
+       chaining into the page's pull-to-refresh. */
+    touch-action: none;
+    overscroll-behavior: contain;
 }
 
 /* No padding/border/gap here: the SVG trace overlay maps its 0..W/0..H viewBox to
@@ -167,7 +175,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 2.6rem;
+    /* ≥44px tap target (Apple/WCAG): these are primary phone controls. */
+    width: 2.75rem;
+    min-width: 44px;
+    min-height: 44px;
     padding: 0;
     line-height: 1;
     font-size: 1.2rem;
@@ -179,9 +190,12 @@
     transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 .tr-grid-iconbtn:disabled { opacity: 0.4; cursor: default; }
-.tr-grid-clearbtn:not(:disabled):hover { background: rgba(236, 227, 208, 0.10); border-color: var(--tr-gold); color: #f3ecda; }
+/* :hover does not fire reliably on touch — mirror to :active so phone taps still give feedback. */
+.tr-grid-clearbtn:not(:disabled):hover,
+.tr-grid-clearbtn:not(:disabled):active { background: rgba(236, 227, 208, 0.10); border-color: var(--tr-gold); color: #f3ecda; }
 .tr-grid-submitbtn { color: var(--tr-accent); }
-.tr-grid-submitbtn:not(:disabled):hover { background: var(--tr-accent-dim); border-color: var(--tr-accent); }
+.tr-grid-submitbtn:not(:disabled):hover,
+.tr-grid-submitbtn:not(:disabled):active { background: var(--tr-accent-dim); border-color: var(--tr-accent); }
 
 .tr-grid-clear {
     font-family: var(--tr-font-display);
@@ -190,6 +204,7 @@
     color: var(--tr-ink);
     border-radius: var(--tr-radius-sm);
     padding: 0.35rem 1.1rem;
+    min-height: 44px; /* ≥44px tap target */
     font-weight: 600;
     font-size: 0.95rem;
     letter-spacing: 0.16em;
@@ -198,7 +213,9 @@
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
-.tr-grid-clear:hover { background: rgba(236, 227, 208, 0.10); border-color: var(--tr-gold); color: #f3ecda; }
+/* :active mirrors :hover for touch (no reliable hover on phones). */
+.tr-grid-clear:hover,
+.tr-grid-clear:active { background: rgba(236, 227, 208, 0.10); border-color: var(--tr-gold); color: #f3ecda; }
 
 /* Square icon button reusing the Clear look. The glyph carries the rotation, so it isn't
    affected by --tr-rotation (that prop only lives inside .tr-grid). */

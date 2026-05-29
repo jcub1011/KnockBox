@@ -198,9 +198,11 @@ namespace KnockBox.Tracery.Services.Logic
 
         /// <summary>
         /// Finds a self-avoiding 8-way path of <paramref name="length"/> cells via randomized
-        /// DFS (rng-shuffled neighbours, like Spardle's Fisher–Yates), retrying from different
-        /// random starts on a dead-end. On a fully connected grid a simple path of length
-        /// ≤ CellCount always exists, so this only fails when length &gt; CellCount.
+        /// DFS (rng-shuffled neighbours, like Spardle's Fisher–Yates). Each cell is tried as the
+        /// start exactly once, in a randomized order, so every starting cell is exhausted before
+        /// giving up — random re-draws could otherwise skip the only start a path exists from. On a
+        /// fully connected grid a simple path of length ≤ CellCount always exists, so this only
+        /// fails when length &gt; CellCount.
         /// </summary>
         private int[]? FindSelfAvoidingPath(Grid grid, int length)
         {
@@ -210,10 +212,14 @@ namespace KnockBox.Tracery.Services.Logic
             var visited = new bool[area];
             var path = new int[length];
 
-            for (int start = 0; start < area; start++)
+            // Visit every cell as a candidate start, shuffled for variety but each tried once.
+            int[] starts = new int[area];
+            for (int i = 0; i < area; i++) starts[i] = i;
+            Shuffle(starts);
+
+            foreach (int first in starts)
             {
                 Array.Clear(visited);
-                int first = _rng.GetRandomInt(area);
                 path[0] = first;
                 visited[first] = true;
                 if (Walk(grid, path, visited, depth: 1, length))

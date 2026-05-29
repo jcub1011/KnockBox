@@ -6,7 +6,8 @@
 .tr-page {
     position: relative;
     min-height: 100%;
-    padding: 1.5rem 1rem 3rem;
+    /* Keep the bottom of the playing view clear of the iOS home indicator on notched phones. */
+    padding: 1.5rem 1rem max(3rem, calc(env(safe-area-inset-bottom) + 1.5rem));
     display: flex;
     flex-direction: column;
     align-items: center;

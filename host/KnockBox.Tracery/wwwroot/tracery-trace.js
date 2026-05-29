@@ -15,6 +15,7 @@
 //   OnDragStart(int cellId)  — drag promoted; open a fresh path on the press's start cell.
 //   OnDragEnter(int cellId)  — pointer moved into a different cell during a drag.
 //   OnDragEnd()              — pointer released after a drag; submit the current path.
+//   OnDragCancel()           — drag interrupted by the OS (e.g. a second finger); discard the path.
 //
 // Cells must carry a `data-tr-cell="<id>"` attribute. Cells also need `touch-action: none`
 // (set in CSS) so a finger drag traces instead of scrolling the page.
@@ -113,7 +114,9 @@ function onPointerMove(ev) {
     invoke('OnDragEnter', id);
 }
 
-function endDrag(ev) {
+// Shared teardown for the end of a gesture. `submit` distinguishes a deliberate release
+// (pointerup → submit the trace) from an OS-interrupted gesture (pointercancel → discard it).
+function finishGesture(submit) {
     if (!pointerDown) return;
     const wasDragging = dragging;
     pointerDown = false;
@@ -124,13 +127,25 @@ function endDrag(ev) {
         try { container.releasePointerCapture?.(activePointerId); } catch { /* unsupported */ }
         activePointerId = null;
     }
-    // Only a real drag submits through .NET. A tap (no cell crossing) never signalled the drag
+    // Only a real drag signals through .NET. A tap (no cell crossing) never signalled the drag
     // callbacks, so it falls through to the native click → Blazor @onclick. A finished drag, on
     // the other hand, may emit a trailing click we must swallow so it doesn't re-tap a cell.
     if (wasDragging) {
         suppressNextClick = true;
-        invoke('OnDragEnd');
+        invoke(submit ? 'OnDragEnd' : 'OnDragCancel');
     }
+}
+
+// Pointer released deliberately — submit the current path.
+function endDrag(ev) {
+    finishGesture(true);
+}
+
+// Pointer interrupted by the OS mid-drag (a second finger, a system gesture, a notification). This
+// is NOT a deliberate release, so the half-finished trace must be discarded, not submitted — the
+// .NET side clears the path and surfaces a brief hint so the word doesn't just vanish unexplained.
+function cancelDrag(ev) {
+    finishGesture(false);
 }
 
 // Capture-phase guard: drops the synthetic click that follows a drag before it can reach the
@@ -150,7 +165,7 @@ export function init(element, ref) {
     container.addEventListener('pointerdown', onPointerDown);
     container.addEventListener('pointermove', onPointerMove);
     container.addEventListener('pointerup', endDrag);
-    container.addEventListener('pointercancel', endDrag);
+    container.addEventListener('pointercancel', cancelDrag);
     container.addEventListener('click', onClickCapture, true); // capture phase
 }
 
@@ -159,7 +174,7 @@ export function dispose() {
         container.removeEventListener('pointerdown', onPointerDown);
         container.removeEventListener('pointermove', onPointerMove);
         container.removeEventListener('pointerup', endDrag);
-        container.removeEventListener('pointercancel', endDrag);
+        container.removeEventListener('pointercancel', cancelDrag);
         container.removeEventListener('click', onClickCapture, true);
     }
     container = null;

@@ -30,11 +30,13 @@ namespace KnockBox.Tracery.Services.Logic
         /// <summary>
         /// Letters treated as "rare" — the single source of truth shared by the
         /// generator's rare-letter quality gate (M03) and rare-letter scoring (M06),
-        /// so the two can never drift apart. These are the high-value Scrabble tiles
-        /// (J/Q/Z and K/V/W/X/Y), case-folded on lookup via <see cref="IsRare"/>.
+        /// so the two can never drift apart. These are exactly the keys of
+        /// <see cref="Models.TracerySettings.RareLetterBonusTable"/> (F/H/K/V/W/Y → +1,
+        /// J/X → +3, Q/Z → +5), case-folded on lookup via <see cref="IsRare"/>; a board word
+        /// that scores a rare-letter bonus is therefore exactly one that satisfies the gate.
         /// </summary>
         internal static readonly FrozenSet<char> RareLetters =
-            new[] { 'j', 'k', 'q', 'v', 'w', 'x', 'y', 'z' }.ToFrozenSet();
+            new[] { 'f', 'h', 'j', 'k', 'q', 'v', 'w', 'x', 'y', 'z' }.ToFrozenSet();
 
         /// <summary>True if <paramref name="c"/> is a rare letter (case-insensitive).</summary>
         internal static bool IsRare(char c) => RareLetters.Contains(char.ToLowerInvariant(c));

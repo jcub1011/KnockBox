@@ -32,6 +32,9 @@ namespace KnockBox.Tracery.Components
         /// <summary>Raised with the completed cell-id path when a trace is submitted.</summary>
         [Parameter] public EventCallback<IReadOnlyList<int>> OnPathSubmitted { get; set; }
 
+        /// <summary>Raised when an in-progress drag is interrupted by the OS and discarded (not submitted).</summary>
+        [Parameter] public EventCallback OnTraceCancelled { get; set; }
+
         private readonly List<int> _path = new();
         private int _rotationQuarterTurns; // 0..3; * 90 = clockwise degrees of the player's view
         private ElementReference _gridEl;
@@ -113,6 +116,21 @@ namespace KnockBox.Tracery.Components
                 _path.Clear();
                 StateHasChanged();
             }
+        });
+
+        /// <summary>
+        /// Drag interrupted by the OS (a second finger, a system gesture, an incoming notification).
+        /// The gesture wasn't deliberately completed, so the half-built trace is discarded rather than
+        /// submitted, and the parent is notified so it can hint why the in-progress word disappeared.
+        /// </summary>
+        [JSInvokable]
+        public Task OnDragCancel() => InvokeAsync(async () =>
+        {
+            bool hadTrace = _path.Count >= 2;
+            _path.Clear();
+            StateHasChanged();
+            if (hadTrace && OnTraceCancelled.HasDelegate)
+                await OnTraceCancelled.InvokeAsync();
         });
 
         // ── Tap (Blazor-driven) ─────────────────────────────────────────────

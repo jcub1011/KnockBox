@@ -16,7 +16,9 @@
 }
 
 @media (max-width: 640px) {
-    .tr-search { width: min(440px, 92vw); max-height: none; }
+    /* The list sits above the board on phones; cap it (rather than max-height:none) so a full
+       25-word list doesn't push the grid off-screen. It scrolls within the cap (overflow-y:auto). */
+    .tr-search { width: min(440px, 92vw); max-height: 40vh; }
 }
 
 .tr-search-head {

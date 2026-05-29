@@ -231,7 +231,7 @@ namespace KnockBox.Tracery.Services.Logic.Games
 
                 // 4b. Search mode: only words on the shared list score. A valid word that isn't a
                 //     target is ignored (soft reject) — it's neither banked nor counted.
-                if (state.Settings.Mode == GameMode.Search && !state.SearchList.Contains(word))
+                if (state.Settings.Mode == GameMode.Search && !state.IsSearchTarget(word))
                     return Result.FromError("Not on the search list.");
 
                 // 5. Already banked this round → no-op success (scores once per player per round).
@@ -283,34 +283,74 @@ namespace KnockBox.Tracery.Services.Logic.Games
             s.IsRoundActive = false;
             s.PhaseExpiresAtUtc = DateTimeOffset.UtcNow + duration;
 
-            s.ScheduleCallback(duration, () =>
+            // Generate the next board on a worker thread *during* the intro countdown rather than
+            // inside the round-start lock. Generation runs up to DefaultMaxAttempts full DFS solves;
+            // doing it under the state's exclusive write lock would block every SubmitTrace and
+            // SkipReveal for its whole duration. Settings is an immutable record, so snapshotting the
+            // reference here (inside the lock) and reading it off-thread is safe. The intro window
+            // almost always outlasts generation, so when the scheduled callback fires the board is
+            // already in hand and the lock is held only for the fast commit in EnterPlaying.
+            var settings = s.Settings;
+            var generation = Task.Run(() => GenerateRoundBoard(settings));
+
+            s.ScheduleCallback(duration, async () =>
             {
-                EnterPlaying(s);
-                return Task.CompletedTask;
+                var board = await generation.ConfigureAwait(false);
+                EnterPlaying(s, board);
             });
         }
 
-        internal void EnterPlaying(TraceryGameState s)
+        /// <summary>
+        /// Builds a round's board off the execute lock (see <see cref="EnterRoundIntro"/>): generate
+        /// against the board (generation) dictionary — the solve the generator already computed while
+        /// clearing the quality bar is the board's common-word set — then derive the validation set
+        /// (everything bankable), re-solving the accepted grid against the answer dictionary only when
+        /// the two dictionaries differ. Pure: touches no game state. A generation failure is carried
+        /// back as <see cref="RoundBoard.Error"/> so the committing <see cref="EnterPlaying"/> can log
+        /// it against the correct round number.
+        /// </summary>
+        internal RoundBoard GenerateRoundBoard(TracerySettings settings)
+        {
+            var gen = GetGenerator(settings.GenerationDictionary).Generate(settings);
+            if (gen.TryGetSuccess(out var board))
+            {
+                var genMode = ResolveMode(settings.GenerationDictionary);
+                var valMode = ResolveMode(settings.ValidationDictionary);
+                var findable = valMode == genMode
+                    ? board.FindableWords // same dictionary → reuse, no second solve
+                    : GetSolver(valMode).Solve(board.Grid, settings.MinWordLength);
+                return new RoundBoard(board.Grid, board.FindableWords, findable, null);
+            }
+
+            gen.TryGetFailure(out var err);
+            return new RoundBoard(null,
+                ImmutableDictionary<string, TracedWord>.Empty,
+                ImmutableDictionary<string, TracedWord>.Empty,
+                err.InternalMessage);
+        }
+
+        /// <summary>
+        /// Convenience for the synchronous start path and unit tests: generate inline, then commit.
+        /// The production round-start path pre-generates off the lock (<see cref="EnterRoundIntro"/>)
+        /// and calls the <see cref="EnterPlaying(TraceryGameState, RoundBoard)"/> overload directly.
+        /// </summary>
+        internal void EnterPlaying(TraceryGameState s) => EnterPlaying(s, GenerateRoundBoard(s.Settings));
+
+        /// <summary>
+        /// Commits a (pre-)generated board and opens the round. Assumes it is already inside the
+        /// execute lock; kept deliberately fast (no generation here) so the lock is held only briefly.
+        /// </summary>
+        internal void EnterPlaying(TraceryGameState s, RoundBoard board)
         {
             s.CurrentRound++;
             foreach (var entry in Roster(s))
                 s.CreatePlayerState(entry.User.Id).ResetRound();
 
-            // Generate the round's board against the board (generation) dictionary; the solve
-            // the generator already computed while clearing the quality bar is the board's
-            // common-word set. Then derive the validation set (everything bankable) — re-solving
-            // the accepted grid with the answer dictionary only when the two dictionaries differ.
-            var gen = GetGenerator(s.Settings.GenerationDictionary).Generate(s.Settings);
-            if (gen.TryGetSuccess(out var board))
+            if (board.Grid is not null)
             {
                 s.CurrentGrid = board.Grid;
-                s.BoardFindableWords = board.FindableWords;
-
-                var genMode = ResolveMode(s.Settings.GenerationDictionary);
-                var valMode = ResolveMode(s.Settings.ValidationDictionary);
-                s.FindableWords = valMode == genMode
-                    ? board.FindableWords // same dictionary → reuse, no second solve
-                    : GetSolver(valMode).Solve(board.Grid, s.Settings.MinWordLength);
+                s.BoardFindableWords = board.BoardFindableWords;
+                s.FindableWords = board.FindableWords;
             }
             else
             {
@@ -318,8 +358,7 @@ namespace KnockBox.Tracery.Services.Logic.Games
                 // fallback, so this is effectively unreachable in production. Fail safe rather
                 // than crash the scheduled callback: log, leave an empty board, and let the
                 // round time out normally.
-                gen.TryGetFailure(out var err);
-                logger.LogError("Tracery board generation failed for round {Round}: {Error}", s.CurrentRound, err.InternalMessage);
+                logger.LogError("Tracery board generation failed for round {Round}: {Error}", s.CurrentRound, board.Error);
                 s.CurrentGrid = null;
                 s.FindableWords = ImmutableDictionary<string, TracedWord>.Empty;
                 s.BoardFindableWords = ImmutableDictionary<string, TracedWord>.Empty;
@@ -563,4 +602,16 @@ namespace KnockBox.Tracery.Services.Logic.Games
             s.PhaseExpiresAtUtc = null;
         }
     }
+
+    /// <summary>
+    /// A round's generated board plus its two findable-word sets, produced off the execute lock by
+    /// <see cref="TraceryGameEngine.GenerateRoundBoard"/> and committed under the lock by
+    /// <see cref="TraceryGameEngine.EnterPlaying(TraceryGameState, RoundBoard)"/>. <see cref="Grid"/>
+    /// is null on a generation failure, in which case <see cref="Error"/> carries the reason.
+    /// </summary>
+    internal readonly record struct RoundBoard(
+        Grid? Grid,
+        IReadOnlyDictionary<string, TracedWord> BoardFindableWords,
+        IReadOnlyDictionary<string, TracedWord> FindableWords,
+        string? Error);
 }

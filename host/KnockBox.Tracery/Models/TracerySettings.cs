@@ -43,6 +43,17 @@ namespace KnockBox.Tracery.Models
         public int SearchPlacementBonusUnit { get; init; } = 10;
 
         // ── Grid (GDD §8) ──────────────────────────────────────────────────────
+        /// <summary>Smallest grid edge the game supports (a 3×3 board still hosts ≥4-letter words).</summary>
+        public const int MinGridDimension = 3;
+
+        /// <summary>
+        /// Largest grid edge the game supports. 8×8 is the ceiling the solver's performance bound is
+        /// validated against (see <c>SolverPerformanceTests</c>) and the upper limit the settings UI
+        /// offers; <see cref="Normalize"/> enforces it for any settings that arrive another way
+        /// (restored localStorage, deserialization).
+        /// </summary>
+        public const int MaxGridDimension = 8;
+
         public int GridWidth { get; init; } = 4;
         public int GridHeight { get; init; } = 4;
 
@@ -142,5 +153,22 @@ namespace KnockBox.Tracery.Models
 
         /// <summary>Cap on generate-and-test attempts before accepting the best candidate (0 = engine default).</summary>
         public int MaxGenerationAttempts { get; init; } = 0;
+
+        /// <summary>
+        /// Returns a copy with values clamped to their supported ranges. The settings panel already
+        /// clamps as the host edits, but settings can also enter from restored localStorage or JSON
+        /// deserialization, which bypass the UI — so the authoritative <c>UpdateSettings</c> path runs
+        /// this to guarantee invariants (notably the <see cref="MinGridDimension"/>..<see cref="MaxGridDimension"/>
+        /// grid cap the solver's performance bound depends on). Returns the same instance when nothing
+        /// needs clamping, so unchanged settings round-trip without allocation.
+        /// </summary>
+        public TracerySettings Normalize()
+        {
+            int w = Math.Clamp(GridWidth, MinGridDimension, MaxGridDimension);
+            int h = Math.Clamp(GridHeight, MinGridDimension, MaxGridDimension);
+            if (w == GridWidth && h == GridHeight)
+                return this;
+            return this with { GridWidth = w, GridHeight = h };
+        }
     }
 }

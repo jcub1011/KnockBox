@@ -175,6 +175,57 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             Assert.AreEqual(1, o3.WordsFound);
         }
 
+        // ── Disconnect closes the early-end gate ────────────────────────────
+
+        [TestMethod]
+        public async Task PlayerDisconnect_SearchMode_EndsRoundEarly_WhenRemainingPlayersAllCompleted()
+        {
+            var host = UserFactory.Create("Host", "host1");
+            var p1 = UserFactory.Create("P1", "p1");
+            var p2 = UserFactory.Create("P2", "p2");
+
+            var created = await _engine.CreateStateAsync(host);
+            var state = (TraceryGameState)created.Value!;
+            state.UpdateSettings(s => s with
+            {
+                Mode = GameMode.Search,
+                MinWordLength = 3,
+                SearchListSize = 2,
+                RoundTimer = TimeSpan.FromMinutes(5),
+                TransitionDuration = TimeSpan.FromMinutes(5)
+            });
+            Assert.IsTrue(state.RegisterPlayer(p1).IsSuccess);
+            // Keep p2's registration token so we can drop them mid-round.
+            Assert.IsTrue(state.RegisterPlayer(p2).TryGetSuccess(out var p2Registration));
+
+            await _engine.StartAsync(host, state);
+            state.Execute(() => _engine.EnterPlaying(state));
+
+            // Pin a deterministic board + 2-word list so the trace paths are stable.
+            var board = MakeBoard();
+            var solved = _engine.GetSolver(WordPoolMode.FullDictionary).Solve(board, minWordLength: 3);
+            var list = solved.Values.Take(2).ToList();
+            state.Execute(() =>
+            {
+                state.CurrentGrid = board;
+                state.BoardFindableWords = solved;
+                state.FindableWords = solved;
+                state.SearchList = [.. list.Select(w => w.Word)];
+                state.SearchCompletionsThisRound = 0;
+            });
+
+            // p1 completes the whole list, but p2 hasn't → the round keeps running.
+            foreach (var w in list) Assert.IsTrue(_engine.SubmitTrace(state, p1, w.Path.ToArray()).IsSuccess);
+            Assert.AreEqual(GamePhase.Playing, state.Phase);
+
+            // p2 drops. With only the (already-finished) p1 left, the early-end gate is now satisfied,
+            // so HandlePlayerLeft closes the round instead of waiting out the clock.
+            p2Registration!.Dispose();
+
+            Assert.AreEqual(GamePhase.Reveal, state.Phase);
+            Assert.IsFalse(state.IsRoundActive);
+        }
+
         // ── Helpers ─────────────────────────────────────────────────────────
 
         // Starts a Search match into Playing on the engine's randomly generated board (used by the

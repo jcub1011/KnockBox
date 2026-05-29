@@ -141,3 +141,11 @@
     border-color: var(--tr-danger);
     background: rgba(177, 65, 78, 0.14);
 }
+
+/* On very narrow phones the brand wordmark + code pill + leave button overrun the bar.
+   Tighten the padding and shrink the wordmark (the rose icon still anchors the brand). */
+@media (max-width: 380px) {
+    .tr-header-container { padding: 0.6rem 0.8rem; gap: 0.5rem; }
+    .tr-header-text { font-size: 1.15rem; letter-spacing: 0.18em; text-indent: 0.18em; }
+    .tr-header-actions ::deep .tr-header-code { min-width: 6rem; }
+}

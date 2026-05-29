@@ -78,6 +78,13 @@ namespace KnockBox.Tracery.Pages
         }
 
         /// <summary>
+        /// A drag was interrupted by the OS (e.g. a second finger touched the screen) and discarded.
+        /// Surface a brief, non-alarming hint so the player understands why their in-progress word
+        /// disappeared — no shake, since nothing was rejected.
+        /// </summary>
+        private Task HandleTraceCancelled() => ShowToast("Trace cancelled", TraceryToast.ToastTone.Warn);
+
+        /// <summary>
         /// Host-only: skip the remaining round-transition (reveal) time and advance immediately.
         /// The engine rejects the call for non-hosts, so this is safe even though the button is
         /// only rendered for the host.

@@ -29,6 +29,7 @@
     gap: 0.6rem;
     width: 100%;
     padding: 0.55rem 0.7rem;
+    min-height: 44px; /* ≥44px tap target — these are tapped on phones in the reveal */
     background: var(--tr-panel);
     border: 1px solid var(--tr-border);
     border-radius: var(--tr-radius-sm);
@@ -262,6 +263,7 @@
     align-items: center;
     gap: 0.55rem;
     padding: 0.4rem 0.55rem;
+    min-height: 44px; /* ≥44px tap target — tapped to spotlight a word on phones */
     background: var(--tr-panel);
     border: 1px solid var(--tr-border);
     border-left-width: 3px;
@@ -271,7 +273,9 @@
     text-align: left;
     transition: background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease, transform 0.12s ease;
 }
-.tr-exp-word:hover { background: var(--tr-panel-2); }
+/* :active mirrors :hover so a phone tap shows feedback (touch has no reliable hover). */
+.tr-exp-word:hover,
+.tr-exp-word:active { background: var(--tr-panel-2); }
 .tr-exp-word-swatch {
     width: 0.6rem; height: 0.6rem;
     border-radius: 2px;
@@ -314,9 +318,18 @@
         flex-wrap: nowrap;
         overflow-x: auto;
         max-height: none;
+        scroll-snap-type: x proximity;
     }
+    /* Horizontal scroll strip on phones: keep each chip a comfortable tap target and stop it
+       collapsing to an unreadable sliver when many players are present. */
     .tr-exp-allbtn,
-    .tr-exp-player { width: auto; flex: 0 0 auto; }
+    .tr-exp-player {
+        width: auto;
+        flex: 0 0 auto;
+        min-width: 7rem;
+        min-height: 44px;
+        scroll-snap-align: start;
+    }
     .tr-exp-words { display: none; }
     .tr-exp-wordlist { max-height: 340px; }
 }

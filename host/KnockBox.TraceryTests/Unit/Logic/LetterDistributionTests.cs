@@ -1,5 +1,6 @@
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Services.Logic.RandomGeneration;
+using KnockBox.Tracery.Models;
 using KnockBox.Tracery.Services.Logic;
 using KnockBox.Tracery.Tests.Helpers;
 
@@ -67,12 +68,16 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
         // ── Rare-letter set ──────────────────────────────────────────────────────
 
         [TestMethod]
-        public void RareLetters_AreTheHighValueTiles_CaseInsensitive()
+        public void RareLetters_MatchTheScoringBonusTable_CaseInsensitive()
         {
-            foreach (char c in new[] { 'j', 'k', 'q', 'v', 'w', 'x', 'y', 'z' })
+            // The rare set must equal the keys of TracerySettings.RareLetterBonusTable so a word
+            // that scores a rare-letter bonus is exactly one that satisfies the generator's gate.
+            var scoringRareLetters = new TracerySettings().RareLetterBonusTable.Keys;
+            foreach (char upper in scoringRareLetters)
             {
-                Assert.IsTrue(LetterDistribution.IsRare(c), $"'{c}' should be rare.");
-                Assert.IsTrue(LetterDistribution.IsRare(char.ToUpperInvariant(c)), $"'{c}' uppercase should be rare.");
+                char lower = char.ToLowerInvariant(upper);
+                Assert.IsTrue(LetterDistribution.IsRare(lower), $"'{lower}' should be rare.");
+                Assert.IsTrue(LetterDistribution.IsRare(upper), $"'{upper}' uppercase should be rare.");
             }
 
             foreach (char c in new[] { 'a', 'e', 'r', 's', 't', 'n' })

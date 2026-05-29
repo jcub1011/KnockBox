@@ -21,13 +21,13 @@
             {
                 <label class="tr-field">
                     <span>Search List Size</span>
-                    <input type="number" min="3" max="25"
+                    <input type="number" inputmode="numeric" min="3" max="25"
                            value="@State.Settings.SearchListSize"
                            @oninput="e => SetInt(e, v => s => s with { SearchListSize = v }, 3, 25)" />
                 </label>
                 <label class="tr-field">
                     <span>Placement Bonus Unit</span>
-                    <input type="number" min="0" max="100" step="1"
+                    <input type="number" inputmode="numeric" min="0" max="100" step="1"
                            value="@State.Settings.SearchPlacementBonusUnit"
                            @oninput="e => SetInt(e, v => s => s with { SearchPlacementBonusUnit = v }, 0, 100)" />
                 </label>
@@ -40,19 +40,19 @@
         <div class="tr-settings-grid">
             <label class="tr-field">
                 <span>Width</span>
-                <input type="number" min="3" max="8"
+                <input type="number" inputmode="numeric" min="@TracerySettings.MinGridDimension" max="@TracerySettings.MaxGridDimension"
                        value="@State.Settings.GridWidth"
-                       @oninput="e => SetInt(e, v => s => s with { GridWidth = v }, 3, 8)" />
+                       @oninput="e => SetInt(e, v => s => s with { GridWidth = v }, TracerySettings.MinGridDimension, TracerySettings.MaxGridDimension)" />
             </label>
             <label class="tr-field">
                 <span>Height</span>
-                <input type="number" min="3" max="8"
+                <input type="number" inputmode="numeric" min="@TracerySettings.MinGridDimension" max="@TracerySettings.MaxGridDimension"
                        value="@State.Settings.GridHeight"
-                       @oninput="e => SetInt(e, v => s => s with { GridHeight = v }, 3, 8)" />
+                       @oninput="e => SetInt(e, v => s => s with { GridHeight = v }, TracerySettings.MinGridDimension, TracerySettings.MaxGridDimension)" />
             </label>
             <label class="tr-field">
                 <span>Min Word Length</span>
-                <input type="number" min="3" max="8"
+                <input type="number" inputmode="numeric" min="3" max="8"
                        value="@State.Settings.MinWordLength"
                        @oninput="e => SetInt(e, v => s => s with { MinWordLength = v }, 3, 8)" />
             </label>
@@ -90,13 +90,13 @@
         <div class="tr-settings-grid">
             <label class="tr-field">
                 <span>Total Rounds</span>
-                <input type="number" min="1" max="20"
+                <input type="number" inputmode="numeric" min="1" max="20"
                        value="@State.Settings.TotalRounds"
                        @oninput="e => SetInt(e, v => s => s with { TotalRounds = v }, 1, 20)" />
             </label>
             <label class="tr-field">
                 <span>Round Timer (seconds)</span>
-                <input type="number" min="15" max="600" step="5"
+                <input type="number" inputmode="numeric" min="15" max="600" step="5"
                        value="@((int)State.Settings.RoundTimer.TotalSeconds)"
                        @oninput="OnRoundTimerChanged"
                        disabled="@_unlimitedTimer" />
@@ -107,14 +107,14 @@
             </label>
             <label class="tr-field">
                 <span>Get Ready (seconds)</span>
-                <input type="number" min="2" max="15" step="1"
+                <input type="number" inputmode="numeric" min="2" max="15" step="1"
                        value="@((int)State.Settings.TransitionDuration.TotalSeconds)"
                        @oninput="OnTransitionChanged"
                        title="The one-time 'get ready' countdown before the first round begins." />
             </label>
             <label class="tr-field">
                 <span>Round Transition (seconds)</span>
-                <input type="number" min="5" max="180" step="5"
+                <input type="number" inputmode="numeric" min="5" max="180" step="5"
                        value="@((int)State.Settings.IntermissionDuration.TotalSeconds)"
                        @oninput="OnIntermissionChanged"
                        title="The results/board screen shown between rounds. The host can skip the remaining time." />
@@ -133,7 +133,7 @@
             </label>
             <label class="tr-field">
                 <span>Unique-Find Multiplier</span>
-                <input type="number" min="1" max="5" step="0.1"
+                <input type="number" inputmode="decimal" min="1" max="5" step="0.1"
                        value="@State.Settings.UniqueFindMultiplier"
                        @oninput="OnMultiplierChanged"
                        disabled="@(!State.Settings.UniqueFindBonusEnabled)" />

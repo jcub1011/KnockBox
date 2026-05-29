@@ -103,6 +103,12 @@
    Shared base
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* This sheet is injected via <HeadContent> only while a Tracery room is mounted, so the page-level
+   rule below is scoped in practice to Tracery play. Tracery is phone-first (players trace on their
+   phones); disabling overscroll chaining stops a finger-trace that runs off the grid from triggering
+   the browser's pull-to-refresh — which would reload the page and drop the player mid-round. */
+html, body { overscroll-behavior: none; }
+
 .tr-stage {
     display: flex;
     flex-direction: column;

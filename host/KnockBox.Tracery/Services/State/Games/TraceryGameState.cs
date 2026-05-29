@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Collections.Immutable;
 using KnockBox.Tracery.Models;
 using KnockBox.Core.Primitives.Returns;
@@ -23,7 +24,10 @@ namespace KnockBox.Tracery.Services.State.Games
         /// single consistent transition and notification fires once after the lock releases.
         /// </summary>
         public Result UpdateSettings(Func<TracerySettings, TracerySettings> mutate) =>
-            Execute(() => { Settings = mutate(Settings); });
+            // Normalize after every mutation so out-of-range values can't reach the engine no matter
+            // how they arrive (UI edit, restored localStorage, deserialization) — chiefly the 8×8 grid
+            // cap the solver's performance bound relies on.
+            Execute(() => { Settings = mutate(Settings).Normalize(); });
 
         // Phase / transition. Mutated only inside Execute (by the engine); read lock-free by
         // the room page to switch its rendered view.
@@ -64,9 +68,28 @@ namespace KnockBox.Tracery.Services.State.Games
         /// Search mode: the round's shared list of target words (lower-cased), the same for every
         /// player. Set by the engine in <c>EnterPlaying</c> from the board's findable words; empty
         /// outside an active Search round and always empty in Standard mode. Read lock-free by the
-        /// room page to render the search checklist.
+        /// room page to render the search checklist (the order matters), so it stays an array; the
+        /// setter also maintains <see cref="_searchListSet"/> for the hot-path membership test.
         /// </summary>
-        public ImmutableArray<string> SearchList { get; set; } = [];
+        public ImmutableArray<string> SearchList
+        {
+            get => _searchList;
+            set
+            {
+                _searchList = value;
+                // Ordinal set so SubmitTrace's per-submission membership check is O(1) instead of a
+                // linear scan inside the execute lock. The solver emits lowercase keys and the list is
+                // drawn from them, so both sides are lowercase — ordinal is correct and explicit.
+                _searchListSet = value.IsDefaultOrEmpty
+                    ? FrozenSet<string>.Empty
+                    : value.ToFrozenSet(StringComparer.Ordinal);
+            }
+        }
+        private ImmutableArray<string> _searchList = [];
+        private FrozenSet<string> _searchListSet = FrozenSet<string>.Empty;
+
+        /// <summary>O(1) membership test for the round's <see cref="SearchList"/> (Search mode).</summary>
+        public bool IsSearchTarget(string word) => _searchListSet.Contains(word);
 
         /// <summary>
         /// Search mode: how many players have found every word on <see cref="SearchList"/> so far
