@@ -42,14 +42,17 @@
 
 .tr-header-actions { display: flex; align-items: center; gap: 0.6rem; }
 
-/* Session-code pill (rendered by RoomCodeButton → reached via ::deep). */
+/* Session-code pill (rendered by RoomCodeButton → reached via ::deep).
+   The cover ("SESSION ID") and the value (the code) are stacked in the SAME grid
+   cell; the code is translated out of view and clipped (overflow: hidden) so it
+   stays hidden behind the cover until the pill is clicked (RoomCodeButton toggles
+   the .revealed class), at which point the cover slides out and the code slides in. */
 .tr-header-actions ::deep .tr-header-code {
-    display: inline-flex;
-    flex-direction: column;
+    display: inline-grid;
     align-items: center;
-    gap: 0.05rem;
+    justify-items: center;
     min-width: 7.5rem;
-    padding: 0.35rem 0.9rem;
+    overflow: hidden;
     background: var(--tr-panel-2);
     border: 1px solid var(--tr-border);
     border-radius: var(--tr-radius-sm);
@@ -61,6 +64,12 @@
     border-color: var(--tr-accent);
     background: rgba(77, 136, 207, 0.10);
 }
+.tr-header-actions ::deep .tr-header-code-cover,
+.tr-header-actions ::deep .tr-header-code-value {
+    grid-area: 1 / 1;
+    padding: 0.35rem 0.9rem;
+    transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
 .tr-header-actions ::deep .tr-header-code-cover {
     font-family: var(--tr-font-display);
     font-size: 0.6rem;
@@ -69,6 +78,9 @@
     text-indent: 0.22em;
     color: var(--tr-ink-mute);
     text-transform: uppercase;
+    background: var(--tr-panel-2);
+    z-index: 1;
+    transform: translateX(0);
 }
 .tr-header-actions ::deep .tr-header-code-value {
     font-family: var(--tr-font-mono);
@@ -77,6 +89,20 @@
     font-weight: 700;
     letter-spacing: 0.14em;
     color: var(--tr-accent);
+    transform: translateX(100%);
+}
+.tr-header-actions ::deep .tr-header-code.revealed .tr-header-code-cover {
+    transform: translateX(-100%);
+}
+.tr-header-actions ::deep .tr-header-code.revealed .tr-header-code-value {
+    transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tr-header-actions ::deep .tr-header-code-cover,
+    .tr-header-actions ::deep .tr-header-code-value {
+        transition: none;
+    }
 }
 
 .tr-header-leave {

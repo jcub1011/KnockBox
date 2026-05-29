@@ -1,6 +1,6 @@
 /* Room shell + the phase markup TraceryRoom renders inline (RoundIntro, the
-   Playing wrapper + banked list, RoundOver title). Shared classes (.tr-stage,
-   .tr-muted, .tr-over-*) live in tracery-theme.css; the dark backdrop and these
+   Playing wrapper + banked list). Shared classes (.tr-stage, .tr-muted,
+   .tr-over-*) live in tracery-theme.css; the dark backdrop and these
    phase-specific bits are owned here. */
 
 .tr-page {
@@ -135,14 +135,4 @@
     letter-spacing: 0.06em;
     color: var(--tr-accent);
     animation: tr-pop 0.3s ease both;
-}
-
-/* ── Round over ────────────────────────────────────────────────────────── */
-.tr-roundover-title {
-    font-family: var(--tr-font-display);
-    font-size: clamp(1.3rem, 5vw, 1.8rem);
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    color: var(--tr-ink);
-    text-shadow: 0 0 26px var(--tr-accent-glow);
 }

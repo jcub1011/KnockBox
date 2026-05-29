@@ -22,7 +22,8 @@ and its intended effect, so playtesters can retune without touching code (GDD §
 |---|---|---|---|
 | `RoundTimer` | 90 s | 15–600 s, or Unlimited | Per-round play time. `TimeSpan.Zero` = unlimited (host-advanced). Shorter = more frantic; longer rewards thoroughness. |
 | `TotalRounds` | 3 | 1–20 | Number of timed rounds before final standings. |
-| `TransitionDuration` | 5 s | 2–15 s | Pacing of the intro / reveal / round-over screens between play phases. |
+| `TransitionDuration` | 5 s | 2–15 s | Pacing of the round-1 "get ready" intro before the first grid appears. |
+| `IntermissionDuration` | 10 s | — | Length of the single post-round intermission (reveal: words found, scoring, standings, next-round indicator) before the next round begins. |
 
 ## Scoring — length-bonus curve (GDD §5.2)
 

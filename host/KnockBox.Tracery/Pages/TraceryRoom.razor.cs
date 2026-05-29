@@ -36,14 +36,6 @@ namespace KnockBox.Tracery.Pages
                 ? ps.BankedWords.Keys.OrderByDescending(w => w.Length).ThenBy(w => w, StringComparer.Ordinal)
                 : [];
 
-        /// <summary>The frozen participant roster ordered by cumulative score, for standings.</summary>
-        private IEnumerable<(string DisplayName, int Score)> Standings()
-            => GameState.Participants
-                .Select(entry => (
-                    entry.DisplayName,
-                    Score: GameState.PlayerStates.TryGetValue(entry.User.Id, out var ps) ? ps.CumulativeScore : 0))
-                .OrderByDescending(x => x.Score);
-
         /// <summary>
         /// Submit handler shared by drag and tap: routes the captured path through the engine
         /// and surfaces accept/reject feedback. A duplicate of an already-banked word comes back

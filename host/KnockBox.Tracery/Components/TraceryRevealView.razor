@@ -8,7 +8,7 @@
     <div class="tr-stage tr-reveal">
         <span class="tr-reveal-title">THE REVEAL</span>
         <p class="tr-muted">Tallying the round…</p>
-        <TraceryRoundTimer State="State" Duration="State.Settings.TransitionDuration" />
+        <TraceryRoundTimer State="State" Duration="State.Settings.IntermissionDuration" />
     </div>
 }
 else
@@ -93,7 +93,16 @@ else
             </div>
         }
 
-        <TraceryRoundTimer State="State" Duration="State.Settings.TransitionDuration" />
+        @if (State.CurrentRound < State.Settings.TotalRounds)
+        {
+            <span class="tr-reveal-next">NEXT · ROUND @((State.CurrentRound + 1).ToString("00")) / @State.Settings.TotalRounds.ToString("00")</span>
+        }
+        else
+        {
+            <span class="tr-reveal-next">FINAL STANDINGS NEXT</span>
+        }
+
+        <TraceryRoundTimer State="State" Duration="State.Settings.IntermissionDuration" />
     </div>
 }
 

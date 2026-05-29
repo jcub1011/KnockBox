@@ -328,23 +328,13 @@ namespace KnockBox.Tracery.Services.Logic.Games
             EnterReveal(s);
         }
 
+        // The single post-round intermission: the reveal shows words found, round scoring, the
+        // cumulative-score standings, and a next-round indicator, then auto-advances straight into
+        // the next round (or final standings) — no separate round-over or between-round intro hops.
         internal void EnterReveal(TraceryGameState s)
         {
-            var duration = s.Settings.TransitionDuration;
+            var duration = s.Settings.IntermissionDuration;
             s.Phase = GamePhase.Reveal;
-            s.PhaseExpiresAtUtc = DateTimeOffset.UtcNow + duration;
-
-            s.ScheduleCallback(duration, () =>
-            {
-                EnterRoundOver(s);
-                return Task.CompletedTask;
-            });
-        }
-
-        internal void EnterRoundOver(TraceryGameState s)
-        {
-            var duration = s.Settings.TransitionDuration;
-            s.Phase = GamePhase.RoundOver;
             s.PhaseExpiresAtUtc = DateTimeOffset.UtcNow + duration;
 
             s.ScheduleCallback(duration, () =>
@@ -359,7 +349,7 @@ namespace KnockBox.Tracery.Services.Logic.Games
             if (s.CurrentRound >= s.Settings.TotalRounds)
                 EnterFinalStandings(s);
             else
-                EnterRoundIntro(s);
+                EnterPlaying(s);
         }
 
         internal void EnterFinalStandings(TraceryGameState s)

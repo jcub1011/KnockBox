@@ -29,8 +29,14 @@ namespace KnockBox.Tracery.Models
         public TimeSpan RoundTimer { get; init; } = TimeSpan.FromSeconds(90);
         public int TotalRounds { get; init; } = 3;
 
-        /// <summary>Intro/reveal/results pacing between the timed play phases.</summary>
+        /// <summary>Pacing of the round-1 "get ready" intro before the first grid appears.</summary>
         public TimeSpan TransitionDuration { get; init; } = TimeSpan.FromSeconds(5);
+
+        /// <summary>
+        /// Length of the single post-round intermission (the reveal: words found, round scoring,
+        /// standings, and the next-round indicator) before the next round begins.
+        /// </summary>
+        public TimeSpan IntermissionDuration { get; init; } = TimeSpan.FromSeconds(10);
 
         // ── Word rules (GDD §4, §8) ────────────────────────────────────────────
         public int MinWordLength { get; init; } = 4;

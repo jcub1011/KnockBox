@@ -90,3 +90,14 @@
 }
 .tr-missed-word { font-family: var(--tr-font-mono); font-weight: 600; font-size: 0.98rem; letter-spacing: 0.05em; color: var(--tr-ink-dim); }
 .tr-missed-score { font-family: var(--tr-font-mono); font-variant-numeric: tabular-nums; font-weight: 700; font-size: 0.9rem; color: var(--tr-ink-mute); }
+
+/* The next-round indicator below the standings — what plays after this intermission. */
+.tr-reveal-next {
+    font-family: var(--tr-font-display);
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    text-indent: 0.2em;
+    text-transform: uppercase;
+    color: var(--tr-ink-mute);
+}

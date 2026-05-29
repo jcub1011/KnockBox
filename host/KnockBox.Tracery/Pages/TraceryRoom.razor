@@ -74,22 +74,6 @@ else
                 <TraceryRevealView State="GameState" />
                 break;
 
-            case GamePhase.RoundOver:
-                <div class="tr-stage tr-roundover">
-                    <span class="tr-roundover-title">ROUND @GameState.CurrentRound STANDINGS</span>
-                    <div class="tr-over-board">
-                        @foreach (var row in Standings())
-                        {
-                            <div class="tr-over-row">
-                                <span class="tr-over-name">@row.DisplayName</span>
-                                <span class="tr-over-score">@row.Score</span>
-                            </div>
-                        }
-                    </div>
-                    <TraceryRoundTimer State="GameState" Duration="GameState.Settings.TransitionDuration" />
-                </div>
-                break;
-
             case GamePhase.FinalStandings:
                 <TraceryFinalStandingsView State="GameState" />
                 break;

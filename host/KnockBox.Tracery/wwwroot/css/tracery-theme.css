@@ -10,7 +10,7 @@
      • shared utility classes used across multiple components
          - .tr-btn / .tr-btn-primary  (Lobby, FinalStandings)
          - .tr-stage / .tr-muted      (every phase)
-         - the .tr-over-* standings board (RoundOver, Reveal, FinalStandings)
+         - the .tr-over-* standings board (Reveal, FinalStandings)
    Per-component layout lives in each component's own .razor.css.
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -159,7 +159,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Shared standings board — RoundOver, Reveal, FinalStandings
+   Shared standings board — Reveal, FinalStandings
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .tr-over {

@@ -15,11 +15,12 @@ namespace KnockBox.Tracery.Models
         /// <summary>The timed round: the shared grid is shown and players trace words.</summary>
         Playing,
 
-        /// <summary>The host-screen reveal — notable words, words nobody found, scores.</summary>
+        /// <summary>
+        /// The single post-round intermission — the host-screen reveal of notable words, words
+        /// nobody found, round scoring, and the cumulative-score standings, plus a "next round"
+        /// indicator. Auto-advances straight into the next round (or final standings).
+        /// </summary>
         Reveal,
-
-        /// <summary>Post-reveal pause showing this round's standings before advancing.</summary>
-        RoundOver,
 
         /// <summary>End of match: final standings across all rounds.</summary>
         FinalStandings

@@ -186,19 +186,19 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             await _engine.StartAsync(_host, state);
             Assert.AreEqual(GamePhase.RoundIntro, state.Phase);
 
-            // Drive the placeholder flow directly (no wall-clock waits) through both rounds.
+            // Drive the flow directly (no wall-clock waits) through both rounds. The round-1 intro
+            // hands off to Playing; thereafter the single Reveal intermission's AdvanceAfterResults
+            // moves straight into the next round (or final standings) — no separate intro hop.
+            state.Execute(() => _engine.EnterPlaying(state));
             for (int round = 1; round <= 2; round++)
             {
-                state.Execute(() => _engine.EnterPlaying(state));
                 Assert.AreEqual(GamePhase.Playing, state.Phase);
                 Assert.AreEqual(round, state.CurrentRound);
 
                 state.Execute(() => _engine.CompleteRound(state));
                 Assert.AreEqual(GamePhase.Reveal, state.Phase);
 
-                state.Execute(() => _engine.EnterRoundOver(state));
-                Assert.AreEqual(GamePhase.RoundOver, state.Phase);
-
+                // Non-final → next Playing round; final → FinalStandings.
                 state.Execute(() => _engine.AdvanceAfterResults(state));
             }
 
@@ -337,9 +337,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
 
             // Advance to the next Playing round (default TotalRounds = 3, so there's room).
             state.Execute(() => _engine.CompleteRound(state));      // → Reveal
-            state.Execute(() => _engine.EnterRoundOver(state));     // → RoundOver
-            state.Execute(() => _engine.AdvanceAfterResults(state));// → RoundIntro
-            state.Execute(() => _engine.EnterPlaying(state));       // → Playing (next round)
+            state.Execute(() => _engine.AdvanceAfterResults(state));// → Playing (next round)
 
             var phaseBefore = state.Phase;
             var roundBefore = state.CurrentRound;
@@ -395,10 +393,10 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             var outcomes = state.RoundResults[^1].Outcomes;
             Assert.IsTrue(outcomes.Any(o => o.UserId == p2.Id), "The remaining player must be scored.");
 
-            // The match can still be driven to its end despite the disconnect.
-            state.Execute(() => _engine.EnterRoundOver(state));
+            // The match can still be driven on despite the disconnect — the intermission advances
+            // straight into the next round.
             state.Execute(() => _engine.AdvanceAfterResults(state));
-            Assert.AreNotEqual(GamePhase.Playing, state.Phase);
+            Assert.AreEqual(GamePhase.Playing, state.Phase);
         }
 
         // ── Helpers ─────────────────────────────────────────────────────────
