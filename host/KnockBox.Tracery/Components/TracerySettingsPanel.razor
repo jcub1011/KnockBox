@@ -129,7 +129,7 @@
     // The board-sensible pools, in display order. NytStandard (5-letter only) and the
     // unbacked modes are intentionally excluded from the host's choices.
     private static readonly WordPoolMode[] OfferedDictionaries =
-        [WordPoolMode.Reduced, WordPoolMode.FullDictionary];
+        [WordPoolMode.ReducedDictionary, WordPoolMode.FullDictionary];
 
     protected override void OnParametersSet()
         => _unlimitedTimer = State.Settings.RoundTimer <= TimeSpan.Zero;
@@ -142,7 +142,7 @@
 
     private static string FriendlyName(WordPoolMode mode) => mode switch
     {
-        WordPoolMode.Reduced => "Common words",
+        WordPoolMode.ReducedDictionary => "Common words",
         WordPoolMode.FullDictionary => "Full dictionary",
         WordPoolMode.NytStandard => "NYT answers",
         _ => mode.ToString(),

@@ -48,7 +48,7 @@ namespace KnockBox.Tracery.Models
         /// recognizable words. Defaults to the curated common-word list; until that list
         /// ships, the engine transparently falls back to <see cref="WordPoolMode.FullDictionary"/>.
         /// </summary>
-        public WordPoolMode GenerationDictionary { get; init; } = WordPoolMode.Reduced;
+        public WordPoolMode GenerationDictionary { get; init; } = WordPoolMode.ReducedDictionary;
 
         /// <summary>
         /// The pool a player's submitted word is validated against. Defaults to the full
