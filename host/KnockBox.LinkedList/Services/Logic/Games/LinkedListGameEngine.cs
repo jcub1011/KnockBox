@@ -30,6 +30,7 @@ namespace KnockBox.LinkedList.Services.Logic.Games
             if (state is not LinkedListGameState gameState)
                 return Task.FromResult(Result.FromError("Error starting game.", $"Game state of type [{(state?.GetType().Name ?? "null")}] couldn't be cast to type [{nameof(LinkedListGameState)}]."));
 
+            Result inner = Result.Success;
             var executeResult = gameState.Execute(() =>
             {
                 // Build the participant roster (respects HostIsParticipant).
@@ -46,7 +47,10 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                     };
                 }
 
-                gameState.TurnManager.SetTurnOrder(participantIds);
+                // Global Auditor-rotation order over all participants (§6). Per-group
+                // submitter rotations live on each ChainState.
+                gameState.ParticipantOrder.Clear();
+                gameState.ParticipantOrder.AddRange(participantIds);
 
                 // Words: honor host-chosen values from the lobby, else pick a curated pair.
                 if (string.IsNullOrWhiteSpace(gameState.StartWord) || string.IsNullOrWhiteSpace(gameState.DestinationWord))
@@ -56,36 +60,63 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                     gameState.DestinationWord = pair.Destination;
                 }
 
-                gameState.CarriedWord = gameState.StartWord;
-                gameState.DestinationReached = false;
-                gameState.Chain.Clear();
-                gameState.RejectionLog.Clear();
-                gameState.RejectionsThisTurn = 0;
+                // Build this match's chains: one all-players group for Collective, or the
+                // assigned teams for Groups (auto-balanced into 2 groups as a fallback).
+                List<ChainState> groups;
+                if (gameState.Settings.PlayerStructure == PlayerStructure.Groups)
+                {
+                    var assignments = gameState.GroupAssignments.Count > 0
+                        ? gameState.GroupAssignments
+                        : AutoBalanceGroups(participantIds, 2);
+                    var (built, error) = BuildGroups(assignments, participantIds);
+                    if (built is null)
+                    {
+                        inner = Result.FromError(error!);
+                        return;
+                    }
+                    groups = built;
+                }
+                else
+                {
+                    groups = BuildCollectiveGroup(participantIds);
+                }
+
+                gameState.Groups.Clear();
+                gameState.Groups.AddRange(groups);
+
+                // Stamp each player's group id for the scoreboard.
+                foreach (var g in groups)
+                    foreach (var id in g.MemberIds)
+                        if (gameState.GamePlayers.TryGetValue(id, out var ps))
+                            ps.GroupId = g.GroupId;
 
                 // Assign the first Auditor: the host-chosen id if valid, else the first
-                // participant who is not the current submitter. M2 enforces the
-                // active-player ≠ Auditor rule; M1 only records the choice.
-                var currentSubmitter = gameState.TurnManager.CurrentPlayer;
+                // participant who isn't a group's opening submitter.
                 bool hostChoiceValid = !string.IsNullOrEmpty(gameState.AuditorPlayerId)
                     && participantIds.Contains(gameState.AuditorPlayerId);
                 if (!hostChoiceValid)
                 {
+                    var openingSubmitter = groups[0].TurnManager.CurrentPlayer;
                     gameState.AuditorPlayerId =
-                        participantIds.FirstOrDefault(id => id != currentSubmitter) ?? "";
+                        participantIds.FirstOrDefault(id => id != openingSubmitter) ?? "";
                 }
 
-                // Seed the rotation index from the chosen Auditor so M4's
+                // Seed the rotation index from the chosen Auditor so the next round's
                 // RotateAuditorAndStartRound advances cleanly from here (§6).
                 gameState.AuditorRotationIndex =
-                    Math.Max(0, gameState.TurnManager.TurnOrder.IndexOf(gameState.AuditorPlayerId));
+                    Math.Max(0, gameState.ParticipantOrder.IndexOf(gameState.AuditorPlayerId));
 
-                // Reset round scoring + match state and start the first submitter's clock.
-                gameState.ElapsedThinkingTime = TimeSpan.Zero;
-                gameState.ThinkingSegmentStartedUtc = null;
+                // Reset every group's round data and seat its first non-Auditor submitter.
+                foreach (var g in groups)
+                {
+                    ResetGroupForRound(g, gameState.StartWord);
+                    SeatFirstNonAuditorSubmitter(gameState, g);
+                }
+
+                // Reset shared round + match state.
+                gameState.AuditQueue.Clear();
                 gameState.LastRoundResult = null;
-                gameState.PhaseExpiresAtUtc = null;
-                gameState.ContributionBaseline = TimeSpan.Zero;
-                gameState.PendingSubmission = null;
+                gameState.LastStandings = [];
                 gameState.LastRejectionReason = null;
                 gameState.RecentReactions.Clear();
                 gameState.Persona = AuditorPersona.Neutral;
@@ -95,29 +126,119 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                 gameState.SetJoinable(false);
                 gameState.SetPhase(LinkedListGamePhase.Playing);
 
-                BeginThinkingTurn(gameState, DateTimeOffset.UtcNow);
+                // Every group starts thinking simultaneously.
+                var now = DateTimeOffset.UtcNow;
+                foreach (var g in groups)
+                    BeginThinkingTurn(gameState, g, now);
             });
 
-            if (executeResult.TryGetFailure(out var error))
+            if (executeResult.TryGetFailure(out var execError))
             {
-                logger.LogError("Failed to start Linked List game: {Error}", error.InternalMessage);
-                return Task.FromResult(Result.FromError(error));
+                logger.LogError("Failed to start Linked List game: {Error}", execError.InternalMessage);
+                return Task.FromResult(Result.FromError(execError));
+            }
+            if (inner.TryGetFailure(out var startError))
+            {
+                logger.LogError("Failed to start Linked List game: {Error}", startError.InternalMessage);
+                return Task.FromResult(Result.FromError(startError));
             }
 
             return Task.FromResult(Result.Success);
         }
 
-        // ── Core gameplay loop (§4) ──────────────────────────────────────────
-        //
-        // All three actions validate and mutate inside a single Execute block so
-        // the read of the guard fields and the write that follows are serialized
-        // with the rest of the room. The inner Result is captured from the
-        // closure; an Execute-level failure (cancellation/exception) is surfaced
-        // separately.
+        // ── Group construction (§8.2) ────────────────────────────────────────
+
+        /// <summary>The single all-players chain for Collective play.</summary>
+        private static List<ChainState> BuildCollectiveGroup(IReadOnlyList<string> participantIds)
+        {
+            var g = new ChainState { GroupId = "all", GroupName = "Everyone" };
+            g.MemberIds.AddRange(participantIds);
+            g.TurnManager.SetTurnOrder(participantIds);
+            return [g];
+        }
 
         /// <summary>
-        /// The active submitter proposes a word that pairs with the carried word.
-        /// No phase change — the Auditor's view reacts to the pending submission.
+        /// Validates and materializes the team assignment into one <see cref="ChainState"/>
+        /// per group. Enforces ≥ 2 groups, ≥ 2 members each, and that every participant
+        /// is assigned. Returns <c>(null, error)</c> on a validation failure.
+        /// </summary>
+        private static (List<ChainState>? groups, string? error) BuildGroups(
+            List<List<string>> assignments, IReadOnlyList<string> participantIds)
+        {
+            var valid = new HashSet<string>(participantIds);
+            var seen = new HashSet<string>();
+            var teams = new List<List<string>>();
+
+            foreach (var team in assignments)
+            {
+                var members = new List<string>();
+                foreach (var id in team)
+                {
+                    if (!valid.Contains(id) || !seen.Add(id)) continue; // drop unknowns / dupes
+                    members.Add(id);
+                }
+                if (members.Count > 0) teams.Add(members);
+            }
+
+            if (teams.Count < 2)
+                return (null, "Groups mode needs at least 2 groups.");
+            if (teams.Any(t => t.Count < 2))
+                return (null, "Each group needs at least 2 players.");
+            if (seen.Count != participantIds.Count)
+                return (null, "Every player must be assigned to a group.");
+
+            var groups = new List<ChainState>();
+            for (int i = 0; i < teams.Count; i++)
+            {
+                var g = new ChainState { GroupId = $"g{i}", GroupName = $"Group {(char)('A' + i)}" };
+                g.MemberIds.AddRange(teams[i]);
+                g.TurnManager.SetTurnOrder(teams[i]);
+                groups.Add(g);
+            }
+            return (groups, null);
+        }
+
+        /// <summary>
+        /// Round-robins <paramref name="playerIds"/> across <paramref name="groupCount"/>
+        /// teams. Used by the lobby's auto-balance button and as the engine's fallback
+        /// when Groups mode starts without an explicit assignment.
+        /// </summary>
+        public static List<List<string>> AutoBalanceGroups(IReadOnlyList<string> playerIds, int groupCount)
+        {
+            if (groupCount < 1) groupCount = 1;
+            var teams = new List<List<string>>();
+            for (int i = 0; i < groupCount; i++) teams.Add([]);
+            for (int i = 0; i < playerIds.Count; i++) teams[i % groupCount].Add(playerIds[i]);
+            return teams;
+        }
+
+        /// <summary>Clears a group's per-round chain data, points it at the start word,
+        /// and seats its first non-Auditor submitter. Match accumulators are untouched.</summary>
+        private static void ResetGroupForRound(ChainState g, string startWord)
+        {
+            g.Chain.Clear();
+            g.RejectionLog.Clear();
+            g.RejectionsThisTurn = 0;
+            g.DestinationReached = false;
+            g.PendingSubmission = null;
+            g.CarriedWord = startWord;
+            g.ElapsedThinkingTime = TimeSpan.Zero;
+            g.ThinkingSegmentStartedUtc = null;
+            g.ContributionBaseline = TimeSpan.Zero;
+            g.PhaseExpiresAtUtc = null;
+            g.TurnTimeoutHandle?.Cancel();
+            g.TurnTimeoutHandle = null;
+        }
+
+        // ── Core gameplay loop (§4), group-scoped ────────────────────────────
+        //
+        // Each action resolves the relevant ChainState and validates + mutates it
+        // inside a single Execute block. Collective resolves to the only group, so
+        // its behavior is unchanged from M2–M4.
+
+        /// <summary>
+        /// The active submitter of their group proposes a word that pairs with the
+        /// group's carried word, sending it to the Auditor's queue.
         /// </summary>
         public Result SubmitPair(User user, LinkedListGameState state, string word, DateTimeOffset? now = null)
         {
@@ -132,17 +253,28 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                     inner = Result.FromError("The round isn't accepting submissions right now.");
                     return;
                 }
-                if (user.Id != state.TurnManager.CurrentPlayer)
-                {
-                    inner = Result.FromError("It isn't your turn.");
-                    return;
-                }
                 if (user.Id == state.AuditorPlayerId)
                 {
                     inner = Result.FromError("The Auditor can't submit pairs.");
                     return;
                 }
-                if (state.PendingSubmission is not null)
+                var g = state.TryGroupOf(user.Id);
+                if (g is null)
+                {
+                    inner = Result.FromError("You're not part of this round.");
+                    return;
+                }
+                if (g.Finished)
+                {
+                    inner = Result.FromError("Your group already reached the destination.");
+                    return;
+                }
+                if (user.Id != g.TurnManager.CurrentPlayer)
+                {
+                    inner = Result.FromError("It isn't your turn.");
+                    return;
+                }
+                if (g.PendingSubmission is not null)
                 {
                     inner = Result.FromError("A submission is already awaiting the Auditor.");
                     return;
@@ -156,29 +288,28 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                 }
 
                 // §7.4 optional rigor: block re-forming a pair that already exists
-                // in the chain (a loop). Loops are allowed by default and only
-                // flagged for display; this toggle is the stricter behavior.
-                if (state.Settings.NoImmediateRepeat && IsLoopPair(state, trimmed))
+                // in this group's chain (a loop).
+                if (state.Settings.NoImmediateRepeat && IsLoopPair(g, trimmed))
                 {
                     inner = Result.FromError("That pair already happened — no repeats allowed.");
                     return;
                 }
 
-                state.PendingSubmission = new Submission(user.Id, trimmed);
+                g.PendingSubmission = new Submission(user.Id, trimmed);
 
-                // Submission heads to the Auditor — pause the clock. Deliberation
-                // never counts (§5.2). The seconds spent thinking up to now are
-                // banked, so a later rejection still charges for this attempt.
-                PauseForAudit(state, ts);
+                // Submission heads to the Auditor — pause this group's clock and enqueue
+                // it for the (single) Auditor. Deliberation never counts (§5.2).
+                PauseForAudit(g, ts);
+                EnqueueForAudit(state, g.GroupId);
             });
 
             return exec.TryGetFailure(out var error) ? Result.FromError(error) : inner;
         }
 
         /// <summary>
-        /// Auditor accepts the pending submission: the chain advances, the carried
-        /// word updates, and the turn passes — unless the proposed word is the
-        /// destination, in which case the round ends.
+        /// Auditor accepts the front group's pending submission: that group's chain
+        /// advances and its turn passes — unless the proposed word is the destination,
+        /// in which case the group finishes (and the round ends once all groups have).
         /// </summary>
         public Result Approve(User auditor, LinkedListGameState state, DateTimeOffset? now = null)
         {
@@ -193,27 +324,28 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                     inner = Result.FromError("Only the Auditor can approve a submission.");
                     return;
                 }
-                if (state.PendingSubmission is not { } sub)
+                var g = state.AuditingGroup;
+                if (g?.PendingSubmission is not { } sub)
                 {
                     inner = Result.FromError("There's no submission to approve.");
                     return;
                 }
 
                 var proposed = sub.ProposedWord;
-                bool isLoop = IsLoopPair(state, proposed);
+                bool isLoop = IsLoopPair(g, proposed);
                 var playerName = state.GamePlayers.TryGetValue(sub.PlayerId, out var ps)
                     ? ps.DisplayName : "Player";
 
-                state.Chain.Add(new ChainLink(state.CarriedWord, proposed, sub.PlayerId, playerName, isLoop));
+                g.Chain.Add(new ChainLink(g.CarriedWord, proposed, sub.PlayerId, playerName, isLoop));
                 if (ps is not null)
                 {
                     ps.AcceptedPairs++;
                     if (isLoop) ps.LoopPairsMade++;
 
                     // Per-contribution thinking time (Fastest Time): the segment was
-                    // banked at SubmitPair, so ElapsedThinkingTime is final for this
-                    // attempt. Track the player's fastest landed pair for "Speed Demon".
-                    var contribution = state.ElapsedThinkingTime - state.ContributionBaseline;
+                    // banked at SubmitPair, so this group's ElapsedThinkingTime is final
+                    // for this attempt. Track the player's fastest landed pair.
+                    var contribution = g.ElapsedThinkingTime - g.ContributionBaseline;
                     if (contribution > TimeSpan.Zero
                         && (ps.FastestContribution is null || contribution < ps.FastestContribution))
                     {
@@ -221,31 +353,38 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                     }
                 }
 
+                g.PendingSubmission = null;
+                DequeueFromAudit(state, g.GroupId);
+                state.LastRejectionReason = null;
+
                 if (string.Equals(proposed, state.DestinationWord, StringComparison.OrdinalIgnoreCase))
                 {
-                    state.DestinationReached = true;
-                    FinalizeRound(state, ts);
+                    // This group is done; stop its clock and timer.
+                    g.DestinationReached = true;
+                    g.BankClock(ts);
+                    g.TurnTimeoutHandle?.Cancel();
+                    g.TurnTimeoutHandle = null;
+                    g.PhaseExpiresAtUtc = null;
+
+                    if (state.Groups.All(x => x.Finished))
+                        FinalizeRound(state, ts);
                 }
                 else
                 {
-                    state.CarriedWord = proposed;
-                    state.RejectionsThisTurn = 0;
-                    AdvanceToNextSubmitter(state);
-                    // Next submitter is now thinking — (re)start the clock & timeout.
-                    BeginThinkingTurn(state, ts);
+                    g.CarriedWord = proposed;
+                    g.RejectionsThisTurn = 0;
+                    AdvanceToNextSubmitter(state, g);
+                    BeginThinkingTurn(state, g, ts);
                 }
-
-                state.PendingSubmission = null;
-                state.LastRejectionReason = null;
             });
 
             return exec.TryGetFailure(out var error) ? Result.FromError(error) : inner;
         }
 
         /// <summary>
-        /// Auditor rejects the pending submission with a required reason. The
-        /// rejection counts toward the per-turn cap; at the cap the turn is
-        /// forfeited (§7.3) and the chain stays put.
+        /// Auditor rejects the front group's pending submission with a required reason.
+        /// The rejection counts toward that group's per-turn cap; at the cap the turn is
+        /// forfeited (§7.3) and the group's chain stays put.
         /// </summary>
         public Result Reject(User auditor, LinkedListGameState state, string reason, DateTimeOffset? now = null)
         {
@@ -260,7 +399,8 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                     inner = Result.FromError("Only the Auditor can reject a submission.");
                     return;
                 }
-                if (state.PendingSubmission is not { } sub)
+                var g = state.AuditingGroup;
+                if (g?.PendingSubmission is not { } sub)
                 {
                     inner = Result.FromError("There's no submission to reject.");
                     return;
@@ -273,28 +413,27 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                     return;
                 }
 
-                state.RejectionLog.Add(new RejectionInfo(sub.PlayerId, sub.ProposedWord, trimmedReason));
+                g.RejectionLog.Add(new RejectionInfo(sub.PlayerId, sub.ProposedWord, trimmedReason));
                 state.LastRejectionReason = trimmedReason;
                 if (state.GamePlayers.TryGetValue(sub.PlayerId, out var ps)) ps.RejectionsReceived++;
-                state.RejectionsThisTurn++;
-                state.PendingSubmission = null;
+                g.RejectionsThisTurn++;
+                g.PendingSubmission = null;
+                DequeueFromAudit(state, g.GroupId);
 
                 // §7.3: a positive cap forfeits the turn once reached. The partial
-                // attempt is already discarded (PendingSubmission cleared); advance
-                // the submitter and reset the counter. Cap of 0 = unlimited.
-                if (state.Settings.RejectionCap > 0 && state.RejectionsThisTurn >= state.Settings.RejectionCap)
+                // attempt is already discarded; advance the submitter and reset the
+                // counter. Cap of 0 = unlimited.
+                if (state.Settings.RejectionCap > 0 && g.RejectionsThisTurn >= state.Settings.RejectionCap)
                 {
-                    state.RejectionsThisTurn = 0;
-                    AdvanceToNextSubmitter(state);
-                    // A fresh submitter is thinking now.
-                    BeginThinkingTurn(state, ts);
+                    g.RejectionsThisTurn = 0;
+                    AdvanceToNextSubmitter(state, g);
+                    BeginThinkingTurn(state, g, ts);
                 }
                 else
                 {
-                    // Same submitter retries — resume their clock. The seconds spent
-                    // on the rejected attempt were already banked at SubmitPair, so
-                    // bad guesses cost the time spent thinking about them (§5.2).
-                    BeginThinkingTurn(state, ts);
+                    // Same submitter retries — resume their clock. The rejected attempt's
+                    // seconds were banked at SubmitPair, so bad guesses still cost (§5.2).
+                    BeginThinkingTurn(state, g, ts);
                 }
             });
 
@@ -304,57 +443,64 @@ namespace KnockBox.LinkedList.Services.Logic.Games
         /// <summary>
         /// True when <paramref name="proposed"/> would re-create a pair
         /// (<c>CarriedWord</c> → <paramref name="proposed"/>) that already exists
-        /// somewhere in the chain — i.e. the submission closes a loop (§7.4).
+        /// somewhere in this group's chain — i.e. closes a loop (§7.4).
         /// </summary>
-        private static bool IsLoopPair(LinkedListGameState state, string proposed) =>
-            state.Chain.Any(l =>
-                string.Equals(l.FromWord, state.CarriedWord, StringComparison.OrdinalIgnoreCase) &&
+        private static bool IsLoopPair(ChainState g, string proposed) =>
+            g.Chain.Any(l =>
+                string.Equals(l.FromWord, g.CarriedWord, StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(l.ToWord, proposed, StringComparison.OrdinalIgnoreCase));
 
         /// <summary>
-        /// Advances the turn to the next non-Auditor submitter. The Auditor is
-        /// never made the active submitter (M2 rule; full rotation is M4). Guards
-        /// against an infinite loop if the Auditor is somehow the only player.
-        /// Must be called from inside <see cref="LinkedListGameState"/>'s execute lock.
+        /// Advances a group's turn to its next non-Auditor submitter. The Auditor is
+        /// never made the active submitter. Guards against an infinite loop if the
+        /// Auditor is somehow the only candidate. Call inside the execute lock.
         /// </summary>
-        private static void AdvanceToNextSubmitter(LinkedListGameState state)
+        private static void AdvanceToNextSubmitter(LinkedListGameState state, ChainState g)
         {
-            int count = state.TurnManager.TurnOrder.Count;
+            int count = g.TurnManager.TurnOrder.Count;
             if (count == 0) return;
 
             for (int i = 0; i < count; i++)
             {
-                state.TurnManager.NextTurn();
-                if (state.TurnManager.CurrentPlayer != state.AuditorPlayerId)
+                g.TurnManager.NextTurn();
+                if (g.TurnManager.CurrentPlayer != state.AuditorPlayerId)
                     return;
             }
-            // Only the Auditor remains in the turn order; leave the index put.
+            // Only the Auditor remains in this group's order; leave the index put.
         }
 
-        // ── Fastest Time clock & per-turn timeout (§5.2, M3) ─────────────────
-        //
-        // All of these run inside the state's execute lock (called from within an
-        // Execute block, or from inside the scheduled callback which itself runs
-        // through ExecuteAsync). They mutate state directly and never re-enter
-        // Execute. ScheduleCallback only takes the state's scheduling lock, not the
-        // execute lock, so calling it from here is deadlock-free.
+        // ── Audit queue (staggered/batch, §8.2) ──────────────────────────────
+
+        /// <summary>Appends a group to the FIFO Auditor queue if it isn't already in it.</summary>
+        private static void EnqueueForAudit(LinkedListGameState state, string groupId)
+        {
+            if (!state.AuditQueue.Contains(groupId))
+                state.AuditQueue.Add(groupId);
+        }
+
+        /// <summary>Removes a resolved group from the queue; the next group (if any)
+        /// becomes the front the Auditor judges.</summary>
+        private static void DequeueFromAudit(LinkedListGameState state, string groupId)
+            => state.AuditQueue.Remove(groupId);
+
+        // ── Fastest Time clock & per-turn timeout (§5.2), per group ───────────
 
         /// <summary>
-        /// Begins a new thinking turn for the active submitter: bumps the turn
-        /// token, (re)starts the accrual clock, and arms a per-turn timeout that
+        /// Begins a new thinking turn for a group's active submitter: bumps the group's
+        /// turn token, (re)starts its accrual clock, and arms a per-turn timeout that
         /// auto-forfeits a turn that runs over. Any prior turn timeout is cancelled.
         /// </summary>
-        private void BeginThinkingTurn(LinkedListGameState state, DateTimeOffset now)
+        private void BeginThinkingTurn(LinkedListGameState state, ChainState g, DateTimeOffset now)
         {
-            state.TurnSequence++;
+            g.TurnSequence++;
             // Snapshot banked time so Approve can charge only this attempt's thinking
             // toward the player's fastest-contribution stat (§10 "Speed Demon").
-            state.ContributionBaseline = state.ElapsedThinkingTime;
-            state.StartClock(now); // gated internally on Fastest Time + EnableTimers
+            g.ContributionBaseline = g.ElapsedThinkingTime;
+            g.StartClock(now, state.Settings); // gated internally on Fastest Time + EnableTimers
 
-            state.TurnTimeoutHandle?.Cancel();
-            state.TurnTimeoutHandle = null;
-            state.PhaseExpiresAtUtc = null;
+            g.TurnTimeoutHandle?.Cancel();
+            g.TurnTimeoutHandle = null;
+            g.PhaseExpiresAtUtc = null;
 
             // The per-turn timeout is part of the timed (Fastest Time) experience;
             // Fewest Guesses is a pure puzzle with no clock.
@@ -365,69 +511,125 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                 return;
             }
 
-            state.PhaseExpiresAtUtc = now + state.Settings.PerTurnClock;
-            int seq = state.TurnSequence;
+            g.PhaseExpiresAtUtc = now + state.Settings.PerTurnClock;
+            int seq = g.TurnSequence;
             var scheduled = state.ScheduleCallback(state.Settings.PerTurnClock, () =>
             {
-                ForfeitOnTimeout(state, seq);
+                ForfeitOnTimeout(state, g, seq);
                 return Task.CompletedTask;
             });
             if (scheduled.TryGetSuccess(out var handle))
-                state.TurnTimeoutHandle = handle;
+                g.TurnTimeoutHandle = handle;
         }
 
         /// <summary>
-        /// Pauses the clock for the auditing window: banks the running thinking
+        /// Pauses a group's clock for the auditing window: banks the running thinking
         /// segment and disarms the per-turn timeout (the Auditor has no clock).
         /// </summary>
-        private static void PauseForAudit(LinkedListGameState state, DateTimeOffset now)
+        private static void PauseForAudit(ChainState g, DateTimeOffset now)
         {
-            state.BankClock(now);
-            state.TurnTimeoutHandle?.Cancel();
-            state.TurnTimeoutHandle = null;
-            state.PhaseExpiresAtUtc = null;
+            g.BankClock(now);
+            g.TurnTimeoutHandle?.Cancel();
+            g.TurnTimeoutHandle = null;
+            g.PhaseExpiresAtUtc = null;
         }
 
         /// <summary>
-        /// Auto-forfeits the active turn when the per-turn clock expires. Ignored if
-        /// the turn has already advanced (stale token) or the round is no longer in
-        /// play. Banks any running segment, clears the pending submission, and moves
-        /// to the next submitter.
+        /// Auto-forfeits a group's active turn when its per-turn clock expires. Ignored
+        /// if the turn has already advanced (stale token), the group has finished, or the
+        /// round is no longer in play. Banks any running segment and moves to the next
+        /// submitter.
         /// </summary>
-        private void ForfeitOnTimeout(LinkedListGameState state, int forfeitSequence)
+        private void ForfeitOnTimeout(LinkedListGameState state, ChainState g, int forfeitSequence)
         {
-            if (state.TurnSequence != forfeitSequence) return;          // superseded
-            if (state.Phase != LinkedListGamePhase.Playing) return;     // round ended
+            if (g.TurnSequence != forfeitSequence) return;             // superseded
+            if (state.Phase != LinkedListGamePhase.Playing) return;    // round ended
+            if (g.Finished) return;                                    // group already done
 
             var now = DateTimeOffset.UtcNow;
-            state.BankClock(now);
-            state.PendingSubmission = null;
-            state.RejectionsThisTurn = 0;
-            AdvanceToNextSubmitter(state);
-            BeginThinkingTurn(state, now);
+            g.BankClock(now);
+            g.PendingSubmission = null;
+            DequeueFromAudit(state, g.GroupId);
+            g.RejectionsThisTurn = 0;
+            AdvanceToNextSubmitter(state, g);
+            BeginThinkingTurn(state, g, now);
         }
 
         /// <summary>
-        /// Banks any running clock, disarms the per-turn timeout, and computes the
-        /// <see cref="RoundResult"/> for the active scoring mode before the caller
-        /// transitions to <see cref="LinkedListGamePhase.RoundOver"/>.
+        /// Banks every group's clock, disarms timers, computes the per-group standings
+        /// (§8.2) and the back-compat single <see cref="RoundResult"/>, then transitions
+        /// to <see cref="LinkedListGamePhase.RoundOver"/>.
         /// </summary>
         private static void FinalizeRound(LinkedListGameState state, DateTimeOffset now)
         {
-            state.BankClock(now);
-            state.TurnTimeoutHandle?.Cancel();
-            state.TurnTimeoutHandle = null;
-            state.PhaseExpiresAtUtc = null;
+            foreach (var g in state.Groups)
+            {
+                g.BankClock(now);
+                g.TurnTimeoutHandle?.Cancel();
+                g.TurnTimeoutHandle = null;
+                g.PhaseExpiresAtUtc = null;
+            }
+            state.AuditQueue.Clear();
 
-            var mode = state.Settings.ScoringMode;
-            int guesses = state.GuessCount;
-            int? par = state.Settings.Par;
-            bool beatPar = mode == ScoringMode.FewestGuesses && par is int p && guesses <= p;
+            state.LastStandings = ComputeStandings(state);
 
-            state.LastRoundResult = new RoundResult(
-                mode, guesses, state.ElapsedThinkingTime, par, beatPar, state.DestinationReached);
+            // Back-compat single result: the winning group for Groups, else the only group.
+            var winnerId = state.LastStandings.Count > 0
+                ? state.LastStandings[0].GroupId
+                : state.PrimaryGroup?.GroupId;
+            var winner = state.GroupById(winnerId) ?? state.PrimaryGroup;
+            if (winner is not null)
+            {
+                var mode = state.Settings.ScoringMode;
+                int guesses = winner.GuessCount;
+                int? par = state.Settings.Par;
+                bool beatPar = mode == ScoringMode.FewestGuesses && par is int p && guesses <= p;
+                state.LastRoundResult = new RoundResult(
+                    mode, guesses, winner.ElapsedThinkingTime, par, beatPar, winner.DestinationReached);
+            }
 
             state.SetPhase(LinkedListGamePhase.RoundOver);
+        }
+
+        /// <summary>
+        /// Ranks the round's groups by the active mode's primary metric, breaking ties
+        /// with the other metric (§8.2): for Fewest Guesses, fewer guesses win and time
+        /// breaks ties; for Fastest Time, less time wins and guesses break ties. Groups
+        /// that reached the destination always outrank those that didn't (unreached are
+        /// ordered by partial progress). Ties on the primary metric are flagged so the
+        /// scoreboard can highlight the tie-break winner.
+        /// </summary>
+        private static IReadOnlyList<GroupStanding> ComputeStandings(LinkedListGameState state)
+        {
+            var mode = state.Settings.ScoringMode;
+
+            double Primary(ChainState g) => mode == ScoringMode.FastestTime
+                ? g.ElapsedThinkingTime.TotalMilliseconds : g.GuessCount;
+            double Secondary(ChainState g) => mode == ScoringMode.FastestTime
+                ? g.GuessCount : g.ElapsedThinkingTime.TotalMilliseconds;
+
+            var finished = state.Groups.Where(g => g.DestinationReached)
+                .OrderBy(Primary).ThenBy(Secondary).ThenBy(g => g.GroupId, StringComparer.Ordinal)
+                .ToList();
+            var unfinished = state.Groups.Where(g => !g.DestinationReached)
+                .OrderByDescending(g => g.GuessCount).ThenBy(Secondary).ThenBy(g => g.GroupId, StringComparer.Ordinal)
+                .ToList();
+            var ordered = finished.Concat(unfinished).ToList();
+
+            var standings = new List<GroupStanding>(ordered.Count);
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                var g = ordered[i];
+                // A finished group is a tie-break winner if another finished group shares
+                // its primary metric but ranks below it (so the secondary metric decided).
+                bool tieWinner = g.DestinationReached && ordered
+                    .Skip(i + 1)
+                    .Any(o => o.DestinationReached && Primary(o) == Primary(g));
+                standings.Add(new GroupStanding(
+                    g.GroupId, g.GroupName, i + 1,
+                    g.GuessCount, g.ElapsedThinkingTime, g.DestinationReached, tieWinner));
+            }
+            return standings;
         }
 
         // ── Match flow (§10): rotation, persona, reactions, end-of-match ─────
@@ -439,21 +641,20 @@ namespace KnockBox.LinkedList.Services.Logic.Games
 
         /// <summary>The id of the Auditor for the <em>next</em> round, given the current
         /// rotation — used by the RoundOver screen to announce who's up. Returns empty
-        /// if the turn order isn't set.</summary>
+        /// if the participant order isn't set.</summary>
         public static string NextAuditorId(LinkedListGameState state)
         {
-            int count = state.TurnManager.TurnOrder.Count;
+            int count = state.ParticipantOrder.Count;
             if (count == 0) return "";
-            return state.TurnManager.TurnOrder[(state.AuditorRotationIndex + 1) % count];
+            return state.ParticipantOrder[(state.AuditorRotationIndex + 1) % count];
         }
 
         /// <summary>
         /// Ends the current round's scoreboard and starts a fresh round: rotates the
-        /// Auditor forward by one in turn order (§6), resets all round data, draws a new
-        /// curated start/destination pair, seats the first non-Auditor as submitter,
-        /// and arms the clock. If the match has already reached
-        /// <see cref="LinkedListSettings.RoundsPerMatch"/>, ends the match instead
-        /// (auto-end safety net for the host control).
+        /// Auditor forward by one in participant order (§6), resets every group's round
+        /// data, draws a new curated start/destination pair, seats each group's first
+        /// non-Auditor submitter, and arms the clocks. If the match has already reached
+        /// <see cref="LinkedListSettings.RoundsPerMatch"/>, ends the match instead.
         /// </summary>
         public Result RotateAuditorAndStartRound(LinkedListGameState state, DateTimeOffset? now = null)
         {
@@ -463,7 +664,7 @@ namespace KnockBox.LinkedList.Services.Logic.Games
             Result inner = Result.Success;
             var exec = state.Execute(() =>
             {
-                int count = state.TurnManager.TurnOrder.Count;
+                int count = state.ParticipantOrder.Count;
                 if (count == 0)
                 {
                     inner = Result.FromError("Can't start a round without players.");
@@ -479,34 +680,32 @@ namespace KnockBox.LinkedList.Services.Logic.Games
 
                 // Rotate the Auditor forward (wraps so everyone audits in turn).
                 state.AuditorRotationIndex = (state.AuditorRotationIndex + 1) % count;
-                state.AuditorPlayerId = state.TurnManager.TurnOrder[state.AuditorRotationIndex];
-
-                // Reset round data (match accumulators on players are preserved).
-                state.Chain.Clear();
-                state.RejectionLog.Clear();
-                state.RejectionsThisTurn = 0;
-                state.DestinationReached = false;
-                state.PendingSubmission = null;
-                state.LastRejectionReason = null;
-                state.RecentReactions.Clear();
-                state.ElapsedThinkingTime = TimeSpan.Zero;
-                state.ThinkingSegmentStartedUtc = null;
-                state.ContributionBaseline = TimeSpan.Zero;
-                state.PhaseExpiresAtUtc = null;
-                state.LastRoundResult = null;
-                state.Persona = AuditorPersona.Neutral;
+                state.AuditorPlayerId = state.ParticipantOrder[state.AuditorRotationIndex];
 
                 // New journey for the round.
                 var pair = wordPairSource.Random(randomNumberService);
                 state.StartWord = pair.Start;
                 state.DestinationWord = pair.Destination;
-                state.CarriedWord = state.StartWord;
 
-                SeatFirstNonAuditorSubmitter(state);
+                // Reset every group's round data (match accumulators on players persist).
+                foreach (var g in state.Groups)
+                {
+                    ResetGroupForRound(g, state.StartWord);
+                    SeatFirstNonAuditorSubmitter(state, g);
+                }
+
+                state.AuditQueue.Clear();
+                state.LastRejectionReason = null;
+                state.RecentReactions.Clear();
+                state.LastRoundResult = null;
+                state.LastStandings = [];
+                state.Persona = AuditorPersona.Neutral;
 
                 state.RoundNumber++;
                 state.SetPhase(LinkedListGamePhase.Playing);
-                BeginThinkingTurn(state, ts);
+
+                foreach (var g in state.Groups)
+                    BeginThinkingTurn(state, g, ts);
             });
 
             return exec.TryGetFailure(out var error) ? Result.FromError(error) : inner;
@@ -529,12 +728,18 @@ namespace KnockBox.LinkedList.Services.Logic.Games
         /// <summary>Shared end-of-match transition. Call from inside the execute lock.</summary>
         private static void EndMatchCore(LinkedListGameState state, DateTimeOffset now)
         {
-            state.BankClock(now);
-            state.TurnTimeoutHandle?.Cancel();
-            state.TurnTimeoutHandle = null;
-            state.PhaseExpiresAtUtc = null;
-            state.PendingSubmission = null;
+            foreach (var g in state.Groups)
+            {
+                g.BankClock(now);
+                g.TurnTimeoutHandle?.Cancel();
+                g.TurnTimeoutHandle = null;
+                g.PhaseExpiresAtUtc = null;
+                g.PendingSubmission = null;
+            }
+            state.AuditQueue.Clear();
 
+            // Final standings reflect wherever each group ended up.
+            state.LastStandings = ComputeStandings(state);
             state.Superlatives = ComputeSuperlatives(state);
             state.SetPhase(LinkedListGamePhase.GameOver);
         }
@@ -682,18 +887,17 @@ namespace KnockBox.LinkedList.Services.Logic.Games
         }
 
         /// <summary>
-        /// Points <see cref="TurnManager"/> at the first player in turn order who isn't
-        /// the Auditor, so the new round's first submitter is valid. Call inside the
-        /// execute lock.
+        /// Points a group's <see cref="TurnManager"/> at its first member who isn't the
+        /// Auditor, so the new round's first submitter is valid. Call inside the execute lock.
         /// </summary>
-        private static void SeatFirstNonAuditorSubmitter(LinkedListGameState state)
+        private static void SeatFirstNonAuditorSubmitter(LinkedListGameState state, ChainState g)
         {
-            var order = state.TurnManager.TurnOrder;
+            var order = g.TurnManager.TurnOrder;
             for (int i = 0; i < order.Count; i++)
             {
                 if (order[i] != state.AuditorPlayerId)
                 {
-                    state.TurnManager.SetCurrentPlayerIndex(i);
+                    g.TurnManager.SetCurrentPlayerIndex(i);
                     return;
                 }
             }

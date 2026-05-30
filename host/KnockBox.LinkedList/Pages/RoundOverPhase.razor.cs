@@ -25,6 +25,26 @@ namespace KnockBox.LinkedList.Pages
                 ? $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}"
                 : $"{elapsed.Minutes}:{elapsed.Seconds:00}";
 
+        /// <summary>True when the round was played as competing groups (§8.2).</summary>
+        protected bool IsGroups => GameState.Settings.PlayerStructure == PlayerStructure.Groups;
+
+        /// <summary>Per-group standings for the round, ranked with cross-metric tie-break.</summary>
+        protected IReadOnlyList<GroupStanding> Standings => GameState.LastStandings;
+
+        /// <summary>True when the primary scoring metric is time (so guesses break ties).</summary>
+        protected bool PrimaryIsTime => GameState.Settings.ScoringMode == ScoringMode.FastestTime;
+
+        protected static string RankMedal(int rank) => rank switch
+        {
+            1 => "🥇",
+            2 => "🥈",
+            3 => "🥉",
+            _ => $"#{rank}",
+        };
+
+        /// <summary>The chain for a given standing's group (for the per-group chain list).</summary>
+        protected ChainState? GroupOf(string groupId) => GameState.GroupById(groupId);
+
         /// <summary>True once the match has played its full complement of rounds — the
         /// host can only proceed to the Results screen (§10 auto-end).</summary>
         protected bool IsLastRound => GameState.RoundNumber >= GameState.Settings.RoundsPerMatch;

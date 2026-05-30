@@ -43,6 +43,15 @@ namespace KnockBox.LinkedList.Pages
             _ => $"#{rank}",
         };
 
+        /// <summary>True when the match was played as competing groups (§8.2).</summary>
+        protected bool IsGroups => GameState.Settings.PlayerStructure == PlayerStructure.Groups;
+
+        /// <summary>Final per-group standings (the last round's result).</summary>
+        protected IReadOnlyList<GroupStanding> Standings => GameState.LastStandings;
+
+        /// <summary>True when the primary scoring metric is time (so guesses break ties).</summary>
+        protected bool PrimaryIsTime => GameState.Settings.ScoringMode == ScoringMode.FastestTime;
+
         /// <summary>Host-only: starts a brand-new match with the same players. Clears the
         /// round words so a fresh curated pair is drawn, then re-runs the engine start
         /// logic (which resets accumulators, the chain, scoring, and round counter).</summary>

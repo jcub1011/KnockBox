@@ -22,99 +22,158 @@ namespace KnockBox.LinkedList.Services.State.Games
         /// </summary>
         public void SetPhase(LinkedListGamePhase phase) => Phase = phase;
 
-        /// <summary>Drives the submitting-player rotation.</summary>
-        public TurnManager TurnManager { get; } = new();
-
         /// <summary>All player states, keyed by player id.</summary>
         public ConcurrentDictionary<string, LinkedListPlayerState> GamePlayers { get; } = new();
 
-        // ── Round data (single shared chain for Collective; Groups extends this in M5) ──
+        // ── Per-group round data (§8.2) ──────────────────────────────────────
+        //
+        // The round's chain(s) live on <see cref="Groups"/>. Collective is exactly
+        // one group containing every participant; Groups holds several, each with
+        // its own chain, submitter rotation, and clock. The single-chain accessors
+        // further down delegate to <see cref="PrimaryGroup"/> so M2–M4 code and
+        // tests keep working unchanged through the Collective (single-group) path.
+
+        /// <summary>The round's chains — exactly one for Collective, several for Groups.</summary>
+        public List<ChainState> Groups { get; } = [];
+
+        /// <summary>The first group, or <c>null</c> before a round has started. For
+        /// Collective this is the only group; the single-chain accessors delegate here.</summary>
+        public ChainState? PrimaryGroup => Groups.Count > 0 ? Groups[0] : null;
+
+        /// <summary>The group the given player belongs to. Throws if the player isn't in
+        /// any group — call <see cref="TryGroupOf"/> when membership is uncertain.</summary>
+        public ChainState GroupOf(string playerId) => Groups.First(g => g.MemberIds.Contains(playerId));
+
+        /// <summary>The group the given player belongs to, or <c>null</c> if none.</summary>
+        public ChainState? TryGroupOf(string playerId) => Groups.FirstOrDefault(g => g.MemberIds.Contains(playerId));
+
+        /// <summary>The group with the given id, or <c>null</c> if none.</summary>
+        public ChainState? GroupById(string? groupId) =>
+            groupId is null ? null : Groups.FirstOrDefault(g => g.GroupId == groupId);
+
+        // ── Group assignment (lobby → engine, Groups mode) ───────────────────
+
+        /// <summary>Pending team assignment chosen in the lobby for Groups mode: each
+        /// inner list is one group's member ids. Read by the engine at start. Empty for
+        /// Collective (the engine builds a single all-players group regardless).</summary>
+        public List<List<string>> GroupAssignments { get; set; } = [];
+
+        // ── Audit queue (staggered/batch auditing, §8.2) ─────────────────────
+        //
+        // A single human Auditor judges one group's submission at a time. As groups
+        // submit, their ids queue here in FIFO order; the Auditor always acts on the
+        // front group. Each group appears at most once.
+
+        /// <summary>Group ids awaiting the Auditor, in submission (FIFO) order.</summary>
+        public List<string> AuditQueue { get; } = [];
+
+        /// <summary>The group whose submission the Auditor is currently judging — the
+        /// front of <see cref="AuditQueue"/>, or <c>null</c> when nothing is pending.</summary>
+        public string? AuditingGroupId => AuditQueue.Count > 0 ? AuditQueue[0] : null;
+
+        /// <summary>The group the Auditor is currently judging, or <c>null</c>.</summary>
+        public ChainState? AuditingGroup => GroupById(AuditingGroupId);
+
+        // ── Shared round data ────────────────────────────────────────────────
 
         public string StartWord { get; set; } = "";
         public string DestinationWord { get; set; } = "";
-        public string CarriedWord { get; set; } = "";
-        public readonly List<ChainLink> Chain = [];
-        public readonly List<RejectionInfo> RejectionLog = [];
-        public int RejectionsThisTurn { get; set; }
-        public bool DestinationReached { get; set; }
-
-        /// <summary>
-        /// The submitter's word currently awaiting the Auditor's call, or
-        /// <c>null</c> between turns (no pending decision). Set by
-        /// <c>SubmitPair</c>; cleared by <c>Approve</c>/<c>Reject</c>.
-        /// </summary>
-        public Submission? PendingSubmission { get; set; }
 
         /// <summary>The Auditor's most recent rejection reason, surfaced to the
         /// whole table for banter (§6/§9.2). Cleared on the next accepted pair.</summary>
         public string? LastRejectionReason { get; set; }
 
-        // ── Fastest Time accrual (§5.2) ──────────────────────────────────────
+        /// <summary>Drives the global Auditor rotation (§6). Holds every participant's
+        /// id in a stable order set once at match start; <see cref="AuditorRotationIndex"/>
+        /// indexes into it. Per-group submitter rotation lives on each
+        /// <see cref="ChainState.TurnManager"/>, not here.</summary>
+        public List<string> ParticipantOrder { get; } = [];
+
+        // ── Single-chain accessors (Collective / PrimaryGroup back-compat) ────
         //
-        // The clock measures *thinking* time only. It accrues while a submitter
-        // is thinking, banks (pauses) the moment a submission goes to the Auditor,
-        // and resumes on a rejection. Auditor deliberation never counts. All of
-        // these fields are mutated exclusively inside Execute via the engine.
+        // M2–M4 engine code and tests read/write the round's chain through these.
+        // They delegate to PrimaryGroup so Collective behaves exactly as before;
+        // Groups-aware code resolves a specific ChainState instead.
 
-        /// <summary>Banked thinking time for the round so far.</summary>
-        public TimeSpan ElapsedThinkingTime { get; set; } = TimeSpan.Zero;
+        /// <summary>Submitter rotation for the primary group (Collective: all players).</summary>
+        public TurnManager TurnManager => PrimaryGroup!.TurnManager;
 
-        /// <summary>Non-null while the clock is "running" — the UTC instant the
-        /// current thinking segment began. Banked and cleared when the clock pauses.</summary>
-        public DateTimeOffset? ThinkingSegmentStartedUtc { get; set; }
+        public string CarriedWord
+        {
+            get => PrimaryGroup?.CarriedWord ?? "";
+            set => PrimaryGroup!.CarriedWord = value;
+        }
 
-        /// <summary>True while a thinking segment is accruing.</summary>
-        public bool ClockRunning => ThinkingSegmentStartedUtc is not null;
+        public List<ChainLink> Chain => PrimaryGroup!.Chain;
+        public List<RejectionInfo> RejectionLog => PrimaryGroup!.RejectionLog;
 
-        /// <summary>Accepted pairs in the chain — the Fewest-Guesses score.</summary>
-        public int GuessCount => Chain.Count;
+        public int RejectionsThisTurn
+        {
+            get => PrimaryGroup?.RejectionsThisTurn ?? 0;
+            set => PrimaryGroup!.RejectionsThisTurn = value;
+        }
 
-        /// <summary>UTC instant the current turn's per-turn clock expires, or
-        /// <c>null</c> when no per-turn timeout is armed. The UI reads this to
-        /// render a live countdown; the engine reads it for nothing (the timeout
-        /// itself fires via <see cref="AbstractGameState.ScheduleCallback"/>).</summary>
-        public DateTimeOffset? PhaseExpiresAtUtc { get; set; }
+        public bool DestinationReached
+        {
+            get => PrimaryGroup?.DestinationReached ?? false;
+            set => PrimaryGroup!.DestinationReached = value;
+        }
 
-        /// <summary>Monotonic turn token. Bumped each time a new thinking turn
-        /// begins so a stale scheduled timeout can recognize it has been superseded.</summary>
-        public int TurnSequence { get; set; }
+        public Submission? PendingSubmission
+        {
+            get => PrimaryGroup?.PendingSubmission;
+            set => PrimaryGroup!.PendingSubmission = value;
+        }
 
-        /// <summary>Handle to the active per-turn timeout, cancelled when the turn
-        /// ends early (submission, approval, or round end). Not part of serialized
-        /// state — it's a live scheduling handle owned by the engine.</summary>
-        public IScheduledCallbackHandle? TurnTimeoutHandle { get; set; }
+        public TimeSpan ElapsedThinkingTime
+        {
+            get => PrimaryGroup?.ElapsedThinkingTime ?? TimeSpan.Zero;
+            set => PrimaryGroup!.ElapsedThinkingTime = value;
+        }
+
+        public DateTimeOffset? ThinkingSegmentStartedUtc
+        {
+            get => PrimaryGroup?.ThinkingSegmentStartedUtc;
+            set => PrimaryGroup!.ThinkingSegmentStartedUtc = value;
+        }
+
+        public bool ClockRunning => PrimaryGroup?.ClockRunning ?? false;
+
+        public int GuessCount => PrimaryGroup?.GuessCount ?? 0;
+
+        public DateTimeOffset? PhaseExpiresAtUtc
+        {
+            get => PrimaryGroup?.PhaseExpiresAtUtc;
+            set => PrimaryGroup!.PhaseExpiresAtUtc = value;
+        }
+
+        public int TurnSequence
+        {
+            get => PrimaryGroup?.TurnSequence ?? 0;
+            set => PrimaryGroup!.TurnSequence = value;
+        }
+
+        public IScheduledCallbackHandle? TurnTimeoutHandle
+        {
+            get => PrimaryGroup?.TurnTimeoutHandle;
+            set => PrimaryGroup!.TurnTimeoutHandle = value;
+        }
+
+        public TimeSpan ContributionBaseline
+        {
+            get => PrimaryGroup?.ContributionBaseline ?? TimeSpan.Zero;
+            set => PrimaryGroup!.ContributionBaseline = value;
+        }
 
         /// <summary>The result of the most recently completed round, computed when
-        /// the game enters <see cref="LinkedListGamePhase.RoundOver"/>.</summary>
+        /// the game enters <see cref="LinkedListGamePhase.RoundOver"/>. For Collective
+        /// this is the single group's score; for Groups it mirrors the winning group.</summary>
         public RoundResult? LastRoundResult { get; set; }
 
-        /// <summary>
-        /// Starts a thinking segment if the clock is enabled (Fastest Time +
-        /// <c>EnableTimers</c>) and not already running. Idempotent. Call inside Execute.
-        /// </summary>
-        public void StartClock(DateTimeOffset now)
-        {
-            if (Settings.ScoringMode == ScoringMode.FastestTime
-                && Settings.EnableTimers
-                && ThinkingSegmentStartedUtc is null)
-            {
-                ThinkingSegmentStartedUtc = now;
-            }
-        }
-
-        /// <summary>
-        /// Banks the current thinking segment (if running) into
-        /// <see cref="ElapsedThinkingTime"/> and stops the clock. Idempotent —
-        /// a no-op when the clock is already paused. Call inside Execute.
-        /// </summary>
-        public void BankClock(DateTimeOffset now)
-        {
-            if (ThinkingSegmentStartedUtc is { } started)
-            {
-                ElapsedThinkingTime += now - started;
-                ThinkingSegmentStartedUtc = null;
-            }
-        }
+        /// <summary>Per-group standings for the most recent round (§8.2), ranked with
+        /// cross-metric tie-breaking. Empty for an in-progress or Collective round
+        /// (Collective scores through <see cref="LastRoundResult"/>).</summary>
+        public IReadOnlyList<GroupStanding> LastStandings { get; set; } = [];
 
         // ── Auditor rotation (§6) ────────────────────────────────────────────
 
@@ -122,10 +181,10 @@ namespace KnockBox.LinkedList.Services.State.Games
         /// <see cref="AuditorRotationIndex"/> by the engine on each rotation.</summary>
         public string AuditorPlayerId { get; set; } = "";
 
-        /// <summary>Index into <see cref="TurnManager"/>'s <c>TurnOrder</c> identifying
-        /// the current Auditor. Advanced by one (with wrap) each round so the role
-        /// rotates and everyone audits in turn (§6). Kept separate from the submitter
-        /// rotation, which <see cref="TurnManager"/> drives.</summary>
+        /// <summary>Index into <see cref="ParticipantOrder"/> identifying the current
+        /// Auditor. Advanced by one (with wrap) each round so the role rotates and
+        /// everyone audits in turn (§6). Kept separate from the per-group submitter
+        /// rotations.</summary>
         public int AuditorRotationIndex { get; set; }
 
         /// <summary>The Auditor's cosmetic persona for the current round (§6). No rule
@@ -154,12 +213,6 @@ namespace KnockBox.LinkedList.Services.State.Games
         /// the reaction it queued.</summary>
         public long ReactionSequence { get; set; }
 
-        /// <summary>Banked thinking time captured at the start of the active submitter's
-        /// current attempt, so <c>Approve</c> can charge a per-contribution time for
-        /// the "Speed Demon" superlative. Only meaningful when the clock runs
-        /// (Fastest Time + timers).</summary>
-        public TimeSpan ContributionBaseline { get; set; }
-
         /// <summary>
         /// Host-configurable match rules. Always replaced atomically via
         /// <see cref="UpdateSettings"/>; the setter is private so callers can't
@@ -180,6 +233,115 @@ namespace KnockBox.LinkedList.Services.State.Games
                 SetHostIsParticipant(Settings.HostPlaysGame);
             });
     }
+
+    #region ChainState
+
+    /// <summary>
+    /// One group's per-round chain and the state that drives building it: the
+    /// group's submitter rotation, carried word, accepted/rejected links, the
+    /// pending submission awaiting the Auditor, and the Fastest-Time clock. A
+    /// Collective round holds exactly one of these (all players); a Groups round
+    /// holds several. All fields are mutated only inside the owning
+    /// <see cref="LinkedListGameState"/>'s execute lock.
+    /// </summary>
+    public sealed class ChainState
+    {
+        /// <summary>Stable id for the group (also its audit-queue key).</summary>
+        public required string GroupId { get; init; }
+
+        /// <summary>Display name shown on the scoreboard ("Everyone", "Group A", …).</summary>
+        public string GroupName { get; set; } = "";
+
+        /// <summary>Member player ids. For Collective this is every participant; for
+        /// Groups it's the team. The Auditor is skipped within the rotation when it's
+        /// their turn to audit (they're never the active submitter).</summary>
+        public List<string> MemberIds { get; } = [];
+
+        /// <summary>Submitter rotation within this group.</summary>
+        public TurnManager TurnManager { get; } = new();
+
+        /// <summary>The word the next submission must pair with.</summary>
+        public string CarriedWord { get; set; } = "";
+
+        /// <summary>Accepted links in this group's chain.</summary>
+        public readonly List<ChainLink> Chain = [];
+
+        /// <summary>Rejected attempts and the Auditor's reasons, for this group.</summary>
+        public readonly List<RejectionInfo> RejectionLog = [];
+
+        /// <summary>Rejections against the current submitter this turn (rejection cap, §7.3).</summary>
+        public int RejectionsThisTurn { get; set; }
+
+        /// <summary>True once this group's chain reaches the destination — the group is
+        /// finished and stops accepting submissions (§8.2).</summary>
+        public bool DestinationReached { get; set; }
+
+        /// <summary>True once the group can no longer submit (destination reached). The
+        /// round ends when every group is finished.</summary>
+        public bool Finished => DestinationReached;
+
+        /// <summary>This group's submission awaiting the Auditor, or <c>null</c>.</summary>
+        public Submission? PendingSubmission { get; set; }
+
+        // ── Fastest Time accrual (§5.2), per group ───────────────────────────
+
+        /// <summary>Banked thinking time for this group's round so far.</summary>
+        public TimeSpan ElapsedThinkingTime { get; set; } = TimeSpan.Zero;
+
+        /// <summary>Non-null while this group's clock is running — the UTC instant the
+        /// current thinking segment began.</summary>
+        public DateTimeOffset? ThinkingSegmentStartedUtc { get; set; }
+
+        /// <summary>True while a thinking segment is accruing for this group.</summary>
+        public bool ClockRunning => ThinkingSegmentStartedUtc is not null;
+
+        /// <summary>Accepted pairs in this group's chain — the Fewest-Guesses score.</summary>
+        public int GuessCount => Chain.Count;
+
+        /// <summary>UTC instant the current turn's per-turn clock expires, or <c>null</c>.</summary>
+        public DateTimeOffset? PhaseExpiresAtUtc { get; set; }
+
+        /// <summary>Monotonic turn token; bumped each new thinking turn so a stale
+        /// scheduled timeout recognizes it has been superseded.</summary>
+        public int TurnSequence { get; set; }
+
+        /// <summary>Handle to the active per-turn timeout for this group.</summary>
+        public IScheduledCallbackHandle? TurnTimeoutHandle { get; set; }
+
+        /// <summary>Banked time captured at the start of the active submitter's current
+        /// attempt, so <c>Approve</c> can charge a per-contribution time for "Speed Demon".</summary>
+        public TimeSpan ContributionBaseline { get; set; }
+
+        /// <summary>
+        /// Starts a thinking segment if the clock is enabled (Fastest Time +
+        /// <c>EnableTimers</c>) and not already running. Idempotent. Call inside Execute.
+        /// </summary>
+        public void StartClock(DateTimeOffset now, LinkedListSettings settings)
+        {
+            if (settings.ScoringMode == ScoringMode.FastestTime
+                && settings.EnableTimers
+                && ThinkingSegmentStartedUtc is null)
+            {
+                ThinkingSegmentStartedUtc = now;
+            }
+        }
+
+        /// <summary>
+        /// Banks the current thinking segment (if running) into
+        /// <see cref="ElapsedThinkingTime"/> and stops the clock. Idempotent — a no-op
+        /// when the clock is already paused. Call inside Execute.
+        /// </summary>
+        public void BankClock(DateTimeOffset now)
+        {
+            if (ThinkingSegmentStartedUtc is { } started)
+            {
+                ElapsedThinkingTime += now - started;
+                ThinkingSegmentStartedUtc = null;
+            }
+        }
+    }
+
+    #endregion
 
     #region Enums
 
@@ -218,10 +380,26 @@ namespace KnockBox.LinkedList.Services.State.Games
         ScoringMode Mode, int Guesses, TimeSpan Elapsed,
         int? Par, bool BeatPar, bool DestinationReached);
 
+    /// <summary>
+    /// A group's place on the competitive scoreboard (§8.2). <paramref name="Primary"/>
+    /// is the active mode's metric (guess count or elapsed time) and
+    /// <paramref name="Secondary"/> the other; ranking sorts on the primary and breaks
+    /// ties with the secondary. <paramref name="IsTieBreakWinner"/> flags a group that
+    /// out-ranked another on equal primary metric purely via the secondary.
+    /// </summary>
+    public sealed record GroupStanding(
+        string GroupId, string GroupName, int Rank,
+        int Guesses, TimeSpan Elapsed, bool DestinationReached,
+        bool IsTieBreakWinner);
+
     public sealed class LinkedListPlayerState
     {
         public required string PlayerId { get; init; }
         public required string DisplayName { get; init; }
+
+        /// <summary>Id of the group this player competes with (Groups mode), or empty for
+        /// Collective. Set at match start from the team assignment.</summary>
+        public string GroupId { get; set; } = "";
 
         // ── Match accumulators (persist across rounds; reset only at match start) ──
         public int AcceptedPairs { get; set; }     // for "fewest guesses" + superlatives
@@ -232,7 +410,6 @@ namespace KnockBox.LinkedList.Services.State.Games
         /// Time mode), or <c>null</c> if the player hasn't landed a timed pair yet.
         /// Drives the "Speed Demon" superlative.</summary>
         public TimeSpan? FastestContribution { get; set; }
-        // group id added in later milestones
     }
 
     #endregion

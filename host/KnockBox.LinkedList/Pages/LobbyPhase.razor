@@ -114,6 +114,53 @@
                         </label>
                     }
                 }
+                else
+                {
+                    @* ── Teams (Groups / competitive) ── *@
+                    var teams = ReconcileTeams();
+                    var validity = TeamsValidity();
+                    <h4 class="ll-section-title">Teams</h4>
+                    <label class="ll-field">
+                        <span>Number of groups</span>
+                        <input type="number" min="2" max="@MaxGroupCount" class="ll-input" @bind="GroupCountInput" />
+                    </label>
+                    <button class="ll-btn ll-btn-ghost ll-balance-btn" @onclick="AutoBalanceTeams">⚖️ Auto-balance</button>
+
+                    <div class="ll-teams">
+                        @for (int gi = 0; gi < teams.Count; gi++)
+                        {
+                            var groupIndex = gi;
+                            var members = teams[groupIndex];
+                            <div class="ll-team-card">
+                                <div class="ll-team-head">
+                                    <span class="ll-team-name">@GroupLabel(groupIndex)</span>
+                                    <span class="ll-team-count">@members.Count player@(members.Count == 1 ? "" : "s")</span>
+                                </div>
+                                @foreach (var pid in members)
+                                {
+                                    <div class="ll-team-member">
+                                        <span class="ll-team-member-name">@DisplayNameOf(pid)</span>
+                                        <select class="ll-input ll-team-select"
+                                                @onchange="e => AssignPlayerToGroup(pid, int.TryParse(e.Value?.ToString(), out var v) ? v : groupIndex)">
+                                            @for (int t = 0; t < teams.Count; t++)
+                                            {
+                                                <option value="@t" selected="@(t == groupIndex)">@GroupLabel(t)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                }
+                                @if (members.Count == 0)
+                                {
+                                    <p class="ll-hint">No players — move someone here.</p>
+                                }
+                            </div>
+                        }
+                    </div>
+                    @if (!validity.Ok)
+                    {
+                        <p class="ll-hint">⚠️ @validity.Message</p>
+                    }
+                }
 
                 <h4 class="ll-section-title">Start &amp; destination</h4>
                 <label class="ll-field">

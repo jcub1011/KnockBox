@@ -32,6 +32,45 @@
         </div>
     }
 
+    @* ── Group standings (competitive, §8.2) ── *@
+    @if (IsGroups && Standings.Count > 0)
+    {
+        <div class="ll-go-scoreboard">
+            <h4 class="ll-go-section-title">Final Group Standings</h4>
+            <table class="ll-standings">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Group</th>
+                        <th>@(PrimaryIsTime ? "Time" : "Guesses")</th>
+                        <th class="ll-standings-secondary">@(PrimaryIsTime ? "Guesses" : "Time")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Standings)
+                    {
+                        <tr class="@(s.Rank == 1 ? "ll-standings-top" : "")">
+                            <td>@RankMedal(s.Rank)</td>
+                            <td>
+                                @s.GroupName
+                                @if (s.IsTieBreakWinner)
+                                {
+                                    <span class="ll-tiebreak">⚖️ tiebreak</span>
+                                }
+                                @if (!s.DestinationReached)
+                                {
+                                    <span class="ll-standings-dnf">DNF</span>
+                                }
+                            </td>
+                            <td>@(PrimaryIsTime ? FormatElapsed(s.Elapsed) : s.Guesses.ToString())</td>
+                            <td class="ll-standings-secondary">@(PrimaryIsTime ? s.Guesses.ToString() : FormatElapsed(s.Elapsed))</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
     @* ── Ranked scoreboard ── *@
     <div class="ll-go-scoreboard">
         <h4 class="ll-go-section-title">Scoreboard</h4>

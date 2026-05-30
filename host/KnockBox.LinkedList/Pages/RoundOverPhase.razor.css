@@ -85,6 +85,61 @@
     color: #ff8b6b;
 }
 
+/* ── Group standings (competitive) ── */
+
+.ll-standings-card {
+    padding: 1rem 1.25rem;
+    border: 1px solid rgba(128, 128, 128, 0.35);
+    border-radius: 0.75rem;
+}
+
+.ll-standings {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+
+.ll-standings th,
+.ll-standings td {
+    text-align: left;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+.ll-standings th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.7;
+}
+
+.ll-standings-top {
+    background: rgba(255, 200, 0, 0.12);
+    font-weight: 700;
+}
+
+.ll-standings-secondary {
+    opacity: 0.7;
+}
+
+.ll-tiebreak {
+    margin-left: 0.4rem;
+    font-size: 0.7rem;
+    padding: 0.05rem 0.35rem;
+    border-radius: 0.3rem;
+    background: rgba(255, 200, 0, 0.25);
+    font-weight: 600;
+}
+
+.ll-standings-dnf {
+    margin-left: 0.4rem;
+    font-size: 0.7rem;
+    padding: 0.05rem 0.35rem;
+    border-radius: 0.3rem;
+    background: rgba(211, 65, 59, 0.2);
+    font-weight: 600;
+}
+
 /* ── Match progress + next Auditor ── */
 
 .ll-ro-progress {

@@ -176,3 +176,59 @@
     background: rgba(128, 128, 128, 0.1);
     color: inherit;
 }
+
+/* ── Teams (Groups mode) ── */
+
+.ll-btn-ghost {
+    background: rgba(128, 128, 128, 0.18);
+    color: inherit;
+}
+
+.ll-balance-btn {
+    margin-bottom: 0.75rem;
+}
+
+.ll-teams {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.ll-team-card {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid rgba(128, 128, 128, 0.35);
+    border-radius: 0.6rem;
+    background: rgba(128, 128, 128, 0.08);
+}
+
+.ll-team-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+}
+
+.ll-team-name {
+    font-weight: 700;
+}
+
+.ll-team-count {
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+.ll-team-member {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.2rem 0;
+}
+
+.ll-team-member-name {
+    flex: 1;
+}
+
+.ll-team-select {
+    width: auto;
+    font-size: 0.85rem;
+}

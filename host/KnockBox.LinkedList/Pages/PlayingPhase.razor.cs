@@ -151,6 +151,23 @@ namespace KnockBox.LinkedList.Pages
         protected string DisplayNameOf(string playerId)
             => GameState.GamePlayers.TryGetValue(playerId, out var ps) ? ps.DisplayName : "Someone";
 
+        // ── Groups (competitive) helpers (§8.2) ──────────────────────────────
+
+        /// <summary>True when this match splits players into competing groups.</summary>
+        protected bool IsGroups => GameState.Settings.PlayerStructure == PlayerStructure.Groups;
+
+        /// <summary>The group the current user plays in, or <c>null</c> (Auditor / host
+        /// spectator / not yet seated).</summary>
+        protected ChainState? MyGroup =>
+            UserService.CurrentUser is { } u ? GameState.TryGroupOf(u.Id) : null;
+
+        /// <summary>The group whose submission the Auditor is currently judging.</summary>
+        protected ChainState? AuditingGroup => GameState.AuditingGroup;
+
+        /// <summary>Groups other than <paramref name="mine"/>, for the rival-progress strip.</summary>
+        protected IReadOnlyList<ChainState> RivalsOf(ChainState? mine)
+            => [.. GameState.Groups.Where(g => g.GroupId != mine?.GroupId)];
+
         /// <summary>Formats banked thinking time as <c>m:ss</c> (or <c>h:mm:ss</c>).</summary>
         protected static string FormatElapsed(TimeSpan elapsed)
             => elapsed >= TimeSpan.FromHours(1)

@@ -706,5 +706,275 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             var expected = string.CompareOrdinal(pA.PlayerId, pC.PlayerId) <= 0 ? pA.PlayerId : pC.PlayerId;
             Assert.AreEqual(expected, state.Superlatives.First(s => s.Title == "Most Rejected").PlayerId);
         }
+
+        // ── Milestone 5: Groups (competitive) ────────────────────────────────
+
+        /// <summary>
+        /// Starts a Groups match with <paramref name="groupCount"/> teams of
+        /// <paramref name="perGroup"/> players each, fixed words, and a deterministic
+        /// Auditor (the last participant). Group ids are "g0", "g1", … in order.
+        /// </summary>
+        private async Task<LinkedListGameState> StartedGroupsGameAsync(
+            int perGroup = 2, int groupCount = 2,
+            ScoringMode mode = ScoringMode.FewestGuesses,
+            string start = "START", string destination = "FINISH")
+        {
+            int total = perGroup * groupCount;
+            var state = await CreateWithPlayersAsync(total);
+            var ids = state.Participants.Select(p => p.User.Id).ToList();
+
+            var teams = new List<List<string>>();
+            for (int i = 0; i < groupCount; i++)
+                teams.Add(ids.Skip(i * perGroup).Take(perGroup).ToList());
+
+            state.UpdateSettings(s => s with
+            {
+                PlayerStructure = PlayerStructure.Groups,
+                ScoringMode = mode,
+                RejectionCap = 3,
+            });
+            state.Execute(() =>
+            {
+                state.GroupAssignments = teams;
+                state.StartWord = start;
+                state.DestinationWord = destination;
+                state.AuditorPlayerId = ids[^1]; // deterministic Auditor (last player)
+            });
+            await _engine.StartAsync(_host, state);
+            return state;
+        }
+
+        private static User SubmitterOfGroup(ChainState g)
+            => UserFactory.Create("Submitter", g.TurnManager.CurrentPlayer!);
+
+        private static void SeedChain(ChainState g, int count)
+        {
+            g.Chain.Clear();
+            for (int i = 0; i < count; i++)
+                g.Chain.Add(new ChainLink($"W{i}", $"W{i + 1}", "pid", "P", false));
+        }
+
+        [TestMethod]
+        public async Task Collective_RunsThroughASingleGroup()
+        {
+            var state = await StartedGameAsync(start: "HOUSE");
+
+            Assert.AreEqual(1, state.Groups.Count);
+            Assert.AreEqual("Everyone", state.Groups[0].GroupName);
+            CollectionAssert.AreEquivalent(
+                state.Participants.Select(p => p.User.Id).ToList(),
+                state.Groups[0].MemberIds);
+            // The single-chain accessors delegate to the only group.
+            Assert.AreSame(state.Groups[0].Chain, state.Chain);
+            Assert.AreEqual(state.Groups[0].CarriedWord, state.CarriedWord);
+        }
+
+        [TestMethod]
+        public async Task Groups_Start_BuildsOneChainPerTeam()
+        {
+            var state = await StartedGroupsGameAsync(perGroup: 2, groupCount: 2, start: "HOUSE");
+
+            Assert.AreEqual(2, state.Groups.Count);
+            Assert.AreEqual("g0", state.Groups[0].GroupId);
+            Assert.AreEqual("g1", state.Groups[1].GroupId);
+            foreach (var g in state.Groups)
+            {
+                Assert.AreEqual(2, g.MemberIds.Count);
+                Assert.AreEqual("HOUSE", g.CarriedWord);
+                Assert.AreEqual(0, g.Chain.Count);
+                // The seated submitter is never the Auditor.
+                Assert.AreNotEqual(state.AuditorPlayerId, g.TurnManager.CurrentPlayer);
+            }
+        }
+
+        [TestMethod]
+        public async Task Groups_Approve_IsIsolatedToTheActingGroup()
+        {
+            var state = await StartedGroupsGameAsync(start: "HOUSE");
+            var a = state.Groups[0];
+            var b = state.Groups[1];
+
+            Assert.IsTrue(_engine.SubmitPair(SubmitterOfGroup(a), state, "boat").IsSuccess);
+            Assert.IsTrue(_engine.Approve(AuditorOf(state), state).IsSuccess);
+
+            // Group A advanced…
+            Assert.AreEqual(1, a.Chain.Count);
+            Assert.AreEqual("boat", a.CarriedWord);
+            // …Group B is completely untouched.
+            Assert.AreEqual(0, b.Chain.Count);
+            Assert.AreEqual("HOUSE", b.CarriedWord);
+            Assert.AreEqual(0, b.RejectionsThisTurn);
+            Assert.IsNull(b.PendingSubmission);
+            Assert.IsFalse(b.DestinationReached);
+        }
+
+        [TestMethod]
+        public async Task Groups_RejectionCap_IsIsolatedPerGroup()
+        {
+            var state = await StartedGroupsGameAsync();
+            var a = state.Groups[0];
+            var b = state.Groups[1];
+
+            for (int i = 0; i < 3; i++)
+            {
+                Assert.IsTrue(_engine.SubmitPair(SubmitterOfGroup(a), state, $"try{i}").IsSuccess);
+                Assert.IsTrue(_engine.Reject(AuditorOf(state), state, "nope").IsSuccess);
+            }
+
+            Assert.AreEqual(0, a.RejectionsThisTurn); // forfeited and reset
+            Assert.AreEqual(3, a.RejectionLog.Count);
+            // Group B never saw a rejection.
+            Assert.AreEqual(0, b.RejectionsThisTurn);
+            Assert.AreEqual(0, b.RejectionLog.Count);
+            Assert.AreEqual(0, b.Chain.Count);
+        }
+
+        [TestMethod]
+        public async Task Groups_AuditQueue_ResolvesGroupsFifo()
+        {
+            var state = await StartedGroupsGameAsync(start: "HOUSE");
+            var a = state.Groups[0];
+            var b = state.Groups[1];
+
+            // A submits, then B submits → FIFO queue [A, B]; A is at the front.
+            Assert.IsTrue(_engine.SubmitPair(SubmitterOfGroup(a), state, "boat").IsSuccess);
+            Assert.IsTrue(_engine.SubmitPair(SubmitterOfGroup(b), state, "raft").IsSuccess);
+            Assert.AreEqual(2, state.AuditQueue.Count);
+            Assert.AreEqual(a.GroupId, state.AuditingGroupId);
+
+            // Resolving the front (A) advances the queue to B.
+            Assert.IsTrue(_engine.Approve(AuditorOf(state), state).IsSuccess);
+            Assert.AreEqual(1, a.Chain.Count);
+            Assert.AreEqual(b.GroupId, state.AuditingGroupId);
+
+            // Resolving B drains the queue.
+            Assert.IsTrue(_engine.Approve(AuditorOf(state), state).IsSuccess);
+            Assert.AreEqual(1, b.Chain.Count);
+            Assert.AreEqual(0, state.AuditQueue.Count);
+            Assert.IsNull(state.AuditingGroupId);
+        }
+
+        [TestMethod]
+        public async Task Groups_RoundEnds_OnlyWhenEveryGroupReachesDestination()
+        {
+            var state = await StartedGroupsGameAsync(start: "HOUSE", destination: "OMEGA");
+            var a = state.Groups[0];
+            var b = state.Groups[1];
+
+            // Group A reaches the destination first.
+            Assert.IsTrue(_engine.SubmitPair(SubmitterOfGroup(a), state, "omega").IsSuccess);
+            Assert.IsTrue(_engine.Approve(AuditorOf(state), state).IsSuccess);
+            Assert.IsTrue(a.DestinationReached);
+            Assert.AreEqual(LinkedListGamePhase.Playing, state.Phase); // round still live
+
+            // A finished group can't submit anymore.
+            Assert.IsTrue(_engine.SubmitPair(SubmitterOfGroup(a), state, "extra").IsFailure);
+
+            // When B also reaches it, the round ends.
+            Assert.IsTrue(_engine.SubmitPair(SubmitterOfGroup(b), state, "omega").IsSuccess);
+            Assert.IsTrue(_engine.Approve(AuditorOf(state), state).IsSuccess);
+            Assert.IsTrue(b.DestinationReached);
+            Assert.AreEqual(LinkedListGamePhase.RoundOver, state.Phase);
+            Assert.AreEqual(2, state.LastStandings.Count);
+        }
+
+        [TestMethod]
+        public async Task Groups_TieBreak_FewestGuesses_LowerTimeWins()
+        {
+            var state = await StartedGroupsGameAsync(mode: ScoringMode.FewestGuesses);
+            var a = state.Groups[0];
+            var b = state.Groups[1];
+
+            state.Execute(() =>
+            {
+                SeedChain(a, 2);
+                SeedChain(b, 2); // equal guess counts → tie on the primary metric
+                a.DestinationReached = true; a.ElapsedThinkingTime = TimeSpan.FromSeconds(30); a.ThinkingSegmentStartedUtc = null;
+                b.DestinationReached = true; b.ElapsedThinkingTime = TimeSpan.FromSeconds(10); b.ThinkingSegmentStartedUtc = null;
+            });
+
+            Assert.IsTrue(_engine.EndMatch(state).IsSuccess);
+
+            var standings = state.LastStandings;
+            Assert.AreEqual(b.GroupId, standings[0].GroupId); // less time breaks the guess tie
+            Assert.AreEqual(1, standings[0].Rank);
+            Assert.IsTrue(standings[0].IsTieBreakWinner);
+            Assert.AreEqual(a.GroupId, standings[1].GroupId);
+        }
+
+        [TestMethod]
+        public async Task Groups_TieBreak_FastestTime_FewerGuessesWins()
+        {
+            var state = await StartedGroupsGameAsync(mode: ScoringMode.FastestTime);
+            var a = state.Groups[0];
+            var b = state.Groups[1];
+
+            state.Execute(() =>
+            {
+                SeedChain(a, 5);
+                SeedChain(b, 3);
+                a.DestinationReached = true; a.ElapsedThinkingTime = TimeSpan.FromSeconds(10); a.ThinkingSegmentStartedUtc = null;
+                b.DestinationReached = true; b.ElapsedThinkingTime = TimeSpan.FromSeconds(10); b.ThinkingSegmentStartedUtc = null;
+            });
+
+            Assert.IsTrue(_engine.EndMatch(state).IsSuccess);
+
+            var standings = state.LastStandings;
+            Assert.AreEqual(b.GroupId, standings[0].GroupId); // fewer guesses breaks the time tie
+            Assert.AreEqual(1, standings[0].Rank);
+            Assert.IsTrue(standings[0].IsTieBreakWinner);
+        }
+
+        [TestMethod]
+        public async Task Groups_Start_RejectsFewerThanTwoGroups()
+        {
+            var state = await CreateWithPlayersAsync(4);
+            var ids = state.Participants.Select(p => p.User.Id).ToList();
+            state.UpdateSettings(s => s with { PlayerStructure = PlayerStructure.Groups });
+            state.Execute(() =>
+            {
+                state.GroupAssignments = [ids]; // everyone in one group
+                state.StartWord = "ALPHA";
+                state.DestinationWord = "OMEGA";
+            });
+
+            var result = await _engine.StartAsync(_host, state);
+
+            Assert.IsTrue(result.IsFailure);
+            Assert.AreEqual(LinkedListGamePhase.Setup, state.Phase);
+            Assert.IsTrue(state.IsJoinable);
+        }
+
+        [TestMethod]
+        public async Task Groups_Start_RejectsGroupWithFewerThanTwoMembers()
+        {
+            var state = await CreateWithPlayersAsync(4);
+            var ids = state.Participants.Select(p => p.User.Id).ToList();
+            state.UpdateSettings(s => s with { PlayerStructure = PlayerStructure.Groups });
+            state.Execute(() =>
+            {
+                // 3 + 1 → the second group is too small.
+                state.GroupAssignments = [ids.Take(3).ToList(), ids.Skip(3).ToList()];
+                state.StartWord = "ALPHA";
+                state.DestinationWord = "OMEGA";
+            });
+
+            var result = await _engine.StartAsync(_host, state);
+
+            Assert.IsTrue(result.IsFailure);
+            Assert.AreEqual(LinkedListGamePhase.Setup, state.Phase);
+        }
+
+        [TestMethod]
+        public void AutoBalanceGroups_RoundRobinsPlayers()
+        {
+            var teams = LinkedListGameEngine.AutoBalanceGroups(["a", "b", "c", "d", "e"], 2);
+
+            Assert.AreEqual(2, teams.Count);
+            Assert.AreEqual(3, teams[0].Count); // a, c, e
+            Assert.AreEqual(2, teams[1].Count); // b, d
+            CollectionAssert.AreEqual(new[] { "a", "c", "e" }, teams[0]);
+            CollectionAssert.AreEqual(new[] { "b", "d" }, teams[1]);
+        }
     }
 }

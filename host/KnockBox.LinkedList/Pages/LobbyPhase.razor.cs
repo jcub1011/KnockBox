@@ -25,7 +25,8 @@ namespace KnockBox.LinkedList.Pages
         protected bool CanStart =>
             GameState.IsJoinable
             && GameState.Players.Length >= GameEngine.MinPlayerCount
-            && GameState.Players.Length <= GameEngine.MaxPlayerCount;
+            && GameState.Players.Length <= GameEngine.MaxPlayerCount
+            && (Structure != PlayerStructure.Groups || TeamsValidity().Ok);
 
         protected void ToggleSettings() => SettingsOpen = !SettingsOpen;
 
@@ -41,8 +42,93 @@ namespace KnockBox.LinkedList.Pages
         protected PlayerStructure Structure
         {
             get => GameState.Settings.PlayerStructure;
-            set => UpdateSettings(s => s with { PlayerStructure = value });
+            set
+            {
+                UpdateSettings(s => s with { PlayerStructure = value });
+                // Seed a sensible default team layout the first time Groups is chosen.
+                if (value == PlayerStructure.Groups && GameState.GroupAssignments.Count == 0)
+                    AutoBalanceTeams();
+            }
         }
+
+        // ── Group assignment (Groups mode, §8.2) ─────────────────────────────
+
+        protected IReadOnlyList<string> ParticipantIds =>
+            [.. GameState.Participants.Select(p => p.User.Id)];
+
+        /// <summary>The number of teams; at least 2 in Groups mode.</summary>
+        protected int GroupCount => Math.Max(2, GameState.GroupAssignments.Count);
+
+        /// <summary>Upper bound on teams so every team can still hold ≥ 2 players.</summary>
+        protected int MaxGroupCount => Math.Max(2, ParticipantIds.Count / 2);
+
+        /// <summary>Number-stepper binding for the team count. Setting it re-balances.</summary>
+        protected int GroupCountInput
+        {
+            get => GroupCount;
+            set => SetGroupCount(value);
+        }
+
+        protected void SetGroupCount(int count)
+        {
+            count = Math.Clamp(count, 2, MaxGroupCount);
+            PersistAssignments(LinkedListGameEngine.AutoBalanceGroups(ParticipantIds, count));
+        }
+
+        protected void AutoBalanceTeams()
+            => PersistAssignments(LinkedListGameEngine.AutoBalanceGroups(ParticipantIds, GroupCount));
+
+        /// <summary>Reassigns a player to a different team, keeping the team count fixed.</summary>
+        protected void AssignPlayerToGroup(string playerId, int groupIndex)
+        {
+            var teams = ReconcileTeams();
+            foreach (var t in teams) t.Remove(playerId);
+            if (groupIndex < 0 || groupIndex >= teams.Count) groupIndex = 0;
+            teams[groupIndex].Add(playerId);
+            PersistAssignments(teams);
+        }
+
+        protected static string GroupLabel(int index) => $"Group {(char)('A' + index)}";
+
+        protected string DisplayNameOf(string playerId)
+        {
+            var entry = GameState.Participants.FirstOrDefault(e => e.User.Id == playerId);
+            return entry.User is not null ? entry.DisplayName : "Player";
+        }
+
+        /// <summary>Whether the current team layout can legally start a Groups match.</summary>
+        protected (bool Ok, string? Message) TeamsValidity()
+        {
+            var teams = ReconcileTeams();
+            if (teams.Count < 2) return (false, "Need at least 2 groups.");
+            if (teams.Any(t => t.Count < 2)) return (false, "Each group needs at least 2 players.");
+            return (true, null);
+        }
+
+        /// <summary>Pure (no-persist) view of the teams, reconciled against the current
+        /// roster: members who left are dropped and players with no team join the
+        /// smallest one. Safe to call during render.</summary>
+        protected List<List<string>> ReconcileTeams()
+        {
+            var ids = ParticipantIds.ToHashSet();
+            var teams = GameState.GroupAssignments.Count > 0
+                ? GameState.GroupAssignments.Select(t => new List<string>(t)).ToList()
+                : LinkedListGameEngine.AutoBalanceGroups(ParticipantIds, 2);
+
+            foreach (var t in teams) t.RemoveAll(id => !ids.Contains(id));
+            while (teams.Count < 2) teams.Add([]);
+
+            var assigned = teams.SelectMany(t => t).ToHashSet();
+            foreach (var id in ParticipantIds)
+            {
+                if (assigned.Add(id))
+                    teams.OrderBy(t => t.Count).First().Add(id);
+            }
+            return teams;
+        }
+
+        private void PersistAssignments(List<List<string>> teams)
+            => SetState(() => GameState.GroupAssignments = teams);
 
         protected int RejectionCap
         {
@@ -138,6 +224,12 @@ namespace KnockBox.LinkedList.Pages
         protected async Task StartGame()
         {
             if (UserService.CurrentUser is null) return;
+
+            // Lock in a roster-consistent team layout so the engine sees a valid,
+            // fully-assigned set of groups.
+            if (Structure == PlayerStructure.Groups)
+                PersistAssignments(ReconcileTeams());
+
             var result = await GameEngine.StartAsync(UserService.CurrentUser, GameState);
             if (result.TryGetFailure(out var error))
                 Logger.LogError("Failed to start Linked List game: {Error}", error.PublicMessage);
