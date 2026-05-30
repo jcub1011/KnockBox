@@ -22,3 +22,33 @@
 .start-btn {
     margin-top: 1rem;
 }
+
+/* ── Error toast ── */
+
+.ll-error-toast {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1.1rem;
+    border-radius: 0.5rem;
+    background: rgba(211, 65, 59, 0.95);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    animation: ll-toast-fade 3s ease forwards;
+}
+
+.ll-error-icon {
+    font-size: 1.1rem;
+}
+
+@keyframes ll-toast-fade {
+    0% { opacity: 0; transform: translate(-50%, -0.5rem); }
+    10% { opacity: 1; transform: translate(-50%, 0); }
+    85% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, -0.5rem); }
+}

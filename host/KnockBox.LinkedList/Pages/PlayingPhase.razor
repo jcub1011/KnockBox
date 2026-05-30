@@ -1,0 +1,175 @@
+@using KnockBox.LinkedList.Services.State.Games
+
+@{
+    var myId = UserService.CurrentUser?.Id ?? "";
+    var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
+    var isAuditor = myId == GameState.AuditorPlayerId;
+    var activeId = GameState.TurnManager.CurrentPlayer ?? "";
+    var isMyTurn = !isHostSpectator && myId == activeId && !isAuditor;
+    var pending = GameState.PendingSubmission;
+    var activeName = DisplayNameOf(activeId);
+}
+
+<div class="ll-play">
+
+    @* ── Journey banner: start → destination ── *@
+    <div class="ll-journey">
+        <span class="ll-journey-word ll-journey-start">@GameState.StartWord</span>
+        <span class="ll-journey-arrow">➜</span>
+        <span class="ll-journey-word ll-journey-dest">@GameState.DestinationWord</span>
+    </div>
+
+    @* ── Timer bar (Fastest Time only): live per-turn countdown + banked total ── *@
+    @if (GameState.Settings.ScoringMode == ScoringMode.FastestTime && GameState.Settings.EnableTimers)
+    {
+        <div class="ll-timer">
+            <div class="ll-timer-total">
+                <span class="ll-timer-label">Elapsed</span>
+                <span class="ll-timer-value">@FormatElapsed(GameState.ElapsedThinkingTime)</span>
+            </div>
+
+            @if (GameState.ClockRunning && GameState.PhaseExpiresAtUtc is { } expires)
+            {
+                var duration = GameState.Settings.PerTurnClock;
+                <CountdownClock EndTimeUtc="expires" Duration="duration" Context="countdown">
+                    @{
+                        var barWidth = 20;
+                        var filled = (int)Math.Ceiling(countdown.Fraction * barWidth);
+                        if (filled < 0) filled = 0;
+                        if (filled > barWidth) filled = barWidth;
+                        var bar = new string('█', filled) + new string('░', barWidth - filled);
+                        var seconds = (int)Math.Ceiling(countdown.RemainingSeconds);
+                    }
+                    <div class="ll-timer-bar @(seconds < 5 ? "ll-timer-urgent" : "")">
+                        <span class="ll-timer-mono">[@bar] @(seconds)s</span>
+                        <span class="ll-timer-caption">@activeName is on the clock</span>
+                    </div>
+                </CountdownClock>
+            }
+            else if (pending is not null)
+            {
+                <div class="ll-timer-bar ll-timer-paused">
+                    <span class="ll-timer-mono">⏸ PAUSED — auditing</span>
+                    <span class="ll-timer-caption">the clock resumes if the pair is rejected</span>
+                </div>
+            }
+        </div>
+    }
+
+    @* ════════════════ SUBMITTER VIEW ════════════════ *@
+    @if (isMyTurn)
+    {
+        <div class="ll-panel ll-panel-turn">
+            <p class="ll-turn-label">Your turn — build from</p>
+            <div class="ll-carried">@GameState.CarriedWord</div>
+
+            @if (pending is null)
+            {
+                <form class="ll-submit-row" @onsubmit="SubmitPair" @onsubmit:preventDefault="true">
+                    @* DOM owns the value; @key bump clears it after a successful submit. *@
+                    <input @key="_inputKey" type="text" class="ll-input"
+                           placeholder="@($"a word that pairs with {GameState.CarriedWord}…")"
+                           @oninput="OnWordInput" maxlength="40" autocomplete="off" />
+                    <button type="submit" class="ll-btn ll-btn-primary">Submit</button>
+                </form>
+            }
+            else
+            {
+                <div class="ll-pending-note">
+                    Proposed <strong>@pending.ProposedWord</strong> — waiting for the Auditor…
+                </div>
+            }
+        </div>
+    }
+    @* ════════════════ AUDITOR VIEW ════════════════ *@
+    else if (isAuditor)
+    {
+        <div class="ll-panel ll-panel-auditor">
+            <p class="ll-role-label">You are the Auditor</p>
+
+            @if (pending is not null)
+            {
+                <div class="ll-proposal">
+                    <span class="ll-proposal-word">@GameState.CarriedWord</span>
+                    <span class="ll-proposal-arrow">→</span>
+                    <span class="ll-proposal-word ll-proposal-new">@pending.ProposedWord</span>
+                </div>
+                <p class="ll-proposal-by">from @DisplayNameOf(pending.PlayerId)</p>
+
+                @if (!_rejecting)
+                {
+                    <div class="ll-decision-row">
+                        <button class="ll-btn ll-btn-approve" @onclick="Approve">✓ Approve</button>
+                        <button class="ll-btn ll-btn-reject" @onclick="BeginReject">✕ Reject</button>
+                    </div>
+                }
+                else
+                {
+                    <form class="ll-reject-form" @onsubmit="ConfirmReject" @onsubmit:preventDefault="true">
+                        <input @key="_reasonKey" type="text" class="ll-input"
+                               placeholder="Reason (required)…"
+                               @oninput="OnReasonInput" maxlength="80" autocomplete="off" />
+                        <div class="ll-decision-row">
+                            <button type="submit" class="ll-btn ll-btn-reject"
+                                    disabled="@string.IsNullOrWhiteSpace(_reason)">Confirm reject</button>
+                            <button type="button" class="ll-btn ll-btn-ghost" @onclick="CancelReject">Cancel</button>
+                        </div>
+                    </form>
+                }
+            }
+            else
+            {
+                <p class="ll-waiting">Waiting for @activeName to submit a word…</p>
+            }
+        </div>
+    }
+    @* ════════════════ SPECTATOR / OTHER PLAYERS ════════════════ *@
+    else
+    {
+        <div class="ll-panel">
+            <p class="ll-carried-label">Carried word</p>
+            <div class="ll-carried ll-carried-sm">@GameState.CarriedWord</div>
+            @if (pending is null)
+            {
+                <p class="ll-waiting">Waiting for @activeName to submit a word…</p>
+            }
+            else
+            {
+                <p class="ll-waiting">@activeName proposed <strong>@pending.ProposedWord</strong> — the Auditor is deciding…</p>
+            }
+        </div>
+    }
+
+    @* ── Last rejection reason (banter fuel, shown to everyone) ── *@
+    @if (!string.IsNullOrEmpty(GameState.LastRejectionReason))
+    {
+        <div class="ll-rejection-banner">
+            <span class="ll-rejection-icon">🚫</span>
+            <span>Auditor's last call: “@GameState.LastRejectionReason”</span>
+        </div>
+    }
+
+    @* ── The chain, rendered as connected links (the linked list) ── *@
+    <div class="ll-chain-card">
+        <h4 class="ll-chain-title">The Chain</h4>
+        <div class="ll-chain">
+            <span class="ll-anchor ll-anchor-start">@GameState.StartWord</span>
+            @foreach (var link in GameState.Chain)
+            {
+                <span class="ll-connector">─</span>
+                <span class="ll-link @(link.IsLoop ? "ll-link-loop" : "")">
+                    <span class="ll-link-pair">@link.FromWord → @link.ToWord</span>
+                    <span class="ll-link-by">@link.PlayerName</span>
+                    @if (link.IsLoop)
+                    {
+                        <span class="ll-loop-badge" title="This pair already appeared in the chain">↺ loop</span>
+                    }
+                </span>
+            }
+            <span class="ll-connector">─</span>
+            <span class="ll-anchor ll-anchor-dest @(GameState.DestinationReached ? "ll-anchor-reached" : "")">
+                @GameState.DestinationWord
+            </span>
+        </div>
+    </div>
+</div>

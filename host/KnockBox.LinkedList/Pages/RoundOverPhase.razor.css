@@ -1,0 +1,195 @@
+.ll-roundover {
+    width: 100%;
+    max-width: 40rem;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* ── Outcome banner ── */
+
+.ll-ro-banner {
+    text-align: center;
+    padding: 1.25rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(128, 128, 128, 0.35);
+}
+
+.ll-ro-success {
+    background: rgba(34, 165, 89, 0.14);
+    border-color: rgba(34, 165, 89, 0.5);
+}
+
+.ll-ro-stalled {
+    background: rgba(211, 65, 59, 0.12);
+    border-color: rgba(211, 65, 59, 0.4);
+}
+
+.ll-ro-emoji {
+    font-size: 2.5rem;
+}
+
+.ll-ro-headline {
+    margin: 0.25rem 0 0.25rem;
+}
+
+.ll-ro-sub {
+    margin: 0;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.9rem;
+}
+
+/* ── Score ── */
+
+.ll-ro-score {
+    text-align: center;
+    padding: 1rem;
+    border: 1px solid rgba(128, 128, 128, 0.35);
+    border-radius: 0.75rem;
+}
+
+.ll-ro-metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+}
+
+.ll-ro-metric-value {
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.ll-ro-metric-label {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+.ll-ro-par {
+    margin: 0.75rem 0 0;
+    font-size: 0.95rem;
+}
+
+.ll-ro-par-good {
+    color: #2fcf7a;
+}
+
+.ll-ro-par-over {
+    color: #ff8b6b;
+}
+
+/* ── Actions ── */
+
+.ll-ro-actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.6rem;
+}
+
+.ll-ro-wait {
+    text-align: center;
+    opacity: 0.75;
+}
+
+/* ── Buttons (mirror PlayingPhase) ── */
+
+.ll-btn {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-weight: 600;
+    color: #fff;
+}
+
+.ll-btn:disabled {
+    background: rgba(128, 128, 128, 0.4);
+    cursor: not-allowed;
+}
+
+.ll-btn-primary {
+    background: #3b82f6;
+}
+
+/* ── Chain (mirror PlayingPhase styling so the final chain reads the same) ── */
+
+.ll-chain-card {
+    padding: 1rem 1.25rem;
+    border: 1px solid rgba(128, 128, 128, 0.35);
+    border-radius: 0.75rem;
+}
+
+.ll-chain-title {
+    margin: 0 0 0.75rem;
+}
+
+.ll-chain {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.ll-connector {
+    opacity: 0.4;
+}
+
+.ll-anchor {
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 0.35rem 0.6rem;
+    border-radius: 0.5rem;
+    background: rgba(80, 160, 255, 0.18);
+}
+
+.ll-anchor-dest {
+    background: rgba(120, 220, 140, 0.18);
+}
+
+.ll-anchor-reached {
+    outline: 2px solid #22a559;
+    box-shadow: 0 0 12px rgba(34, 165, 89, 0.5);
+}
+
+.ll-link {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 0.5rem;
+    background: rgba(128, 128, 128, 0.15);
+    border: 1px solid rgba(128, 128, 128, 0.35);
+}
+
+.ll-link-loop {
+    border-color: rgba(255, 170, 0, 0.7);
+    background: rgba(255, 170, 0, 0.12);
+}
+
+.ll-link-pair {
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+}
+
+.ll-link-by {
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
+.ll-loop-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 0.05rem 0.35rem;
+    border-radius: 0.3rem;
+    background: rgba(255, 170, 0, 0.3);
+}

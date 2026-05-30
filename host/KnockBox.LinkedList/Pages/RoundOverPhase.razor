@@ -1,0 +1,103 @@
+@using KnockBox.LinkedList.Services.State.Games
+
+@{
+    var myId = UserService.CurrentUser?.Id ?? "";
+    var isHost = GameState.Host.Id == myId;
+    var result = GameState.LastRoundResult;
+}
+
+<div class="ll-roundover">
+
+    @* ── Outcome banner ── *@
+    @if (GameState.DestinationReached)
+    {
+        <div class="ll-ro-banner ll-ro-success">
+            <span class="ll-ro-emoji">🎉</span>
+            <h3 class="ll-ro-headline">Destination reached!</h3>
+            <p class="ll-ro-sub">@GameState.StartWord ➜ @GameState.DestinationWord</p>
+        </div>
+    }
+    else
+    {
+        <div class="ll-ro-banner ll-ro-stalled">
+            <span class="ll-ro-emoji">🛑</span>
+            <h3 class="ll-ro-headline">Round over</h3>
+            <p class="ll-ro-sub">The chain didn't reach @GameState.DestinationWord this time.</p>
+        </div>
+    }
+
+    @* ── Score for the active mode ── *@
+    @if (result is not null)
+    {
+        <div class="ll-ro-score">
+            @if (result.Mode == ScoringMode.FewestGuesses)
+            {
+                <div class="ll-ro-metric">
+                    <span class="ll-ro-metric-value">@result.Guesses</span>
+                    <span class="ll-ro-metric-label">accepted pair@(result.Guesses == 1 ? "" : "s")</span>
+                </div>
+
+                @if (result.Par is int par)
+                {
+                    <div class="ll-ro-par @(result.BeatPar ? "ll-ro-par-good" : "ll-ro-par-over")">
+                        Par @par · You: @result.Guesses —
+                        @if (result.BeatPar)
+                        {
+                            <strong>@(result.Guesses < par ? "under par!" : "right on par!")</strong>
+                        }
+                        else
+                        {
+                            <strong>@(result.Guesses - par) over par</strong>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="ll-ro-metric">
+                    <span class="ll-ro-metric-value">@FormatElapsed(result.Elapsed)</span>
+                    <span class="ll-ro-metric-label">thinking time</span>
+                </div>
+                <p class="ll-ro-par">Auditor deliberation didn't count — only the seconds the team spent thinking.</p>
+            }
+        </div>
+    }
+
+    @* ── The final chain ── *@
+    <div class="ll-chain-card">
+        <h4 class="ll-chain-title">The Chain</h4>
+        <div class="ll-chain">
+            <span class="ll-anchor ll-anchor-start">@GameState.StartWord</span>
+            @foreach (var link in GameState.Chain)
+            {
+                <span class="ll-connector">─</span>
+                <span class="ll-link @(link.IsLoop ? "ll-link-loop" : "")">
+                    <span class="ll-link-pair">@link.FromWord → @link.ToWord</span>
+                    <span class="ll-link-by">@link.PlayerName</span>
+                    @if (link.IsLoop)
+                    {
+                        <span class="ll-loop-badge" title="This pair already appeared in the chain">↺ loop</span>
+                    }
+                </span>
+            }
+            <span class="ll-connector">─</span>
+            <span class="ll-anchor ll-anchor-dest @(GameState.DestinationReached ? "ll-anchor-reached" : "")">
+                @GameState.DestinationWord
+            </span>
+        </div>
+    </div>
+
+    @* ── Host continue control (full match flow lands in M4) ── *@
+    @if (isHost)
+    {
+        <div class="ll-ro-actions">
+            <button class="ll-btn ll-btn-primary" @onclick="StartNewRound" disabled="@_starting">
+                @(_starting ? "Starting…" : "New round")
+            </button>
+        </div>
+    }
+    else
+    {
+        <p class="ll-ro-wait">Waiting for the host to start the next round…</p>
+    }
+</div>

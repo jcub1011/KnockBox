@@ -10,6 +10,15 @@
 </HeadContent>
 
 <div class="content">
+@* ── Error toast ── *@
+@if (_errorMessage is not null)
+{
+    <div @key="_errorKey" class="ll-error-toast">
+        <span class="ll-error-icon">⚠️</span>
+        <span>@_errorMessage</span>
+    </div>
+}
+
 @if (GameState == null)
 {
     <div>Loading...</div>
@@ -23,13 +32,10 @@ else
     @switch (GameState.Phase)
     {
         case LinkedListGamePhase.Playing:
-            <div class="card">
-                <p>The round has started. Start word: <strong>@GameState.StartWord</strong> → destination: <strong>@GameState.DestinationWord</strong>.</p>
-                <p>Gameplay UI arrives in Milestone 2.</p>
-            </div>
+            <PlayingPhase GameState="GameState" OnError="ShowError" />
             break;
         case LinkedListGamePhase.RoundOver:
-            <div class="card"><p>Round over. (Milestone 3.)</p></div>
+            <RoundOverPhase GameState="GameState" OnError="ShowError" />
             break;
         case LinkedListGamePhase.GameOver:
             <div class="card"><p>Game over. (Milestone 4.)</p></div>
