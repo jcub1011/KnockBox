@@ -1,0 +1,178 @@
+.ll-lobby {
+    width: 100%;
+    max-width: 32rem;
+    margin: 0 auto;
+}
+
+.ll-lobby-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.ll-title {
+    margin: 0;
+}
+
+.ll-gear-btn,
+.ll-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.ll-players-card {
+    padding: 1.25rem;
+    border: 1px solid rgba(128, 128, 128, 0.35);
+    border-radius: 0.75rem;
+}
+
+.ll-player-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin: 0.5rem 0;
+}
+
+.ll-player {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.5rem;
+    background: rgba(128, 128, 128, 0.12);
+}
+
+.ll-player-me {
+    outline: 2px solid rgba(80, 160, 255, 0.6);
+}
+
+.ll-player-name {
+    flex: 1;
+}
+
+.ll-host-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.35rem;
+    background: rgba(255, 200, 0, 0.25);
+}
+
+.ll-kick-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #d33;
+    font-weight: 700;
+}
+
+.ll-player-count {
+    margin: 0.5rem 0;
+    opacity: 0.8;
+    font-size: 0.9rem;
+}
+
+.ll-btn {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.ll-btn-primary {
+    background: #3b82f6;
+    color: #fff;
+}
+
+.ll-btn-primary:disabled {
+    background: rgba(128, 128, 128, 0.4);
+    cursor: not-allowed;
+}
+
+.ll-hint {
+    margin: 0.5rem 0 0;
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+/* ── Settings drawer ── */
+
+.ll-settings-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 40;
+}
+
+.ll-settings-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: min(24rem, 90vw);
+    background: var(--surface, #1e1e24);
+    color: inherit;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.4);
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+    z-index: 41;
+    display: flex;
+    flex-direction: column;
+}
+
+.ll-settings-drawer-open {
+    transform: translateX(0);
+}
+
+.ll-settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.35);
+}
+
+.ll-settings-header h3 {
+    margin: 0;
+}
+
+.ll-settings-body {
+    padding: 1rem 1.25rem;
+    overflow-y: auto;
+}
+
+.ll-section-title {
+    margin: 1rem 0 0.5rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.7;
+}
+
+.ll-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.ll-field-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ll-input {
+    padding: 0.4rem 0.5rem;
+    border: 1px solid rgba(128, 128, 128, 0.5);
+    border-radius: 0.4rem;
+    background: rgba(128, 128, 128, 0.1);
+    color: inherit;
+}

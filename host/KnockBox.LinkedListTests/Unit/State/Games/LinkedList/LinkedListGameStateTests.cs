@@ -37,5 +37,68 @@ namespace KnockBox.LinkedList.Tests.Unit.State
             state.Execute(() => state.SetJoinable(false));
             Assert.IsFalse(state.IsJoinable);
         }
+
+        [TestMethod]
+        public void DefaultSettings_HaveExpectedValues()
+        {
+            using var state = new LinkedListGameState(_host, _loggerMock.Object);
+
+            Assert.AreEqual(ScoringMode.FewestGuesses, state.Settings.ScoringMode);
+            Assert.AreEqual(PlayerStructure.Collective, state.Settings.PlayerStructure);
+            Assert.AreEqual(3, state.Settings.RejectionCap);
+            Assert.IsFalse(state.Settings.NoImmediateRepeat);
+            Assert.IsFalse(state.Settings.HostPlaysGame);
+            Assert.IsNull(state.Settings.Par);
+            Assert.IsTrue(state.Settings.EnableTimers);
+        }
+
+        [TestMethod]
+        public void DefaultPhase_IsSetup()
+        {
+            using var state = new LinkedListGameState(_host, _loggerMock.Object);
+
+            Assert.AreEqual(LinkedListGamePhase.Setup, state.Phase);
+        }
+
+        [TestMethod]
+        public void SetPhase_ChangesPhase()
+        {
+            using var state = new LinkedListGameState(_host, _loggerMock.Object);
+
+            state.Execute(() => state.SetPhase(LinkedListGamePhase.Playing));
+
+            Assert.AreEqual(LinkedListGamePhase.Playing, state.Phase);
+        }
+
+        [TestMethod]
+        public void UpdateSettings_ReplacesSettingsAtomically()
+        {
+            using var state = new LinkedListGameState(_host, _loggerMock.Object);
+
+            var result = state.UpdateSettings(s => s with
+            {
+                ScoringMode = ScoringMode.FastestTime,
+                RejectionCap = 0,
+                Par = 12,
+            });
+
+            Assert.IsTrue(result.IsSuccess);
+            Assert.AreEqual(ScoringMode.FastestTime, state.Settings.ScoringMode);
+            Assert.AreEqual(0, state.Settings.RejectionCap);
+            Assert.AreEqual(12, state.Settings.Par);
+        }
+
+        [TestMethod]
+        public void UpdateSettings_ReflectsHostPlaysGameIntoHostIsParticipant()
+        {
+            using var state = new LinkedListGameState(_host, _loggerMock.Object);
+            Assert.IsFalse(state.HostIsParticipant);
+
+            state.UpdateSettings(s => s with { HostPlaysGame = true });
+            Assert.IsTrue(state.HostIsParticipant);
+
+            state.UpdateSettings(s => s with { HostPlaysGame = false });
+            Assert.IsFalse(state.HostIsParticipant);
+        }
     }
 }

@@ -1,0 +1,150 @@
+@using KnockBox.LinkedList.Services.State.Games
+
+<div class="ll-lobby">
+    <div class="ll-lobby-header">
+        <h2 class="ll-title">Linked List</h2>
+        @if (IsHost)
+        {
+            <button class="ll-gear-btn" @onclick="ToggleSettings" title="Game settings">⚙️</button>
+        }
+    </div>
+
+    <div class="ll-players-card">
+        <h4>Players (@GameState.Participants.Length)</h4>
+        <div class="ll-player-list">
+            @foreach (var entry in GameState.RosterIncludingHost)
+            {
+                bool isHostEntry = entry.User.Id == GameState.Host.Id;
+                bool isMe = entry.User.Id == UserService.CurrentUser?.Id;
+                bool canKick = IsHost && !isHostEntry;
+                <div class="ll-player @(isMe ? "ll-player-me" : "")">
+                    <span class="ll-player-name">@entry.DisplayName</span>
+                    @if (isHostEntry)
+                    {
+                        <span class="ll-host-badge">HOST</span>
+                    }
+                    @if (canKick)
+                    {
+                        <button class="ll-kick-btn" title="Kick player"
+                                @onclick="() => KickPlayer(entry.User.Id)">✕</button>
+                    }
+                </div>
+            }
+        </div>
+
+        <p class="ll-player-count">
+            @GameState.Players.Length players joined (need @GameEngine.MinPlayerCount–@GameEngine.MaxPlayerCount)
+        </p>
+
+        @if (IsHost)
+        {
+            <button class="ll-btn ll-btn-primary" @onclick="StartGame" disabled="@(!CanStart)"
+                    title="@(CanStart ? "Start the game" : $"Need {GameEngine.MinPlayerCount}–{GameEngine.MaxPlayerCount} players")">
+                Start Game
+            </button>
+            @if (!CanStart)
+            {
+                <p class="ll-hint">⚠️ Need @GameEngine.MinPlayerCount–@GameEngine.MaxPlayerCount players to start.</p>
+            }
+        }
+        else
+        {
+            <p class="ll-hint">Waiting for the host to start…</p>
+        }
+    </div>
+
+    @if (IsHost)
+    {
+        @if (SettingsOpen)
+        {
+            <div class="ll-settings-backdrop" @onclick="ToggleSettings"></div>
+        }
+        <div class="ll-settings-drawer @(SettingsOpen ? "ll-settings-drawer-open" : "")">
+            <div class="ll-settings-header">
+                <h3>⚙️ Game Settings</h3>
+                <button class="ll-close-btn" @onclick="ToggleSettings" title="Close">✕</button>
+            </div>
+            <div class="ll-settings-body">
+
+                <h4 class="ll-section-title">Scoring &amp; structure</h4>
+                <label class="ll-field">
+                    <span>Scoring mode</span>
+                    <select class="ll-input" @bind="Mode">
+                        <option value="@ScoringMode.FewestGuesses">Fewest Guesses</option>
+                        <option value="@ScoringMode.FastestTime">Fastest Time</option>
+                    </select>
+                </label>
+                <label class="ll-field">
+                    <span>Player structure</span>
+                    <select class="ll-input" @bind="Structure">
+                        <option value="@PlayerStructure.Collective">Collective (co-op)</option>
+                        <option value="@PlayerStructure.Groups">Groups (competitive)</option>
+                    </select>
+                </label>
+
+                <h4 class="ll-section-title">Rules</h4>
+                <label class="ll-field">
+                    <span>Rejection cap per turn (0 = off)</span>
+                    <input type="number" min="0" class="ll-input" @bind="RejectionCap" />
+                </label>
+                <label class="ll-field ll-field-row">
+                    <span>Block immediate repeats</span>
+                    <input type="checkbox" @bind="NoImmediateRepeat" />
+                </label>
+                <label class="ll-field ll-field-row">
+                    <span>Host plays the game</span>
+                    <input type="checkbox" @bind="HostPlaysGame" />
+                </label>
+
+                @if (Structure == PlayerStructure.Collective)
+                {
+                    <label class="ll-field ll-field-row">
+                        <span>Set a par (target)</span>
+                        <input type="checkbox" @bind="ParEnabled" />
+                    </label>
+                    @if (ParEnabled)
+                    {
+                        <label class="ll-field">
+                            <span>Par</span>
+                            <input type="number" min="1" class="ll-input" @bind="ParValue" />
+                        </label>
+                    }
+                }
+
+                <h4 class="ll-section-title">Start &amp; destination</h4>
+                <label class="ll-field">
+                    <span>Pick a curated pair</span>
+                    <select class="ll-input" @onchange="@(e => ApplyCuratedPair(int.TryParse(e.Value?.ToString(), out var i) ? i : -1))">
+                        <option value="-1">— random at start —</option>
+                        @for (int i = 0; i < WordPairSource.Pairs.Length; i++)
+                        {
+                            var pair = WordPairSource.Pairs[i];
+                            <option value="@i">@pair.Start → @pair.Destination</option>
+                        }
+                    </select>
+                </label>
+                <label class="ll-field">
+                    <span>Start word (blank = random)</span>
+                    <input type="text" class="ll-input" @bind="StartWord" placeholder="random" />
+                </label>
+                <label class="ll-field">
+                    <span>Destination word (blank = random)</span>
+                    <input type="text" class="ll-input" @bind="DestinationWord" placeholder="random" />
+                </label>
+
+                <h4 class="ll-section-title">First Auditor</h4>
+                <label class="ll-field">
+                    <span>Auditor (blank = auto)</span>
+                    <select class="ll-input" @bind="AuditorPlayerId">
+                        <option value="">— auto-assign —</option>
+                        @foreach (var entry in GameState.Participants)
+                        {
+                            <option value="@entry.User.Id">@entry.DisplayName</option>
+                        }
+                    </select>
+                </label>
+
+            </div>
+        </div>
+    }
+</div>

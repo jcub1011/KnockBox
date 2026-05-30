@@ -16,6 +16,10 @@
     <Using Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Data\start-destination-pairs.json" />
+  </ItemGroup>
+
   <Import Project="..\Directory.Plugin.targets" />
 
 </Project>

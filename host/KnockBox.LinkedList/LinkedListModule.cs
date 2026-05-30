@@ -1,4 +1,5 @@
 using KnockBox.Core.Plugins;
+using KnockBox.LinkedList.Services.Logic;
 using KnockBox.LinkedList.Services.Logic.Games;
 
 namespace KnockBox.LinkedList
@@ -9,6 +10,9 @@ namespace KnockBox.LinkedList
             PluginManifest.FromEmbeddedResourceOrThrow(typeof(LinkedListModule).Assembly);
 
         public void RegisterServices(IPluginRegistration registration)
-            => registration.AddGameEngine<LinkedListGameEngine>();
+        {
+            registration.AddSingleton<WordPairSource>(_ => new WordPairSource());
+            registration.AddGameEngine<LinkedListGameEngine>();
+        }
     }
 }

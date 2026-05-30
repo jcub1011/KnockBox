@@ -14,33 +14,29 @@
 {
     <div>Loading...</div>
 }
+else if (GameState.IsJoinable)
+{
+    <LobbyPhase GameState="GameState" />
+}
 else
 {
-    @if (GameState.IsJoinable)
+    @switch (GameState.Phase)
     {
-        <div class="card">
-            <div class="joinable-state">
-                <h4>Players</h4>
-                <div class="player-list">
-                    @foreach (var entry in GameState.Players)
-                    {
-                        <button class="btn" title="Click to kick player."
-                                @onclick="() => GameState.KickPlayer(UserService.CurrentUser!, entry.User)">@entry.DisplayName @(entry.User.Id == GameState.Host.Id ? "(Host)" : "")</button>
-                    }
-                </div>
-                @if (UserService.CurrentUser?.Id == GameState.Host.Id)
-                {
-                    <button class="btn btn-primary start-btn mt-3" @onclick="StartGame">Start Session</button>
-                }
+        case LinkedListGamePhase.Playing:
+            <div class="card">
+                <p>The round has started. Start word: <strong>@GameState.StartWord</strong> → destination: <strong>@GameState.DestinationWord</strong>.</p>
+                <p>Gameplay UI arrives in Milestone 2.</p>
             </div>
-        </div>
-    }
-    else
-    {
-        <!-- Game UI TODO -->
-        <div class="card">
-            <p>The game has started. Add the Linked List game UI here.</p>
-        </div>
+            break;
+        case LinkedListGamePhase.RoundOver:
+            <div class="card"><p>Round over. (Milestone 3.)</p></div>
+            break;
+        case LinkedListGamePhase.GameOver:
+            <div class="card"><p>Game over. (Milestone 4.)</p></div>
+            break;
+        default:
+            <div class="card"><p>Setting up…</p></div>
+            break;
     }
 }
 </div>
