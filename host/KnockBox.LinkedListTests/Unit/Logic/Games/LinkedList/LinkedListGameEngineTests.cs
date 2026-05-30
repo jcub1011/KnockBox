@@ -496,5 +496,215 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             Assert.IsNull(state.LastRoundResult!.Par);
             Assert.IsFalse(state.LastRoundResult.BeatPar);
         }
+
+        // ── Milestone 4: auditor rotation, persona, reactions, match flow ────
+
+        [TestMethod]
+        public async Task RotateAuditorAndStartRound_AdvancesAuditorByOne_AndWraps()
+        {
+            var state = await StartedGameAsync();
+            var order = state.TurnManager.TurnOrder;
+            // Auto-assigned first Auditor is order[1] (first id that isn't submitter order[0]).
+            Assert.AreEqual(order[1], state.AuditorPlayerId);
+            Assert.AreEqual(1, state.AuditorRotationIndex);
+            Assert.AreEqual(1, state.RoundNumber);
+
+            Assert.IsTrue(_engine.RotateAuditorAndStartRound(state).IsSuccess);
+            Assert.AreEqual(order[2], state.AuditorPlayerId);
+            Assert.AreEqual(2, state.RoundNumber);
+            Assert.AreEqual(LinkedListGamePhase.Playing, state.Phase);
+            // New Auditor is excluded from submitting that round.
+            Assert.AreNotEqual(state.AuditorPlayerId, state.TurnManager.CurrentPlayer);
+
+            Assert.IsTrue(_engine.RotateAuditorAndStartRound(state).IsSuccess);
+            Assert.AreEqual(order[0], state.AuditorPlayerId); // wrapped to the front
+            Assert.AreEqual(3, state.RoundNumber);
+            Assert.AreNotEqual(state.AuditorPlayerId, state.TurnManager.CurrentPlayer);
+        }
+
+        [TestMethod]
+        public async Task RotateAuditorAndStartRound_ResetsRoundData_PreservesMatchAccumulators()
+        {
+            var state = await StartedGameAsync(start: "HOUSE");
+            var firstSubmitter = SubmitterOf(state);
+            SubmitAndApprove(state, "boat"); // accepted pair → accumulator + chain link
+            Assert.AreEqual(1, state.Chain.Count);
+            Assert.AreEqual(1, state.GamePlayers[firstSubmitter.Id].AcceptedPairs);
+
+            Assert.IsTrue(_engine.RotateAuditorAndStartRound(state).IsSuccess);
+
+            Assert.AreEqual(0, state.Chain.Count);                // round data reset
+            Assert.AreEqual(0, state.RejectionsThisTurn);
+            Assert.IsFalse(state.DestinationReached);
+            Assert.IsNull(state.PendingSubmission);
+            Assert.AreEqual(state.StartWord, state.CarriedWord);
+            // Match accumulator survives the rotation.
+            Assert.AreEqual(1, state.GamePlayers[firstSubmitter.Id].AcceptedPairs);
+        }
+
+        [TestMethod]
+        public async Task SetPersona_ChangesPersonaOnly_NoEffectOnOutcomes()
+        {
+            var state = await StartedGameAsync(start: "HOUSE");
+            var auditor = AuditorOf(state);
+
+            Assert.IsTrue(_engine.SetPersona(auditor, state, AuditorPersona.MercilessJudge).IsSuccess);
+            Assert.AreEqual(AuditorPersona.MercilessJudge, state.Persona);
+
+            // A non-Auditor can't set the persona.
+            var submitter = SubmitterOf(state);
+            Assert.IsTrue(_engine.SetPersona(submitter, state, AuditorPersona.EasyMark).IsFailure);
+            Assert.AreEqual(AuditorPersona.MercilessJudge, state.Persona);
+
+            // Approve still works identically regardless of persona.
+            Assert.IsTrue(_engine.SubmitPair(submitter, state, "boat").IsSuccess);
+            Assert.IsTrue(_engine.Approve(auditor, state).IsSuccess);
+            Assert.AreEqual(1, state.Chain.Count);
+            Assert.AreEqual(AuditorPersona.MercilessJudge, state.Persona); // unchanged by Approve
+        }
+
+        [TestMethod]
+        public async Task RejectWithPreset_RecordsPresetText_IncrementsRejectionStats()
+        {
+            var state = await StartedGameAsync();
+            var submitter = SubmitterOf(state);
+            _engine.SubmitPair(submitter, state, "boat");
+
+            // A preset reject is just Reject with a canned reason.
+            Assert.IsTrue(_engine.Reject(AuditorOf(state), state, "Cute, but no").IsSuccess);
+
+            Assert.AreEqual("Cute, but no", state.RejectionLog[0].Reason);
+            Assert.AreEqual("Cute, but no", state.LastRejectionReason);
+            Assert.AreEqual(1, state.GamePlayers[submitter.Id].RejectionsReceived);
+        }
+
+        [TestMethod]
+        public async Task BroadcastReaction_AppendsAllowedEmoji_RejectsUnknown_ManualClearEmpties()
+        {
+            var state = await StartedGameAsync();
+            var someone = SubmitterOf(state);
+
+            Assert.IsTrue(_engine.BroadcastReaction(someone, state, "🔥").IsSuccess);
+            Assert.AreEqual(1, state.RecentReactions.Count);
+            Assert.AreEqual("🔥", state.RecentReactions[0].Emoji);
+            Assert.AreEqual(someone.Id, state.RecentReactions[0].PlayerId);
+
+            // Unknown emoji is rejected and not appended.
+            Assert.IsTrue(_engine.BroadcastReaction(someone, state, "🍕").IsFailure);
+            Assert.AreEqual(1, state.RecentReactions.Count);
+
+            // A second valid reaction gets a distinct sequence number.
+            Assert.IsTrue(_engine.BroadcastReaction(someone, state, "👏").IsSuccess);
+            Assert.AreEqual(2, state.RecentReactions.Count);
+            Assert.AreNotEqual(state.RecentReactions[0].Seq, state.RecentReactions[1].Seq);
+
+            // Manual clear empties the list (the scheduled clear does this after a delay).
+            state.Execute(() => state.RecentReactions.Clear());
+            Assert.AreEqual(0, state.RecentReactions.Count);
+        }
+
+        [TestMethod]
+        public async Task BroadcastReaction_RejectedOutsidePlayingPhase()
+        {
+            var state = await StartedGameAsync();
+            var someone = SubmitterOf(state);
+            state.Execute(() => state.SetPhase(LinkedListGamePhase.RoundOver));
+
+            Assert.IsTrue(_engine.BroadcastReaction(someone, state, "🔥").IsFailure);
+            Assert.AreEqual(0, state.RecentReactions.Count);
+        }
+
+        [TestMethod]
+        public async Task EndMatch_SetsGameOver()
+        {
+            var state = await StartedGameAsync();
+
+            Assert.IsTrue(_engine.EndMatch(state).IsSuccess);
+
+            Assert.AreEqual(LinkedListGamePhase.GameOver, state.Phase);
+        }
+
+        [TestMethod]
+        public async Task RotateAuditorAndStartRound_AutoEndsAtRoundsPerMatch()
+        {
+            var state = await StartedGameAsync();
+            state.UpdateSettings(s => s with { RoundsPerMatch = 2 });
+
+            // Round 1 → 2 (1 < 2, so a real rotation).
+            Assert.IsTrue(_engine.RotateAuditorAndStartRound(state).IsSuccess);
+            Assert.AreEqual(2, state.RoundNumber);
+            Assert.AreEqual(LinkedListGamePhase.Playing, state.Phase);
+
+            // Round 2 has been played; the next rotate auto-ends the match.
+            Assert.IsTrue(_engine.RotateAuditorAndStartRound(state).IsSuccess);
+            Assert.AreEqual(LinkedListGamePhase.GameOver, state.Phase);
+            Assert.AreEqual(2, state.RoundNumber); // not incremented past the limit
+        }
+
+        [TestMethod]
+        public async Task Superlatives_FewestGuesses_PickCorrectWinners()
+        {
+            var state = await StartedGameAsync();
+            var order = state.TurnManager.TurnOrder;
+            var pA = state.GamePlayers[order[0]];
+            var pB = state.GamePlayers[order[1]];
+            var pC = state.GamePlayers[order[2]];
+
+            state.Execute(() =>
+            {
+                pA.AcceptedPairs = 3; pA.RejectionsReceived = 5;             // Most Rejected
+                pB.AcceptedPairs = 4; pB.RejectionsReceived = 0;             // Speed Demon + Smooth Operator
+                pC.AcceptedPairs = 1; pC.RejectionsReceived = 1; pC.LoopPairsMade = 2; // Loop Lord
+            });
+
+            Assert.IsTrue(_engine.EndMatch(state).IsSuccess);
+            var sup = state.Superlatives;
+
+            Assert.AreEqual(pA.PlayerId, sup.First(s => s.Title == "Most Rejected").PlayerId);
+            Assert.AreEqual(pB.PlayerId, sup.First(s => s.Title == "Speed Demon").PlayerId);
+            Assert.AreEqual(pC.PlayerId, sup.First(s => s.Title == "Loop Lord").PlayerId);
+            Assert.AreEqual(pB.PlayerId, sup.First(s => s.Title == "Smooth Operator").PlayerId);
+        }
+
+        [TestMethod]
+        public async Task Superlatives_FastestTime_SpeedDemonIsFastestContribution()
+        {
+            var state = await StartedGameAsync();
+            state.UpdateSettings(s => s with { ScoringMode = ScoringMode.FastestTime });
+            var order = state.TurnManager.TurnOrder;
+            var pA = state.GamePlayers[order[0]];
+            var pB = state.GamePlayers[order[1]];
+
+            state.Execute(() =>
+            {
+                pA.AcceptedPairs = 2; pA.FastestContribution = TimeSpan.FromSeconds(10);
+                pB.AcceptedPairs = 1; pB.FastestContribution = TimeSpan.FromSeconds(3);
+            });
+
+            Assert.IsTrue(_engine.EndMatch(state).IsSuccess);
+
+            Assert.AreEqual(pB.PlayerId, state.Superlatives.First(s => s.Title == "Speed Demon").PlayerId);
+        }
+
+        [TestMethod]
+        public async Task Superlatives_TiesBreakByAscendingPlayerId()
+        {
+            var state = await StartedGameAsync();
+            var order = state.TurnManager.TurnOrder;
+            var pA = state.GamePlayers[order[0]];
+            var pC = state.GamePlayers[order[2]];
+
+            // Two players tie on rejections; the ordinally-smaller id must win.
+            state.Execute(() =>
+            {
+                pA.AcceptedPairs = 1; pA.RejectionsReceived = 3;
+                pC.AcceptedPairs = 1; pC.RejectionsReceived = 3;
+            });
+
+            Assert.IsTrue(_engine.EndMatch(state).IsSuccess);
+
+            var expected = string.CompareOrdinal(pA.PlayerId, pC.PlayerId) <= 0 ? pA.PlayerId : pC.PlayerId;
+            Assert.AreEqual(expected, state.Superlatives.First(s => s.Title == "Most Rejected").PlayerId);
+        }
     }
 }

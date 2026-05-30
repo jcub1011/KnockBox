@@ -116,9 +116,49 @@ namespace KnockBox.LinkedList.Services.State.Games
             }
         }
 
-        // ── Auditor (rotation logic lands in M4; M1 just assigns the first one) ──
+        // ── Auditor rotation (§6) ────────────────────────────────────────────
 
+        /// <summary>The current Auditor's player id. Derived from
+        /// <see cref="AuditorRotationIndex"/> by the engine on each rotation.</summary>
         public string AuditorPlayerId { get; set; } = "";
+
+        /// <summary>Index into <see cref="TurnManager"/>'s <c>TurnOrder</c> identifying
+        /// the current Auditor. Advanced by one (with wrap) each round so the role
+        /// rotates and everyone audits in turn (§6). Kept separate from the submitter
+        /// rotation, which <see cref="TurnManager"/> drives.</summary>
+        public int AuditorRotationIndex { get; set; }
+
+        /// <summary>The Auditor's cosmetic persona for the current round (§6). No rule
+        /// effect — shown as flavor + an informal difficulty hint. Reset each round.</summary>
+        public AuditorPersona Persona { get; set; } = AuditorPersona.Neutral;
+
+        // ── Match progress (§10) ─────────────────────────────────────────────
+
+        /// <summary>1-based round counter within the current match. Set to 1 at match
+        /// start and incremented on each <c>RotateAuditorAndStartRound</c>.</summary>
+        public int RoundNumber { get; set; }
+
+        /// <summary>Fun end-of-match awards, computed once on entering
+        /// <see cref="LinkedListGamePhase.GameOver"/>.</summary>
+        public IReadOnlyList<Superlative> Superlatives { get; set; } = [];
+
+        // ── Reactions (§9.1) — heckle/cheer flavor, never scored ──────────────
+
+        /// <summary>Reactions currently floating over the chain view. Each is trimmed
+        /// by a scheduled clear ~2s after it's broadcast (see
+        /// <c>LinkedListGameEngine.BroadcastReaction</c>).</summary>
+        public readonly List<ReactionEvent> RecentReactions = [];
+
+        /// <summary>Monotonic counter assigning each reaction a unique
+        /// <see cref="ReactionEvent.Seq"/>, so the scheduled clear can remove exactly
+        /// the reaction it queued.</summary>
+        public long ReactionSequence { get; set; }
+
+        /// <summary>Banked thinking time captured at the start of the active submitter's
+        /// current attempt, so <c>Approve</c> can charge a per-contribution time for
+        /// the "Speed Demon" superlative. Only meaningful when the clock runs
+        /// (Fastest Time + timers).</summary>
+        public TimeSpan ContributionBaseline { get; set; }
 
         /// <summary>
         /// Host-configurable match rules. Always replaced atomically via
@@ -158,6 +198,15 @@ namespace KnockBox.LinkedList.Services.State.Games
     /// <summary>A player's proposed next word (the first word is the carried word).</summary>
     public sealed record Submission(string PlayerId, string ProposedWord);
 
+    /// <summary>A transient reaction broadcast by a non-active player (§9.1). Cleared
+    /// shortly after display; <paramref name="Seq"/> uniquely identifies it so the
+    /// scheduled clear removes exactly the right one.</summary>
+    public sealed record ReactionEvent(string PlayerId, string Emoji, long Seq);
+
+    /// <summary>A fun end-of-match award (§10): a title, the winning player, and a
+    /// short detail line explaining why they earned it.</summary>
+    public sealed record Superlative(string Title, string Emoji, string PlayerId, string PlayerName, string Detail);
+
     /// <summary>
     /// Immutable snapshot of a finished round's score, computed once on entering
     /// <see cref="LinkedListGamePhase.RoundOver"/>. <paramref name="Guesses"/> is the
@@ -173,9 +222,17 @@ namespace KnockBox.LinkedList.Services.State.Games
     {
         public required string PlayerId { get; init; }
         public required string DisplayName { get; init; }
+
+        // ── Match accumulators (persist across rounds; reset only at match start) ──
         public int AcceptedPairs { get; set; }     // for "fewest guesses" + superlatives
         public int RejectionsReceived { get; set; }
-        // group id / time accrual added in later milestones
+        public int LoopPairsMade { get; set; }      // "Loop Lord" superlative
+
+        /// <summary>Fastest single accepted contribution's thinking time (Fastest
+        /// Time mode), or <c>null</c> if the player hasn't landed a timed pair yet.
+        /// Drives the "Speed Demon" superlative.</summary>
+        public TimeSpan? FastestContribution { get; set; }
+        // group id added in later milestones
     }
 
     #endregion

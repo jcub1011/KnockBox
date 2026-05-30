@@ -39,6 +39,177 @@
     font-size: 1.25rem;
 }
 
+/* ── Meta strip: round + auditor / persona ── */
+
+.ll-meta-strip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.ll-round-chip {
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(128, 128, 128, 0.18);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.ll-auditor-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(255, 200, 0, 0.14);
+    border: 1px solid rgba(255, 200, 0, 0.4);
+}
+
+.ll-auditor-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.7;
+}
+
+.ll-auditor-name {
+    font-weight: 700;
+}
+
+.ll-persona-tag {
+    font-size: 0.8rem;
+    opacity: 0.85;
+}
+
+/* ── Persona dial (Auditor view) ── */
+
+.ll-persona-dial {
+    margin-bottom: 1rem;
+}
+
+.ll-persona-dial-label {
+    display: block;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.7;
+    margin-bottom: 0.35rem;
+}
+
+.ll-persona-options {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.ll-persona-btn {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid rgba(128, 128, 128, 0.45);
+    border-radius: 0.5rem;
+    background: rgba(0, 0, 0, 0.12);
+    color: inherit;
+    cursor: pointer;
+    min-width: 4.2rem;
+}
+
+.ll-persona-btn-active {
+    border-color: rgba(255, 200, 0, 0.8);
+    background: rgba(255, 200, 0, 0.18);
+}
+
+.ll-persona-btn-emoji {
+    font-size: 1.2rem;
+}
+
+.ll-persona-btn-label {
+    font-size: 0.66rem;
+    opacity: 0.85;
+}
+
+/* ── Reason presets ── */
+
+.ll-preset-row {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.ll-preset-btn {
+    padding: 0.4rem 0.7rem;
+    border: 1px solid rgba(211, 65, 59, 0.5);
+    border-radius: 999px;
+    background: rgba(211, 65, 59, 0.12);
+    color: inherit;
+    cursor: pointer;
+    font-size: 0.82rem;
+}
+
+.ll-preset-btn:hover {
+    background: rgba(211, 65, 59, 0.22);
+}
+
+/* ── Reactions ── */
+
+.ll-reaction-bar {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.ll-reaction-btn {
+    padding: 0.35rem 0.6rem;
+    border: 1px solid rgba(128, 128, 128, 0.4);
+    border-radius: 0.5rem;
+    background: rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.ll-reaction-btn:hover {
+    background: rgba(128, 128, 128, 0.22);
+}
+
+.ll-chain-card {
+    position: relative;
+}
+
+.ll-reaction-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    z-index: 2;
+}
+
+.ll-reaction-float {
+    font-size: 2.2rem;
+    animation: ll-reaction-pop 2s ease-out forwards;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+}
+
+@keyframes ll-reaction-pop {
+    0% { transform: translateY(10px) scale(0.6); opacity: 0; }
+    15% { transform: translateY(0) scale(1.15); opacity: 1; }
+    70% { opacity: 1; }
+    100% { transform: translateY(-28px) scale(1); opacity: 0; }
+}
+
 /* ── Timer bar (Fastest Time) ── */
 
 .ll-timer {

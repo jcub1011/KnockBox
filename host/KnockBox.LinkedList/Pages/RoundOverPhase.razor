@@ -87,17 +87,42 @@
         </div>
     </div>
 
-    @* ── Host continue control (full match flow lands in M4) ── *@
+    @* ── Match progress + next Auditor ── *@
+    <div class="ll-ro-progress">
+        <span class="ll-round-chip">Round @GameState.RoundNumber / @GameState.Settings.RoundsPerMatch</span>
+        @if (!IsLastRound)
+        {
+            <span class="ll-ro-next-auditor">Next Auditor: <strong>@NextAuditorName</strong></span>
+        }
+    </div>
+
+    @* ── Host controls: next round vs end match (§10) ── *@
     @if (isHost)
     {
         <div class="ll-ro-actions">
-            <button class="ll-btn ll-btn-primary" @onclick="StartNewRound" disabled="@_starting">
-                @(_starting ? "Starting…" : "New round")
-            </button>
+            @if (IsLastRound)
+            {
+                <button class="ll-btn ll-btn-primary" @onclick="EndMatch" disabled="@_starting">
+                    @(_starting ? "Wrapping up…" : "View Results 🏆")
+                </button>
+            }
+            else
+            {
+                <button class="ll-btn ll-btn-primary" @onclick="NextRound" disabled="@_starting">
+                    @(_starting ? "Starting…" : "Next round")
+                </button>
+                <button class="ll-btn ll-btn-ghost" @onclick="EndMatch" disabled="@_starting">
+                    End match early
+                </button>
+            }
         </div>
     }
     else
     {
-        <p class="ll-ro-wait">Waiting for the host to start the next round…</p>
+        <p class="ll-ro-wait">
+            @(IsLastRound
+                ? "Waiting for the host to show the final results…"
+                : "Waiting for the host to start the next round…")
+        </p>
     }
 </div>

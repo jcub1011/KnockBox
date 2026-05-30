@@ -1,4 +1,4 @@
-.ll-roundover {
+.ll-gameover {
     width: 100%;
     max-width: 40rem;
     margin: 0 auto;
@@ -7,34 +7,25 @@
     gap: 1rem;
 }
 
-/* ── Outcome banner ── */
+/* ── Headline ── */
 
-.ll-ro-banner {
+.ll-go-banner {
     text-align: center;
     padding: 1.25rem;
     border-radius: 0.75rem;
-    border: 1px solid rgba(128, 128, 128, 0.35);
+    border: 1px solid rgba(255, 200, 0, 0.5);
+    background: rgba(255, 200, 0, 0.12);
 }
 
-.ll-ro-success {
-    background: rgba(34, 165, 89, 0.14);
-    border-color: rgba(34, 165, 89, 0.5);
-}
-
-.ll-ro-stalled {
-    background: rgba(211, 65, 59, 0.12);
-    border-color: rgba(211, 65, 59, 0.4);
-}
-
-.ll-ro-emoji {
+.ll-go-emoji {
     font-size: 2.5rem;
 }
 
-.ll-ro-headline {
+.ll-go-headline {
     margin: 0.25rem 0 0.25rem;
 }
 
-.ll-ro-sub {
+.ll-go-sub {
     margin: 0;
     opacity: 0.8;
     text-transform: uppercase;
@@ -42,93 +33,129 @@
     font-size: 0.9rem;
 }
 
-/* ── Score ── */
+/* ── Superlatives ── */
 
-.ll-ro-score {
-    text-align: center;
-    padding: 1rem;
+.ll-go-superlatives {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0.6rem;
+}
+
+.ll-superlative-card {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid rgba(128, 128, 128, 0.35);
+    border-radius: 0.75rem;
+    background: rgba(0, 0, 0, 0.12);
+}
+
+.ll-superlative-emoji {
+    font-size: 1.8rem;
+}
+
+.ll-superlative-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+    min-width: 0;
+}
+
+.ll-superlative-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.7;
+}
+
+.ll-superlative-player {
+    font-weight: 800;
+}
+
+.ll-superlative-detail {
+    font-size: 0.78rem;
+    opacity: 0.8;
+}
+
+/* ── Scoreboard ── */
+
+.ll-go-scoreboard {
+    padding: 1rem 1.25rem;
     border: 1px solid rgba(128, 128, 128, 0.35);
     border-radius: 0.75rem;
 }
 
-.ll-ro-metric {
+.ll-go-section-title {
+    margin: 0 0 0.75rem;
+}
+
+.ll-go-rows {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 0.1rem;
+    gap: 0.4rem;
 }
 
-.ll-ro-metric-value {
-    font-size: 3rem;
-    font-weight: 800;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-}
-
-.ll-ro-metric-label {
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: 0.8rem;
-    opacity: 0.7;
-}
-
-.ll-ro-par {
-    margin: 0.75rem 0 0;
-    font-size: 0.95rem;
-}
-
-.ll-ro-par-good {
-    color: #2fcf7a;
-}
-
-.ll-ro-par-over {
-    color: #ff8b6b;
-}
-
-/* ── Match progress + next Auditor ── */
-
-.ll-ro-progress {
+.ll-go-row {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
+    gap: 0.6rem;
+    padding: 0.5rem 0.7rem;
+    border-radius: 0.5rem;
+    background: rgba(128, 128, 128, 0.12);
+}
+
+.ll-go-row-top {
+    background: rgba(255, 200, 0, 0.16);
+    outline: 1px solid rgba(255, 200, 0, 0.45);
+}
+
+.ll-go-row-me {
+    outline: 2px solid rgba(80, 160, 255, 0.6);
+}
+
+.ll-go-rank {
+    font-size: 1.1rem;
+    min-width: 1.8rem;
+    text-align: center;
+}
+
+.ll-go-name {
+    font-weight: 700;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ll-go-stats {
+    display: flex;
+    gap: 0.5rem;
     flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
-.ll-round-chip {
-    padding: 0.25rem 0.6rem;
-    border-radius: 999px;
-    background: rgba(128, 128, 128, 0.18);
-    font-size: 0.78rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.ll-ro-next-auditor {
-    font-size: 0.95rem;
+.ll-go-stat {
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
     opacity: 0.9;
 }
 
 /* ── Actions ── */
 
-.ll-ro-actions {
+.ll-go-actions {
     display: flex;
     justify-content: center;
     gap: 0.6rem;
-    flex-wrap: wrap;
 }
 
-.ll-btn-ghost {
-    background: rgba(128, 128, 128, 0.3);
-}
-
-.ll-ro-wait {
+.ll-go-wait {
     text-align: center;
     opacity: 0.75;
 }
 
-/* ── Buttons (mirror PlayingPhase) ── */
+/* ── Buttons ── */
 
 .ll-btn {
     padding: 0.6rem 1.2rem;
@@ -148,7 +175,7 @@
     background: #3b82f6;
 }
 
-/* ── Chain (mirror PlayingPhase styling so the final chain reads the same) ── */
+/* ── Chain (mirror PlayingPhase so the final chain reads the same) ── */
 
 .ll-chain-card {
     padding: 1rem 1.25rem;

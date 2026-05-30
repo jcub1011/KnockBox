@@ -84,6 +84,10 @@
 
                 <h4 class="ll-section-title">Rules</h4>
                 <label class="ll-field">
+                    <span>Rounds per match</span>
+                    <input type="number" min="1" class="ll-input" @bind="RoundsPerMatch" />
+                </label>
+                <label class="ll-field">
                     <span>Rejection cap per turn (0 = off)</span>
                     <input type="number" min="0" class="ll-input" @bind="RejectionCap" />
                 </label>

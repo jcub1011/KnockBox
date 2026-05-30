@@ -30,6 +30,10 @@ public sealed record LinkedListSettings
     /// <summary>Collective co-op target the host sets by hand (§8.1). Null = no par.</summary>
     public int? Par { get; init; } = null;
 
+    /// <summary>Rounds played before the match ends and the Results screen shows (§10).
+    /// The Auditor rotates each round, so this also controls how many players audit.</summary>
+    public int RoundsPerMatch { get; init; } = 5;
+
     // Timer durations used in Milestone 3 (defined now so the record is stable).
     public TimeSpan PerTurnClock { get; init; } = TimeSpan.FromSeconds(60);
     public bool EnableTimers { get; init; } = true;

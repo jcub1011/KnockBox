@@ -8,6 +8,9 @@
     var isMyTurn = !isHostSpectator && myId == activeId && !isAuditor;
     var pending = GameState.PendingSubmission;
     var activeName = DisplayNameOf(activeId);
+    var auditorName = DisplayNameOf(GameState.AuditorPlayerId);
+    var persona = PersonaInfoOf(GameState.Persona);
+    var canReact = !isHostSpectator ? (myId != activeId && !isAuditor) : true;
 }
 
 <div class="ll-play">
@@ -17,6 +20,16 @@
         <span class="ll-journey-word ll-journey-start">@GameState.StartWord</span>
         <span class="ll-journey-arrow">➜</span>
         <span class="ll-journey-word ll-journey-dest">@GameState.DestinationWord</span>
+    </div>
+
+    @* ── Round + Auditor / persona strip ── *@
+    <div class="ll-meta-strip">
+        <span class="ll-round-chip">Round @GameState.RoundNumber / @GameState.Settings.RoundsPerMatch</span>
+        <span class="ll-auditor-chip" title="@persona.Hint">
+            <span class="ll-auditor-label">Auditor</span>
+            <span class="ll-auditor-name">@auditorName</span>
+            <span class="ll-persona-tag">@persona.Emoji @persona.Label</span>
+        </span>
     </div>
 
     @* ── Timer bar (Fastest Time only): live per-turn countdown + banked total ── *@
@@ -87,6 +100,21 @@
         <div class="ll-panel ll-panel-auditor">
             <p class="ll-role-label">You are the Auditor</p>
 
+            @* ── Persona dial (cosmetic, §6) ── *@
+            <div class="ll-persona-dial">
+                <span class="ll-persona-dial-label">Persona</span>
+                <div class="ll-persona-options">
+                    @foreach (var p in AllPersonas)
+                    {
+                        <button class="ll-persona-btn @(GameState.Persona == p.Persona ? "ll-persona-btn-active" : "")"
+                                title="@p.Hint" @onclick="() => SetPersona(p.Persona)">
+                            <span class="ll-persona-btn-emoji">@p.Emoji</span>
+                            <span class="ll-persona-btn-label">@p.Label</span>
+                        </button>
+                    }
+                </div>
+            </div>
+
             @if (pending is not null)
             {
                 <div class="ll-proposal">
@@ -106,8 +134,15 @@
                 else
                 {
                     <form class="ll-reject-form" @onsubmit="ConfirmReject" @onsubmit:preventDefault="true">
+                        <div class="ll-preset-row">
+                            @foreach (var preset in ReasonPresets)
+                            {
+                                <button type="button" class="ll-preset-btn"
+                                        @onclick="() => RejectWithPreset(preset)">@preset</button>
+                            }
+                        </div>
                         <input @key="_reasonKey" type="text" class="ll-input"
-                               placeholder="Reason (required)…"
+                               placeholder="…or a custom reason (required)"
                                @oninput="OnReasonInput" maxlength="80" autocomplete="off" />
                         <div class="ll-decision-row">
                             <button type="submit" class="ll-btn ll-btn-reject"
@@ -149,8 +184,29 @@
         </div>
     }
 
+    @* ── Reaction bar: non-active players heckle/cheer (§9.1) ── *@
+    @if (canReact)
+    {
+        <div class="ll-reaction-bar">
+            @foreach (var emoji in Reactions)
+            {
+                <button class="ll-reaction-btn" @onclick="() => React(emoji)">@emoji</button>
+            }
+        </div>
+    }
+
     @* ── The chain, rendered as connected links (the linked list) ── *@
     <div class="ll-chain-card">
+        @* Floating reactions overlay the chain view. *@
+        @if (GameState.RecentReactions.Count > 0)
+        {
+            <div class="ll-reaction-overlay">
+                @foreach (var r in GameState.RecentReactions)
+                {
+                    <span @key="r.Seq" class="ll-reaction-float" title="@DisplayNameOf(r.PlayerId)">@r.Emoji</span>
+                }
+            </div>
+        }
         <h4 class="ll-chain-title">The Chain</h4>
         <div class="ll-chain">
             <span class="ll-anchor ll-anchor-start">@GameState.StartWord</span>

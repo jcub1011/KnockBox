@@ -25,13 +25,22 @@ namespace KnockBox.LinkedList.Pages
                 ? $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}"
                 : $"{elapsed.Minutes}:{elapsed.Seconds:00}";
 
-        /// <summary>
-        /// Host-only: begins a fresh round. Clears the start/destination words so a
-        /// new curated pair is drawn, then re-runs the engine's start logic (which
-        /// resets the chain, scoring, and turn order). Full match flow — scoreboards,
-        /// auditor rotation, match end — arrives in Milestone 4.
-        /// </summary>
-        protected async Task StartNewRound()
+        /// <summary>True once the match has played its full complement of rounds — the
+        /// host can only proceed to the Results screen (§10 auto-end).</summary>
+        protected bool IsLastRound => GameState.RoundNumber >= GameState.Settings.RoundsPerMatch;
+
+        /// <summary>Display name of the Auditor who'll run the next round (§6).</summary>
+        protected string NextAuditorName
+        {
+            get
+            {
+                var id = LinkedListGameEngine.NextAuditorId(GameState);
+                return GameState.GamePlayers.TryGetValue(id, out var ps) ? ps.DisplayName : "—";
+            }
+        }
+
+        /// <summary>Host-only: rotates the Auditor and starts the next round (§6/§10).</summary>
+        protected void NextRound()
         {
             if (_starting || UserService.CurrentUser is null) return;
             if (GameState.Host.Id != UserService.CurrentUser.Id) return;
@@ -39,17 +48,33 @@ namespace KnockBox.LinkedList.Pages
             _starting = true;
             try
             {
-                GameState.Execute(() =>
-                {
-                    GameState.StartWord = "";
-                    GameState.DestinationWord = "";
-                });
-
-                var result = await GameEngine.StartAsync(UserService.CurrentUser, GameState);
+                var result = GameEngine.RotateAuditorAndStartRound(GameState);
                 if (result.TryGetFailure(out var error))
                 {
-                    Logger.LogError("Failed to start a new Linked List round: {Error}", error.InternalMessage);
-                    await OnError.InvokeAsync(error.PublicMessage);
+                    Logger.LogError("Failed to start the next Linked List round: {Error}", error.InternalMessage);
+                    _ = OnError.InvokeAsync(error.PublicMessage);
+                }
+            }
+            finally
+            {
+                _starting = false;
+            }
+        }
+
+        /// <summary>Host-only: ends the match and shows the Results screen (§10).</summary>
+        protected void EndMatch()
+        {
+            if (_starting || UserService.CurrentUser is null) return;
+            if (GameState.Host.Id != UserService.CurrentUser.Id) return;
+
+            _starting = true;
+            try
+            {
+                var result = GameEngine.EndMatch(GameState);
+                if (result.TryGetFailure(out var error))
+                {
+                    Logger.LogError("Failed to end the Linked List match: {Error}", error.InternalMessage);
+                    _ = OnError.InvokeAsync(error.PublicMessage);
                 }
             }
             finally

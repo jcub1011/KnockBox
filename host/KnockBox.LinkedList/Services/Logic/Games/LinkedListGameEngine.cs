@@ -74,11 +74,23 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                         participantIds.FirstOrDefault(id => id != currentSubmitter) ?? "";
                 }
 
-                // Reset round scoring state and start the first submitter's clock.
+                // Seed the rotation index from the chosen Auditor so M4's
+                // RotateAuditorAndStartRound advances cleanly from here (§6).
+                gameState.AuditorRotationIndex =
+                    Math.Max(0, gameState.TurnManager.TurnOrder.IndexOf(gameState.AuditorPlayerId));
+
+                // Reset round scoring + match state and start the first submitter's clock.
                 gameState.ElapsedThinkingTime = TimeSpan.Zero;
                 gameState.ThinkingSegmentStartedUtc = null;
                 gameState.LastRoundResult = null;
                 gameState.PhaseExpiresAtUtc = null;
+                gameState.ContributionBaseline = TimeSpan.Zero;
+                gameState.PendingSubmission = null;
+                gameState.LastRejectionReason = null;
+                gameState.RecentReactions.Clear();
+                gameState.Persona = AuditorPersona.Neutral;
+                gameState.Superlatives = [];
+                gameState.RoundNumber = 1;
 
                 gameState.SetJoinable(false);
                 gameState.SetPhase(LinkedListGamePhase.Playing);
@@ -193,7 +205,21 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                     ? ps.DisplayName : "Player";
 
                 state.Chain.Add(new ChainLink(state.CarriedWord, proposed, sub.PlayerId, playerName, isLoop));
-                if (ps is not null) ps.AcceptedPairs++;
+                if (ps is not null)
+                {
+                    ps.AcceptedPairs++;
+                    if (isLoop) ps.LoopPairsMade++;
+
+                    // Per-contribution thinking time (Fastest Time): the segment was
+                    // banked at SubmitPair, so ElapsedThinkingTime is final for this
+                    // attempt. Track the player's fastest landed pair for "Speed Demon".
+                    var contribution = state.ElapsedThinkingTime - state.ContributionBaseline;
+                    if (contribution > TimeSpan.Zero
+                        && (ps.FastestContribution is null || contribution < ps.FastestContribution))
+                    {
+                        ps.FastestContribution = contribution;
+                    }
+                }
 
                 if (string.Equals(proposed, state.DestinationWord, StringComparison.OrdinalIgnoreCase))
                 {
@@ -321,6 +347,9 @@ namespace KnockBox.LinkedList.Services.Logic.Games
         private void BeginThinkingTurn(LinkedListGameState state, DateTimeOffset now)
         {
             state.TurnSequence++;
+            // Snapshot banked time so Approve can charge only this attempt's thinking
+            // toward the player's fastest-contribution stat (§10 "Speed Demon").
+            state.ContributionBaseline = state.ElapsedThinkingTime;
             state.StartClock(now); // gated internally on Fastest Time + EnableTimers
 
             state.TurnTimeoutHandle?.Cancel();
@@ -399,6 +428,275 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                 mode, guesses, state.ElapsedThinkingTime, par, beatPar, state.DestinationReached);
 
             state.SetPhase(LinkedListGamePhase.RoundOver);
+        }
+
+        // ── Match flow (§10): rotation, persona, reactions, end-of-match ─────
+
+        /// <summary>Emoji the table can react with (§9.1). The engine validates against
+        /// this set so a client can't inject arbitrary content.</summary>
+        public static readonly IReadOnlyList<string> AllowedReactions =
+            ["😂", "🔥", "👏", "😱", "🤔", "💀"];
+
+        /// <summary>The id of the Auditor for the <em>next</em> round, given the current
+        /// rotation — used by the RoundOver screen to announce who's up. Returns empty
+        /// if the turn order isn't set.</summary>
+        public static string NextAuditorId(LinkedListGameState state)
+        {
+            int count = state.TurnManager.TurnOrder.Count;
+            if (count == 0) return "";
+            return state.TurnManager.TurnOrder[(state.AuditorRotationIndex + 1) % count];
+        }
+
+        /// <summary>
+        /// Ends the current round's scoreboard and starts a fresh round: rotates the
+        /// Auditor forward by one in turn order (§6), resets all round data, draws a new
+        /// curated start/destination pair, seats the first non-Auditor as submitter,
+        /// and arms the clock. If the match has already reached
+        /// <see cref="LinkedListSettings.RoundsPerMatch"/>, ends the match instead
+        /// (auto-end safety net for the host control).
+        /// </summary>
+        public Result RotateAuditorAndStartRound(LinkedListGameState state, DateTimeOffset? now = null)
+        {
+            if (state is null) return Result.FromError("No game state.");
+
+            var ts = now ?? DateTimeOffset.UtcNow;
+            Result inner = Result.Success;
+            var exec = state.Execute(() =>
+            {
+                int count = state.TurnManager.TurnOrder.Count;
+                if (count == 0)
+                {
+                    inner = Result.FromError("Can't start a round without players.");
+                    return;
+                }
+
+                // Auto-end: the match has run its rounds — show the Results screen.
+                if (state.RoundNumber >= state.Settings.RoundsPerMatch)
+                {
+                    EndMatchCore(state, ts);
+                    return;
+                }
+
+                // Rotate the Auditor forward (wraps so everyone audits in turn).
+                state.AuditorRotationIndex = (state.AuditorRotationIndex + 1) % count;
+                state.AuditorPlayerId = state.TurnManager.TurnOrder[state.AuditorRotationIndex];
+
+                // Reset round data (match accumulators on players are preserved).
+                state.Chain.Clear();
+                state.RejectionLog.Clear();
+                state.RejectionsThisTurn = 0;
+                state.DestinationReached = false;
+                state.PendingSubmission = null;
+                state.LastRejectionReason = null;
+                state.RecentReactions.Clear();
+                state.ElapsedThinkingTime = TimeSpan.Zero;
+                state.ThinkingSegmentStartedUtc = null;
+                state.ContributionBaseline = TimeSpan.Zero;
+                state.PhaseExpiresAtUtc = null;
+                state.LastRoundResult = null;
+                state.Persona = AuditorPersona.Neutral;
+
+                // New journey for the round.
+                var pair = wordPairSource.Random(randomNumberService);
+                state.StartWord = pair.Start;
+                state.DestinationWord = pair.Destination;
+                state.CarriedWord = state.StartWord;
+
+                SeatFirstNonAuditorSubmitter(state);
+
+                state.RoundNumber++;
+                state.SetPhase(LinkedListGamePhase.Playing);
+                BeginThinkingTurn(state, ts);
+            });
+
+            return exec.TryGetFailure(out var error) ? Result.FromError(error) : inner;
+        }
+
+        /// <summary>
+        /// Ends the match: disarms timers, computes the end-of-match superlatives from
+        /// the per-player accumulators, and transitions to
+        /// <see cref="LinkedListGamePhase.GameOver"/>.
+        /// </summary>
+        public Result EndMatch(LinkedListGameState state, DateTimeOffset? now = null)
+        {
+            if (state is null) return Result.FromError("No game state.");
+
+            var ts = now ?? DateTimeOffset.UtcNow;
+            var exec = state.Execute(() => EndMatchCore(state, ts));
+            return exec.TryGetFailure(out var error) ? Result.FromError(error) : Result.Success;
+        }
+
+        /// <summary>Shared end-of-match transition. Call from inside the execute lock.</summary>
+        private static void EndMatchCore(LinkedListGameState state, DateTimeOffset now)
+        {
+            state.BankClock(now);
+            state.TurnTimeoutHandle?.Cancel();
+            state.TurnTimeoutHandle = null;
+            state.PhaseExpiresAtUtc = null;
+            state.PendingSubmission = null;
+
+            state.Superlatives = ComputeSuperlatives(state);
+            state.SetPhase(LinkedListGamePhase.GameOver);
+        }
+
+        /// <summary>
+        /// The Auditor sets the round's cosmetic persona (§6). No rule effect — the
+        /// outcome of <c>Approve</c>/<c>Reject</c> is identical regardless of persona.
+        /// </summary>
+        public Result SetPersona(User user, LinkedListGameState state, AuditorPersona persona)
+        {
+            if (user is null) return Result.FromError("Unknown player.");
+
+            Result inner = Result.Success;
+            var exec = state.Execute(() =>
+            {
+                if (user.Id != state.AuditorPlayerId)
+                {
+                    inner = Result.FromError("Only the Auditor can set the persona.");
+                    return;
+                }
+                state.Persona = persona;
+            });
+
+            return exec.TryGetFailure(out var error) ? Result.FromError(error) : inner;
+        }
+
+        /// <summary>
+        /// Broadcasts a transient emoji reaction (§9.1) from any player to the whole
+        /// table and schedules its removal after <paramref name="ttl"/> (default ~2s).
+        /// Heckle/cheer flavor only — never scored. Validated against
+        /// <see cref="AllowedReactions"/>.
+        /// </summary>
+        public Result BroadcastReaction(User user, LinkedListGameState state, string emoji, TimeSpan? ttl = null)
+        {
+            if (user is null) return Result.FromError("Unknown player.");
+
+            Result inner = Result.Success;
+            var exec = state.Execute(() =>
+            {
+                if (state.Phase != LinkedListGamePhase.Playing)
+                {
+                    inner = Result.FromError("Reactions are only live during a round.");
+                    return;
+                }
+                if (string.IsNullOrEmpty(emoji) || !AllowedReactions.Contains(emoji))
+                {
+                    inner = Result.FromError("That reaction isn't available.");
+                    return;
+                }
+
+                long seq = ++state.ReactionSequence;
+                state.RecentReactions.Add(new ReactionEvent(user.Id, emoji, seq));
+
+                // Drop this exact reaction after a beat. Runs through ExecuteAsync, so
+                // it mutates state under the lock and notifies subscribers.
+                state.ScheduleCallback(ttl ?? TimeSpan.FromSeconds(2), () =>
+                {
+                    state.RecentReactions.RemoveAll(r => r.Seq == seq);
+                    return Task.CompletedTask;
+                });
+            });
+
+            return exec.TryGetFailure(out var error) ? Result.FromError(error) : inner;
+        }
+
+        /// <summary>
+        /// Computes the fun end-of-match awards (§10) from per-player accumulators.
+        /// Ties break deterministically by ascending player id so results are stable.
+        /// Only players who contributed at least one accepted pair are eligible.
+        /// </summary>
+        private static IReadOnlyList<Superlative> ComputeSuperlatives(LinkedListGameState state)
+        {
+            var players = state.GamePlayers.Values
+                .OrderBy(p => p.PlayerId, StringComparer.Ordinal)
+                .ToList();
+            if (players.Count == 0) return [];
+
+            var awards = new List<Superlative>();
+
+            // Most Rejected — the player who drew the most rejections (needs > 0).
+            var mostRejected = players
+                .Where(p => p.RejectionsReceived > 0)
+                .OrderByDescending(p => p.RejectionsReceived)
+                .FirstOrDefault();
+            if (mostRejected is not null)
+            {
+                awards.Add(new Superlative(
+                    "Most Rejected", "🙅", mostRejected.PlayerId, mostRejected.DisplayName,
+                    $"{mostRejected.RejectionsReceived} rejection{(mostRejected.RejectionsReceived == 1 ? "" : "s")} survived."));
+            }
+
+            // Speed Demon — fastest landed pair (Fastest Time) or most accepted pairs.
+            if (state.Settings.ScoringMode == ScoringMode.FastestTime)
+            {
+                var speed = players
+                    .Where(p => p.FastestContribution is not null)
+                    .OrderBy(p => p.FastestContribution!.Value)
+                    .FirstOrDefault();
+                if (speed is not null)
+                {
+                    awards.Add(new Superlative(
+                        "Speed Demon", "⚡", speed.PlayerId, speed.DisplayName,
+                        $"Fastest pair in {speed.FastestContribution!.Value.TotalSeconds:0.#}s."));
+                }
+            }
+            else
+            {
+                var prolific = players
+                    .Where(p => p.AcceptedPairs > 0)
+                    .OrderByDescending(p => p.AcceptedPairs)
+                    .FirstOrDefault();
+                if (prolific is not null)
+                {
+                    awards.Add(new Superlative(
+                        "Speed Demon", "⚡", prolific.PlayerId, prolific.DisplayName,
+                        $"{prolific.AcceptedPairs} accepted pair{(prolific.AcceptedPairs == 1 ? "" : "s")}."));
+                }
+            }
+
+            // Loop Lord — most loop pairs landed (needs > 0).
+            var loopLord = players
+                .Where(p => p.LoopPairsMade > 0)
+                .OrderByDescending(p => p.LoopPairsMade)
+                .FirstOrDefault();
+            if (loopLord is not null)
+            {
+                awards.Add(new Superlative(
+                    "Loop Lord", "🔁", loopLord.PlayerId, loopLord.DisplayName,
+                    $"{loopLord.LoopPairsMade} loop pair{(loopLord.LoopPairsMade == 1 ? "" : "s")}."));
+            }
+
+            // Smooth Operator — landed pairs with zero rejections against them.
+            var smooth = players
+                .Where(p => p.AcceptedPairs > 0 && p.RejectionsReceived == 0)
+                .OrderByDescending(p => p.AcceptedPairs)
+                .FirstOrDefault();
+            if (smooth is not null)
+            {
+                awards.Add(new Superlative(
+                    "Smooth Operator", "😎", smooth.PlayerId, smooth.DisplayName,
+                    "Not a single rejection — clean run."));
+            }
+
+            return awards;
+        }
+
+        /// <summary>
+        /// Points <see cref="TurnManager"/> at the first player in turn order who isn't
+        /// the Auditor, so the new round's first submitter is valid. Call inside the
+        /// execute lock.
+        /// </summary>
+        private static void SeatFirstNonAuditorSubmitter(LinkedListGameState state)
+        {
+            var order = state.TurnManager.TurnOrder;
+            for (int i = 0; i < order.Count; i++)
+            {
+                if (order[i] != state.AuditorPlayerId)
+                {
+                    state.TurnManager.SetCurrentPlayerIndex(i);
+                    return;
+                }
+            }
         }
     }
 }

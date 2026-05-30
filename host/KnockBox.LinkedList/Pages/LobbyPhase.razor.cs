@@ -62,6 +62,12 @@ namespace KnockBox.LinkedList.Pages
             set => UpdateSettings(s => s with { HostPlaysGame = value });
         }
 
+        protected int RoundsPerMatch
+        {
+            get => GameState.Settings.RoundsPerMatch;
+            set => UpdateSettings(s => s with { RoundsPerMatch = value < 1 ? 1 : value });
+        }
+
         protected bool ParEnabled
         {
             get => GameState.Settings.Par is not null;

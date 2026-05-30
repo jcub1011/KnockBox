@@ -38,7 +38,7 @@ else
             <RoundOverPhase GameState="GameState" OnError="ShowError" />
             break;
         case LinkedListGamePhase.GameOver:
-            <div class="card"><p>Game over. (Milestone 4.)</p></div>
+            <GameOverPhase GameState="GameState" OnError="ShowError" />
             break;
         default:
             <div class="card"><p>Setting up…</p></div>
