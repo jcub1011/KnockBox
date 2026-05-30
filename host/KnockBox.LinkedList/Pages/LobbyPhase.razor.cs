@@ -22,10 +22,15 @@ namespace KnockBox.LinkedList.Pages
 
         protected bool IsHost => UserService.CurrentUser?.Id == GameState.Host.Id;
 
+        /// <summary>Bodies that actually play — registered players plus the host when
+        /// "Host plays the game" is on. This is what the start gate and the player-count
+        /// readout measure against, so toggling host-plays moves the count immediately.</summary>
+        protected int ParticipantCount => GameState.Participants.Length;
+
         protected bool CanStart =>
             GameState.IsJoinable
-            && GameState.Players.Length >= GameEngine.MinPlayerCount
-            && GameState.Players.Length <= GameEngine.MaxPlayerCount
+            && ParticipantCount >= GameEngine.MinPlayerCount
+            && ParticipantCount <= GameEngine.MaxPlayerCount
             && (Structure != PlayerStructure.Groups || TeamsValidity().Ok);
 
         protected void ToggleSettings() => SettingsOpen = !SettingsOpen;
@@ -197,6 +202,14 @@ namespace KnockBox.LinkedList.Pages
                 GameState.DestinationWord = pair.Destination.ToUpperInvariant();
             });
         }
+
+        /// <summary>Restores every host-configurable rule to its out-of-the-box value by
+        /// replacing the settings record with a fresh <see cref="LinkedListSettings"/>.
+        /// Round words, the chosen Auditor, and team assignments live on state (not the
+        /// settings record), so they're left untouched. Routed through
+        /// <see cref="UpdateSettings"/> so <c>HostIsParticipant</c> is reflected in the
+        /// same critical section.</summary>
+        protected void ResetSettings() => UpdateSettings(_ => new LinkedListSettings());
 
         private void UpdateSettings(Func<LinkedListSettings, LinkedListSettings> mutate)
         {

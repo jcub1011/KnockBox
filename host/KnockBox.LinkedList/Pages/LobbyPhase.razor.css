@@ -163,6 +163,16 @@
     font-size: 0.9rem;
 }
 
+.ll-settings-footer {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(128, 128, 128, 0.25);
+}
+
+.ll-reset-btn {
+    width: 100%;
+}
+
 .ll-field-row {
     flex-direction: row;
     align-items: center;
