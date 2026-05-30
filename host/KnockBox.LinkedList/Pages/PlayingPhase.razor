@@ -5,7 +5,6 @@
     var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
     var isAuditor = myId == GameState.AuditorPlayerId;
     var auditorName = DisplayNameOf(GameState.AuditorPlayerId);
-    var persona = PersonaInfoOf(GameState.Persona);
 
     // Reusable chain view for one group's chain.
     RenderFragment<ChainState> chainView = g =>
@@ -39,13 +38,12 @@
         <span class="ll-journey-word ll-journey-dest">@GameState.DestinationWord</span>
     </div>
 
-    @* ── Round + Auditor / persona strip ── *@
+    @* ── Round + Auditor strip ── *@
     <div class="ll-meta-strip">
         <span class="ll-round-chip">Round @GameState.RoundNumber / @GameState.Settings.RoundsPerMatch</span>
-        <span class="ll-auditor-chip" title="@persona.Hint">
+        <span class="ll-auditor-chip">
             <span class="ll-auditor-label">Auditor</span>
             <span class="ll-auditor-name">@auditorName</span>
-            <span class="ll-persona-tag">@persona.Emoji @persona.Label</span>
         </span>
     </div>
 
@@ -58,7 +56,6 @@
         var isMyTurn = !isHostSpectator && myId == activeId && !isAuditor;
         var pending = GameState.PendingSubmission;
         var activeName = DisplayNameOf(activeId);
-        var canReact = !isHostSpectator ? (myId != activeId && !isAuditor) : true;
 
         @* ── Timer bar (Fastest Time only): live per-turn countdown + banked total ── *@
         @if (GameState.Settings.ScoringMode == ScoringMode.FastestTime && GameState.Settings.EnableTimers)
@@ -128,21 +125,6 @@
             <div class="ll-panel ll-panel-auditor">
                 <p class="ll-role-label">You are the Auditor</p>
 
-                @* ── Persona dial (cosmetic, §6) ── *@
-                <div class="ll-persona-dial">
-                    <span class="ll-persona-dial-label">Persona</span>
-                    <div class="ll-persona-options">
-                        @foreach (var p in AllPersonas)
-                        {
-                            <button class="ll-persona-btn @(GameState.Persona == p.Persona ? "ll-persona-btn-active" : "")"
-                                    title="@p.Hint" @onclick="() => SetPersona(p.Persona)">
-                                <span class="ll-persona-btn-emoji">@p.Emoji</span>
-                                <span class="ll-persona-btn-label">@p.Label</span>
-                            </button>
-                        }
-                    </div>
-                </div>
-
                 @if (pending is not null)
                 {
                     <div class="ll-proposal">
@@ -152,33 +134,10 @@
                     </div>
                     <p class="ll-proposal-by">from @DisplayNameOf(pending.PlayerId)</p>
 
-                    @if (!_rejecting)
-                    {
-                        <div class="ll-decision-row">
-                            <button class="ll-btn ll-btn-approve" @onclick="Approve">✓ Approve</button>
-                            <button class="ll-btn ll-btn-reject" @onclick="BeginReject">✕ Reject</button>
-                        </div>
-                    }
-                    else
-                    {
-                        <form class="ll-reject-form" @onsubmit="ConfirmReject" @onsubmit:preventDefault="true">
-                            <div class="ll-preset-row">
-                                @foreach (var preset in ReasonPresets)
-                                {
-                                    <button type="button" class="ll-preset-btn"
-                                            @onclick="() => RejectWithPreset(preset)">@preset</button>
-                                }
-                            </div>
-                            <input @key="_reasonKey" type="text" class="ll-input"
-                                   placeholder="…or a custom reason (required)"
-                                   @oninput="OnReasonInput" maxlength="80" autocomplete="off" />
-                            <div class="ll-decision-row">
-                                <button type="submit" class="ll-btn ll-btn-reject"
-                                        disabled="@string.IsNullOrWhiteSpace(_reason)">Confirm reject</button>
-                                <button type="button" class="ll-btn ll-btn-ghost" @onclick="CancelReject">Cancel</button>
-                            </div>
-                        </form>
-                    }
+                    <div class="ll-decision-row">
+                        <button class="ll-btn ll-btn-approve" @onclick="Approve">✓ Approve</button>
+                        <button class="ll-btn ll-btn-reject" @onclick="Reject">✕ Reject</button>
+                    </div>
                 }
                 else
                 {
@@ -203,28 +162,8 @@
             </div>
         }
 
-        @* ── Reaction bar: non-active players heckle/cheer (§9.1) ── *@
-        @if (canReact)
-        {
-            <div class="ll-reaction-bar">
-                @foreach (var emoji in Reactions)
-                {
-                    <button class="ll-reaction-btn" @onclick="() => React(emoji)">@emoji</button>
-                }
-            </div>
-        }
-
         @* ── The chain, rendered as connected links (the linked list) ── *@
         <div class="ll-chain-card">
-            @if (GameState.RecentReactions.Count > 0)
-            {
-                <div class="ll-reaction-overlay">
-                    @foreach (var r in GameState.RecentReactions)
-                    {
-                        <span @key="r.Seq" class="ll-reaction-float" title="@DisplayNameOf(r.PlayerId)">@r.Emoji</span>
-                    }
-                </div>
-            }
             <h4 class="ll-chain-title">The Chain</h4>
             @chainView(GameState.PrimaryGroup!)
         </div>
@@ -234,8 +173,6 @@
     @* ════════════════════════════════════════════════════════════════════ *@
     else
     {
-        var canReactGroups = isHostSpectator || (!isAuditor && MyGroup is { } mg && myId != mg.TurnManager.CurrentPlayer);
-
         @* ════════════════ AUDITOR VIEW — audit queue ════════════════ *@
         @if (isAuditor)
         {
@@ -244,20 +181,6 @@
 
             <div class="ll-panel ll-panel-auditor">
                 <p class="ll-role-label">You are the Auditor</p>
-
-                <div class="ll-persona-dial">
-                    <span class="ll-persona-dial-label">Persona</span>
-                    <div class="ll-persona-options">
-                        @foreach (var p in AllPersonas)
-                        {
-                            <button class="ll-persona-btn @(GameState.Persona == p.Persona ? "ll-persona-btn-active" : "")"
-                                    title="@p.Hint" @onclick="() => SetPersona(p.Persona)">
-                                <span class="ll-persona-btn-emoji">@p.Emoji</span>
-                                <span class="ll-persona-btn-label">@p.Label</span>
-                            </button>
-                        }
-                    </div>
-                </div>
 
                 @if (auditing is { PendingSubmission: { } sub })
                 {
@@ -275,33 +198,10 @@
                     </div>
                     <p class="ll-proposal-by">from @DisplayNameOf(sub.PlayerId)</p>
 
-                    @if (!_rejecting)
-                    {
-                        <div class="ll-decision-row">
-                            <button class="ll-btn ll-btn-approve" @onclick="Approve">✓ Approve</button>
-                            <button class="ll-btn ll-btn-reject" @onclick="BeginReject">✕ Reject</button>
-                        </div>
-                    }
-                    else
-                    {
-                        <form class="ll-reject-form" @onsubmit="ConfirmReject" @onsubmit:preventDefault="true">
-                            <div class="ll-preset-row">
-                                @foreach (var preset in ReasonPresets)
-                                {
-                                    <button type="button" class="ll-preset-btn"
-                                            @onclick="() => RejectWithPreset(preset)">@preset</button>
-                                }
-                            </div>
-                            <input @key="_reasonKey" type="text" class="ll-input"
-                                   placeholder="…or a custom reason (required)"
-                                   @oninput="OnReasonInput" maxlength="80" autocomplete="off" />
-                            <div class="ll-decision-row">
-                                <button type="submit" class="ll-btn ll-btn-reject"
-                                        disabled="@string.IsNullOrWhiteSpace(_reason)">Confirm reject</button>
-                                <button type="button" class="ll-btn ll-btn-ghost" @onclick="CancelReject">Cancel</button>
-                            </div>
-                        </form>
-                    }
+                    <div class="ll-decision-row">
+                        <button class="ll-btn ll-btn-approve" @onclick="Approve">✓ Approve</button>
+                        <button class="ll-btn ll-btn-reject" @onclick="Reject">✕ Reject</button>
+                    </div>
                 }
                 else
                 {
@@ -415,16 +315,6 @@
                 </div>
             }
 
-            @if (canReactGroups)
-            {
-                <div class="ll-reaction-bar">
-                    @foreach (var emoji in Reactions)
-                    {
-                        <button class="ll-reaction-btn" @onclick="() => React(emoji)">@emoji</button>
-                    }
-                </div>
-            }
-
             <div class="ll-chain-card">
                 <h4 class="ll-chain-title">@group.GroupName's Chain</h4>
                 @chainView(group)
@@ -446,14 +336,5 @@
                 }
             </div>
         }
-    }
-
-    @* ── Last rejection reason (banter fuel, shown to everyone) ── *@
-    @if (!string.IsNullOrEmpty(GameState.LastRejectionReason))
-    {
-        <div class="ll-rejection-banner">
-            <span class="ll-rejection-icon">🚫</span>
-            <span>Auditor's last call: “@GameState.LastRejectionReason”</span>
-        </div>
     }
 </div>

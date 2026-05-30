@@ -4,7 +4,7 @@
 
 ## What we're building
 
-A Jackbox-style party word game (`host/KnockBox.LinkedList/Docs/linked-list-gdd.md`). Players build a chain of word pairs from a **start word** to a **destination word**; each new pair must begin with the last word of the previous pair (the **carried word**). A rotating **human Auditor** approves or rejects each submission and supplies a short reason on reject. Two scoring modes (Fewest Guesses, Fastest Time) and two player structures (Collective co-op, Groups competitive).
+A Jackbox-style party word game (`host/KnockBox.LinkedList/Docs/linked-list-gdd.md`). Players build a chain of word pairs from a **start word** to a **destination word**; each new pair must begin with the last word of the previous pair (the **carried word**). A rotating **human Auditor** approves or rejects each submission with a single tap (any reasoning is given out loud — the game is played in the same room). Two scoring modes (Fewest Guesses, Fastest Time) and two player structures (Collective co-op, Groups competitive).
 
 **v1 scope is human-Auditor only.** No automated judge, no word graph, no generated puzzles, no daily puzzle, no persistent profiles — those are GDD §11 future work and stay out.
 
@@ -89,7 +89,7 @@ The project is already referenced transitively from `host/KnockBox/KnockBox.cspr
 public enum LinkedListGamePhase { Setup, Playing, RoundOver, GameOver }
 
 public sealed record ChainLink(string FromWord, string ToWord, string PlayerId, string PlayerName, bool IsLoop);
-public sealed record RejectionInfo(string PlayerId, string AttemptedWord, string Reason);
+public sealed record RejectionInfo(string PlayerId, string AttemptedWord);
 public sealed record Submission(string PlayerId, string ProposedWord);  // first word is the carried word
 
 public sealed class LinkedListPlayerState
@@ -123,5 +123,5 @@ public sealed class LinkedListPlayerState
 1. **Foundation** — data model, settings, curated word source, engine start wiring, configurable lobby setup screen.
 2. **Core loop** — playable §4 loop: Collective + Fewest Guesses + human Auditor (submit → audit → chain → destination), rejection cap, loop detection, role-conditioned Playing UI with chain-as-links visual.
 3. **Scoring & timers** — Fewest Guesses + Fastest Time clock (pauses during audit, rejections cost time), host par, round/scoreboard screen.
-4. **Auditor & match flow** — Auditor rotation, persona dial, reason presets, emoji reactions, full match lifecycle + results superlatives.
+4. **Auditor & match flow** — Auditor rotation, one-tap approve/reject, full match lifecycle + results superlatives. (The persona dial, reason presets, and emoji reactions originally built here were later removed as unnecessary for same-room play.)
 5. **Groups (competitive)** — independent chains per group, staggered/batch auditing, standings, cross-metric tie-breaking.

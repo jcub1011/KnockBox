@@ -42,7 +42,7 @@ This supports two contexts with one build:
 ## 3. Design Pillars
 
 1. **Fun over fairness.** The game is deliberately loose. The Auditor's subjectivity is entertainment, and the rules should never get in the way of a good round.
-2. **Banter is the product.** Every rejection comes with a stated reason. Arguing with the Auditor is encouraged, not penalized.
+2. **Banter is the product.** The Auditor calls their reasoning out loud at the table; arguing with the Auditor is encouraged, not penalized. (The game is played in the same room — no on-screen reactions or typed reasons needed.)
 3. **The software keeps score so humans can play.** Timing, guess counts, rejection caps, chain history, and loop detection are all automated. Human judgment is reserved for the one thing it's good at: deciding whether a pair "counts."
 4. **Zero rules to host.** Anyone can be Auditor with no rules knowledge, because the rule is "do you buy it or not."
 
@@ -52,7 +52,7 @@ This supports two contexts with one build:
 
 1. The game presents a **start word** and a **destination word**.
 2. The active player submits a **word pair** that begins with the current carried word (on turn one, the start word).
-3. The **Auditor** approves or rejects, giving a quick reason.
+3. The **Auditor** approves or rejects (saying why out loud, if they like).
    - **Approved:** the second word of the pair becomes the new carried word. Turn passes on.
    - **Rejected:** the player tries again, until they succeed or hit the **rejection cap** (see §7.3).
 4. Repeat until a submission's second word equals the **destination word**.
@@ -96,9 +96,8 @@ Because rejections are free here, the **rejection cap** (§7.3) is the friction 
 
 The Auditor is a human player and the heart of the game. There is no automated judge in v1, and that's a deliberate choice rather than a shortcut. The set of valid English word pairs is effectively unbounded and always shifting — open compounds, slang, playful coinages — so any fixed dataset would end up rejecting pairs players *know* are fine and feel broken rather than strict. A human sidesteps that entirely and supplies the banter the game is built on. (An optional automated judge is considered as a future feature in §11.)
 
-The active Auditor approves or rejects each submission and **must enter a short reason** when rejecting (banter fuel; shown on the Stage). The Auditor may be **strict or lenient** — that's their prerogative, and their decision is final with no formal appeals (heckling is welcome).
+The active Auditor approves or rejects each submission with a single tap — any reasoning is delivered out loud at the table, not typed (the game is played in the same room). The Auditor may be **strict or lenient** — that's their prerogative, and their decision is final with no formal appeals (heckling is welcome).
 
-- **Persona dial (optional flavor).** At round start the Auditor can pick a persona — e.g. *Merciless Judge*, *Easy Mark*, *Pedant* — that sets a tone and doubles as an informal difficulty setting. Purely cosmetic; it changes vibe, not rules.
 - **Rotation.** Because the Auditor can't play, the role **rotates each round** so nobody is stuck refereeing all night. Rotation order is automatic.
 
 ---
@@ -171,20 +170,17 @@ A larger ambition — modeling the language as a **graph** (words = nodes, valid
 - Current **start → destination** banner and the **carried word** they must build from.
 - A single text input + submit; clear pending/approved/rejected states.
 - Their turn indicator and personal/group score.
-- Reaction buttons (emoji) for non-active players to heckle/cheer.
 
 ### 9.2 Auditor device
 
-- The submission, large, with **Approve / Reject** buttons.
-- A required short **reason** field on reject (quick presets + free text).
-- Persona indicator; rotation reminder.
+- The submission, large, with **Approve / Reject** buttons (Reject is a single tap).
+- Rotation reminder.
 
 ### 9.3 Stage screen (shared)
 
 - The growing **chain** rendered as connected links (the "linked list" visual).
 - Live **timer** and/or **guess count** for the active mode.
 - Group standings (in competitive mode).
-- The Auditor's last rejection reason, for the table to react to.
 
 ---
 
@@ -212,10 +208,9 @@ A larger ambition — modeling the language as a **graph** (words = nodes, valid
 
 ## 12. Open Questions
 
-1. **Reason presets.** What's the funniest, fastest set of one-tap rejection reasons that keeps banter flowing without slowing the round?
-2. **Competitive group staffing.** For group play, is one-Auditor-per-group or staggered/batch auditing the better default — and at what party size does each start to feel right?
-3. **Destination feel.** Should reaching the destination one move early (a lucky direct pair) feel like a win or an anticlimax — and do we want to curate start/destination distance to avoid trivial rounds?
-4. **Is an automated Auditor ever worth it?** A judge model would unlock solo and simultaneous play, but at the cost of the human subjectivity that makes the game funny. Does that tradeoff pay off, or is the human the whole point?
+1. **Competitive group staffing.** For group play, is one-Auditor-per-group or staggered/batch auditing the better default — and at what party size does each start to feel right?
+2. **Destination feel.** Should reaching the destination one move early (a lucky direct pair) feel like a win or an anticlimax — and do we want to curate start/destination distance to avoid trivial rounds?
+3. **Is an automated Auditor ever worth it?** A judge model would unlock solo and simultaneous play, but at the cost of the human subjectivity that makes the game funny. Does that tradeoff pay off, or is the human the whole point?
 
 ---
 

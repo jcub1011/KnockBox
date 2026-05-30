@@ -1,5 +1,7 @@
 # Milestone 2 — Core Gameplay Loop
 
+> **Update (post-M5):** rejection no longer requires (or records) a **reason** — the Auditor rejects with a single tap and says why out loud at the table. References below to a required reason, `LastRejectionReason`, and `RejectionInfo.Reason` are historical; `Reject(User auditor, LinkedListGameState state, …)` takes no reason argument.
+
 ## Goal
 
 Implement the playable GDD §4 loop for the prototype configuration: **Collective (one shared chain) + Fewest Guesses + human Auditor**. A player submits a word that pairs with the carried word; the Auditor approves (chain advances, carried word updates, turn passes) or rejects with a reason (counts toward the per-turn cap; at the cap the turn is forfeited). Reaching the destination ends the round (`RoundOver`). The chain renders as connected "links" (the linked-list visual) inside the player/Auditor pages — no separate Stage route.

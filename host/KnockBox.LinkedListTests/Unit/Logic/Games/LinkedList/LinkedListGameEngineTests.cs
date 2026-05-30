@@ -192,31 +192,16 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
         }
 
         [TestMethod]
-        public async Task Reject_RequiresReason()
+        public async Task Reject_LogsAttempt_IncrementsCounters()
         {
             var state = await StartedGameAsync();
             var submitter = SubmitterOf(state);
             _engine.SubmitPair(submitter, state, "boat");
 
-            var result = _engine.Reject(AuditorOf(state), state, "   ");
-
-            Assert.IsTrue(result.IsFailure);
-            Assert.IsNotNull(state.PendingSubmission); // not consumed by a failed reject
-        }
-
-        [TestMethod]
-        public async Task Reject_LogsInfo_SetsLastReason_IncrementsCounters()
-        {
-            var state = await StartedGameAsync();
-            var submitter = SubmitterOf(state);
-            _engine.SubmitPair(submitter, state, "boat");
-
-            Assert.IsTrue(_engine.Reject(AuditorOf(state), state, "not a real pair").IsSuccess);
+            Assert.IsTrue(_engine.Reject(AuditorOf(state), state).IsSuccess);
 
             Assert.AreEqual(1, state.RejectionLog.Count);
             Assert.AreEqual("boat", state.RejectionLog[0].AttemptedWord);
-            Assert.AreEqual("not a real pair", state.RejectionLog[0].Reason);
-            Assert.AreEqual("not a real pair", state.LastRejectionReason);
             Assert.AreEqual(1, state.RejectionsThisTurn);
             Assert.AreEqual(1, state.GamePlayers[submitter.Id].RejectionsReceived);
             Assert.IsNull(state.PendingSubmission);
@@ -232,7 +217,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             for (int i = 0; i < 3; i++)
             {
                 _engine.SubmitPair(submitter, state, $"try{i}");
-                Assert.IsTrue(_engine.Reject(AuditorOf(state), state, "nope").IsSuccess);
+                Assert.IsTrue(_engine.Reject(AuditorOf(state), state).IsSuccess);
             }
 
             Assert.AreEqual(0, state.RejectionsThisTurn);          // reset on forfeit
@@ -251,7 +236,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             for (int i = 0; i < 5; i++)
             {
                 _engine.SubmitPair(submitter, state, $"try{i}");
-                Assert.IsTrue(_engine.Reject(AuditorOf(state), state, "nope").IsSuccess);
+                Assert.IsTrue(_engine.Reject(AuditorOf(state), state).IsSuccess);
             }
 
             Assert.AreEqual(5, state.RejectionsThisTurn);
@@ -383,7 +368,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             for (int i = 0; i < 4; i++)
             {
                 Assert.IsTrue(_engine.SubmitPair(submitter, state, $"bad{i}").IsSuccess);
-                Assert.IsTrue(_engine.Reject(AuditorOf(state), state, "nope").IsSuccess);
+                Assert.IsTrue(_engine.Reject(AuditorOf(state), state).IsSuccess);
             }
 
             SubmitAndApprove(state, "beta"); // accepted pair #2
@@ -439,7 +424,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             Assert.AreEqual(TimeSpan.FromSeconds(8), state.ElapsedThinkingTime);
 
             // Auditor deliberates 12s then rejects at T0+20 → same submitter resumes.
-            Assert.IsTrue(_engine.Reject(AuditorOf(state), state, "not a pair", now: T0.AddSeconds(20)).IsSuccess);
+            Assert.IsTrue(_engine.Reject(AuditorOf(state), state, now: T0.AddSeconds(20)).IsSuccess);
             Assert.AreEqual(TimeSpan.FromSeconds(8), state.ElapsedThinkingTime); // rejected time NOT refunded
             Assert.IsTrue(state.ClockRunning);                                   // clock resumed for retry
             Assert.AreEqual(submitter.Id, state.TurnManager.CurrentPlayer);      // still their turn
@@ -540,78 +525,6 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             Assert.AreEqual(state.StartWord, state.CarriedWord);
             // Match accumulator survives the rotation.
             Assert.AreEqual(1, state.GamePlayers[firstSubmitter.Id].AcceptedPairs);
-        }
-
-        [TestMethod]
-        public async Task SetPersona_ChangesPersonaOnly_NoEffectOnOutcomes()
-        {
-            var state = await StartedGameAsync(start: "HOUSE");
-            var auditor = AuditorOf(state);
-
-            Assert.IsTrue(_engine.SetPersona(auditor, state, AuditorPersona.MercilessJudge).IsSuccess);
-            Assert.AreEqual(AuditorPersona.MercilessJudge, state.Persona);
-
-            // A non-Auditor can't set the persona.
-            var submitter = SubmitterOf(state);
-            Assert.IsTrue(_engine.SetPersona(submitter, state, AuditorPersona.EasyMark).IsFailure);
-            Assert.AreEqual(AuditorPersona.MercilessJudge, state.Persona);
-
-            // Approve still works identically regardless of persona.
-            Assert.IsTrue(_engine.SubmitPair(submitter, state, "boat").IsSuccess);
-            Assert.IsTrue(_engine.Approve(auditor, state).IsSuccess);
-            Assert.AreEqual(1, state.Chain.Count);
-            Assert.AreEqual(AuditorPersona.MercilessJudge, state.Persona); // unchanged by Approve
-        }
-
-        [TestMethod]
-        public async Task RejectWithPreset_RecordsPresetText_IncrementsRejectionStats()
-        {
-            var state = await StartedGameAsync();
-            var submitter = SubmitterOf(state);
-            _engine.SubmitPair(submitter, state, "boat");
-
-            // A preset reject is just Reject with a canned reason.
-            Assert.IsTrue(_engine.Reject(AuditorOf(state), state, "Cute, but no").IsSuccess);
-
-            Assert.AreEqual("Cute, but no", state.RejectionLog[0].Reason);
-            Assert.AreEqual("Cute, but no", state.LastRejectionReason);
-            Assert.AreEqual(1, state.GamePlayers[submitter.Id].RejectionsReceived);
-        }
-
-        [TestMethod]
-        public async Task BroadcastReaction_AppendsAllowedEmoji_RejectsUnknown_ManualClearEmpties()
-        {
-            var state = await StartedGameAsync();
-            var someone = SubmitterOf(state);
-
-            Assert.IsTrue(_engine.BroadcastReaction(someone, state, "🔥").IsSuccess);
-            Assert.AreEqual(1, state.RecentReactions.Count);
-            Assert.AreEqual("🔥", state.RecentReactions[0].Emoji);
-            Assert.AreEqual(someone.Id, state.RecentReactions[0].PlayerId);
-
-            // Unknown emoji is rejected and not appended.
-            Assert.IsTrue(_engine.BroadcastReaction(someone, state, "🍕").IsFailure);
-            Assert.AreEqual(1, state.RecentReactions.Count);
-
-            // A second valid reaction gets a distinct sequence number.
-            Assert.IsTrue(_engine.BroadcastReaction(someone, state, "👏").IsSuccess);
-            Assert.AreEqual(2, state.RecentReactions.Count);
-            Assert.AreNotEqual(state.RecentReactions[0].Seq, state.RecentReactions[1].Seq);
-
-            // Manual clear empties the list (the scheduled clear does this after a delay).
-            state.Execute(() => state.RecentReactions.Clear());
-            Assert.AreEqual(0, state.RecentReactions.Count);
-        }
-
-        [TestMethod]
-        public async Task BroadcastReaction_RejectedOutsidePlayingPhase()
-        {
-            var state = await StartedGameAsync();
-            var someone = SubmitterOf(state);
-            state.Execute(() => state.SetPhase(LinkedListGamePhase.RoundOver));
-
-            Assert.IsTrue(_engine.BroadcastReaction(someone, state, "🔥").IsFailure);
-            Assert.AreEqual(0, state.RecentReactions.Count);
         }
 
         [TestMethod]
@@ -818,7 +731,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             for (int i = 0; i < 3; i++)
             {
                 Assert.IsTrue(_engine.SubmitPair(SubmitterOfGroup(a), state, $"try{i}").IsSuccess);
-                Assert.IsTrue(_engine.Reject(AuditorOf(state), state, "nope").IsSuccess);
+                Assert.IsTrue(_engine.Reject(AuditorOf(state), state).IsSuccess);
             }
 
             Assert.AreEqual(0, a.RejectionsThisTurn); // forfeited and reset

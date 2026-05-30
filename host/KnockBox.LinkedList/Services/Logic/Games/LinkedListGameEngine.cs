@@ -117,9 +117,6 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                 gameState.AuditQueue.Clear();
                 gameState.LastRoundResult = null;
                 gameState.LastStandings = [];
-                gameState.LastRejectionReason = null;
-                gameState.RecentReactions.Clear();
-                gameState.Persona = AuditorPersona.Neutral;
                 gameState.Superlatives = [];
                 gameState.RoundNumber = 1;
 
@@ -355,7 +352,6 @@ namespace KnockBox.LinkedList.Services.Logic.Games
 
                 g.PendingSubmission = null;
                 DequeueFromAudit(state, g.GroupId);
-                state.LastRejectionReason = null;
 
                 if (string.Equals(proposed, state.DestinationWord, StringComparison.OrdinalIgnoreCase))
                 {
@@ -382,11 +378,11 @@ namespace KnockBox.LinkedList.Services.Logic.Games
         }
 
         /// <summary>
-        /// Auditor rejects the front group's pending submission with a required reason.
-        /// The rejection counts toward that group's per-turn cap; at the cap the turn is
-        /// forfeited (§7.3) and the group's chain stays put.
+        /// Auditor rejects the front group's pending submission. The rejection counts
+        /// toward that group's per-turn cap; at the cap the turn is forfeited (§7.3) and
+        /// the group's chain stays put.
         /// </summary>
-        public Result Reject(User auditor, LinkedListGameState state, string reason, DateTimeOffset? now = null)
+        public Result Reject(User auditor, LinkedListGameState state, DateTimeOffset? now = null)
         {
             if (auditor is null) return Result.FromError("Unknown player.");
 
@@ -406,15 +402,7 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                     return;
                 }
 
-                var trimmedReason = (reason ?? "").Trim();
-                if (string.IsNullOrEmpty(trimmedReason))
-                {
-                    inner = Result.FromError("A rejection needs a reason.");
-                    return;
-                }
-
-                g.RejectionLog.Add(new RejectionInfo(sub.PlayerId, sub.ProposedWord, trimmedReason));
-                state.LastRejectionReason = trimmedReason;
+                g.RejectionLog.Add(new RejectionInfo(sub.PlayerId, sub.ProposedWord));
                 if (state.GamePlayers.TryGetValue(sub.PlayerId, out var ps)) ps.RejectionsReceived++;
                 g.RejectionsThisTurn++;
                 g.PendingSubmission = null;
@@ -632,12 +620,7 @@ namespace KnockBox.LinkedList.Services.Logic.Games
             return standings;
         }
 
-        // ── Match flow (§10): rotation, persona, reactions, end-of-match ─────
-
-        /// <summary>Emoji the table can react with (§9.1). The engine validates against
-        /// this set so a client can't inject arbitrary content.</summary>
-        public static readonly IReadOnlyList<string> AllowedReactions =
-            ["😂", "🔥", "👏", "😱", "🤔", "💀"];
+        // ── Match flow (§10): rotation, end-of-match ─────────────────────────
 
         /// <summary>The id of the Auditor for the <em>next</em> round, given the current
         /// rotation — used by the RoundOver screen to announce who's up. Returns empty
@@ -695,11 +678,8 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                 }
 
                 state.AuditQueue.Clear();
-                state.LastRejectionReason = null;
-                state.RecentReactions.Clear();
                 state.LastRoundResult = null;
                 state.LastStandings = [];
-                state.Persona = AuditorPersona.Neutral;
 
                 state.RoundNumber++;
                 state.SetPhase(LinkedListGamePhase.Playing);
@@ -742,67 +722,6 @@ namespace KnockBox.LinkedList.Services.Logic.Games
             state.LastStandings = ComputeStandings(state);
             state.Superlatives = ComputeSuperlatives(state);
             state.SetPhase(LinkedListGamePhase.GameOver);
-        }
-
-        /// <summary>
-        /// The Auditor sets the round's cosmetic persona (§6). No rule effect — the
-        /// outcome of <c>Approve</c>/<c>Reject</c> is identical regardless of persona.
-        /// </summary>
-        public Result SetPersona(User user, LinkedListGameState state, AuditorPersona persona)
-        {
-            if (user is null) return Result.FromError("Unknown player.");
-
-            Result inner = Result.Success;
-            var exec = state.Execute(() =>
-            {
-                if (user.Id != state.AuditorPlayerId)
-                {
-                    inner = Result.FromError("Only the Auditor can set the persona.");
-                    return;
-                }
-                state.Persona = persona;
-            });
-
-            return exec.TryGetFailure(out var error) ? Result.FromError(error) : inner;
-        }
-
-        /// <summary>
-        /// Broadcasts a transient emoji reaction (§9.1) from any player to the whole
-        /// table and schedules its removal after <paramref name="ttl"/> (default ~2s).
-        /// Heckle/cheer flavor only — never scored. Validated against
-        /// <see cref="AllowedReactions"/>.
-        /// </summary>
-        public Result BroadcastReaction(User user, LinkedListGameState state, string emoji, TimeSpan? ttl = null)
-        {
-            if (user is null) return Result.FromError("Unknown player.");
-
-            Result inner = Result.Success;
-            var exec = state.Execute(() =>
-            {
-                if (state.Phase != LinkedListGamePhase.Playing)
-                {
-                    inner = Result.FromError("Reactions are only live during a round.");
-                    return;
-                }
-                if (string.IsNullOrEmpty(emoji) || !AllowedReactions.Contains(emoji))
-                {
-                    inner = Result.FromError("That reaction isn't available.");
-                    return;
-                }
-
-                long seq = ++state.ReactionSequence;
-                state.RecentReactions.Add(new ReactionEvent(user.Id, emoji, seq));
-
-                // Drop this exact reaction after a beat. Runs through ExecuteAsync, so
-                // it mutates state under the lock and notifies subscribers.
-                state.ScheduleCallback(ttl ?? TimeSpan.FromSeconds(2), () =>
-                {
-                    state.RecentReactions.RemoveAll(r => r.Seq == seq);
-                    return Task.CompletedTask;
-                });
-            });
-
-            return exec.TryGetFailure(out var error) ? Result.FromError(error) : inner;
         }
 
         /// <summary>

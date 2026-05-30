@@ -1,5 +1,7 @@
 # Milestone 4 — Auditor Flavor & Match Flow
 
+> **Update (post-M5):** the **persona dial**, **reason presets / free-text reason**, and **emoji reactions** described below were later removed — they added friction without value for a game played in the same room. The Auditor now rejects with a single tap (no reason), and `RejectionInfo` no longer carries a `Reason`. Auditor rotation, the match lifecycle, and results superlatives remain. Treat the persona/reason/reaction passages here as historical.
+
 ## Goal
 
 Turn the single playable round into a full match. Add **Auditor rotation** each round (§6), the cosmetic **persona dial**, one-tap **reason presets** plus free text (§9.2, §12 Q1), **emoji reactions** for non-active players (§9.1), and the complete **match flow** (§10): Lobby → Round → Scoreboard → rotate & repeat → final **Results** with fun superlatives ("Most Rejected," "Speed Demon").

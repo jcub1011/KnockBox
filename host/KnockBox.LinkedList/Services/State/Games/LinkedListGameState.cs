@@ -79,10 +79,6 @@ namespace KnockBox.LinkedList.Services.State.Games
         public string StartWord { get; set; } = "";
         public string DestinationWord { get; set; } = "";
 
-        /// <summary>The Auditor's most recent rejection reason, surfaced to the
-        /// whole table for banter (§6/§9.2). Cleared on the next accepted pair.</summary>
-        public string? LastRejectionReason { get; set; }
-
         /// <summary>Drives the global Auditor rotation (§6). Holds every participant's
         /// id in a stable order set once at match start; <see cref="AuditorRotationIndex"/>
         /// indexes into it. Per-group submitter rotation lives on each
@@ -187,10 +183,6 @@ namespace KnockBox.LinkedList.Services.State.Games
         /// rotations.</summary>
         public int AuditorRotationIndex { get; set; }
 
-        /// <summary>The Auditor's cosmetic persona for the current round (§6). No rule
-        /// effect — shown as flavor + an informal difficulty hint. Reset each round.</summary>
-        public AuditorPersona Persona { get; set; } = AuditorPersona.Neutral;
-
         // ── Match progress (§10) ─────────────────────────────────────────────
 
         /// <summary>1-based round counter within the current match. Set to 1 at match
@@ -200,18 +192,6 @@ namespace KnockBox.LinkedList.Services.State.Games
         /// <summary>Fun end-of-match awards, computed once on entering
         /// <see cref="LinkedListGamePhase.GameOver"/>.</summary>
         public IReadOnlyList<Superlative> Superlatives { get; set; } = [];
-
-        // ── Reactions (§9.1) — heckle/cheer flavor, never scored ──────────────
-
-        /// <summary>Reactions currently floating over the chain view. Each is trimmed
-        /// by a scheduled clear ~2s after it's broadcast (see
-        /// <c>LinkedListGameEngine.BroadcastReaction</c>).</summary>
-        public readonly List<ReactionEvent> RecentReactions = [];
-
-        /// <summary>Monotonic counter assigning each reaction a unique
-        /// <see cref="ReactionEvent.Seq"/>, so the scheduled clear can remove exactly
-        /// the reaction it queued.</summary>
-        public long ReactionSequence { get; set; }
 
         /// <summary>
         /// Host-configurable match rules. Always replaced atomically via
@@ -266,7 +246,7 @@ namespace KnockBox.LinkedList.Services.State.Games
         /// <summary>Accepted links in this group's chain.</summary>
         public readonly List<ChainLink> Chain = [];
 
-        /// <summary>Rejected attempts and the Auditor's reasons, for this group.</summary>
+        /// <summary>Rejected attempts for this group.</summary>
         public readonly List<RejectionInfo> RejectionLog = [];
 
         /// <summary>Rejections against the current submitter this turn (rejection cap, §7.3).</summary>
@@ -354,16 +334,11 @@ namespace KnockBox.LinkedList.Services.State.Games
     /// <summary>An accepted link in the chain (<c>FromWord</c> → <c>ToWord</c>).</summary>
     public sealed record ChainLink(string FromWord, string ToWord, string PlayerId, string PlayerName, bool IsLoop);
 
-    /// <summary>A rejected attempt and the Auditor's reason.</summary>
-    public sealed record RejectionInfo(string PlayerId, string AttemptedWord, string Reason);
+    /// <summary>A rejected attempt by the Auditor.</summary>
+    public sealed record RejectionInfo(string PlayerId, string AttemptedWord);
 
     /// <summary>A player's proposed next word (the first word is the carried word).</summary>
     public sealed record Submission(string PlayerId, string ProposedWord);
-
-    /// <summary>A transient reaction broadcast by a non-active player (§9.1). Cleared
-    /// shortly after display; <paramref name="Seq"/> uniquely identifies it so the
-    /// scheduled clear removes exactly the right one.</summary>
-    public sealed record ReactionEvent(string PlayerId, string Emoji, long Seq);
 
     /// <summary>A fun end-of-match award (§10): a title, the winning player, and a
     /// short detail line explaining why they earned it.</summary>
