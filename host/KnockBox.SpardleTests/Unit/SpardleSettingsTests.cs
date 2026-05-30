@@ -1,7 +1,6 @@
 using System.Text.Json;
 using KnockBox.Spardle;
 using KnockBox.Spardle.Models;
-using KnockBox.WordService.Contracts;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace KnockBox.SpardleTests.Unit;
@@ -14,7 +13,7 @@ public class SpardleSettingsTests
 
     private static SpardleSettings NonDefaultSettings() => new()
     {
-        WordPoolMode = WordPoolMode.FullDictionary,
+        WordPoolMode = SpardleWordSource.FullDictionary,
         WordOrderMode = WordOrderMode.ReverseListOrder,
         WinCondition = WinConditionMode.Tactician,
         ConstantWordLength = false,

@@ -1,0 +1,174 @@
+using System.Collections.Immutable;
+using KnockBox.WordService.Contracts;
+
+namespace KnockBox.Tracery.Models
+{
+    /// <summary>
+    /// The host-configurable rules for a Tracery match. Held by
+    /// <c>TraceryGameState.Settings</c> and replaced atomically via <c>with</c>
+    /// expressions inside the state's execute lock (see
+    /// <c>TraceryGameState.UpdateSettings</c>). Persisted to the host's browser
+    /// localStorage by the room page so preferred rules survive across sessions.
+    /// Property-initializer form keeps it round-trippable by System.Text.Json (Web
+    /// defaults) via the parameterless constructor + init setters.
+    /// </summary>
+    /// <remarks>
+    /// Defaults come from GDD §8. The scoring (<see cref="UniqueFindMultiplier"/>) and
+    /// generation-quality (<see cref="MinFindableWords"/> etc.) knobs are surfaced here —
+    /// rather than baked into the engine — so they stay playtest-tunable per GDD §10. The
+    /// generation knobs are consumed in Milestone 03; the full scoring tables arrive in
+    /// Milestone 06.
+    /// </remarks>
+    public sealed record TracerySettings
+    {
+        // ── Mode ───────────────────────────────────────────────────────────────
+        /// <summary>
+        /// Which play mode the match runs in. Frozen at game start. <see cref="GameMode.Search"/>
+        /// switches the engine to the shared word-search race; the <c>Search*</c> knobs below only
+        /// apply in that mode.
+        /// </summary>
+        public GameMode Mode { get; init; } = GameMode.Standard;
+
+        /// <summary>
+        /// Search mode: how many target words the shared search list holds each round. Clamped at
+        /// generation time to the number of words actually findable on the board.
+        /// </summary>
+        public int SearchListSize { get; init; } = 10;
+
+        /// <summary>
+        /// Search mode: the per-place unit of the completion (placement) bonus. The first player to
+        /// find every list word earns <c>unit × playerCount</c>, the next <c>unit × (playerCount-1)</c>,
+        /// and so on; players who never complete the list earn no placement bonus.
+        /// </summary>
+        public int SearchPlacementBonusUnit { get; init; } = 10;
+
+        // ── Grid (GDD §8) ──────────────────────────────────────────────────────
+        /// <summary>Smallest grid edge the game supports (a 3×3 board still hosts ≥4-letter words).</summary>
+        public const int MinGridDimension = 3;
+
+        /// <summary>
+        /// Largest grid edge the game supports. 8×8 is the ceiling the solver's performance bound is
+        /// validated against (see <c>SolverPerformanceTests</c>) and the upper limit the settings UI
+        /// offers; <see cref="Normalize"/> enforces it for any settings that arrive another way
+        /// (restored localStorage, deserialization).
+        /// </summary>
+        public const int MaxGridDimension = 8;
+
+        public int GridWidth { get; init; } = 5;
+        public int GridHeight { get; init; } = 5;
+
+        // ── Rounds & timing (GDD §8) ───────────────────────────────────────────
+        /// <summary>Per-round play time. <see cref="System.TimeSpan.Zero"/> = unlimited.</summary>
+        public TimeSpan RoundTimer { get; init; } = TimeSpan.FromSeconds(90);
+        public int TotalRounds { get; init; } = 3;
+
+        /// <summary>Pacing of the round-1 "get ready" intro before the first grid appears.</summary>
+        public TimeSpan TransitionDuration { get; init; } = TimeSpan.FromSeconds(5);
+
+        /// <summary>
+        /// Length of the single post-round intermission (the reveal: words found, round scoring,
+        /// standings, and the next-round indicator) before the next round begins.
+        /// </summary>
+        public TimeSpan IntermissionDuration { get; init; } = TimeSpan.FromSeconds(30);
+
+        // ── Word rules (GDD §4, §8) ────────────────────────────────────────────
+        public int MinWordLength { get; init; } = 4;
+
+        // ── Dictionaries ───────────────────────────────────────────────────────
+        // The intended relationship is board ⊆ answers: generate from a common-word pool, then
+        // let players bank anything from a wider validation pool. A host *may* invert this
+        // (validation narrower than generation), but the result is deliberately confusing — the
+        // board can contain (and the reveal's "words nobody found" can list) words that no player
+        // is allowed to submit, and the theoretical maximum can fall below the visible board's
+        // worth. We allow it rather than constrain the dropdowns; that's a host's choice to make.
+        /// <summary>
+        /// The pool a board is generated and judged against — keep boards dense with
+        /// recognizable words. Defaults to the curated common-word list; for any unbacked pool
+        /// the engine transparently falls back to <see cref="WordPoolMode.FullDictionary"/>.
+        /// </summary>
+        public WordPoolMode GenerationDictionary { get; init; } = WordPoolMode.ReducedDictionary;
+
+        /// <summary>
+        /// The pool a player's submitted word is validated against. Defaults to the full
+        /// dictionary so players can still find obscure words even on a common-word board.
+        /// Best set to a superset of <see cref="GenerationDictionary"/> (see note above).
+        /// </summary>
+        public WordPoolMode ValidationDictionary { get; init; } = WordPoolMode.FullDictionary;
+
+        // ── Scoring toggles & tunables (GDD §5, §10) ───────────────────────────
+        public bool UniqueFindBonusEnabled { get; init; } = true;
+        public double UniqueFindMultiplier { get; init; } = 1.5;
+        public bool RareLetterBonusEnabled { get; init; } = true;
+
+        /// <summary>
+        /// When true, the reveal shows the board's theoretical maximum score (GDD §7) — the total
+        /// one player would earn by banking every findable word as a unique find. A benchmark only;
+        /// it never affects gameplay or scoring, so it is purely a display toggle.
+        /// </summary>
+        public bool ShowTheoreticalMax { get; init; } = true;
+
+        /// <summary>
+        /// Superlinear length-bonus table (GDD §5.2), indexed by word length: entry
+        /// <c>[len]</c> is the bonus added on top of the base score for a word of that length.
+        /// Lengths below the minimum are zero; lengths at or above the table's last index clamp
+        /// to that final entry (the "10+" row). Kept here — rather than baked into the scorer —
+        /// so the curve stays playtest-tunable per GDD §10. The default encodes the triangular
+        /// escalation from the GDD: 4→0, 5→+1, 6→+3, 7→+6, 8→+10, 9→+15, 10+→+21.
+        /// </summary>
+        public ImmutableArray<int> LengthBonusTable { get; init; } =
+            // index:  0  1  2  3  4  5  6  7   8   9  10+
+            [0, 0, 0, 0, 0, 1, 3, 6, 10, 15, 21];
+
+        /// <summary>
+        /// Rare-letter bonus table (GDD §5.3), keyed by upper-case letter: each qualifying
+        /// letter occurrence in a word adds its value. Gated by <see cref="RareLetterBonusEnabled"/>.
+        /// Default uses the GDD's Scrabble-style tiers: K,F,H,V,W,Y → +1; J,X → +3; Q,Z → +5.
+        /// </summary>
+        public ImmutableDictionary<char, int> RareLetterBonusTable { get; init; } =
+            ImmutableDictionary.CreateRange(new[]
+            {
+                KeyValuePair.Create('K', 1), KeyValuePair.Create('F', 1), KeyValuePair.Create('H', 1),
+                KeyValuePair.Create('V', 1), KeyValuePair.Create('W', 1), KeyValuePair.Create('Y', 1),
+                KeyValuePair.Create('J', 3), KeyValuePair.Create('X', 3),
+                KeyValuePair.Create('Q', 5), KeyValuePair.Create('Z', 5),
+            });
+
+        // ── Host role (mirrors Spardle) ────────────────────────────────────────
+        /// <summary>
+        /// When true and other players are present, the host plays as a normal
+        /// participant instead of becoming the display-only observer. Off by default,
+        /// preserving the "host is the shared display once others join" model from the GDD.
+        /// </summary>
+        public bool HostPlaysAlong { get; init; } = false;
+
+        // ── Generation quality bar (Milestone 03; tunable now per GDD §6, §10) ──
+        /// <summary>Minimum findable words a board must have to be accepted (0 = engine default).</summary>
+        public int MinFindableWords { get; init; } = 0;
+
+        /// <summary>A board must contain at least one findable word of this length (the "big find").</summary>
+        public int MinLongWordLength { get; init; } = 7;
+
+        /// <summary>Prefer boards with at least one rare-letter word.</summary>
+        public bool RequireRareLetterWord { get; init; } = true;
+
+        /// <summary>Cap on generate-and-test attempts before accepting the best candidate (0 = engine default).</summary>
+        public int MaxGenerationAttempts { get; init; } = 0;
+
+        /// <summary>
+        /// Returns a copy with values clamped to their supported ranges. The settings panel already
+        /// clamps as the host edits, but settings can also enter from restored localStorage or JSON
+        /// deserialization, which bypass the UI — so the authoritative <c>UpdateSettings</c> path runs
+        /// this to guarantee invariants (notably the <see cref="MinGridDimension"/>..<see cref="MaxGridDimension"/>
+        /// grid cap the solver's performance bound depends on). Returns the same instance when nothing
+        /// needs clamping, so unchanged settings round-trip without allocation.
+        /// </summary>
+        public TracerySettings Normalize()
+        {
+            int w = Math.Clamp(GridWidth, MinGridDimension, MaxGridDimension);
+            int h = Math.Clamp(GridHeight, MinGridDimension, MaxGridDimension);
+            if (w == GridWidth && h == GridHeight)
+                return this;
+            return this with { GridWidth = w, GridHeight = h };
+        }
+    }
+}

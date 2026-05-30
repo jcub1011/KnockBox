@@ -87,13 +87,13 @@
                         <label class="spd-lobby-field">
                             <span>Source</span>
                             <select @bind:get="State.Settings.WordPoolMode" @bind:set="SetWordPoolMode">
-                                <option value="@WordPoolMode.NytStandard">NYT Standard</option>
-                                <option value="@WordPoolMode.FullDictionary">Full Dictionary</option>
-                                <option value="@WordPoolMode.HostDefined">Host Defined</option>
-                                <option value="@WordPoolMode.CsvUpload">CSV Upload</option>
+                                <option value="@SpardleWordSource.NytStandard">NYT Standard</option>
+                                <option value="@SpardleWordSource.FullDictionary">Full Dictionary</option>
+                                <option value="@SpardleWordSource.HostDefined">Host Defined</option>
+                                <option value="@SpardleWordSource.CsvUpload">CSV Upload</option>
                             </select>
                         </label>
-                        @if (State.Settings.WordPoolMode == WordPoolMode.CsvUpload)
+                        @if (State.Settings.WordPoolMode == SpardleWordSource.CsvUpload)
                         {
                             <label class="spd-lobby-field spd-lobby-field-full">
                                 <span>CSV File (max 1MB)</span>
@@ -124,7 +124,7 @@
                                 <option value="@WordOrderMode.ReverseListOrder">Reverse List Order</option>
                             </select>
                         </label>
-                        @if (State.Settings.WordPoolMode == WordPoolMode.FullDictionary)
+                        @if (State.Settings.WordPoolMode == SpardleWordSource.FullDictionary)
                         {
                             <label class="spd-lobby-field spd-lobby-field-row">
                                 <span>Constant Word Length</span>
@@ -165,7 +165,7 @@
                                 </label>
                             }
                         }
-                        @if (State.Settings.WordPoolMode == WordPoolMode.HostDefined)
+                        @if (State.Settings.WordPoolMode == SpardleWordSource.HostDefined)
                         {
                             <label class="spd-lobby-field spd-lobby-field-full">
                                 <span>Custom Words (one per line)</span>
@@ -291,8 +291,8 @@
 
     private bool IsHost => UserService.CurrentUser?.Id == State.Host.Id;
     private bool CanStart => State.CustomWordPool.Count > 0
-        || State.Settings.WordPoolMode == WordPoolMode.NytStandard
-        || State.Settings.WordPoolMode == WordPoolMode.FullDictionary;
+        || State.Settings.WordPoolMode == SpardleWordSource.NytStandard
+        || State.Settings.WordPoolMode == SpardleWordSource.FullDictionary;
 
     protected override void OnInitialized()
     {
@@ -345,12 +345,12 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    private void SetWordPoolMode(WordPoolMode value)
+    private void SetWordPoolMode(SpardleWordSource value)
     {
         // NYT and Full Dictionary have no visible custom-words editor, so any leftover
         // CustomWordPool entries would silently override the built-in source. Clear them
         // on transition so the mode the user selects is the one the engine actually uses.
-        bool clearCustom = value is WordPoolMode.NytStandard or WordPoolMode.FullDictionary;
+        bool clearCustom = value is SpardleWordSource.NytStandard or SpardleWordSource.FullDictionary;
         UpdateSettings(s => s with { WordPoolMode = value });
         if (clearCustom)
         {
@@ -402,7 +402,7 @@
             await LoadSettingsAsync();
         }
 
-        bool shouldBeAttached = State.Settings.WordPoolMode == WordPoolMode.CsvUpload;
+        bool shouldBeAttached = State.Settings.WordPoolMode == SpardleWordSource.CsvUpload;
 
         if (shouldBeAttached && !_csvModuleAttached)
         {
