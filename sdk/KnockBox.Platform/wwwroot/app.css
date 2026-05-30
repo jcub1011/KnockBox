@@ -1,12 +1,27 @@
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=IM+Fell+DW+Pica:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Lexend:wght@100..900&family=Outfit:wght@100..900&display=swap');
 
 :root {
-    --font-primary: "Lexend", sans-serif;
+    --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+    --font-primary: "Outfit", system-ui, sans-serif;
+    --font-title: "Lexend", system-ui, sans-serif;
     --font-mono: "Google Sans Code", monospace;
-    --bg-color: #000; /* previous color: #A9CEF4*/
+    --bg-color: #1f1428;
     --accent-color: #FF0055;
     --trietary-color: #21897E;
+
+    --tile-cyan: #1EFFBC;
+    --tile-yellow: #FFD166;
+    --tile-pink: #FF0055;
+    --ink: #f4ece4;
+    --ink-soft: rgba(244, 236, 228, 0.65);
+    --paper-warm: #1a0808;
+    --canvas-dark: #1f1820;
+    --canvas-card: rgba(255, 255, 255, 0.04);
+    --canvas-card-border: rgba(255, 255, 255, 0.12);
+
+    --shadow-card-rest: 4px 4px 0 rgba(0, 0, 0, 0.35);
+    --shadow-card-lift: 8px 8px 0 rgba(0, 0, 0, 0.35);
+    --shadow-card-press: 2px 2px 0 rgba(0, 0, 0, 0.35);
 }
 
 /* Apply border-box globally to all elements and pseudo-elements */
@@ -98,7 +113,8 @@ h1:focus {
     border-radius: 16px;
     width: 100%;
     aspect-ratio: 3 / 2;
-    box-shadow: 8px 8px 0 #000;
+    background-color: black;
+    box-shadow: var(--shadow-card-rest);
     transition: transform 0.1s, box-shadow 0.1s;
 }
 
@@ -109,13 +125,13 @@ h1:focus {
 .game-tile-surface:hover,
 .game-tile:hover > .game-tile-surface {
     transform: translate(-3px, -3px);
-    box-shadow: 11px 11px 0 #000;
+    box-shadow: var(--shadow-card-lift);
 }
 
 .game-tile-surface:active,
 .game-tile:active > .game-tile-surface {
     transform: translate(3px, 3px);
-    box-shadow: 2px 2px 0 #000;
+    box-shadow: var(--shadow-card-press);
 }
 
 /* Work-in-progress overlay applied when a plugin sets `workInProgress: true`
@@ -151,7 +167,7 @@ h1:focus {
 .game-tile.is-wip:hover > .game-tile-surface,
 .game-tile.is-wip:active > .game-tile-surface {
     transform: none;
-    box-shadow: 8px 8px 0 #000;
+    box-shadow: var(--shadow-card-rest);
 }
 
 /* Default tile shown when a plugin's manifest has no `tileAsset` declared.

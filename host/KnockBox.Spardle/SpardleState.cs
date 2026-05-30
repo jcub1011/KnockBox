@@ -24,6 +24,10 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     public Result UpdateSettings(Func<SpardleSettings, SpardleSettings> mutate) =>
         Execute(() => { Settings = mutate(Settings); });
 
+    // Spardle treats the host as a participant by default before the game starts;
+    // StartAsync re-fixes HostIsParticipant based on whether other players joined.
+    protected override bool DefaultHostIsParticipant => true;
+
     // Game state
     public int CurrentRound { get; set; } = 0;
     public string TargetWord { get; set; } = string.Empty;
@@ -59,32 +63,21 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     private readonly ConcurrentDictionary<string, PlayerState> _playerStates = new();
     public IReadOnlyDictionary<string, PlayerState> PlayerStates => _playerStates;
 
-    // True when the host is playing alongside everyone else; false when the host is a
-    // display-only observer (set at StartAsync time based on whether any other players
-    // joined, then locked for the duration of the game).
-    //
-    // Hides AbstractGameState.HostIsParticipant on purpose: the base property is the
-    // dynamic, lobby-time toggle; Spardle's is the frozen-at-start snapshot the engine
-    // and UI read from for the rest of the match. The Spardle engine + UI bind to this
-    // local value; an alignment pass that migrates Spardle to the base hook is tracked
-    // separately.
-    public new bool HostIsParticipant { get; private set; } = true;
-
-    internal new void SetHostIsParticipant(bool value) => HostIsParticipant = value;
-
     // The participant roster captured at game start, frozen for the match. Used by
     // the final standings screen so players who disconnect (and are dropped from the
     // live Players roster) still appear on the end-screen leaderboard. PlayerStates
     // already persists their TotalScore, so leavers keep their final score.
     //
-    // Hides AbstractGameState.Participants for the same reason: this is the immutable
-    // match roster, not the dynamic participant snapshot the base exposes.
-    public new ImmutableArray<PlayerEntry> Participants { get; private set; } = [];
+    // Distinct from the base AbstractGameState.Participants (which tracks the live
+    // roster and prunes leavers); this is the immutable match snapshot. The base's
+    // HostIsParticipant toggle drives whether the host is included — set once at
+    // StartAsync time and never changed, so it is effectively frozen for the match.
+    public ImmutableArray<PlayerEntry> MatchParticipants { get; private set; } = [];
 
-    internal void SetParticipants(IEnumerable<PlayerEntry> participants) =>
+    internal void SetMatchParticipants(IEnumerable<PlayerEntry> participants) =>
         // Drop the unsubscriber token so the long-lived snapshot doesn't retain
         // registration handles; only User + DisplayName are needed for display.
-        Participants = participants
+        MatchParticipants = participants
             .Select(e => new PlayerEntry(e.User, e.DisplayName, null))
             .ToImmutableArray();
 

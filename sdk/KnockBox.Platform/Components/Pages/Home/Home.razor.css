@@ -1,6 +1,7 @@
 /* ── Home Container ──────────────────────────────────────────────────────── */
 
 .home-container {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -9,17 +10,111 @@
     font-family: var(--font-primary);
     min-height: 100%;
     gap: 0;
+    overflow-x: clip;
 }
 
-/* ── Hero Section ───────────────────────────────────────────────────────── */
+/* ── Hero Banner (askew scrolling ribbon + bouncy title) ────────────────── */
+
+.hero-banner {
+    position: relative;
+    width: 100%;
+    margin: 8px 0 24px 0;
+    padding: 28px 0 36px 0;
+    min-height: clamp(140px, 22vw, 220px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+}
+
+.hero-ribbon {
+    /* --ribbon-h, --img-w, --copies cascade to .hero-ribbon-track and
+       .hero-ribbon-tile so they can compute width and duration off the
+       same numbers. Each tile becomes exactly enough integer image copies
+       to cover the viewport, no more — narrow screens don't pay for the
+       12 copies a dual-monitor setup needs.
+
+       --img-w is the image's NATIVE pixel width (1536px), so the background
+       renders 1:1 and each tile is an exact integer count of native-width
+       copies — background-repeat-x lands cleanly and translateX(-50%) wraps
+       with no seam. Deriving width from a constant (not the element height)
+       also sidesteps the global border-box + 4px top/bottom border shrink,
+       which previously made the rendered image width disagree with --img-w. */
+    --ribbon-h: clamp(140px, 18vw, 180px);
+    --img-w: 1536px;
+    --copies: round(up, 100vw / var(--img-w), 1);
+
+    position: absolute;
+    left: -5vw;
+    right: -5vw;
+    top: 50%;
+    transform: translateY(-50%) rotate(-2deg);
+    height: var(--ribbon-h);
+    overflow: hidden;
+    z-index: 0;
+    border-top: 4px solid #000;
+    border-bottom: 4px solid #000;
+    box-shadow: var(--shadow-card-rest);
+}
+
+/* Dark overlay sits above the moving tiles for a subtle tint without
+   interfering with pointer events. */
+.hero-ribbon::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05));
+    pointer-events: none;
+}
+
+.hero-ribbon-track {
+    display: flex;
+    width: max-content;
+    height: 100%;
+    /* Duration scales with tile width so the scroll speed (px/s) stays
+       constant across viewports. ~32 px/s matches the prior tuning. The
+       `length / 1px` trick yields a unitless number we can multiply by 1s. */
+    animation: ribbonScroll
+        calc(var(--copies) * var(--img-w) / 1px / 32 * 1s)
+        linear infinite;
+    will-change: transform;
+}
+
+.hero-ribbon-tile {
+    flex: 0 0 auto;
+    height: 100%;
+    /* Tile width = an integer count of image copies, so background-repeat-x
+       lands cleanly on the tile boundary (no seam at the tile↔tile join).
+       Both tiles are identical width, so translateX(-50%) is seamless too. */
+    width: calc(var(--copies) * var(--img-w));
+    background-image: url("/_content/KnockBox.Platform/content/backgrounds/yellow-vertical_loop_crop.webp");
+    background-repeat: repeat-x;
+    /* Native intrinsic size (1536×645) — pixels render 1:1 instead of being
+       squeezed to the band height. The 645px-tall image is taller than the
+       band, so center it vertically and let the band crop it. */
+    background-size: auto;
+    background-position: center;
+}
+
+@keyframes ribbonScroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hero-ribbon-track {
+        animation: none;
+    }
+}
 
 .hero {
+    position: relative;
+    z-index: 1;
     text-align: center;
-    margin-bottom: 32px;
-    padding-top: 16px;
 }
 
 .title {
+    font-family: var(--font-title);
     font-size: clamp(3rem, 8vw, 5.5rem);
     font-weight: 900;
     text-transform: uppercase;
@@ -61,6 +156,18 @@
     }
 }
 
+.hero-tagline {
+    font-family: var(--font-primary);
+    font-style: italic;
+    font-weight: 500;
+    font-size: clamp(0.95rem, 1.6vw, 1.15rem);
+    color: var(--ink-soft);
+    text-align: center;
+    margin: 0 auto 32px auto;
+    max-width: 540px;
+    animation: fade-in-up 0.6s ease-out 0.5s both;
+}
+
 .sr-only {
     position: absolute;
     width: 1px;
@@ -73,17 +180,24 @@
     border: 0;
 }
 
-/* ── Join Section (side-by-side cards) ──────────────────────────────────── */
+/* ── Join Section (clean side-by-side cards) ────────────────────────────── */
 
 .join-section {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: row;
     gap: 20px;
-    margin: 0 auto 36px auto;
+    margin: 0 auto 40px auto;
     width: 100%;
     max-width: 680px;
     padding: 0 8px;
-    animation: fade-in-up 0.6s ease-out 0.6s both;
+    /* `backwards` (not `both`): `both` keeps the final keyframe's transform
+       (translateY(0)) applied forever, and a transformed ancestor forms a
+       backdrop root that defeats the cards' backdrop-filter. The final keyframe
+       equals the resting state, so dropping `forwards` changes nothing visually
+       but removes the lingering transform → the cards can blur the page again. */
+    animation: fade-in-up 0.6s ease-out 0.6s backwards;
 }
 
 @keyframes fade-in-up {
@@ -99,56 +213,70 @@
 
 .join-card {
     flex: 1;
-    padding: 20px;
-    border: 4px solid #000;
-    border-radius: 14px;
-    box-shadow: 6px 6px 0px #000;
+    padding: 18px 20px;
+    /* Brand-pink tint (near --accent #FF0055), fairly opaque so the cards read as
+       a solid pink panel against the violet background. */
+    background-color: rgba(255, 45, 110, 0.4);
+    border: 1px solid rgba(255, 45, 110, 0.7);
+    border-radius: 12px;
+    box-shadow: var(--shadow-card-rest);
+    /* Frosts the violet/dots showing through the 40%-opaque pink. (-webkit- for
+       Safari.) Only takes effect because .join-section no longer retains a
+       transform — see the note there. */
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
     display: flex;
     flex-direction: column;
     gap: 10px;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .join-card:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: 8px 8px 0px #000;
-}
-
-.join-card-name {
-    background-color: #1EFFBC;
-}
-
-.join-card-code {
-    background-color: #FFD166;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-lift);
+    border-color: rgba(255, 45, 110, 0.9);
 }
 
 .join-label {
-    font-size: 1rem;
-    font-weight: 800;
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: #000;
+    letter-spacing: 0.14em;
+    color: var(--ink);
     margin: 0;
 }
 
 .join-card input {
-    font-family: var(--font-mono);
-    font-size: 20px;
-    font-weight: 700;
-    text-align: center;
+    font-family: var(--font-primary);
+    font-size: 1.05rem;
+    font-weight: 500;
+    text-align: left;
     padding: 10px 12px;
-    border: 3px solid #000;
+    border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 8px;
     width: 100%;
-    box-sizing: border-box;
-    background: rgba(255, 255, 255, 0.85);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--ink);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+#room-code-input {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-align: center;
+}
+
+.join-card input::placeholder {
+    color: rgba(244, 236, 228, 0.55);
 }
 
 .join-card input:focus {
     outline: none;
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 3px rgba(255, 0, 85, 0.2);
+    box-shadow: 0 0 0 3px rgba(255, 0, 85, 0.25);
+    background: rgba(0, 0, 0, 0.35);
 }
 
 .join-code-row {
@@ -163,46 +291,46 @@
 }
 
 .join-btn {
-    font-family: var(--font-primary);
-    font-size: 1.1rem;
-    font-weight: 800;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.08em;
     background-color: var(--accent-color);
-    color: white;
-    border: 3px solid #000;
+    color: #fff;
+    border: none;
     border-radius: 8px;
-    padding: 10px 20px;
+    padding: 10px 22px;
     cursor: pointer;
-    transition: transform 0.1s, box-shadow 0.1s, background-color 0.15s;
-    box-shadow: 4px 4px 0px #000;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.15s ease;
+    box-shadow: 0 2px 6px rgba(255, 0, 85, 0.35);
     white-space: nowrap;
     flex-shrink: 0;
 }
 
 .join-btn:hover:not(:disabled) {
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0px #000;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 0, 85, 0.45);
     background-color: #ff2d6f;
 }
 
 .join-btn:active:not(:disabled) {
-    transform: translate(2px, 2px);
-    box-shadow: 1px 1px 0px #000;
+    transform: translateY(1px);
+    box-shadow: 0 1px 3px rgba(255, 0, 85, 0.3);
 }
 
 .join-btn:disabled {
-    background-color: #ccc;
+    background-color: rgba(255, 255, 255, 0.08);
     cursor: not-allowed;
     box-shadow: none;
-    transform: none;
-    border-color: #888;
-    color: #666;
+    color: rgba(244, 236, 228, 0.35);
 }
 
 /* ── Games Section ──────────────────────────────────────────────────────── */
 
 .games-section {
+    position: relative;
+    z-index: 1;
     width: 100%;
     max-width: 960px;
     margin: 0 auto;
@@ -210,37 +338,35 @@
 }
 
 .games-heading {
-    font-size: 1.6rem;
-    font-weight: 900;
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 3px;
+    letter-spacing: 0.18em;
     color: #fff;
-    text-shadow: 3px 3px 0 #000;
     text-align: center;
-    margin: 0 0 20px 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
+    margin: 0 0 28px 0;
+    position: relative;
+    padding-bottom: 12px;
 }
 
-.games-heading-icon {
-    font-size: 1.8rem;
-    display: inline-block;
-    animation: icon-wiggle 2s ease-in-out infinite;
-}
-
-@keyframes icon-wiggle {
-    0%, 100% { transform: rotate(0deg); }
-    25% { transform: rotate(-12deg); }
-    75% { transform: rotate(12deg); }
+.games-heading::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+    width: 56px;
+    height: 3px;
+    background-color: var(--accent-color);
+    border-radius: 2px;
 }
 
 .game-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 24px;
-    padding: 0 16px 16px 16px;
+    gap: 36px 32px;
+    padding: 4px 20px 24px 20px;
 }
 
 /* Structural shell only — each game plugin owns its own visual design via a
@@ -255,8 +381,20 @@
     display: block;
     font: inherit;
     color: inherit;
-    transition: transform 0.15s ease;
     position: relative;
+    transition: transform 220ms cubic-bezier(.34, 1.56, .64, 1), filter 200ms ease;
+}
+
+/* Faint deterministic per-index tilt so tiles feel hand-placed without
+   shouting. Five-slot cycle so the pattern never lines up with a row. */
+.game-tile:nth-child(5n+1) { transform: rotate(-1deg); }
+.game-tile:nth-child(5n+2) { transform: rotate(0.4deg); }
+.game-tile:nth-child(5n+3) { transform: rotate(1deg); }
+.game-tile:nth-child(5n+4) { transform: rotate(-0.6deg); }
+.game-tile:nth-child(5n+5) { transform: rotate(0.7deg); }
+
+.game-tile:hover:not(:disabled) {
+    transform: rotate(0deg) translateY(-3px);
 }
 
 .game-tile:disabled {
@@ -268,9 +406,17 @@
 
 .game-tile:focus-visible {
     outline: 3px solid var(--accent-color);
-    outline-offset: 3px;
-    border-radius: 14px;
+    outline-offset: 6px;
+    border-radius: 18px;
 }
+
+/* WIP tiles keep their resting tilt on hover (no snap-to-zero), since the game
+   isn't playable. Mirrors the gentle nth-child pattern above. */
+.game-tile.is-wip:nth-child(5n+1):hover { transform: rotate(-1deg); }
+.game-tile.is-wip:nth-child(5n+2):hover { transform: rotate(0.4deg); }
+.game-tile.is-wip:nth-child(5n+3):hover { transform: rotate(1deg); }
+.game-tile.is-wip:nth-child(5n+4):hover { transform: rotate(-0.6deg); }
+.game-tile.is-wip:nth-child(5n+5):hover { transform: rotate(0.7deg); }
 
 /* Renders when a plugin declares `tileAsset` in its manifest — collapses the
    former multi-element Razor tile into a single <img>. The SVG owns its own
@@ -316,6 +462,7 @@
     }
 }
 
+.home-container.transitioning .hero-tagline,
 .home-container.transitioning .join-section {
     animation: fade-out-down 0.35s ease-in 0.05s forwards;
 }
@@ -350,8 +497,11 @@
 .home-container.returning .title-letter:nth-child(7) { animation-delay: 0.35s; }
 .home-container.returning .title-letter:nth-child(8) { animation-delay: 0.40s; }
 
+.home-container.returning .hero-tagline,
 .home-container.returning .join-section {
-    animation: fade-in-up 0.6s ease-out 0.1s both;
+    /* `backwards` not `both` — same reason as the base .join-section rule: a
+       retained transform would re-break the cards' backdrop-filter. */
+    animation: fade-in-up 0.6s ease-out 0.1s backwards;
 }
 
 .home-container.returning .games-section {
@@ -408,14 +558,14 @@
     }
 
     .games-heading {
-        font-size: 1.3rem;
-        letter-spacing: 2px;
+        font-size: 1rem;
+        letter-spacing: 0.16em;
     }
 
     .game-grid {
         grid-template-columns: 1fr;
-        gap: 16px;
-        padding: 0 8px 16px 8px;
+        gap: 24px 16px;
+        padding: 4px 12px 16px 12px;
     }
 }
 
@@ -423,6 +573,17 @@
     .game-grid {
         grid-template-columns: repeat(2, 1fr);
     }
+}
+
+/* Tilt-snap on hover doesn't feel right on touch devices — no resting hover
+   state means the tile would flicker through hover on tap. Flatten the
+   resting tilt so the static look stays sticker-ish without animation drama. */
+@media (hover: none) {
+    .game-tile:nth-child(5n+1) { transform: rotate(-0.5deg); }
+    .game-tile:nth-child(5n+2) { transform: rotate(0.2deg); }
+    .game-tile:nth-child(5n+3) { transform: rotate(0.5deg); }
+    .game-tile:nth-child(5n+4) { transform: rotate(-0.3deg); }
+    .game-tile:nth-child(5n+5) { transform: rotate(0.4deg); }
 }
 
 /* ── Reduced Motion ─────────────────────────────────────────────────────── */
@@ -435,29 +596,24 @@
     }
 
     .games-section,
-    .join-section {
+    .join-section,
+    .hero-tagline {
         animation: none;
         opacity: 1;
         transform: none;
     }
 
-    .games-heading-icon {
-        animation: none;
-    }
-
-    .join-card {
-        transition: none;
-    }
-
+    .join-card,
     .game-tile {
         transition: none;
     }
 
-    .home-container::before {
+    .hero-ribbon {
         animation: none;
     }
 
     .home-container.transitioning .title-letter,
+    .home-container.transitioning .hero-tagline,
     .home-container.transitioning .join-section,
     .home-container.transitioning .games-section {
         animation: none;
@@ -465,6 +621,7 @@
     }
 
     .home-container.returning .title-letter,
+    .home-container.returning .hero-tagline,
     .home-container.returning .join-section,
     .home-container.returning .games-section {
         animation: none;

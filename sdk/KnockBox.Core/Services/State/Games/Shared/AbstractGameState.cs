@@ -130,7 +130,22 @@ namespace KnockBox.Core.Services.State.Games.Shared
 
             // Roster always contains the host at index 0; players are appended on join.
             _cachedRoster = [new PlayerEntry(host, host.Name, null)];
+
+            // Seed the participant view from the subclass's pre-start default. The
+            // engine usually overwrites this at game start via SetHostIsParticipant;
+            // the default only governs the window before the game begins.
+            _hostIsParticipant = DefaultHostIsParticipant;
+            _cachedParticipants = _hostIsParticipant ? _cachedRoster : _cachedPlayerEntries;
         }
+
+        /// <summary>
+        /// The value <see cref="HostIsParticipant"/> takes before the game starts.
+        /// Defaults to <c>false</c> (host is the shared display). Games where the host
+        /// plays by default until <see cref="SetHostIsParticipant"/> fixes the value at
+        /// game start can override this to <c>true</c>. The override must be a constant
+        /// (it is read from the base constructor, before subclass fields initialize).
+        /// </summary>
+        protected virtual bool DefaultHostIsParticipant => false;
 
         /// <summary>
         /// The UTC time when this state was created.
@@ -156,8 +171,9 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// <summary>
         /// When <c>true</c>, the host is treated as a game participant — appearing
         /// in <see cref="Participants"/> alongside registered players, and counting
-        /// toward any participant-count check. Defaults to <c>false</c>, preserving
-        /// the "host is the shared display" behavior. Toggled via
+        /// toward any participant-count check. The pre-start value comes from
+        /// <see cref="DefaultHostIsParticipant"/> (<c>false</c> by default, preserving
+        /// the "host is the shared display" behavior). Toggled via
         /// <see cref="SetHostIsParticipant"/> from inside <see cref="Execute(Action)"/>.
         /// </summary>
         public bool HostIsParticipant => _hostIsParticipant;
@@ -262,9 +278,10 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// <summary>
         /// Sets <see cref="HostIsParticipant"/> and republishes the participant
         /// snapshot. Must be invoked from inside an <see cref="Execute(Action)"/>
-        /// block on this state.
+        /// block on this state. Public — like <see cref="SetJoinable"/> — so a
+        /// game's engine can toggle it from outside the state class.
         /// </summary>
-        protected void SetHostIsParticipant(bool value)
+        public void SetHostIsParticipant(bool value)
         {
             ThrowIfNotExecuting();
             if (_hostIsParticipant == value) return;
@@ -718,6 +735,13 @@ namespace KnockBox.Core.Services.State.Games.Shared
             if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
 
             _stateDisposed.Notify();
+
+            // Drop subscribers now that the disposed signal has fired — their captures
+            // hold component/engine references, so clearing promptly breaks the
+            // state↔subscriber cycle instead of waiting for GC.
+            _stateChanged.Clear();
+            _playerUnregistered.Clear();
+            _stateDisposed.Clear();
 
             CancellationTokenSource? disposeCts;
             ImmutableArray<CancellationTokenSource> pendingCallbacks;

@@ -5,10 +5,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
-    <!-- DATAS: keep Server GC but let it shrink heap count/size under low load.
-         Best fit for the containerized host where idle footprint matters but
-         peak throughput across concurrent lobbies is still wanted. -->
-    <GarbageCollectionAdaptationMode>1</GarbageCollectionAdaptationMode>
+    <!-- Workstation GC: ASP.NET Core defaults to Server GC, which reserves
+         per-core heaps and is slow to return committed memory to the OS, so
+         idle RSS tracks the high-water mark rather than the (small) live set.
+         For this host idle footprint in the container matters more than peak
+         throughput across many concurrent lobbies, so we opt into Workstation
+         GC to keep idle memory low. Revert to Server GC (+ DATAS via
+         GarbageCollectionAdaptationMode) if concurrent-lobby throughput
+         becomes the bottleneck. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
     <!-- Drop ICU globalization data. Safe only while user-visible strings stay
          English-only and we don't culture-parse user input; revert if either
          changes. -->
@@ -96,6 +101,8 @@
     <ProjectReference Include="..\KnockBox.AlphaChain\KnockBox.AlphaChain.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\KnockBox.LinkedList\KnockBox.LinkedList.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\KnockBox.Tracery\KnockBox.Tracery.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
     <!--
       Library plugins. Same ReferenceOutputAssembly="false" Private="false" pattern

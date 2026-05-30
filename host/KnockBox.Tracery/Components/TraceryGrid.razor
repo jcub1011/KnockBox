@@ -1,0 +1,53 @@
+@* The player's traceable copy of the shared grid. Tap-adjacent selection (@onclick) and
+   smooth drag (pointer/touch via tracery-trace.js) feed ONE client path model; both finish
+   through SubmitPath → OnPathSubmitted, so the server validates a single code path. The client
+   only previews legality (adjacency + no-revisit); TracerySolver.ValidateTrace is authoritative. *@
+@implements IDisposable
+
+@if (Grid is not null)
+{
+    <div class="tr-grid-wrap">
+        <div class="tr-grid-topbar">
+            <button type="button" class="tr-grid-clear tr-grid-rotate" @onclick="RotateGrid"
+                    title="Rotate board" aria-label="Rotate board">↻</button>
+            <div class="tr-grid-banner @(_path.Count > 0 ? "tr-grid-banner-active" : "")">
+                <span class="tr-grid-banner-text">@CurrentWord()</span>
+            </div>
+            <button type="button" class="tr-grid-iconbtn tr-grid-clearbtn" @onclick="ClearPath"
+                    disabled="@(_path.Count == 0 || !IsActive)"
+                    title="Clear word" aria-label="Clear word">✕</button>
+            <button type="button" class="tr-grid-iconbtn tr-grid-submitbtn" @onclick="SubmitWord"
+                    disabled="@(_path.Count == 0 || !IsActive)"
+                    title="Submit word" aria-label="Submit word">✓</button>
+        </div>
+
+        <div class="tr-grid @(Invalid ? "tr-grid-shake" : "")"
+             @ref="_gridEl"
+             style="--tr-cols:@Grid.Width;--tr-rows:@Grid.Height;--tr-rotation:@(RotationDegrees)deg;aspect-ratio:@Grid.Width / @Grid.Height;">
+
+            <svg class="tr-grid-lines" viewBox="0 0 @Grid.Width @Grid.Height" preserveAspectRatio="none" aria-hidden="true">
+                @if (_path.Count >= 2)
+                {
+                    <polyline points="@LinePoints()" />
+                }
+            </svg>
+
+            @for (int id = 0; id < Grid.CellCount; id++)
+            {
+                int cellId = id;
+                var (r, c) = Grid.FromCellId(cellId);
+                int order = _path.IndexOf(cellId);
+                bool selected = order >= 0;
+                bool isLast = selected && order == _path.Count - 1;
+                <button type="button"
+                        class="tr-cell @(selected ? "tr-cell-selected" : "") @(isLast ? "tr-cell-last" : "")"
+                        data-tr-cell="@cellId"
+                        style="grid-column:@(c + 1);grid-row:@(r + 1);"
+                        disabled="@(!IsActive)"
+                        @onclick="() => OnCellTap(cellId)">
+                    <span class="tr-cell-letter">@char.ToUpperInvariant(Grid[cellId])</span>
+                </button>
+            }
+        </div>
+    </div>
+}

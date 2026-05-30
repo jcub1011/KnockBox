@@ -1,0 +1,45 @@
+@* Search mode (Playing): the shared target list, each word checked off as the current player finds
+   it, a found/total progress count, and a banner once the whole list is complete. Pure renderer —
+   the room page re-renders it on every state-change notification. *@
+
+<div class="tr-search">
+    <div class="tr-search-head">
+        <span class="tr-search-label">FIND THESE</span>
+        <span class="tr-search-progress">@FoundCount / @State.SearchList.Length</span>
+    </div>
+
+    @if (PlayerState?.CompletionRank is int rank)
+    {
+        <div class="tr-search-done">FOUND ALL · @Ordinal(rank) PLACE</div>
+    }
+
+    <div class="tr-search-list">
+        @foreach (var word in State.SearchList)
+        {
+            var found = PlayerState?.HasBanked(word) == true;
+            <div class="tr-search-word @(found ? "is-found" : null)" @key="word">
+                <span class="tr-search-tick">@(found ? "✓" : "")</span>
+                <span class="tr-search-word-text">@word.ToUpperInvariant()</span>
+                <span class="tr-search-word-len">@word.Length</span>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TraceryGameState State { get; set; } = default!;
+
+    /// <summary>The viewing player's round state (their banked words + completion rank), or null for an observer.</summary>
+    [Parameter] public TraceryPlayerState? PlayerState { get; set; }
+
+    private int FoundCount => PlayerState is null ? 0 : State.SearchList.Count(PlayerState.HasBanked);
+
+    // 1st / 2nd / 3rd / 4th… with correct -teen handling.
+    private static string Ordinal(int n)
+    {
+        string suffix = (n % 100) is >= 11 and <= 13
+            ? "th"
+            : (n % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" };
+        return $"{n}{suffix}";
+    }
+}

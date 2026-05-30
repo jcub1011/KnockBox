@@ -51,7 +51,7 @@ public class SpardleEngine(
             s.SetHostIsParticipant(s.Players.Length == 0 || s.Settings.HostPlaysAlong);
             // Freeze the participant roster now so the final standings screen can show
             // everyone even after disconnects prune them from the live Players roster.
-            s.SetParticipants(s.HostIsParticipant ? s.RosterIncludingHost : s.Players);
+            s.SetMatchParticipants(s.HostIsParticipant ? s.RosterIncludingHost : s.Players);
             s.CurrentRound = 0;
             s.IsGameOver = false;
             s.RoundHistory = s.RoundHistory.Clear();
@@ -92,26 +92,36 @@ public class SpardleEngine(
             return;
         }
 
-        if (state.Settings.WordPoolMode == WordPoolMode.NytStandard)
+        if (state.Settings.WordPoolMode == SpardleWordSource.NytStandard)
         {
-            FillFromSingleLength(queue, state.Settings.WordPoolMode, state.Settings.WordOrderMode, length: 5, requested);
+            FillFromSingleLength(queue, WordPoolMode.NytStandard, state.Settings.WordOrderMode, length: 5, requested);
             state.RoundQueue = queue.ToImmutableList();
             return;
         }
 
-        if (state.Settings.WordPoolMode == WordPoolMode.FullDictionary)
+        if (state.Settings.WordPoolMode == SpardleWordSource.FullDictionary)
         {
             if (state.Settings.ConstantWordLength)
-                FillFromSingleLength(queue, state.Settings.WordPoolMode, state.Settings.WordOrderMode, state.Settings.TargetWordLength, requested);
+                FillFromSingleLength(queue, WordPoolMode.FullDictionary, state.Settings.WordOrderMode, state.Settings.TargetWordLength, requested);
             else
-                FillFromLengthRange(queue, state.Settings.WordPoolMode, state.Settings.WordOrderMode, state.Settings.MinWordLength, state.Settings.MaxWordLength, requested);
-            
+                FillFromLengthRange(queue, WordPoolMode.FullDictionary, state.Settings.WordOrderMode, state.Settings.MinWordLength, state.Settings.MaxWordLength, requested);
+
             state.RoundQueue = queue.ToImmutableList();
             return;
         }
 
+        // HostDefined / CsvUpload with an empty custom pool: nothing to play.
         state.RoundQueue = queue.ToImmutableList();
     }
+
+    // NytStandard/FullDictionary are library-backed; HostDefined/CsvUpload are custom pools
+    // the library can't answer (null) and are served from SpardleState.CustomWordPool instead.
+    private static WordPoolMode? ToLibraryPool(SpardleWordSource source) => source switch
+    {
+        SpardleWordSource.NytStandard => WordPoolMode.NytStandard,
+        SpardleWordSource.FullDictionary => WordPoolMode.FullDictionary,
+        _ => null,
+    };
 
     private void FillFromSingleLength(List<string> queue, WordPoolMode poolMode, WordOrderMode orderMode, int length, int requested)
     {
@@ -615,7 +625,8 @@ public class SpardleEngine(
 
         if (!state.Settings.AllowDictionaryFallback)
         {
-            if (!wordListService.IsInPool(state.Settings.WordPoolMode, guess))
+            var libPool = ToLibraryPool(state.Settings.WordPoolMode);
+            if (libPool is null || !wordListService.IsInPool(libPool.Value, guess))
                 return Result.FromError("Word not in list.");
         }
         else

@@ -7,8 +7,19 @@ public enum LetterStatus
     Correct
 }
 
-// WordPoolMode moved to KnockBox.WordService.Contracts so the shared word-service
-// library plugin owns the enum alongside IWordListService.
+/// <summary>
+/// Word source a Spardle host picks in the lobby. NytStandard and FullDictionary are
+/// served by the shared word-service library; HostDefined and CsvUpload are Spardle-local
+/// pools the host supplies at lobby time (typed in or CSV-uploaded), stored on
+/// SpardleState.CustomWordPool and never backed by IWordListService.
+/// </summary>
+public enum SpardleWordSource
+{
+    NytStandard,
+    FullDictionary,
+    HostDefined,
+    CsvUpload
+}
 
 public enum WordOrderMode
 {
