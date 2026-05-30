@@ -164,6 +164,20 @@ html, body { overscroll-behavior: none; }
     box-shadow: 0 6px 22px -10px var(--tr-accent-glow);
 }
 
+.tr-btn-danger {
+    color: #f3ecda;
+    background: var(--tr-danger);
+    border-color: var(--tr-danger);
+    box-shadow: 0 0 0 0 var(--tr-danger-glow);
+}
+
+.tr-btn-danger:hover:not(:disabled) {
+    background: #c64a57;
+    border-color: #d65c50;
+    color: #fff;
+    box-shadow: 0 6px 22px -10px var(--tr-danger-glow);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Shared standings board — Reveal, FinalStandings
    ═══════════════════════════════════════════════════════════════════════════ */

@@ -54,8 +54,8 @@ namespace KnockBox.Tracery.Models
         /// </summary>
         public const int MaxGridDimension = 8;
 
-        public int GridWidth { get; init; } = 4;
-        public int GridHeight { get; init; } = 4;
+        public int GridWidth { get; init; } = 5;
+        public int GridHeight { get; init; } = 5;
 
         // ── Rounds & timing (GDD §8) ───────────────────────────────────────────
         /// <summary>Per-round play time. <see cref="System.TimeSpan.Zero"/> = unlimited.</summary>
@@ -69,7 +69,7 @@ namespace KnockBox.Tracery.Models
         /// Length of the single post-round intermission (the reveal: words found, round scoring,
         /// standings, and the next-round indicator) before the next round begins.
         /// </summary>
-        public TimeSpan IntermissionDuration { get; init; } = TimeSpan.FromSeconds(10);
+        public TimeSpan IntermissionDuration { get; init; } = TimeSpan.FromSeconds(30);
 
         // ── Word rules (GDD §4, §8) ────────────────────────────────────────────
         public int MinWordLength { get; init; } = 4;

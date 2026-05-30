@@ -68,4 +68,5 @@
 .tr-lobby-waiting { color: var(--tr-ink-dim); }
 .tr-lobby-waiting strong { color: var(--tr-ink); }
 .tr-lobby-start { margin-top: 0.25rem; min-width: 13rem; }
+.tr-lobby-reset { min-width: 13rem; }
 .tr-lobby-error { color: var(--tr-danger); font-size: 0.9rem; font-weight: 600; }
