@@ -1,0 +1,438 @@
+/* ════════════════════════════════════════════════════════════════════════
+   LINKED LIST — "THE WORD LINE"
+   Transit-map design system. Global (non-scoped) stylesheet: holds the design
+   tokens and every primitive shared across phases (buttons, the chain rendered
+   as a metro line, standings boards). Loaded via a <link> in LinkedListLobby's
+   HeadContent. Tokens live here because Blazor scoped `.razor.css` rewrites
+   `:root` to `:root[b-xxx]`, which never matches — so per-component scoped files
+   read these vars but cannot define them.
+
+   Concept: the chain of words is a subway line. Each accepted word is a STATION,
+   START/DEST are TERMINALS, the Auditor is the SIGNAL OPERATOR, and competing
+   Groups are parallel coloured lines racing across the network.
+   ════════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:opsz,wght@10..72,400..800&family=Hanken+Grotesk:wght@400..800&family=Spline+Sans+Mono:wght@400..600&display=swap');
+
+:root {
+    /* ── Typography ─────────────────────────────────────────────────────── */
+    --ll-font-display: "Big Shoulders Display", "Arial Narrow", system-ui, sans-serif; /* signage */
+    --ll-font-station: "Hanken Grotesk", system-ui, sans-serif;                        /* body/words */
+    --ll-font-mono:    "Spline Sans Mono", "Google Sans Code", ui-monospace, monospace; /* timetable */
+
+    /* ── Surfaces (backlit night map) ──────────────────────────────────── */
+    --ll-bg:      #0e1320;
+    --ll-bg-2:    #141b2c;
+    --ll-panel:   rgba(148, 178, 220, 0.05);
+    --ll-panel-2: rgba(148, 178, 220, 0.09);
+    --ll-border:  rgba(150, 180, 220, 0.16);
+    --ll-ink:     #eef2f8;
+    --ll-ink-soft: rgba(238, 242, 248, 0.62);
+
+    /* ── Signals & lines ───────────────────────────────────────────────── */
+    --ll-line:    #38d9c4;  /* the collective route */
+    --ll-dest:    #f4b740;  /* destination beacon (pre-arrival) */
+    --ll-reached: #34d399;  /* arrived */
+    --ll-auditor: #f4b740;  /* signal operator */
+    --ll-go:      #34d399;  /* approve = clear signal */
+    --ll-stop:    #f25f5c;  /* reject = hold signal */
+    --ll-loop:    #b48ef2;  /* loop line */
+
+    /* ── Named group lines (parallel competitive routes) ───────────────── */
+    --ll-route-0: #f25f5c; /* Red    */
+    --ll-route-1: #4aa3ff; /* Blue   */
+    --ll-route-2: #34d399; /* Green  */
+    --ll-route-3: #f4b740; /* Amber  */
+    --ll-route-4: #b48ef2; /* Violet */
+    --ll-route-5: #ff8fab; /* Pink   */
+
+    --ll-shadow:  0 10px 30px rgba(0, 0, 0, 0.45);
+    --ll-hard:    0 4px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* ── Phase roots: base typography ──────────────────────────────────────── */
+.ll-lobby,
+.ll-play,
+.ll-roundover,
+.ll-gameover {
+    font-family: var(--ll-font-station);
+    color: var(--ll-ink);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Accessible focus ring in the line colour. */
+.ll-lobby :focus-visible,
+.ll-play :focus-visible,
+.ll-roundover :focus-visible,
+.ll-gameover :focus-visible {
+    outline: 3px solid var(--ll-line);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   BUTTONS — metro "go signal" pills with a hard-shadow press
+   ════════════════════════════════════════════════════════════════════════ */
+.ll-btn {
+    font-family: var(--ll-font-station);
+    font-weight: 800;
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+    padding: 0.7rem 1.5rem;
+    min-height: 44px;
+    border: 2px solid rgba(0, 0, 0, 0.5);
+    border-radius: 999px;
+    color: #07171a;
+    background: var(--ll-line);
+    cursor: pointer;
+    box-shadow: var(--ll-hard);
+    transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
+}
+
+.ll-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.5);
+    filter: brightness(1.06);
+}
+
+.ll-btn:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+.ll-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4);
+}
+
+.ll-btn-primary { background: var(--ll-line); color: #04201c; }
+.ll-btn-approve { background: var(--ll-go);   color: #052013; }
+.ll-btn-reject  { background: var(--ll-stop); color: #2a0908; }
+
+.ll-btn-ghost {
+    background: transparent;
+    color: var(--ll-ink);
+    border-color: var(--ll-border);
+    box-shadow: none;
+}
+.ll-btn-ghost:hover:not(:disabled) {
+    background: var(--ll-panel-2);
+    box-shadow: none;
+    transform: translateY(-1px);
+    filter: none;
+}
+.ll-btn-ghost:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   THE CHAIN — rendered as a metro line (shared by all three phases)
+   DOM: [.ll-anchor-start] (.ll-connector .ll-link)* .ll-connector [.ll-anchor-dest]
+   ════════════════════════════════════════════════════════════════════════ */
+.ll-chain-card {
+    padding: 1.1rem 1.2rem 1.25rem;
+    border: 1px solid var(--ll-border);
+    border-radius: 1rem;
+    background: var(--ll-panel);
+}
+
+.ll-chain-title {
+    margin: 0 0 0.85rem;
+    font-family: var(--ll-font-display);
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ll-ink-soft);
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.ll-chain-sub {
+    font-family: var(--ll-font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    color: var(--ll-ink-soft);
+    text-transform: none;
+}
+
+.ll-chain {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem 0;
+    padding: 0.4rem 0;
+}
+
+/* Route segment between stations (the literal "─" is hidden via font-size:0). */
+.ll-connector {
+    flex: 0 0 auto;
+    width: 1.6rem;
+    height: 0.3rem;
+    border-radius: 2px;
+    background: var(--ll-route, var(--ll-line));
+    font-size: 0;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--ll-route, var(--ll-line)) 45%, transparent);
+}
+
+/* The segment leading into the destination stays a dashed "planned route" until
+   the chain actually arrives — a solid glowing line would falsely read as done. */
+.ll-connector-pending {
+    height: 0;
+    background: none;
+    box-shadow: none;
+    border-radius: 0;
+    border-top: 0.16rem dashed color-mix(in srgb, var(--ll-ink-soft) 60%, transparent);
+}
+
+/* Terminals (start / destination). */
+.ll-anchor {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: var(--ll-font-display);
+    font-weight: 700;
+    font-size: 1.2rem;
+    line-height: 1;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--ll-ink);
+    padding: 0.55rem 0.9rem;
+    border-radius: 0.6rem;
+}
+
+.ll-anchor-start {
+    background: color-mix(in srgb, var(--ll-route, var(--ll-line)) 16%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--ll-route, var(--ll-line)) 55%, transparent);
+}
+.ll-anchor-start::before {
+    content: "●";
+    color: var(--ll-route, var(--ll-line));
+    font-size: 0.85em;
+}
+
+.ll-anchor-dest {
+    background: color-mix(in srgb, var(--ll-dest) 15%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--ll-dest) 55%, transparent);
+}
+.ll-anchor-dest::before {
+    content: "◎";
+    color: var(--ll-dest);
+    font-size: 0.95em;
+}
+
+.ll-anchor-reached {
+    background: color-mix(in srgb, var(--ll-reached) 18%, transparent);
+    border-color: var(--ll-reached);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--ll-reached) 50%, transparent);
+    animation: ll-arrived-glow 1.9s ease-in-out infinite;
+}
+.ll-anchor-reached::before { content: "◉"; color: var(--ll-reached); }
+
+/* Stations. */
+.ll-link {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.12rem;
+    padding: 0.7rem 0.8rem 0.55rem;
+    border-radius: 0.7rem;
+    background: var(--ll-panel);
+    border: 1px solid var(--ll-border);
+    animation: ll-station-arrive 0.38s cubic-bezier(0.2, 0.8, 0.3, 1.25) both;
+}
+
+/* Station marker dot. */
+.ll-link::before {
+    content: "";
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 50%;
+    background: var(--ll-bg);
+    border: 0.22rem solid var(--ll-route, var(--ll-line));
+    margin-bottom: 0.25rem;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--ll-route, var(--ll-line)) 45%, transparent);
+}
+
+.ll-link-pair {
+    font-family: var(--ll-font-station);
+    font-weight: 800;
+    font-size: 0.92rem;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--ll-ink);
+}
+
+.ll-link-by {
+    font-family: var(--ll-font-station);
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--ll-ink-soft);
+}
+.ll-link-by::before { content: "by "; opacity: 0.65; }
+
+.ll-link-loop {
+    border-color: color-mix(in srgb, var(--ll-loop) 55%, transparent);
+    background: color-mix(in srgb, var(--ll-loop) 12%, var(--ll-panel));
+}
+.ll-link-loop::before { border-color: var(--ll-loop); box-shadow: 0 0 8px color-mix(in srgb, var(--ll-loop) 50%, transparent); }
+
+.ll-loop-badge {
+    margin-top: 0.2rem;
+    font-family: var(--ll-font-mono);
+    font-size: 0.58rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ll-loop) 30%, transparent);
+    color: #f0e8ff;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   STANDINGS — service-ranking board (RoundOver + GameOver, Groups mode)
+   ════════════════════════════════════════════════════════════════════════ */
+.ll-standings {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--ll-font-mono);
+    font-variant-numeric: tabular-nums;
+}
+
+.ll-standings th {
+    text-align: left;
+    padding: 0.5rem 0.6rem;
+    border-bottom: 1px solid var(--ll-border);
+    font-family: var(--ll-font-display);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ll-ink-soft);
+}
+
+.ll-standings td {
+    text-align: left;
+    padding: 0.55rem 0.6rem;
+    border-bottom: 1px solid var(--ll-border);
+    color: var(--ll-ink);
+}
+
+/* Coloured line bullet before each group name (2nd column). --ll-route is set
+   per-row inline so the bullet matches the group's line colour. */
+.ll-standings tbody td:nth-child(2)::before {
+    content: "●";
+    margin-right: 0.4rem;
+    color: var(--ll-route, var(--ll-line));
+}
+
+.ll-standings-top {
+    background: color-mix(in srgb, var(--ll-dest) 13%, transparent);
+}
+.ll-standings-top td { font-weight: 700; }
+
+.ll-standings-secondary { color: var(--ll-ink-soft); }
+
+.ll-tiebreak,
+.ll-standings-dnf {
+    display: inline-block;
+    margin-left: 0.45rem;
+    font-family: var(--ll-font-mono);
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+}
+.ll-tiebreak     { background: color-mix(in srgb, var(--ll-dest) 26%, transparent); color: #2a1c00; }
+.ll-standings-dnf { background: color-mix(in srgb, var(--ll-stop) 28%, transparent); color: #2a0908; }
+
+/* ── Round chip (shared: playing meta strip + round-over progress) ─────── */
+.ll-round-chip {
+    font-family: var(--ll-font-mono);
+    font-weight: 600;
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--ll-border);
+    color: var(--ll-ink-soft);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ════════════════════════════════════════════════════════════════════════ */
+@keyframes ll-station-arrive {
+    from { opacity: 0; transform: translateY(7px) scale(0.9); }
+    to   { opacity: 1; transform: none; }
+}
+
+@keyframes ll-arrived-glow {
+    0%, 100% { box-shadow: 0 0 14px color-mix(in srgb, var(--ll-reached) 40%, transparent); }
+    50%      { box-shadow: 0 0 26px color-mix(in srgb, var(--ll-reached) 70%, transparent); }
+}
+
+@keyframes ll-signal-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+}
+
+@keyframes ll-doors-closing {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+}
+
+@keyframes ll-alert-slide {
+    0%   { opacity: 0; transform: translate(-50%, -0.6rem); }
+    12%  { opacity: 1; transform: translate(-50%, 0); }
+    88%  { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, -0.6rem); }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   RESPONSIVE — the line goes vertical on narrow screens (mobile metro list)
+   ════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 34rem) {
+    .ll-chain {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0;
+    }
+    .ll-connector {
+        width: 0.3rem;
+        height: 1.15rem;
+        margin-left: 1.15rem;
+    }
+    .ll-connector-pending {
+        width: 0;
+        height: 1.15rem;
+        border-top: none;
+        border-left: 0.16rem dashed color-mix(in srgb, var(--ll-ink-soft) 60%, transparent);
+    }
+    .ll-link {
+        flex-direction: row;
+        gap: 0.55rem;
+        align-items: center;
+        align-self: stretch;
+    }
+    .ll-link::before { margin-bottom: 0; flex: 0 0 auto; }
+    .ll-link-pair { text-align: left; }
+    .ll-anchor { align-self: stretch; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   REDUCED MOTION
+   ════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+    .ll-link,
+    .ll-anchor-reached,
+    .ll-btn {
+        animation: none !important;
+        transition: none !important;
+    }
+}

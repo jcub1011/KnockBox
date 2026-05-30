@@ -22,7 +22,7 @@
                 }
             </span>
         }
-        <span class="ll-connector">─</span>
+        <span class="ll-connector @(g.DestinationReached ? "" : "ll-connector-pending")">─</span>
         <span class="ll-anchor ll-anchor-dest @(g.DestinationReached ? "ll-anchor-reached" : "")">
             @GameState.DestinationWord
         </span>
@@ -245,7 +245,7 @@
                 </div>
             }
 
-            <div class="ll-group-banner">You're in <strong>@group.GroupName</strong></div>
+            <div class="ll-group-banner" style="--ll-route: var(--ll-route-@(GameState.Groups.IndexOf(group) % 6))">You're on <strong>@group.GroupName</strong></div>
 
             @if (group.Finished)
             {
@@ -299,7 +299,7 @@
                 <div class="ll-rivals">
                     @foreach (var r in rivals)
                     {
-                        <div class="ll-rival-chip @(r.Finished ? "ll-rival-done" : "")">
+                        <div class="ll-rival-chip @(r.Finished ? "ll-rival-done" : "")" style="--ll-route: var(--ll-route-@(GameState.Groups.IndexOf(r) % 6))">
                             <span class="ll-rival-name">@r.GroupName</span>
                             <span class="ll-rival-stat">@r.GuessCount link@(r.GuessCount == 1 ? "" : "s")</span>
                             @if (r.Finished)
@@ -315,7 +315,7 @@
                 </div>
             }
 
-            <div class="ll-chain-card">
+            <div class="ll-chain-card" style="--ll-route: var(--ll-route-@(GameState.Groups.IndexOf(group) % 6))">
                 <h4 class="ll-chain-title">@group.GroupName's Chain</h4>
                 @chainView(group)
             </div>
@@ -326,7 +326,7 @@
             <div class="ll-all-groups">
                 @foreach (var g in GameState.Groups)
                 {
-                    <div class="ll-chain-card">
+                    <div class="ll-chain-card" style="--ll-route: var(--ll-route-@(GameState.Groups.IndexOf(g) % 6))">
                         <h4 class="ll-chain-title">
                             @g.GroupName
                             <span class="ll-chain-sub">@g.GuessCount link@(g.GuessCount == 1 ? "" : "s")@(g.Finished ? " · 🏁" : "")</span>

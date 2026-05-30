@@ -131,7 +131,7 @@
                         {
                             var groupIndex = gi;
                             var members = teams[groupIndex];
-                            <div class="ll-team-card">
+                            <div class="ll-team-card" style="--ll-route: var(--ll-route-@(groupIndex % 6))">
                                 <div class="ll-team-head">
                                     <span class="ll-team-name">@GroupLabel(groupIndex)</span>
                                     <span class="ll-team-count">@members.Count player@(members.Count == 1 ? "" : "s")</span>

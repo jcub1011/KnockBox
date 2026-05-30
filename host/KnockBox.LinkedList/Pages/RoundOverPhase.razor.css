@@ -1,147 +1,95 @@
+/* ROUND OVER — "Arrival board". Chain, standings, round-chip and buttons are
+   styled globally; this file owns the arrival banner, score readout, the
+   standings-card wrapper, and the progress strip. */
+
 .ll-roundover {
     width: 100%;
-    max-width: 40rem;
+    max-width: 42rem;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.1rem;
 }
 
-/* ── Outcome banner ── */
-
+/* ── Arrival banner ────────────────────────────────────────────────────── */
 .ll-ro-banner {
     text-align: center;
-    padding: 1.25rem;
-    border-radius: 0.75rem;
-    border: 1px solid rgba(128, 128, 128, 0.35);
+    padding: 1.6rem 1.25rem;
+    border-radius: 1rem;
+    border: 1px solid var(--ll-border);
+    background: var(--ll-panel);
 }
-
 .ll-ro-success {
-    background: rgba(34, 165, 89, 0.14);
-    border-color: rgba(34, 165, 89, 0.5);
+    background: color-mix(in srgb, var(--ll-reached) 14%, transparent);
+    border-color: color-mix(in srgb, var(--ll-reached) 50%, transparent);
 }
-
 .ll-ro-stalled {
-    background: rgba(211, 65, 59, 0.12);
-    border-color: rgba(211, 65, 59, 0.4);
+    background: color-mix(in srgb, var(--ll-stop) 12%, transparent);
+    border-color: color-mix(in srgb, var(--ll-stop) 45%, transparent);
 }
-
-.ll-ro-emoji {
-    font-size: 2.5rem;
-}
-
+.ll-ro-emoji { font-size: 2.6rem; display: block; }
 .ll-ro-headline {
-    margin: 0.25rem 0 0.25rem;
+    margin: 0.4rem 0 0.3rem;
+    font-family: var(--ll-font-display);
+    font-weight: 800;
+    font-size: clamp(1.6rem, 7vw, 2.4rem);
+    line-height: 1;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
 }
-
+.ll-ro-success .ll-ro-headline { color: var(--ll-reached); }
+.ll-ro-stalled .ll-ro-headline { color: var(--ll-stop); }
 .ll-ro-sub {
     margin: 0;
-    opacity: 0.8;
+    font-family: var(--ll-font-display);
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+    color: var(--ll-ink-soft);
 }
 
-/* ── Score ── */
-
+/* ── Score readout ─────────────────────────────────────────────────────── */
 .ll-ro-score {
     text-align: center;
-    padding: 1rem;
-    border: 1px solid rgba(128, 128, 128, 0.35);
-    border-radius: 0.75rem;
+    padding: 1.4rem 1.25rem;
+    border: 1px solid var(--ll-border);
+    border-radius: 1rem;
+    background: var(--ll-panel);
 }
-
-.ll-ro-metric {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.1rem;
-}
-
+.ll-ro-metric { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
 .ll-ro-metric-value {
-    font-size: 3rem;
+    font-family: var(--ll-font-display);
+    font-size: clamp(2.6rem, 12vw, 3.6rem);
     font-weight: 800;
-    line-height: 1;
+    line-height: 0.9;
     font-variant-numeric: tabular-nums;
+    color: var(--ll-line);
 }
-
 .ll-ro-metric-label {
+    font-family: var(--ll-font-mono);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: 0.8rem;
-    opacity: 0.7;
+    letter-spacing: 0.12em;
+    font-size: 0.78rem;
+    color: var(--ll-ink-soft);
 }
-
 .ll-ro-par {
-    margin: 0.75rem 0 0;
-    font-size: 0.95rem;
+    margin: 0.9rem 0 0;
+    font-family: var(--ll-font-mono);
+    font-size: 0.9rem;
+    color: var(--ll-ink-soft);
 }
+.ll-ro-par-good { color: var(--ll-reached); }
+.ll-ro-par-over { color: var(--ll-dest); }
 
-.ll-ro-par-good {
-    color: #2fcf7a;
-}
-
-.ll-ro-par-over {
-    color: #ff8b6b;
-}
-
-/* ── Group standings (competitive) ── */
-
+/* ── Standings card wrapper (table itself is global) ───────────────────── */
 .ll-standings-card {
-    padding: 1rem 1.25rem;
-    border: 1px solid rgba(128, 128, 128, 0.35);
-    border-radius: 0.75rem;
+    padding: 1.1rem 1.2rem;
+    border: 1px solid var(--ll-border);
+    border-radius: 1rem;
+    background: var(--ll-panel);
 }
 
-.ll-standings {
-    width: 100%;
-    border-collapse: collapse;
-    font-variant-numeric: tabular-nums;
-}
-
-.ll-standings th,
-.ll-standings td {
-    text-align: left;
-    padding: 0.4rem 0.5rem;
-    border-bottom: 1px solid rgba(128, 128, 128, 0.2);
-}
-
-.ll-standings th {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    opacity: 0.7;
-}
-
-.ll-standings-top {
-    background: rgba(255, 200, 0, 0.12);
-    font-weight: 700;
-}
-
-.ll-standings-secondary {
-    opacity: 0.7;
-}
-
-.ll-tiebreak {
-    margin-left: 0.4rem;
-    font-size: 0.7rem;
-    padding: 0.05rem 0.35rem;
-    border-radius: 0.3rem;
-    background: rgba(255, 200, 0, 0.25);
-    font-weight: 600;
-}
-
-.ll-standings-dnf {
-    margin-left: 0.4rem;
-    font-size: 0.7rem;
-    padding: 0.05rem 0.35rem;
-    border-radius: 0.3rem;
-    background: rgba(211, 65, 59, 0.2);
-    font-weight: 600;
-}
-
-/* ── Match progress + next Auditor ── */
-
+/* ── Progress + next operator ──────────────────────────────────────────── */
 .ll-ro-progress {
     display: flex;
     align-items: center;
@@ -149,132 +97,9 @@
     gap: 0.75rem;
     flex-wrap: wrap;
 }
+.ll-ro-next-auditor { font-family: var(--ll-font-mono); font-size: 0.85rem; color: var(--ll-ink-soft); }
+.ll-ro-next-auditor strong { color: var(--ll-dest); }
 
-.ll-round-chip {
-    padding: 0.25rem 0.6rem;
-    border-radius: 999px;
-    background: rgba(128, 128, 128, 0.18);
-    font-size: 0.78rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.ll-ro-next-auditor {
-    font-size: 0.95rem;
-    opacity: 0.9;
-}
-
-/* ── Actions ── */
-
-.ll-ro-actions {
-    display: flex;
-    justify-content: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-}
-
-.ll-btn-ghost {
-    background: rgba(128, 128, 128, 0.3);
-}
-
-.ll-ro-wait {
-    text-align: center;
-    opacity: 0.75;
-}
-
-/* ── Buttons (mirror PlayingPhase) ── */
-
-.ll-btn {
-    padding: 0.6rem 1.2rem;
-    border: none;
-    border-radius: 0.5rem;
-    cursor: pointer;
-    font-weight: 600;
-    color: #fff;
-}
-
-.ll-btn:disabled {
-    background: rgba(128, 128, 128, 0.4);
-    cursor: not-allowed;
-}
-
-.ll-btn-primary {
-    background: #3b82f6;
-}
-
-/* ── Chain (mirror PlayingPhase styling so the final chain reads the same) ── */
-
-.ll-chain-card {
-    padding: 1rem 1.25rem;
-    border: 1px solid rgba(128, 128, 128, 0.35);
-    border-radius: 0.75rem;
-}
-
-.ll-chain-title {
-    margin: 0 0 0.75rem;
-}
-
-.ll-chain {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-}
-
-.ll-connector {
-    opacity: 0.4;
-}
-
-.ll-anchor {
-    font-weight: 800;
-    text-transform: uppercase;
-    padding: 0.35rem 0.6rem;
-    border-radius: 0.5rem;
-    background: rgba(80, 160, 255, 0.18);
-}
-
-.ll-anchor-dest {
-    background: rgba(120, 220, 140, 0.18);
-}
-
-.ll-anchor-reached {
-    outline: 2px solid #22a559;
-    box-shadow: 0 0 12px rgba(34, 165, 89, 0.5);
-}
-
-.ll-link {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.1rem;
-    padding: 0.35rem 0.6rem;
-    border-radius: 0.5rem;
-    background: rgba(128, 128, 128, 0.15);
-    border: 1px solid rgba(128, 128, 128, 0.35);
-}
-
-.ll-link-loop {
-    border-color: rgba(255, 170, 0, 0.7);
-    background: rgba(255, 170, 0, 0.12);
-}
-
-.ll-link-pair {
-    font-weight: 700;
-    text-transform: uppercase;
-    font-size: 0.9rem;
-}
-
-.ll-link-by {
-    font-size: 0.7rem;
-    opacity: 0.7;
-}
-
-.ll-loop-badge {
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    padding: 0.05rem 0.35rem;
-    border-radius: 0.3rem;
-    background: rgba(255, 170, 0, 0.3);
-}
+/* ── Actions ───────────────────────────────────────────────────────────── */
+.ll-ro-actions { display: flex; justify-content: center; gap: 0.7rem; flex-wrap: wrap; }
+.ll-ro-wait { text-align: center; color: var(--ll-ink-soft); font-family: var(--ll-font-mono); font-size: 0.85rem; }

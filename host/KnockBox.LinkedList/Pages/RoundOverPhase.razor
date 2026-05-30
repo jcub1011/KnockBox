@@ -22,7 +22,7 @@
                 }
             </span>
         }
-        <span class="ll-connector">─</span>
+        <span class="ll-connector @(g.DestinationReached ? "" : "ll-connector-pending")">─</span>
         <span class="ll-anchor ll-anchor-dest @(g.DestinationReached ? "ll-anchor-reached" : "")">
             @GameState.DestinationWord
         </span>
@@ -117,7 +117,7 @@
                 <tbody>
                     @foreach (var s in Standings)
                     {
-                        <tr class="@(s.Rank == 1 ? "ll-standings-top" : "")">
+                        <tr class="@(s.Rank == 1 ? "ll-standings-top" : "")" style="--ll-route: var(--ll-route-@(GameState.Groups.FindIndex(grp => grp.GroupId == s.GroupId) % 6))">
                             <td>@RankMedal(s.Rank)</td>
                             <td>
                                 @s.GroupName
@@ -143,7 +143,7 @@
         {
             var g = GroupOf(s.GroupId);
             if (g is null) { continue; }
-            <div class="ll-chain-card">
+            <div class="ll-chain-card" style="--ll-route: var(--ll-route-@(GameState.Groups.IndexOf(g) % 6))">
                 <h4 class="ll-chain-title">@RankMedal(s.Rank) @g.GroupName</h4>
                 @chainView(g)
             </div>

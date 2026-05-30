@@ -10,7 +10,7 @@
     @* ── Headline ── *@
     <div class="ll-go-banner">
         <span class="ll-go-emoji">🏆</span>
-        <h3 class="ll-go-headline">Match Results</h3>
+        <h3 class="ll-go-headline">End of the Line</h3>
         <p class="ll-go-sub">@GameState.RoundNumber round@(GameState.RoundNumber == 1 ? "" : "s") played</p>
     </div>
 
@@ -49,7 +49,7 @@
                 <tbody>
                     @foreach (var s in Standings)
                     {
-                        <tr class="@(s.Rank == 1 ? "ll-standings-top" : "")">
+                        <tr class="@(s.Rank == 1 ? "ll-standings-top" : "")" style="--ll-route: var(--ll-route-@(GameState.Groups.FindIndex(grp => grp.GroupId == s.GroupId) % 6))">
                             <td>@RankMedal(s.Rank)</td>
                             <td>
                                 @s.GroupName
@@ -73,7 +73,7 @@
 
     @* ── Ranked scoreboard ── *@
     <div class="ll-go-scoreboard">
-        <h4 class="ll-go-section-title">Scoreboard</h4>
+        <h4 class="ll-go-section-title">Passenger Log</h4>
         <div class="ll-go-rows">
             @{ int rank = 1; }
             @foreach (var ps in ranked)
@@ -119,7 +119,7 @@
                         }
                     </span>
                 }
-                <span class="ll-connector">─</span>
+                <span class="ll-connector @(GameState.DestinationReached ? "" : "ll-connector-pending")">─</span>
                 <span class="ll-anchor ll-anchor-dest @(GameState.DestinationReached ? "ll-anchor-reached" : "")">
                     @GameState.DestinationWord
                 </span>
