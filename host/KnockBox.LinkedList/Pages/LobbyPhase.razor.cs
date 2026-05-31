@@ -1,12 +1,14 @@
 using KnockBox.Core.Services.State.Users;
+using KnockBox.Core.Services.Storage.ClientStorage;
 using KnockBox.LinkedList.Services.Logic;
 using KnockBox.LinkedList.Services.Logic.Games;
 using KnockBox.LinkedList.Services.State.Games;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace KnockBox.LinkedList.Pages
 {
-    public partial class LobbyPhase : ComponentBase
+    public partial class LobbyPhase : ComponentBase, IAsyncDisposable
     {
         [Inject] protected LinkedListGameEngine GameEngine { get; set; } = default!;
 
@@ -14,11 +16,20 @@ namespace KnockBox.LinkedList.Pages
 
         [Inject] protected WordPairSource WordPairSource { get; set; } = default!;
 
+        [Inject] protected ILocalStorageService LocalStorage { get; set; } = default!;
+
         [Inject] protected ILogger<LobbyPhase> Logger { get; set; } = default!;
 
         [Parameter] public LinkedListGameState GameState { get; set; } = default!;
 
         protected bool SettingsOpen { get; private set; }
+
+        private readonly CancellationTokenSource _cts = new();
+        private Task? _saveTask;
+
+        // True once the host has changed any setting locally. Blocks the initial localStorage
+        // load from clobbering an in-flight edit if the load returns after the user interacted.
+        private bool _userHasEdited;
 
         protected bool IsHost => UserService.CurrentUser?.Id == GameState.Host.Id;
 
@@ -213,8 +224,13 @@ namespace KnockBox.LinkedList.Pages
 
         private void UpdateSettings(Func<LinkedListSettings, LinkedListSettings> mutate)
         {
+            _userHasEdited = true;
             if (GameState.UpdateSettings(mutate).TryGetFailure(out var error))
+            {
                 Logger.LogError("Failed to update Linked List settings: {Error}", error.PublicMessage);
+                return;
+            }
+            PersistSettings();
         }
 
         private void SetState(Action mutate)
@@ -246,6 +262,84 @@ namespace KnockBox.LinkedList.Pages
             var result = await GameEngine.StartAsync(UserService.CurrentUser, GameState);
             if (result.TryGetFailure(out var error))
                 Logger.LogError("Failed to start Linked List game: {Error}", error.PublicMessage);
+        }
+
+        // ── Settings persistence (host browser localStorage) ─────────────────
+
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            // localStorage needs JS interop, so the host's saved settings load here (not
+            // OnInitialized, which also runs during prerender). Host-only — only the host
+            // edits and persists these.
+            if (firstRender && IsHost)
+                await LoadSettingsAsync();
+        }
+
+        private async Task LoadSettingsAsync()
+        {
+            try
+            {
+                var saved = await LocalStorage.GetAsync<LinkedListSettings>("linked-list", "settings", _cts.Token);
+                // If the host already edited a setting while the load was in flight,
+                // the user's edit wins — the saved snapshot would clobber it.
+                if (saved is not null && !_userHasEdited)
+                {
+                    // Apply through GameState directly (not the local UpdateSettings) so the
+                    // load doesn't flip _userHasEdited or re-persist the just-loaded value.
+                    if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
+                    {
+                        Logger.LogError("Failed to apply saved Linked List settings: {Error}", error.PublicMessage);
+                        return;
+                    }
+                    StateHasChanged();
+                }
+            }
+            catch (OperationCanceledException) { /* component disposed */ }
+            catch (ObjectDisposedException) { /* circuit gone */ }
+            catch (JSDisconnectedException) { /* circuit gone */ }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error loading Linked List settings.");
+            }
+        }
+
+        private void PersistSettings()
+        {
+            var snapshot = GameState.Settings;
+            _saveTask = SaveSettingsAsync(snapshot, _saveTask, _cts.Token);
+        }
+
+        private async Task SaveSettingsAsync(LinkedListSettings settings, Task? prior, CancellationToken ct)
+        {
+            if (prior is not null)
+            {
+                try { await prior; } catch { /* prior failure already logged */ }
+            }
+            try
+            {
+                await LocalStorage.SetAsync("linked-list", "settings", settings, ct);
+            }
+            catch (OperationCanceledException) { /* component disposed */ }
+            catch (ObjectDisposedException) { /* circuit gone */ }
+            catch (JSDisconnectedException) { /* circuit gone */ }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error saving Linked List settings.");
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            // Flush the last pending save before tearing down so a change made right before
+            // navigating away isn't lost. A dead circuit makes SetAsync throw
+            // JSDisconnectedException, which SaveSettingsAsync swallows.
+            if (_saveTask is not null)
+            {
+                try { await _saveTask; } catch { /* best-effort flush */ }
+            }
+
+            _cts.Cancel();
+            _cts.Dispose();
         }
     }
 }
