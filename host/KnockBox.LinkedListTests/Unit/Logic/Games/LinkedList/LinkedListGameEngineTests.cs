@@ -326,6 +326,55 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             Assert.IsTrue(_engine.Approve(AuditorOf(state), state).IsSuccess);
         }
 
+        // ── Host "end round now" escape hatch (§10.3) ────────────────────────
+
+        [TestMethod]
+        public async Task EndRound_ByHost_FinalizesFromPartialProgress_ToRoundOver()
+        {
+            var state = await StartedGameAsync(start: "START", destination: "FINISH");
+            SubmitAndApprove(state, "boat"); // one accepted pair; destination not reached
+
+            Assert.IsTrue(_engine.EndRound(_host, state).IsSuccess);
+
+            Assert.AreEqual(LinkedListGamePhase.RoundOver, state.Phase);
+            Assert.IsFalse(state.DestinationReached);
+            Assert.IsNotNull(state.LastRoundResult);
+            Assert.AreEqual(1, state.LastRoundResult!.Guesses);
+            Assert.IsFalse(state.LastRoundResult.DestinationReached);
+        }
+
+        [TestMethod]
+        public async Task EndRound_ClearsPendingSubmission()
+        {
+            var state = await StartedGameAsync();
+            Assert.IsTrue(_engine.SubmitPair(SubmitterOf(state), state, "boat").IsSuccess);
+            Assert.IsNotNull(state.PendingSubmission);
+
+            Assert.IsTrue(_engine.EndRound(_host, state).IsSuccess);
+
+            Assert.AreEqual(LinkedListGamePhase.RoundOver, state.Phase);
+            Assert.IsNull(state.PendingSubmission);
+        }
+
+        [TestMethod]
+        public async Task EndRound_ByNonHost_Fails_RoundContinues()
+        {
+            var state = await StartedGameAsync();
+            var player = SubmitterOf(state); // a participant, not the host
+
+            Assert.IsTrue(_engine.EndRound(player, state).IsFailure);
+            Assert.AreEqual(LinkedListGamePhase.Playing, state.Phase);
+        }
+
+        [TestMethod]
+        public async Task EndRound_WhenNotPlaying_Fails()
+        {
+            var state = await CreateWithPlayersAsync(3); // still in Setup
+
+            Assert.IsTrue(_engine.EndRound(_host, state).IsFailure);
+            Assert.AreEqual(LinkedListGamePhase.Setup, state.Phase);
+        }
+
         // ── Milestone 3: scoring modes & timers ──────────────────────────────
 
         private static readonly DateTimeOffset T0 =

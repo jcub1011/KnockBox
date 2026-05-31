@@ -429,6 +429,45 @@ namespace KnockBox.LinkedList.Services.Logic.Games
         }
 
         /// <summary>
+        /// Lets the host end the current round immediately (§10.3 "...to the destination
+        /// or a time/round limit") — the escape hatch for a stuck or AFK group when no one
+        /// is going to reach the destination. Finalizes from wherever each group currently
+        /// stands; groups that didn't reach the destination are scored on partial progress
+        /// and rank below those that did. Only the host may call this, and only while a
+        /// round is in play.
+        /// </summary>
+        public Result EndRound(User requester, LinkedListGameState state, DateTimeOffset? now = null)
+        {
+            if (requester is null) return Result.FromError("Unknown player.");
+            if (state is null) return Result.FromError("No game state.");
+
+            var ts = now ?? DateTimeOffset.UtcNow;
+            Result inner = Result.Success;
+            var exec = state.Execute(() =>
+            {
+                if (requester.Id != state.Host.Id)
+                {
+                    inner = Result.FromError("Only the host can end the round.");
+                    return;
+                }
+                if (state.Phase != LinkedListGamePhase.Playing)
+                {
+                    inner = Result.FromError("There's no round in progress to end.");
+                    return;
+                }
+
+                // Clear any in-flight submission so the finalized round carries no
+                // dangling pending state into the scoreboard.
+                foreach (var g in state.Groups)
+                    g.PendingSubmission = null;
+
+                FinalizeRound(state, ts);
+            });
+
+            return exec.TryGetFailure(out var error) ? Result.FromError(error) : inner;
+        }
+
+        /// <summary>
         /// True when <paramref name="proposed"/> would re-create a pair
         /// (<c>CarriedWord</c> → <paramref name="proposed"/>) that already exists
         /// somewhere in this group's chain — i.e. closes a loop (§7.4).
@@ -596,6 +635,13 @@ namespace KnockBox.LinkedList.Services.Logic.Games
             double Secondary(ChainState g) => mode == ScoringMode.FastestTime
                 ? g.GuessCount : g.ElapsedThinkingTime.TotalMilliseconds;
 
+            // Compare the primary metric on its native type (exact integer guess count
+            // or TimeSpan ticks) rather than via the projected double, so tie detection
+            // can't be skewed by floating-point representation.
+            bool SamePrimary(ChainState a, ChainState b) => mode == ScoringMode.FastestTime
+                ? a.ElapsedThinkingTime == b.ElapsedThinkingTime
+                : a.GuessCount == b.GuessCount;
+
             var finished = state.Groups.Where(g => g.DestinationReached)
                 .OrderBy(Primary).ThenBy(Secondary).ThenBy(g => g.GroupId, StringComparer.Ordinal)
                 .ToList();
@@ -612,7 +658,7 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                 // its primary metric but ranks below it (so the secondary metric decided).
                 bool tieWinner = g.DestinationReached && ordered
                     .Skip(i + 1)
-                    .Any(o => o.DestinationReached && Primary(o) == Primary(g));
+                    .Any(o => o.DestinationReached && SamePrimary(o, g));
                 standings.Add(new GroupStanding(
                     g.GroupId, g.GroupName, i + 1,
                     g.GuessCount, g.ElapsedThinkingTime, g.DestinationReached, tieWinner));

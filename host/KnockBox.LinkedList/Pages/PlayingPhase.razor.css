@@ -299,3 +299,27 @@
 .ll-rival-flag { font-size: 0.9rem; }
 
 .ll-all-groups { display: flex; flex-direction: column; gap: 1rem; }
+
+/* ── Host escape hatch: end the round from its current progress ── */
+.ll-host-controls {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--ll-border);
+}
+.ll-btn-end-round {
+    background: transparent;
+    color: var(--ll-ink-soft);
+    border-color: var(--ll-border);
+    box-shadow: none;
+    text-shadow: none;
+    font-size: 0.82rem;
+}
+.ll-btn-end-round:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--ll-reject, #e1605c) 14%, transparent);
+    border-color: color-mix(in srgb, var(--ll-reject, #e1605c) 50%, transparent);
+    color: var(--ll-ink);
+    box-shadow: none;
+    filter: none;
+}

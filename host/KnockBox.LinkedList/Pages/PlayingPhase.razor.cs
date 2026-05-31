@@ -67,6 +67,22 @@ namespace KnockBox.LinkedList.Pages
             }
         }
 
+        /// <summary>True when the current user is the lobby host — gates the
+        /// "End round now" escape hatch.</summary>
+        protected bool IsHost => UserService.CurrentUser?.Id == GameState.Host.Id;
+
+        protected void EndRound()
+        {
+            if (UserService.CurrentUser is null) return;
+
+            var result = GameEngine.EndRound(UserService.CurrentUser, GameState);
+            if (result.TryGetFailure(out var error))
+            {
+                Logger.LogInformation("End round failed: {Error}", error.InternalMessage);
+                _ = OnError.InvokeAsync(error.PublicMessage);
+            }
+        }
+
         protected string DisplayNameOf(string playerId)
             => GameState.GamePlayers.TryGetValue(playerId, out var ps) ? ps.DisplayName : "Someone";
 

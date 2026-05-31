@@ -22,7 +22,9 @@ public sealed record LinkedListSettings
     /// <summary>Rejected attempts allowed per turn before forfeit. 0 = off (unlimited).</summary>
     public int RejectionCap { get; init; } = 3;
 
-    /// <summary>Optional §7.4 rigor: block a pair identical to the immediately previous pair.</summary>
+    /// <summary>Optional §7.4 rigor: reject a submission that would re-form a pair
+    /// (<c>CarriedWord</c> → proposed) that already appears anywhere in the chain —
+    /// i.e. closing a loop. Off by default; loops are allowed and merely flagged.</summary>
     public bool NoImmediateRepeat { get; init; } = false;
 
     public bool HostPlaysGame { get; init; } = false;

@@ -337,4 +337,14 @@
             </div>
         }
     }
+
+    @* ── Host escape hatch: end a stuck/AFK round from wherever it stands (§10.3) ── *@
+    @if (myId == GameState.Host.Id)
+    {
+        <div class="ll-host-controls">
+            <button class="ll-btn ll-btn-end-round" @onclick="EndRound" title="Score the round from its current progress">
+                End round now
+            </button>
+        </div>
+    }
 </div>
