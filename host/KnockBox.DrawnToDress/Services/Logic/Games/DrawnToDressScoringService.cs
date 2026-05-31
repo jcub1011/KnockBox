@@ -1,4 +1,5 @@
 using KnockBox.DrawnToDress.Services.State.Games.Data;
+using KnockBox.Tooling.Collections;
 
 namespace KnockBox.DrawnToDress.Services.Logic.Games
 {
@@ -18,12 +19,15 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             double weight,
             IEnumerable<VoteSubmission> votes)
         {
-            var criterionVotes = votes
-                .Where(v => v.MatchupId == matchup.Id && v.CriterionId == criterionId)
-                .ToList();
-
-            int aVotes = criterionVotes.Count(v => v.ChosenEntrantId == matchup.EntrantAId);
-            int bVotes = criterionVotes.Count(v => v.ChosenEntrantId == matchup.EntrantBId);
+            // Single pass: avoids the per-call Where().ToList() plus two Count() re-scans.
+            // This runs per criterion × matchup × round, so it's the hottest scoring path.
+            int aVotes = 0, bVotes = 0;
+            foreach (var v in votes)
+            {
+                if (v.MatchupId != matchup.Id || v.CriterionId != criterionId) continue;
+                if (v.ChosenEntrantId == matchup.EntrantAId) aVotes++;
+                else if (v.ChosenEntrantId == matchup.EntrantBId) bVotes++;
+            }
 
             return (aVotes * weight, bVotes * weight);
         }
@@ -39,7 +43,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             IEnumerable<VoteSubmission> votes,
             IReadOnlyList<CriterionCoinFlipResult>? existingFlipResults = null)
         {
-            var voteList = votes.ToList();
+            var voteList = votes.AsReadOnlyList();
             var existing = existingFlipResults ?? [];
             var ties = new List<(Guid, string)>();
 
@@ -55,12 +59,14 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
                     if (existing.Any(r => r.MatchupId == matchup.Id && r.CriterionId == criterion.Id))
                         continue;
 
-                    var criterionVotes = matchupVotes
-                        .Where(v => v.CriterionId == criterion.Id)
-                        .ToList();
-
-                    int aVotes = criterionVotes.Count(v => v.ChosenEntrantId == matchup.EntrantAId);
-                    int bVotes = criterionVotes.Count(v => v.ChosenEntrantId == matchup.EntrantBId);
+                    // Single pass over the matchup's votes — no per-criterion list allocation.
+                    int aVotes = 0, bVotes = 0;
+                    foreach (var v in matchupVotes)
+                    {
+                        if (v.CriterionId != criterion.Id) continue;
+                        if (v.ChosenEntrantId == matchup.EntrantAId) aVotes++;
+                        else if (v.ChosenEntrantId == matchup.EntrantBId) bVotes++;
+                    }
 
                     if (aVotes == bVotes)
                         ties.Add((matchup.Id, criterion.Id));
@@ -80,7 +86,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             IEnumerable<VoteSubmission> votes,
             IReadOnlyList<CriterionCoinFlipResult> coinFlipResults)
         {
-            var voteList = votes.ToList();
+            var voteList = votes.AsReadOnlyList();
             double aTotal = 0;
             double bTotal = 0;
 
@@ -112,7 +118,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             IEnumerable<VoteSubmission> votes,
             IReadOnlyList<CriterionCoinFlipResult> coinFlipResults)
         {
-            var voteList = votes.ToList();
+            var voteList = votes.AsReadOnlyList();
             var scores = new Dictionary<EntrantId, double>();
 
             foreach (var matchup in round.Matchups)
@@ -149,7 +155,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             IEnumerable<VoteSubmission> votes,
             IReadOnlyList<CriterionCoinFlipResult> coinFlipResults)
         {
-            var voteList = votes.ToList();
+            var voteList = votes.AsReadOnlyList();
             var wins = new Dictionary<EntrantId, double>();
 
             foreach (var round in rounds)
@@ -197,7 +203,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             IReadOnlyDictionary<string, DrawnToDressPlayerState> players,
             DrawnToDressSettings config)
         {
-            var voteList = votes.ToList();
+            var voteList = votes.AsReadOnlyList();
             var playerTotals = new Dictionary<string, double>();
 
             // Sum entrant scores across all rounds.
@@ -232,7 +238,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
                 IReadOnlyDictionary<string, DrawnToDressPlayerState> players,
                 DrawnToDressSettings config)
         {
-            var voteList = votes.ToList();
+            var voteList = votes.AsReadOnlyList();
             var playerTotals = CalculatePlayerTotals(rounds, criteria, voteList, coinFlipResults, players, config);
             var entrantMatchupWins = CalculateMatchupWins(rounds, criteria, voteList, coinFlipResults);
 

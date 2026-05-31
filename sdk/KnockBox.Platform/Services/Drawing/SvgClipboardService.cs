@@ -1,17 +1,23 @@
 using KnockBox.Core.Services.Drawing;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using System.Threading;
 
 namespace KnockBox.Services.Drawing
 {
     /// <summary>
     /// Thread-safe singleton that stores SVG drawing content under a randomly generated share
-    /// code. Entries expire after <see cref="Ttl"/> and are lazily purged on each
-    /// <see cref="Store"/> call.
+    /// code. Entries expire after <see cref="Ttl"/>. Expired entries are purged on each
+    /// <see cref="Store"/> call and, so that abandoned SVG strings (which can be tens of KB
+    /// each) don't linger when sharing activity stops, by a low-frequency background sweep.
     /// </summary>
-    public sealed class SvgClipboardService : ISvgClipboardService
+    public sealed class SvgClipboardService : ISvgClipboardService, IDisposable
     {
         private static readonly TimeSpan Ttl = TimeSpan.FromMinutes(10);
+
+        // Background sweep cadence. Cheap relative to the TTL — it just snapshots the key set
+        // and drops anything already past its expiry, bounding the post-expiry residency window.
+        private static readonly TimeSpan SweepInterval = TimeSpan.FromMinutes(3);
 
         // Excludes visually ambiguous characters (I, L, O, U) to make codes easier to read aloud.
         private const string CodeChars = "ABCDEFGHJKMNPQRSTVWXYZ";
@@ -21,6 +27,14 @@ namespace KnockBox.Services.Drawing
         private sealed record Entry(string Content, DateTimeOffset ExpiresAt);
 
         private readonly ConcurrentDictionary<string, Entry> _entries = new(StringComparer.Ordinal);
+        private readonly Timer _sweepTimer;
+
+        public SvgClipboardService()
+        {
+            // Periodic sweep so expired entries are reclaimed even with no further Store calls.
+            _sweepTimer = new Timer(static state => ((SvgClipboardService)state!).PurgeExpired(),
+                this, SweepInterval, SweepInterval);
+        }
 
         /// <inheritdoc />
         public string Store(string svgContent)
@@ -74,5 +88,7 @@ namespace KnockBox.Services.Drawing
                     _entries.TryRemove(key, out _);
             }
         }
+
+        public void Dispose() => _sweepTimer.Dispose();
     }
 }

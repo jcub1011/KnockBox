@@ -54,5 +54,29 @@ namespace KnockBox.Tooling.Collections
             // Unreachable in practice, but satisfies the compiler
             throw new InvalidOperationException("Weighted selection failed unexpectedly.");
         }
+
+        /// <summary>
+        /// Returns <paramref name="source"/> as an <see cref="IReadOnlyList{T}"/>, casting it
+        /// directly when it already is one (e.g. a <see cref="List{T}"/> or array) and only
+        /// materializing via <see cref="Enumerable.ToList{TSource}"/> otherwise.
+        /// </summary>
+        /// <remarks>
+        /// Use this to avoid a redundant defensive copy when a sequence flows through an API
+        /// typed as <see cref="IEnumerable{T}"/> but is frequently already a list — for example
+        /// when the same collection is threaded through several methods that each only enumerate
+        /// it. No copy is made on the fast path; a single copy is made only for lazy sequences.
+        /// </remarks>
+        /// <typeparam name="T">The element type.</typeparam>
+        /// <param name="source">The source sequence.</param>
+        /// <returns>
+        /// <paramref name="source"/> itself when it implements <see cref="IReadOnlyList{T}"/>;
+        /// otherwise a newly materialized list of its elements.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> is null.</exception>
+        public static IReadOnlyList<T> AsReadOnlyList<T>(this IEnumerable<T> source)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            return source as IReadOnlyList<T> ?? [.. source];
+        }
     }
 }

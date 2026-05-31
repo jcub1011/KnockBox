@@ -1,4 +1,5 @@
 using KnockBox.DrawnToDress.Services.State.Games.Data;
+using KnockBox.Tooling.Collections;
 
 namespace KnockBox.DrawnToDress.Services.Logic.Games
 {
@@ -39,20 +40,24 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             IEnumerable<VoteSubmission> votes)
         {
             var wins = new Dictionary<EntrantId, double>();
-            var voteList = votes.ToList();
+            // Skip a defensive copy when the caller already passed a materialized list.
+            var voteList = votes.AsReadOnlyList();
 
             foreach (var round in previousRounds)
             {
                 foreach (var matchup in round.Matchups)
                 {
-                    var matchupVotes = voteList
-                        .Where(v => v.MatchupId == matchup.Id)
-                        .ToList();
+                    // Single pass per matchup — no per-matchup list allocation or Count() re-scans.
+                    int aVotes = 0, bVotes = 0, matchupVoteCount = 0;
+                    foreach (var v in voteList)
+                    {
+                        if (v.MatchupId != matchup.Id) continue;
+                        matchupVoteCount++;
+                        if (v.ChosenEntrantId == matchup.EntrantAId) aVotes++;
+                        else if (v.ChosenEntrantId == matchup.EntrantBId) bVotes++;
+                    }
 
-                    if (matchupVotes.Count == 0) continue;
-
-                    int aVotes = matchupVotes.Count(v => v.ChosenEntrantId == matchup.EntrantAId);
-                    int bVotes = matchupVotes.Count(v => v.ChosenEntrantId == matchup.EntrantBId);
+                    if (matchupVoteCount == 0) continue;
 
                     if (aVotes > bVotes)
                         wins[matchup.EntrantAId] = wins.GetValueOrDefault(matchup.EntrantAId, 0.0) + 1.0;

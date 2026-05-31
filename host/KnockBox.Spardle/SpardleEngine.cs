@@ -161,29 +161,32 @@ public class SpardleEngine(
         }
     }
 
-    private IEnumerable<int> PickIndices(WordOrderMode mode, int total, int take)
+    // The caller enumerates the result exactly once (a foreach that immediately maps each
+    // index to a word). Only RandomNoRepeats needs a materialized buffer (it shuffles a
+    // pool); the other three modes are produced lazily so we don't allocate a `take`-sized
+    // array — which is up to the full dictionary size in FullDictionary mode — just to walk
+    // it once.
+    private IEnumerable<int> PickIndices(WordOrderMode mode, int total, int take) => mode switch
     {
-        switch (mode)
-        {
-            case WordOrderMode.RandomNoRepeats:
-                return SampleUniqueIndices(total, take);
+        WordOrderMode.RandomNoRepeats => SampleUniqueIndices(total, take),
+        WordOrderMode.RandomWithRepeats => RandomWithRepeatIndices(total, take),
+        WordOrderMode.ReverseListOrder => ReverseListIndices(total, take),
+        _ => AscendingIndices(take),
+    };
 
-            case WordOrderMode.RandomWithRepeats:
-                var withRepeats = new int[take];
-                for (int i = 0; i < take; i++) withRepeats[i] = rng.GetRandomInt(total);
-                return withRepeats;
+    private IEnumerable<int> RandomWithRepeatIndices(int total, int take)
+    {
+        for (int i = 0; i < take; i++) yield return rng.GetRandomInt(total);
+    }
 
-            case WordOrderMode.ReverseListOrder:
-                var rev = new int[take];
-                for (int i = 0; i < take; i++) rev[i] = total - 1 - i;
-                return rev;
+    private static IEnumerable<int> ReverseListIndices(int total, int take)
+    {
+        for (int i = 0; i < take; i++) yield return total - 1 - i;
+    }
 
-            case WordOrderMode.ListOrder:
-            default:
-                var asc = new int[take];
-                for (int i = 0; i < take; i++) asc[i] = i;
-                return asc;
-        }
+    private static IEnumerable<int> AscendingIndices(int take)
+    {
+        for (int i = 0; i < take; i++) yield return i;
     }
 
     // Fisher–Yates when the sampling ratio is high (or the universe is small); rejection
