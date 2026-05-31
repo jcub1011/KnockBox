@@ -8,7 +8,7 @@
     var myPlayer = GetMyPlayer();
     var myId = UserService.CurrentUser?.Id ?? "";
     var activeId = GameState.TurnManager.CurrentPlayer ?? "";
-    var isHost = IsHost();
+    var isSharedDisplay = IsSharedDisplay();
     // Show all game players in the player list (including self; host has no player state)
     var allPlayers = GameState.GamePlayers.Values.ToList();
     // Leaderboard ranking (used by both host and player views)
@@ -137,7 +137,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Se
 }
 
 @* ── Reaction Overlay (Unified full-screen prompt) ── *@
-@if ((myPlayer != null && (GameState.FeelingLuckyTargetId == myId || (GameState.PendingReaction is { TargetId: var targetId } && targetId == myId))) || (IsHost() && (GameState.FeelingLuckyTargetId != null || GameState.PendingReaction != null)))
+@if ((myPlayer != null && (GameState.FeelingLuckyTargetId == myId || (GameState.PendingReaction is { TargetId: var targetId } && targetId == myId))) || (IsSharedDisplay() && (GameState.FeelingLuckyTargetId != null || GameState.PendingReaction != null)))
 {
     bool isAnyFeelingLucky = GameState.FeelingLuckyTargetId != null;
     bool isAnyPendingReaction = GameState.PendingReaction != null;
@@ -515,7 +515,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Se
 }
 
 @* ── Host Broadcast: Operator Result Toast (shows ALL operator results) ── *@
-@if (isHost && !_operatorResultDismissed && GameState.LastOperatorResult is { } hostOpResult)
+@if (isSharedDisplay && !_operatorResultDismissed && GameState.LastOperatorResult is { } hostOpResult)
 {
     double hostOpDelta = hostOpResult.BalanceAfter - hostOpResult.BalanceBefore;
     <div @key="_toastKey"
@@ -558,7 +558,7 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Se
 @* ═══════════════════════════════════════════════════════════════════════════ *@
 
 <div class="cc-table-area">
-@if (isHost)
+@if (isSharedDisplay)
 {
     @* ════════════════════════════════════════════════════════════════════════ *@
     @* ══ HOST SPECTATOR VIEW — 3 Column Broadcast Layout ════════════════════ *@
@@ -859,7 +859,7 @@ else
                 && (pl.Pot.Count == 0 || pl.PlayerId == myId);
 
             <div class="cc-opponent-card @(isActive ? "cc-opponent-active" : "") @(isMe ? "cc-opponent-me" : "") @(isFeelingLuckyTarget || isReactionTarget ? "cc-opponent-targeted" : "") @(isInvalidSkimTarget ? "cc-opponent-invalid-target" : "")"
-                 @onclick="() => { if (!isHost && !isInvalidSkimTarget) SelectTarget(pl.PlayerId); }"
+                 @onclick="() => { if (!isSharedDisplay && !isInvalidSkimTarget) SelectTarget(pl.PlayerId); }"
                  title="@(pl.DisplayName + (isMe ? " (you)" : "") + (isInvalidSkimTarget ? " — cannot target (empty pot)" : ""))">
                 <div class="cc-opp-header">
                     @if (isActive)
@@ -1288,7 +1288,7 @@ else
 </div>
 
 @* ── Target Select UI (player only) ── *@
-@if (!isHost && _pendingActionCardIndex.HasValue)
+@if (!isSharedDisplay && _pendingActionCardIndex.HasValue)
 {
     var me = GetMyPlayer();
     var card = me?.ActionHand.ElementAtOrDefault(_pendingActionCardIndex.Value);

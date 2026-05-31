@@ -106,6 +106,12 @@ namespace KnockBox.CardCounter.Pages
             return GameState.Host.Id == UserService.CurrentUser.Id;
         }
 
+        /// <summary>
+        /// True when the current user is the host AND the host is not playing — i.e. this circuit
+        /// should render the shared spectator/TV view rather than the player view.
+        /// </summary>
+        protected bool IsSharedDisplay() => IsHost() && !GameState.HostIsParticipant;
+
         protected PlayerState? GetMyPlayer()
         {
             if (GameState == null || UserService.CurrentUser == null) return null;
@@ -228,7 +234,7 @@ namespace KnockBox.CardCounter.Pages
 
         protected void SelectTarget(string playerId)
         {
-            if (IsHost()) return; // host cannot target
+            if (IsSharedDisplay()) return; // the shared display cannot target
             _selectedTargetId = playerId;
         }
 

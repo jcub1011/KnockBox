@@ -23,6 +23,12 @@ public sealed record CardCounterSettings
     public bool FlipWinCondition { get; init; } = false;
 
     /// <summary>
+    /// When true, the host is dealt into the game as an active participant instead of acting
+    /// as a shared spectator display. Set by the lobby's deal buttons (not the House Rules drawer).
+    /// </summary>
+    public bool HostIsParticipant { get; init; } = false;
+
+    /// <summary>
     /// When true, players have no pot. Drawing a number card applies it directly to the
     /// player's balance using their Active Operator. Drawing an operator card replaces the
     /// player's Active Operator. Skim and Turn The Table are not distributed in this mode;

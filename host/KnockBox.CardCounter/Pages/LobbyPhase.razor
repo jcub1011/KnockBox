@@ -48,14 +48,23 @@
             </div>
             @if (UserService.CurrentUser?.Id == GameState.Host.Id)
             {
-                bool canStart = GameState.Players.Length > 0;
-                <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="StartGame" disabled="@(!canStart)"
-                        title="@(!canStart ? "Need at least 1 more player to start" : "Deal cards and start the game")">
-                    🃏 DEAL CARDS
+                @* The host counts toward the player total only when joining as a player, so the
+                   shared-display button needs at least one joined player while the join-as-player
+                   button is always startable (the host themselves is the first participant). *@
+                bool hasJoinedPlayers = GameState.Players.Length > 0;
+                <button class="cc-btn cc-btn-primary cc-btn-lg cc-deal-btn" @onclick="() => StartGame(false)" disabled="@(!hasJoinedPlayers)"
+                        title="@(!hasJoinedPlayers ? "Need at least 1 player to start as a shared display" : "Deal cards and run this screen as a shared display")">
+                    <span class="cc-deal-btn-main">🃏 Deal Cards</span>
+                    <span class="cc-deal-btn-sub">and be a shared display</span>
                 </button>
-                @if (!canStart)
+                <button class="cc-btn cc-btn-secondary cc-btn-lg cc-deal-btn" @onclick="() => StartGame(true)"
+                        title="Deal cards and join the game as a player">
+                    <span class="cc-deal-btn-main">🃏 Deal Cards</span>
+                    <span class="cc-deal-btn-sub">and join as a player</span>
+                </button>
+                @if (!hasJoinedPlayers)
                 {
-                    <p class="cc-lobby-min-players">⚠️ Need at least 1 more player to start</p>
+                    <p class="cc-lobby-min-players">⚠️ Need at least 1 player to deal as a shared display</p>
                 }
             }
             else

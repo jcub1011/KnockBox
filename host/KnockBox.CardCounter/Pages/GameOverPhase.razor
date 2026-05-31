@@ -3,7 +3,7 @@
 @using KnockBox.CardCounter.Services.State.Games
 
 @{
-    var isHost = IsHost();
+    var isHost = IsSharedDisplay();
     var ranked = GameState.Settings.FlipWinCondition
         ? GameState.GamePlayers.Values.OrderByDescending(p => Math.Abs(p.Balance)).ToList()
         : GameState.GamePlayers.Values.OrderBy(p => Math.Abs(p.Balance)).ToList();
