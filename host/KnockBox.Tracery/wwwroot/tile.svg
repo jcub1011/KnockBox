@@ -131,14 +131,4 @@
     <text x="174.5" y="162.5" fill="rgba(236,227,208,0.55)" dominant-baseline="central">V</text>
     <text x="199.5" y="162.5" fill="rgba(236,227,208,0.55)" dominant-baseline="central">Z</text>
   </g>
-
-  <!-- ── Wordmark (in-game grotesque stack) ───────────────────────────────── -->
-  <text x="150" y="195" text-anchor="middle"
-        font-family="'Hanken Grotesk', 'Outfit', system-ui, sans-serif"
-        font-size="14" font-weight="800" letter-spacing="5"
-        fill="#5a4a22">TRACERY</text>
-  <text x="149.4" y="194.4" text-anchor="middle"
-        font-family="'Hanken Grotesk', 'Outfit', system-ui, sans-serif"
-        font-size="14" font-weight="800" letter-spacing="5"
-        fill="#ece3d0">TRACERY</text>
 </svg>

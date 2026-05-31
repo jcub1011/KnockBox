@@ -121,5 +121,5 @@
 
     <!-- Title + Tagline -->
     <text x="150" y="138" text-anchor="middle" class="cc-name" filter="url(#cc-name-shadow)">CARD COUNTER</text>
-    <text x="150" y="160" text-anchor="middle" class="cc-tag">Bluff, count cards, bust the table.</text>
+    <text x="150" y="160" text-anchor="middle" class="cc-tag">Big Number Bad</text>
 </svg>

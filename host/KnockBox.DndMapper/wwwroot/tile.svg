@@ -151,10 +151,10 @@
 
     <path class="dndm-tile-wall" d="M 18 95 L 132 95 L 132 115 L 282 115" />
 
-    <circle id="token-1" class="dndm-tile-token dndm-tile-token--ally" cx="50"  cy="56" r="7" />
-    <circle id="token-2" class="dndm-tile-token dndm-tile-token--ally" cx="90"  cy="78" r="6" />
+    <circle id="token-1" class="dndm-tile-token dndm-tile-token--ally" cx="51"  cy="50" r="7" />
+    <circle id="token-2" class="dndm-tile-token dndm-tile-token--ally" cx="91"  cy="71" r="6" />
     <circle id="token-3" class="dndm-tile-token dndm-tile-token--foe"  cx="248" cy="48" r="7" />
-    <circle id="token-4" class="dndm-tile-token dndm-tile-token--foe"  cx="208" cy="72" r="6" />
+    <circle id="token-4" class="dndm-tile-token dndm-tile-token--foe"  cx="210.5" cy="70" r="6" />
 
     <g class="dndm-tile-die-wrap">
         <svg x="230" y="12" width="58" height="58" viewBox="0 0 64 64">
@@ -166,11 +166,11 @@
         </svg>
     </g>
 
-    <rect x="0" y="140" width="300" height="60" fill="url(#dndm-plaque)" />
-    <rect x="42" y="148" width="216" height="1" fill="url(#dndm-rule)" />
+    <rect x="0" y="120" width="300" height="80" fill="url(#dndm-plaque)" />
+    <rect x="42" y="140" width="216" height="1" fill="url(#dndm-rule)" />
 
-    <text x="150" y="180" text-anchor="middle">
-        <tspan class="dndm-tile-name-drop">D</tspan><tspan class="dndm-tile-name-rest" dx="1">nD Mapper</tspan>
+    <text x="150" y="170" text-anchor="middle">
+        <tspan class="dndm-tile-name-drop">DnD </tspan><tspan class="dndm-tile-name-rest" dx="1">Mapper</tspan>
     </text>
-    <text class="dndm-tile-tag" x="150" y="192" text-anchor="middle">Collaborative Tabletop Maps</text>
+    <text class="dndm-tile-tag" x="150" y="186" text-anchor="middle">The best VTT if you've never used any others</text>
 </svg>

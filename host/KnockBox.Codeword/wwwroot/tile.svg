@@ -86,7 +86,7 @@
     <!-- Prompt line: "> CODEWORD ▮" -->
     <text x="22" y="70" class="ctc-prompt">&gt;</text>
     <text x="40" y="70" class="ctc-name" filter="url(#ctc-glow-name)">CODEWORD</text>
-    <rect class="ctc-caret" x="187" y="55" width="8" height="18"/>
+    <rect class="ctc-caret" x="162" y="53" width="8" height="18"/>
 
     <!-- Intel line: "[INTEL]" label + redacted pill with "CLASSIFIED" -->
     <text x="22" y="118" class="ctc-intel-label">[INTEL]</text>
@@ -99,5 +99,6 @@
     </g>
 
     <!-- Tagline -->
-    <text x="22" y="158" class="ctc-tag">Decode the intel. Smoke out the spy.</text>
+	<text x="22" y="158" class="ctc-tag">Protect the intel and smoke out the spy</text>
+	<text x="22" y="172" class="ctc-tag">If you are the spy, then, uh...</text>
 </svg>

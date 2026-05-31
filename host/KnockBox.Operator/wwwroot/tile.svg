@@ -143,5 +143,5 @@
 
     <!-- Title + tagline -->
     <text x="150" y="148" text-anchor="middle" class="op-name" filter="url(#op-name-shadow)">OPERATOR</text>
-    <text x="150" y="172" text-anchor="middle" class="op-tag">Stack operators. Strike opponents.</text>
+    <text x="150" y="172" text-anchor="middle" class="op-tag">+, -, *, and \ your way to victory</text>
 </svg>
