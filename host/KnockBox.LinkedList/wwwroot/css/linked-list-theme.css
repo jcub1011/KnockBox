@@ -1,0 +1,450 @@
+/* ════════════════════════════════════════════════════════════════════════
+   LINKED LIST — "THE CHAIN"
+   Polished-chain design system. Global (non-scoped) stylesheet: holds the
+   design tokens and every primitive shared across phases (buttons, the chain
+   rendered as interlocking metal rings, standings boards). Loaded via a <link>
+   in LinkedListLobby's HeadContent. Tokens live here because Blazor scoped
+   `.razor.css` rewrites `:root` to `:root[b-xxx]`, which never matches — so
+   per-component scoped files read these vars but cannot define them.
+
+   Concept: the linked list IS a chain. Each accepted word-pair is a forged
+   LINK (an interlocking ring carrying its words), START is the anchor shackle,
+   DESTINATION is an end-ring that locks shut (gold) on arrival, the Auditor
+   inspects each link, and competing Groups are parallel chains in tinted metal.
+   Mood: refined, precise — brushed silver/steel on gunmetal, one cool accent.
+   ════════════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Hanken+Grotesk:wght@400..800&family=Martian+Mono:wght@300..600&display=swap');
+
+:root {
+    /* ── Typography ─────────────────────────────────────────────────────── */
+    --ll-font-display: "Chakra Petch", "Arial Narrow", system-ui, sans-serif; /* engraved nameplate */
+    --ll-font-body:    "Hanken Grotesk", system-ui, sans-serif;               /* readable words/UI */
+    --ll-font-mono:    "Martian Mono", ui-monospace, monospace;               /* instrument readout */
+
+    /* ── Surfaces (gunmetal) ───────────────────────────────────────────── */
+    --ll-bg:      #0d1018;
+    --ll-bg-2:    #141a24;
+    --ll-panel:   rgba(150, 178, 214, 0.05);
+    --ll-panel-2: rgba(150, 178, 214, 0.09);
+    --ll-border:  rgba(150, 178, 214, 0.16);
+    --ll-ink:     #eef3f9;
+    --ll-ink-soft: rgba(238, 243, 249, 0.62);
+
+    /* ── Brushed metal (the chain itself) ──────────────────────────────── */
+    --ll-metal-hi:  #e3ecf8;  /* polished highlight */
+    --ll-metal-mid: #9aa8bc;  /* steel body */
+    --ll-metal-lo:  #5d6a7d;  /* shadowed edge */
+    /* Reusable ring-edge gradient: catches light top-left, falls to shadow. */
+    --ll-edge: linear-gradient(150deg, var(--ll-metal-hi), var(--ll-metal-mid) 45%, var(--ll-metal-lo) 62%, var(--ll-metal-hi));
+
+    /* ── Signals & accents ─────────────────────────────────────────────── */
+    --ll-accent:  #58c7e0;  /* electric steel-cyan — active link / primary */
+    --ll-dest:    #e8c069;  /* gold — destination & winner */
+    --ll-reached: #34d399;  /* green — arrived / locked */
+    --ll-auditor: #58c7e0;  /* inspector */
+    --ll-go:      #34d399;  /* approve */
+    --ll-stop:    #f25f5c;  /* reject */
+    --ll-loop:    #b48ef2;  /* kinked link */
+
+    /* ── Named group chains (parallel competitive strands) ─────────────── */
+    --ll-route-0: #f25f5c; /* Red    */
+    --ll-route-1: #4aa3ff; /* Blue   */
+    --ll-route-2: #34d399; /* Green  */
+    --ll-route-3: #e8c069; /* Gold   */
+    --ll-route-4: #b48ef2; /* Violet */
+    --ll-route-5: #ff8fab; /* Pink   */
+
+    --ll-shadow:  0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Phase roots: base typography ──────────────────────────────────────── */
+.ll-lobby,
+.ll-play,
+.ll-roundover,
+.ll-gameover {
+    font-family: var(--ll-font-body);
+    color: var(--ll-ink);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Accessible focus ring in the accent colour. */
+.ll-lobby :focus-visible,
+.ll-play :focus-visible,
+.ll-roundover :focus-visible,
+.ll-gameover :focus-visible {
+    outline: 3px solid var(--ll-accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   BUTTONS — stamped brushed-steel plates with a beveled edge
+   ════════════════════════════════════════════════════════════════════════ */
+.ll-btn {
+    font-family: var(--ll-font-display);
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.7rem 1.5rem;
+    min-height: 44px;
+    border: 1px solid rgba(0, 0, 0, 0.55);
+    border-radius: 0.55rem;
+    color: #0a0e16;
+    background: linear-gradient(180deg, #cfe0f5 0%, #a6b6cb 48%, #8c9cb2 52%, #b9c8db 100%);
+    cursor: pointer;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -2px 3px rgba(0, 0, 0, 0.3), 0 2px 5px rgba(0, 0, 0, 0.4);
+    transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
+}
+
+.ll-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -2px 3px rgba(0, 0, 0, 0.3), 0 5px 10px rgba(0, 0, 0, 0.45);
+}
+
+.ll-btn:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.ll-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    filter: saturate(0.5);
+}
+
+/* Tinted-metal variants — same bevel, hue-shifted face. */
+.ll-btn-primary { background: linear-gradient(180deg, #c9eef7 0%, #7fcfe2 48%, #5bb6cc 52%, #9fe0ee 100%); color: #042027; }
+.ll-btn-approve { background: linear-gradient(180deg, #b9f3d4 0%, #5fd79f 48%, #3fbf83 52%, #94ecc4 100%); color: #052013; }
+.ll-btn-reject  { background: linear-gradient(180deg, #ffc7c5 0%, #f5807d 48%, #e1605c 52%, #ffaeac 100%); color: #2a0908; }
+
+.ll-btn-ghost {
+    background: transparent;
+    color: var(--ll-ink);
+    border-color: var(--ll-border);
+    box-shadow: none;
+    text-shadow: none;
+}
+.ll-btn-ghost:hover:not(:disabled) {
+    background: var(--ll-panel-2);
+    box-shadow: none;
+    transform: translateY(-1px);
+    filter: none;
+}
+.ll-btn-ghost:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   THE CHAIN — interlocking metal rings (shared by all three phases)
+   DOM: [.ll-anchor-start] (.ll-connector .ll-link)* .ll-connector[-pending] [.ll-anchor-dest]
+   Links are ring-capsules carrying words; connectors are perpendicular rings
+   that overlap their neighbours so the strand reads as a real chain.
+   ════════════════════════════════════════════════════════════════════════ */
+.ll-chain-card {
+    padding: 1.1rem 1.2rem 1.25rem;
+    border: 1px solid var(--ll-border);
+    border-radius: 1rem;
+    background: var(--ll-panel);
+}
+
+.ll-chain-title {
+    margin: 0 0 0.85rem;
+    font-family: var(--ll-font-display);
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ll-ink-soft);
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.ll-chain-sub {
+    font-family: var(--ll-font-mono);
+    font-size: 0.68rem;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    color: var(--ll-ink-soft);
+    text-transform: none;
+}
+
+.ll-chain {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.55rem 0;
+    padding: 0.5rem 0;
+}
+
+/* Connector: a perpendicular open ring that threads through both neighbours.
+   Transparent centre + negative margin = the interlocking-link illusion. */
+.ll-connector {
+    flex: 0 0 auto;
+    position: relative;
+    z-index: 3;
+    width: 1.05rem;
+    height: 1.9rem;
+    margin: 0 -0.5rem;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background:
+        linear-gradient(transparent, transparent) padding-box,
+        var(--ll-edge) border-box;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+    font-size: 0;
+}
+
+/* The link into the destination is a planned (un-forged) ring until arrival —
+   a solid metal ring would falsely read as "locked in". */
+.ll-connector-pending {
+    background: none;
+    border: 2px dashed color-mix(in srgb, var(--ll-metal-mid) 55%, transparent);
+    box-shadow: none;
+    opacity: 0.7;
+}
+
+/* Terminals (start / destination) — heavier shackle rings. */
+.ll-anchor {
+    position: relative;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: var(--ll-font-display);
+    font-weight: 700;
+    font-size: 1.15rem;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ll-ink);
+    padding: 0.6rem 1rem;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background:
+        linear-gradient(var(--ll-bg-2), var(--ll-bg-2)) padding-box,
+        var(--ll-edge) border-box;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.ll-anchor-start::before {
+    content: "◆";
+    color: var(--ll-accent);
+    font-size: 0.85em;
+}
+
+.ll-anchor-dest::before {
+    content: "○";
+    color: var(--ll-dest);
+    font-size: 0.95em;
+}
+
+/* Destination locks shut on arrival — gold, filled, glowing. */
+.ll-anchor-reached {
+    background:
+        linear-gradient(color-mix(in srgb, var(--ll-dest) 22%, var(--ll-bg-2)), color-mix(in srgb, var(--ll-dest) 22%, var(--ll-bg-2))) padding-box,
+        linear-gradient(150deg, #fff0cf, var(--ll-dest) 50%, #9c7d2f 65%, #fff0cf) border-box;
+    animation: ll-lock-glow 2s ease-in-out infinite;
+}
+.ll-anchor-reached::before { content: "◉"; color: var(--ll-dest); }
+
+/* Links — ring-capsules carrying the forged word-pair. */
+.ll-link {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    min-height: 2.7rem;
+    justify-content: center;
+    padding: 0.5rem 1.05rem;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background:
+        linear-gradient(var(--ll-bg-2), var(--ll-bg-2)) padding-box,
+        var(--ll-edge) border-box;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 6px rgba(0, 0, 0, 0.45);
+    animation: ll-link-forge 0.4s cubic-bezier(0.2, 0.8, 0.3, 1.25) both;
+}
+
+.ll-link-pair {
+    font-family: var(--ll-font-display);
+    font-weight: 600;
+    font-size: 0.9rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--ll-ink);
+}
+
+.ll-link-by {
+    font-family: var(--ll-font-mono);
+    font-size: 0.6rem;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    color: var(--ll-ink-soft);
+}
+.ll-link-by::before { content: "by "; opacity: 0.6; }
+
+/* A kinked link (loop pair) — twisted, violet-tinted metal. */
+.ll-link-loop {
+    background:
+        linear-gradient(color-mix(in srgb, var(--ll-loop) 14%, var(--ll-bg-2)), color-mix(in srgb, var(--ll-loop) 14%, var(--ll-bg-2))) padding-box,
+        linear-gradient(150deg, #efe4ff, var(--ll-loop) 50%, #6b4f99 65%, #efe4ff) border-box;
+}
+
+.ll-loop-badge {
+    margin-top: 0.2rem;
+    font-family: var(--ll-font-mono);
+    font-size: 0.56rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ll-loop) 30%, transparent);
+    color: #f0e8ff;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   STANDINGS — engraved ranking plate (RoundOver + GameOver, Groups mode)
+   ════════════════════════════════════════════════════════════════════════ */
+.ll-standings {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--ll-font-mono);
+    font-variant-numeric: tabular-nums;
+}
+
+.ll-standings th {
+    text-align: left;
+    padding: 0.5rem 0.6rem;
+    border-bottom: 1px solid var(--ll-border);
+    font-family: var(--ll-font-display);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ll-ink-soft);
+}
+
+.ll-standings td {
+    text-align: left;
+    padding: 0.55rem 0.6rem;
+    border-bottom: 1px solid var(--ll-border);
+    color: var(--ll-ink);
+    font-size: 0.82rem;
+}
+
+/* Coloured ring before each group name (2nd column). --ll-route is set
+   per-row inline so the marker matches the group's chain colour. */
+.ll-standings tbody td:nth-child(2)::before {
+    content: "◆";
+    margin-right: 0.4rem;
+    color: var(--ll-route, var(--ll-accent));
+}
+
+.ll-standings-top {
+    background: color-mix(in srgb, var(--ll-dest) 13%, transparent);
+}
+.ll-standings-top td { font-weight: 600; }
+
+.ll-standings-secondary { color: var(--ll-ink-soft); }
+
+.ll-tiebreak,
+.ll-standings-dnf {
+    display: inline-block;
+    margin-left: 0.45rem;
+    font-family: var(--ll-font-mono);
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+}
+.ll-tiebreak     { background: color-mix(in srgb, var(--ll-dest) 26%, transparent); color: #2a1c00; }
+.ll-standings-dnf { background: color-mix(in srgb, var(--ll-stop) 28%, transparent); color: #2a0908; }
+
+/* ── Round chip (shared: playing meta strip + round-over progress) ─────── */
+.ll-round-chip {
+    font-family: var(--ll-font-mono);
+    font-weight: 400;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.35rem 0.75rem;
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--ll-border);
+    color: var(--ll-ink-soft);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ════════════════════════════════════════════════════════════════════════ */
+@keyframes ll-link-forge {
+    from { opacity: 0; transform: translateY(6px) scale(0.9); }
+    to   { opacity: 1; transform: none; }
+}
+
+@keyframes ll-lock-glow {
+    0%, 100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 14px color-mix(in srgb, var(--ll-dest) 40%, transparent); }
+    50%      { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 26px color-mix(in srgb, var(--ll-dest) 70%, transparent); }
+}
+
+@keyframes ll-await-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+}
+
+@keyframes ll-link-strain {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+}
+
+@keyframes ll-alert-slide {
+    0%   { opacity: 0; transform: translate(-50%, -0.6rem); }
+    12%  { opacity: 1; transform: translate(-50%, 0); }
+    88%  { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, -0.6rem); }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   RESPONSIVE — the chain hangs vertically on narrow screens
+   ════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 34rem) {
+    .ll-chain {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0;
+    }
+    /* Connector ring turns horizontal to join links stacked top-to-bottom. */
+    .ll-connector {
+        width: 1.9rem;
+        height: 1.05rem;
+        margin: -0.5rem 0 -0.5rem 1.1rem;
+    }
+    .ll-connector-pending { margin-left: 1.1rem; }
+    .ll-link,
+    .ll-anchor { align-self: stretch; }
+    .ll-link {
+        flex-direction: row;
+        gap: 0.55rem;
+        justify-content: flex-start;
+    }
+    .ll-link-pair { text-align: left; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   REDUCED MOTION
+   ════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+    .ll-link,
+    .ll-anchor-reached,
+    .ll-btn {
+        animation: none !important;
+        transition: none !important;
+    }
+}

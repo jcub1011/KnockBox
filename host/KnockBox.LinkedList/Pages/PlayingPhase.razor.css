@@ -1,0 +1,325 @@
+/* PLAYING — the live chain (hero). The chain itself is styled globally; this
+   file owns the start→destination plate, meta strip, forge timer, role panels,
+   the auditor proposal, and the Groups status board. */
+
+.ll-play {
+    width: 100%;
+    max-width: 42rem;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+}
+
+/* ── Start → destination plate: anchor shackle ── strand ── end-ring ────── */
+.ll-journey {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0 0.25rem;
+}
+
+.ll-journey-word {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: var(--ll-font-display);
+    font-weight: 800;
+    font-size: clamp(1.3rem, 5vw, 1.95rem);
+    line-height: 1;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 0.45rem 0.9rem;
+    border-radius: 0.6rem;
+}
+.ll-journey-start {
+    color: var(--ll-accent);
+    background: color-mix(in srgb, var(--ll-accent) 13%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--ll-accent) 45%, transparent);
+}
+.ll-journey-start::before { content: "◆"; font-size: 0.8em; }
+.ll-journey-dest {
+    color: var(--ll-dest);
+    background: color-mix(in srgb, var(--ll-dest) 13%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--ll-dest) 45%, transparent);
+}
+.ll-journey-dest::before { content: "○"; font-size: 0.9em; }
+
+/* The arrow becomes the metal strand spanning anchor to end-ring. */
+.ll-journey-arrow {
+    position: relative;
+    flex: 1 1 2.5rem;
+    min-width: 2.5rem;
+    max-width: 9rem;
+    height: 0.32rem;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--ll-accent), var(--ll-dest));
+    font-size: 0;
+}
+.ll-journey-arrow::after {
+    content: "▶";
+    position: absolute;
+    right: -0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ll-dest);
+    font-size: 0.8rem;
+}
+
+/* ── Meta strip ────────────────────────────────────────────────────────── */
+.ll-meta-strip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.ll-auditor-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.32rem 0.8rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ll-auditor) 13%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ll-auditor) 45%, transparent);
+}
+.ll-auditor-chip::before { content: "◆"; color: var(--ll-auditor); font-size: 0.78rem; }
+.ll-auditor-label {
+    font-family: var(--ll-font-mono);
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ll-ink-soft);
+}
+.ll-auditor-name { font-weight: 800; color: var(--ll-ink); }
+
+/* ── Forge timer (Fastest Time) ────────────────────────────────────────── */
+.ll-timer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--ll-border);
+    border-radius: 0.9rem;
+    background: var(--ll-panel);
+}
+.ll-timer-total { display: flex; align-items: baseline; justify-content: space-between; }
+.ll-timer-label {
+    font-family: var(--ll-font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ll-ink-soft);
+}
+.ll-timer-value {
+    font-family: var(--ll-font-mono);
+    font-size: 1.5rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--ll-ink);
+}
+.ll-timer-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.5rem 0.7rem;
+    border-radius: 0.6rem;
+    background: color-mix(in srgb, var(--ll-accent) 11%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ll-accent) 30%, transparent);
+}
+.ll-timer-mono {
+    font-family: var(--ll-font-mono);
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    color: var(--ll-accent);
+}
+.ll-timer-caption { font-size: 0.72rem; color: var(--ll-ink-soft); }
+.ll-timer-urgent {
+    background: color-mix(in srgb, var(--ll-stop) 15%, transparent);
+    border-color: color-mix(in srgb, var(--ll-stop) 50%, transparent);
+    animation: ll-link-strain 0.9s ease-in-out infinite;
+}
+.ll-timer-urgent .ll-timer-mono { color: var(--ll-stop); }
+.ll-timer-paused {
+    background: color-mix(in srgb, var(--ll-auditor) 13%, transparent);
+    border-color: color-mix(in srgb, var(--ll-auditor) 40%, transparent);
+}
+.ll-timer-paused .ll-timer-mono { color: var(--ll-auditor); }
+
+/* ── Role panels ───────────────────────────────────────────────────────── */
+.ll-panel {
+    padding: 1.4rem 1.25rem;
+    border: 1px solid var(--ll-border);
+    border-radius: 0.95rem;
+    background: var(--ll-panel);
+    text-align: center;
+}
+.ll-panel-turn {
+    border-color: color-mix(in srgb, var(--ll-accent) 55%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ll-accent) 28%, transparent), var(--ll-shadow);
+}
+.ll-panel-auditor {
+    border-color: color-mix(in srgb, var(--ll-auditor) 55%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ll-auditor) 28%, transparent), var(--ll-shadow);
+}
+
+.ll-turn-label,
+.ll-role-label,
+.ll-carried-label {
+    margin: 0 0 0.65rem;
+    font-family: var(--ll-font-mono);
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ll-ink-soft);
+}
+.ll-role-label { color: var(--ll-auditor); }
+
+.ll-carried {
+    font-family: var(--ll-font-display);
+    font-weight: 800;
+    font-size: clamp(2.2rem, 9vw, 3.2rem);
+    line-height: 1;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--ll-accent);
+    margin-bottom: 1.1rem;
+}
+.ll-carried-sm { font-size: clamp(1.5rem, 6vw, 2rem); margin-bottom: 0.6rem; }
+
+/* ── Submitter input ───────────────────────────────────────────────────── */
+.ll-submit-row { display: flex; gap: 0.55rem; flex-wrap: wrap; justify-content: center; }
+.ll-input {
+    flex: 1;
+    min-width: 13rem;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--ll-border);
+    border-radius: 0.6rem;
+    background: var(--ll-bg);
+    color: var(--ll-ink);
+    font-family: var(--ll-font-body);
+    font-size: 1.05rem;
+}
+.ll-input:focus-visible {
+    outline: none;
+    border-color: var(--ll-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ll-accent) 35%, transparent);
+}
+
+.ll-pending-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    justify-content: center;
+    color: var(--ll-ink-soft);
+}
+.ll-pending-note::before {
+    content: "◆";
+    color: var(--ll-auditor);
+    animation: ll-await-pulse 1.1s ease-in-out infinite;
+}
+.ll-pending-note strong { color: var(--ll-ink); }
+
+/* ── Auditor proposal (a new link offered up to the chain) ─────────────── */
+.ll-proposal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.35rem;
+}
+.ll-proposal-word {
+    font-family: var(--ll-font-display);
+    font-weight: 800;
+    font-size: clamp(1.6rem, 7vw, 2.4rem);
+    line-height: 1;
+    text-transform: uppercase;
+    color: var(--ll-ink);
+}
+.ll-proposal-new { color: var(--ll-accent); }
+.ll-proposal-arrow { color: var(--ll-ink-soft); font-size: 1.4rem; }
+.ll-proposal-by {
+    margin: 0 0 1.1rem;
+    font-family: var(--ll-font-mono);
+    font-size: 0.8rem;
+    color: var(--ll-ink-soft);
+}
+.ll-decision-row { display: flex; gap: 0.7rem; justify-content: center; flex-wrap: wrap; }
+.ll-waiting { margin: 0.6rem 0 0; color: var(--ll-ink-soft); }
+.ll-waiting strong { color: var(--ll-ink); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   GROUPS — parallel chains + rival progress
+   ════════════════════════════════════════════════════════════════════════ */
+.ll-audit-queue-head { margin-bottom: 0.7rem; font-size: 1rem; color: var(--ll-ink); }
+.ll-audit-queue-head strong { font-family: var(--ll-font-display); letter-spacing: 0.04em; }
+.ll-audit-waiting { font-family: var(--ll-font-mono); color: var(--ll-ink-soft); font-size: 0.82rem; }
+
+.ll-group-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    text-align: center;
+    font-size: 0.92rem;
+    color: var(--ll-ink-soft);
+}
+.ll-group-banner::before { content: "◆"; color: var(--ll-route, var(--ll-accent)); }
+.ll-group-banner strong { color: var(--ll-ink); }
+
+.ll-rivals { display: flex; gap: 0.55rem; flex-wrap: wrap; justify-content: center; }
+.ll-rival-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ll-route, var(--ll-accent)) 10%, var(--ll-panel));
+    border: 1px solid color-mix(in srgb, var(--ll-route, var(--ll-accent)) 40%, transparent);
+    font-size: 0.82rem;
+}
+.ll-rival-chip::before { content: "◆"; color: var(--ll-route, var(--ll-accent)); font-size: 0.7em; }
+.ll-rival-done {
+    background: color-mix(in srgb, var(--ll-reached) 13%, transparent);
+    border-color: color-mix(in srgb, var(--ll-reached) 50%, transparent);
+}
+.ll-rival-name { font-weight: 800; color: var(--ll-ink); }
+.ll-rival-stat { font-family: var(--ll-font-mono); color: var(--ll-ink-soft); font-size: 0.76rem; }
+.ll-rival-carried {
+    font-family: var(--ll-font-display);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--ll-ink);
+}
+.ll-rival-flag { font-size: 0.9rem; }
+
+.ll-all-groups { display: flex; flex-direction: column; gap: 1rem; }
+
+/* ── Host escape hatch: end the round from its current progress ── */
+.ll-host-controls {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--ll-border);
+}
+.ll-btn-end-round {
+    background: transparent;
+    color: var(--ll-ink-soft);
+    border-color: var(--ll-border);
+    box-shadow: none;
+    text-shadow: none;
+    font-size: 0.82rem;
+}
+.ll-btn-end-round:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--ll-reject, #e1605c) 14%, transparent);
+    border-color: color-mix(in srgb, var(--ll-reject, #e1605c) 50%, transparent);
+    color: var(--ll-ink);
+    box-shadow: none;
+    filter: none;
+}

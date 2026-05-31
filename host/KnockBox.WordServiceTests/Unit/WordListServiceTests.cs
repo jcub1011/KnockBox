@@ -188,4 +188,37 @@ public class WordListServiceTests
     {
         Assert.IsEmpty(_service.GetAvailableLengths((WordPoolMode)(-1)));
     }
+
+    [TestMethod]
+    public void RegisterCustomPool_BuildsLengthBucketedPool()
+    {
+        var pool = _service.RegisterCustomPool(
+            "custom-builds",
+            new[] { "cat", "dog", "apple", "brave", "Apple" });
+
+        // "Apple" dedupes against "apple"; total distinct = 4.
+        Assert.AreEqual(4, pool.TotalWordCount);
+        CollectionAssert.AreEqual(new[] { 3, 5 }, pool.AvailableLengths.ToArray());
+        Assert.IsTrue(pool.Contains("apple"));
+    }
+
+    [TestMethod]
+    public void RegisterCustomPool_IsIdempotentByName()
+    {
+        var first = _service.RegisterCustomPool("custom-idempotent", new[] { "cat", "dog" });
+        // Same name, different words — the original pool is returned unchanged.
+        var second = _service.RegisterCustomPool("custom-idempotent", new[] { "apple", "brave", "crane" });
+
+        Assert.AreSame(first, second);
+        Assert.AreEqual(2, second.TotalWordCount);
+    }
+
+    [TestMethod]
+    public void GetCustomPool_ReturnsRegisteredPool_OrNull()
+    {
+        var registered = _service.RegisterCustomPool("custom-lookup", new[] { "cat", "dog" });
+
+        Assert.AreSame(registered, _service.GetCustomPool("custom-lookup"));
+        Assert.IsNull(_service.GetCustomPool("never-registered"));
+    }
 }
