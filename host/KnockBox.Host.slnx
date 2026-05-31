@@ -22,12 +22,16 @@
   <Project Path="KnockBox.DrawnToDressTests/KnockBox.DrawnToDressTests.csproj" />
   <Project Path="KnockBox.HiddenAgenda/KnockBox.HiddenAgenda.csproj" />
   <Project Path="KnockBox.HiddenAgendaTests/KnockBox.HiddenAgendaTests.csproj" />
+  <Project Path="KnockBox.LinkedList/KnockBox.LinkedList.csproj" />
+  <Project Path="KnockBox.LinkedListTests/KnockBox.LinkedListTests.csproj" />
   <Project Path="KnockBox.Operator/KnockBox.Operator.csproj" />
   <Project Path="KnockBox.OperatorTests/KnockBox.OperatorTests.csproj" />
   <Project Path="KnockBox.Spardle/KnockBox.Spardle.csproj" />
   <Project Path="KnockBox.SpardleTests/KnockBox.SpardleTests.csproj" />
   <Project Path="KnockBox.TaskMaster/KnockBox.TaskMaster.csproj" />
   <Project Path="KnockBox.TaskMasterTests/KnockBox.TaskMasterTests.csproj" />
+  <Project Path="KnockBox.Tracery/KnockBox.Tracery.csproj" />
+  <Project Path="KnockBox.TraceryTests/KnockBox.TraceryTests.csproj" />
   <Project Path="KnockBox.WordService.Contracts/KnockBox.WordService.Contracts.csproj" />
   <Project Path="KnockBox.WordService/KnockBox.WordService.csproj" />
   <Project Path="KnockBox.WordServiceTests/KnockBox.WordServiceTests.csproj" />

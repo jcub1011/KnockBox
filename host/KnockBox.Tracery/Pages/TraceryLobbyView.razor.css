@@ -1,0 +1,72 @@
+/* Lobby — wordmark, tagline, player roster chips, host start control. */
+
+.tr-lobby {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    width: min(680px, 100%);
+    animation: tr-rise 0.4s ease both;
+}
+
+.tr-lobby-brand {
+    font-family: var(--tr-font-display);
+    font-size: clamp(3rem, 12vw, 4.5rem);
+    font-weight: 700;
+    letter-spacing: 0.26em;
+    text-indent: 0.26em;
+    color: var(--tr-ink);
+    text-shadow: 0 0 38px var(--tr-accent-glow);
+    line-height: 1;
+}
+.tr-lobby-tagline {
+    font-family: var(--tr-font-display);
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.42em;
+    text-indent: 0.42em;
+    text-transform: uppercase;
+    color: var(--tr-accent);
+}
+
+.tr-lobby-players { width: 100%; }
+.tr-lobby-players-label {
+    font-family: var(--tr-font-display);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    text-indent: 0.22em;
+    color: var(--tr-ink-mute);
+    margin-bottom: 0.5rem;
+}
+.tr-lobby-players-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.tr-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--tr-panel-2);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    padding: 0.4rem 0.95rem;
+    font-weight: 500;
+    font-size: 1.05rem;
+    color: var(--tr-ink);
+    animation: tr-pop 0.3s ease both;
+}
+.tr-chip-me {
+    border-color: var(--tr-accent);
+    box-shadow: inset 0 0 0 1px var(--tr-accent);
+}
+.tr-chip-kick { cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
+.tr-chip-kick:hover {
+    background: rgba(177, 65, 78, 0.16);
+    border-color: var(--tr-danger);
+    color: var(--tr-danger);
+}
+
+.tr-lobby-waiting { color: var(--tr-ink-dim); }
+.tr-lobby-waiting strong { color: var(--tr-ink); }
+.tr-lobby-start { margin-top: 0.25rem; min-width: 13rem; }
+.tr-lobby-reset { min-width: 13rem; }
+.tr-lobby-error { color: var(--tr-danger); font-size: 0.9rem; font-weight: 600; }

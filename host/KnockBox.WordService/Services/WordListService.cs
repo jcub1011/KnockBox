@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using KnockBox.WordService.Contracts;
 using Microsoft.Extensions.Logging;
 
@@ -7,16 +8,22 @@ public sealed class WordListService : IWordListService
 {
     private readonly IReadOnlyDictionary<int, WordPool> _nytStandardByLength;
     private readonly IReadOnlyDictionary<int, WordPool> _fullDictionaryByLength;
+    private readonly IReadOnlyDictionary<int, WordPool> _reducedByLength;
+
+    // Consumer-supplied pools, registered at runtime via RegisterCustomPool.
+    private readonly ConcurrentDictionary<string, IWordPool> _customPools = new(StringComparer.Ordinal);
 
     public WordListService(ILogger<WordListService> logger)
     {
         var dataDir = ResolveDataDir();
         var nyWords = LoadCsv(Path.Combine(dataDir, "ny-dictionary.csv"), logger);
         var fullWords = LoadCsv(Path.Combine(dataDir, "full-dictionary.csv"), logger);
+        var reducedWords = LoadCsv(Path.Combine(dataDir, "reduced-dictionary.csv"), logger);
 
         _nytStandardByLength = BuildByLength(nyWords);
         // Full pool must include every NY word too — preserves prior UnionWith semantics.
         _fullDictionaryByLength = BuildByLength(fullWords.Concat(nyWords));
+        _reducedByLength = BuildByLength(reducedWords);
     }
 
     // Assembly.Location returns the on-disk path for plugins loaded via
@@ -66,10 +73,33 @@ public sealed class WordListService : IWordListService
         return byLength.Keys.OrderBy(x => x);
     }
 
+    public IWordPool RegisterCustomPool(string name, IEnumerable<string> words)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(words);
+
+        // Fast path for the common case (already registered) so we don't
+        // re-enumerate the caller's word list on repeat calls.
+        if (_customPools.TryGetValue(name, out var existing)) return existing;
+
+        // Materialize so a one-shot enumerable (e.g. a resource-stream iterator)
+        // can be safely passed to GetOrAdd, whose factory may run more than once
+        // under contention.
+        var materialized = words as ICollection<string> ?? words.ToList();
+        return _customPools.GetOrAdd(
+            name,
+            static (_, w) => new CustomWordPool(BuildByLength(w)),
+            materialized);
+    }
+
+    public IWordPool? GetCustomPool(string name)
+        => _customPools.TryGetValue(name, out var pool) ? pool : null;
+
     private IReadOnlyDictionary<int, WordPool>? GetPool(WordPoolMode mode) => mode switch
     {
         WordPoolMode.NytStandard => _nytStandardByLength,
         WordPoolMode.FullDictionary => _fullDictionaryByLength,
+        WordPoolMode.ReducedDictionary => _reducedByLength,
         _ => null,
     };
 

@@ -1,0 +1,191 @@
+@using KnockBox.LinkedList.Services.State.Games
+
+@{
+    var myId = UserService.CurrentUser?.Id ?? "";
+    var isHost = GameState.Host.Id == myId;
+    var result = GameState.LastRoundResult;
+}
+
+@{
+    RenderFragment<ChainState> chainView = g =>
+    @<div class="ll-chain">
+        <span class="ll-anchor ll-anchor-start">@GameState.StartWord</span>
+        @foreach (var link in g.Chain)
+        {
+            <span class="ll-connector">─</span>
+            <span class="ll-link @(link.IsLoop ? "ll-link-loop" : "")">
+                <span class="ll-link-pair">@link.FromWord → @link.ToWord</span>
+                <span class="ll-link-by">@link.PlayerName</span>
+                @if (link.IsLoop)
+                {
+                    <span class="ll-loop-badge" title="This pair already appeared in the chain">↺ kink</span>
+                }
+            </span>
+        }
+        <span class="ll-connector @(g.DestinationReached ? "" : "ll-connector-pending")">─</span>
+        <span class="ll-anchor ll-anchor-dest @(g.DestinationReached ? "ll-anchor-reached" : "")">
+            @GameState.DestinationWord
+        </span>
+    </div>;
+}
+
+<div class="ll-roundover">
+
+    @if (!IsGroups)
+    {
+        @* ── Outcome banner ── *@
+        @if (GameState.DestinationReached)
+        {
+            <div class="ll-ro-banner ll-ro-success">
+                <span class="ll-ro-emoji">🔗</span>
+                <h3 class="ll-ro-headline">Chain complete!</h3>
+                <p class="ll-ro-sub">@GameState.StartWord ➜ @GameState.DestinationWord</p>
+            </div>
+        }
+        else
+        {
+            <div class="ll-ro-banner ll-ro-stalled">
+                <span class="ll-ro-emoji">⛓️‍💥</span>
+                <h3 class="ll-ro-headline">Chain broke</h3>
+                <p class="ll-ro-sub">The chain didn't reach @GameState.DestinationWord this time.</p>
+            </div>
+        }
+
+        @* ── Score for the active mode ── *@
+        @if (result is not null)
+        {
+            <div class="ll-ro-score">
+                @if (result.Mode == ScoringMode.FewestGuesses)
+                {
+                    <div class="ll-ro-metric">
+                        <span class="ll-ro-metric-value">@result.Guesses</span>
+                        <span class="ll-ro-metric-label">accepted pair@(result.Guesses == 1 ? "" : "s")</span>
+                    </div>
+
+                    @if (result.Par is int par)
+                    {
+                        <div class="ll-ro-par @(result.BeatPar ? "ll-ro-par-good" : "ll-ro-par-over")">
+                            Par @par · You: @result.Guesses —
+                            @if (result.BeatPar)
+                            {
+                                <strong>@(result.Guesses < par ? "under par!" : "right on par!")</strong>
+                            }
+                            else
+                            {
+                                <strong>@(result.Guesses - par) over par</strong>
+                            }
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="ll-ro-metric">
+                        <span class="ll-ro-metric-value">@FormatElapsed(result.Elapsed)</span>
+                        <span class="ll-ro-metric-label">thinking time</span>
+                    </div>
+                    <p class="ll-ro-par">Auditor deliberation didn't count — only the seconds the team spent thinking.</p>
+                }
+            </div>
+        }
+
+        @* ── The final chain ── *@
+        <div class="ll-chain-card">
+            <h4 class="ll-chain-title">The Chain</h4>
+            @chainView(GameState.PrimaryGroup!)
+        </div>
+    }
+    else
+    {
+        @* ════════ GROUPS: standings + per-group chains (§8.2) ════════ *@
+        <div class="ll-ro-banner ll-ro-success">
+            <span class="ll-ro-emoji">🔗</span>
+            <h3 class="ll-ro-headline">Round complete</h3>
+            <p class="ll-ro-sub">@GameState.StartWord ➜ @GameState.DestinationWord</p>
+        </div>
+
+        <div class="ll-standings-card">
+            <h4 class="ll-chain-title">Standings</h4>
+            <table class="ll-standings">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Group</th>
+                        <th>@(PrimaryIsTime ? "Time" : "Guesses")</th>
+                        <th class="ll-standings-secondary">@(PrimaryIsTime ? "Guesses" : "Time")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Standings)
+                    {
+                        <tr class="@(s.Rank == 1 ? "ll-standings-top" : "")" style="--ll-route: var(--ll-route-@(GameState.Groups.FindIndex(grp => grp.GroupId == s.GroupId) % 6))">
+                            <td>@RankMedal(s.Rank)</td>
+                            <td>
+                                @s.GroupName
+                                @if (s.IsTieBreakWinner)
+                                {
+                                    <span class="ll-tiebreak" title="Won a tie on the @(PrimaryIsTime ? "time" : "guess") metric via the tiebreaker">⚖️ tiebreak</span>
+                                }
+                                @if (!s.DestinationReached)
+                                {
+                                    <span class="ll-standings-dnf" title="Did not reach the destination">DNF</span>
+                                }
+                            </td>
+                            <td>@(PrimaryIsTime ? FormatElapsed(s.Elapsed) : s.Guesses.ToString())</td>
+                            <td class="ll-standings-secondary">@(PrimaryIsTime ? s.Guesses.ToString() : FormatElapsed(s.Elapsed))</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <p class="ll-ro-par">Ties on @(PrimaryIsTime ? "time" : "guesses") break by @(PrimaryIsTime ? "fewer guesses" : "less thinking time").</p>
+        </div>
+
+        @foreach (var s in Standings)
+        {
+            var g = GroupOf(s.GroupId);
+            if (g is null) { continue; }
+            <div class="ll-chain-card" style="--ll-route: var(--ll-route-@(GameState.Groups.IndexOf(g) % 6))">
+                <h4 class="ll-chain-title">@RankMedal(s.Rank) @g.GroupName</h4>
+                @chainView(g)
+            </div>
+        }
+    }
+
+    @* ── Match progress + next Auditor ── *@
+    <div class="ll-ro-progress">
+        <span class="ll-round-chip">Round @GameState.RoundNumber / @GameState.Settings.RoundsPerMatch</span>
+        @if (!IsLastRound)
+        {
+            <span class="ll-ro-next-auditor">Next Auditor: <strong>@NextAuditorName</strong></span>
+        }
+    </div>
+
+    @* ── Host controls: next round vs end match (§10) ── *@
+    @if (isHost)
+    {
+        <div class="ll-ro-actions">
+            @if (IsLastRound)
+            {
+                <button class="ll-btn ll-btn-primary" @onclick="EndMatch" disabled="@_starting">
+                    @(_starting ? "Wrapping up…" : "View Results 🏆")
+                </button>
+            }
+            else
+            {
+                <button class="ll-btn ll-btn-primary" @onclick="NextRound" disabled="@_starting">
+                    @(_starting ? "Starting…" : "Next round")
+                </button>
+                <button class="ll-btn ll-btn-ghost" @onclick="EndMatch" disabled="@_starting">
+                    End match early
+                </button>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="ll-ro-wait">
+            @(IsLastRound
+                ? "Waiting for the host to show the final results…"
+                : "Waiting for the host to start the next round…")
+        </p>
+    }
+</div>

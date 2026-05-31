@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
+    <!--
+      Reference the word-service contracts assembly so Linked List can inject
+      IWordListService at compile time and register its own audited word list as
+      a custom pool. The runtime resolves the interface via the host's DI
+      container; the implementation lives in the sibling KnockBox.WordService
+      library plugin, which the host loads before any game plugin.
+    -->
+    <ProjectReference Include="..\KnockBox.WordService.Contracts\KnockBox.WordService.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Data\words.csv" />
+  </ItemGroup>
+
+  <Import Project="..\Directory.Plugin.targets" />
+
+</Project>

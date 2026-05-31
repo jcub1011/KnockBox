@@ -1,6 +1,5 @@
 using System.Text.Json.Serialization;
 using KnockBox.Spardle.Models;
-using KnockBox.WordService.Contracts;
 
 namespace KnockBox.Spardle;
 
@@ -16,10 +15,9 @@ namespace KnockBox.Spardle;
 public sealed record SpardleSettings
 {
     // Persist enums by name, not the Web-default numeric ordinal, so reordering or
-    // inserting an enum member can't silently remap a host's saved settings. Scoped to
-    // this record — the shared WordPoolMode contract enum is unchanged.
+    // inserting an enum member can't silently remap a host's saved settings.
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public WordPoolMode WordPoolMode { get; init; } = WordPoolMode.NytStandard;
+    public SpardleWordSource WordPoolMode { get; init; } = SpardleWordSource.NytStandard;
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public WordOrderMode WordOrderMode { get; init; } = WordOrderMode.RandomNoRepeats;
@@ -32,14 +30,14 @@ public sealed record SpardleSettings
     /// <see cref="TargetWordLength"/>. When false, words are sampled across
     /// <see cref="MinWordLength"/>–<see cref="MaxWordLength"/> inclusive.
     /// Only consulted when <see cref="WordPoolMode"/> is
-    /// <see cref="WordPoolMode.FullDictionary"/>.
+    /// <see cref="SpardleWordSource.FullDictionary"/>.
     /// </summary>
     public bool ConstantWordLength { get; init; } = true;
 
     /// <summary>
     /// Target word length when <see cref="ConstantWordLength"/> is true.
     /// Forced to 5 by the engine when <see cref="WordPoolMode"/> is
-    /// <see cref="WordPoolMode.NytStandard"/>. Ignored when the custom word pool is non-empty.
+    /// <see cref="SpardleWordSource.NytStandard"/>. Ignored when the custom word pool is non-empty.
     /// </summary>
     public int TargetWordLength { get; init; } = 5;
 

@@ -1,0 +1,361 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   TRACERY — "The Cathedral Window" theme
+   Carved stone, leaded glass, a thread of light traced through a lattice of
+   letters. Elegant and refined; competitive, but restrained.
+
+   This is the GLOBAL layer (loaded via <HeadContent> on the room page). It holds
+   only what cannot be component-scoped:
+     • :root design tokens (scoped :root[b-xxx] would never match <html>)
+     • shared @keyframes (animation names are global anyway)
+     • shared utility classes used across multiple components
+         - .tr-btn / .tr-btn-primary  (Lobby, FinalStandings)
+         - .tr-stage / .tr-muted      (every phase)
+         - the .tr-over-* standings board (Reveal, FinalStandings)
+   Per-component layout lives in each component's own .razor.css.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+    /* ── Surfaces — warm cathedral stone ───────────────────────────── */
+    --tr-bg-0: #16131d;
+    --tr-bg-1: #1c1825;
+    --tr-panel: rgba(236, 227, 208, 0.045);
+    --tr-panel-2: rgba(236, 227, 208, 0.075);
+    --tr-border: rgba(201, 162, 39, 0.18);          /* faint gilt hairline rule */
+    --tr-border-strong: rgba(201, 162, 39, 0.42);   /* prominent gilt rule */
+
+    /* ── Accent — stained-glass cobalt (trace, focus, you) ─────────── */
+    --tr-accent: #4d88cf;
+    --tr-accent-ink: #f4ecd9;                        /* parchment text on cobalt */
+    --tr-accent-dim: rgba(77, 136, 207, 0.16);       /* cobalt glass tint */
+    --tr-accent-glow: rgba(77, 136, 207, 0.42);      /* soft candle-halo */
+
+    /* ── Secondary / danger / gilt ─────────────────────────────────── */
+    --tr-danger: #b1414e;                            /* garnet / oxblood */
+    --tr-danger-glow: rgba(177, 65, 78, 0.42);
+    --tr-warn: #c79a3e;                              /* muted ochre */
+    --tr-gold: #d9b24a;                              /* gilt leaf — winner only */
+    --tr-gold-glow: rgba(217, 178, 74, 0.50);
+
+    /* ── Text — parchment ──────────────────────────────────────────── */
+    --tr-ink: #ece3d0;
+    --tr-ink-dim: rgba(236, 227, 208, 0.66);
+    --tr-ink-mute: rgba(236, 227, 208, 0.40);
+
+    /* ── Type — a clean, refined grotesque (legible, quietly elegant) ─ */
+    --tr-font-display: "Hanken Grotesk", "Outfit", system-ui, sans-serif;
+    --tr-font-mono: "Hanken Grotesk", "Outfit", system-ui, sans-serif;
+    --tr-font-body: "Hanken Grotesk", "Outfit", system-ui, sans-serif;
+
+    /* ── Shape — carved, architectural ─────────────────────────────── */
+    --tr-radius: 6px;
+    --tr-radius-sm: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Shared animations — restrained: things ink in and settle, they don't slam.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes tr-beat-in {
+    0%   { opacity: 0; transform: translateY(14px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tr-pop {
+    0%   { opacity: 0; transform: scale(0.97); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+/* The banner "inks in" — a soft settle, never a blast. */
+@keyframes tr-slam {
+    0%   { opacity: 0; transform: translateY(12px); letter-spacing: 0.16em; }
+    100% { opacity: 1; transform: translateY(0); letter-spacing: 0.04em; }
+}
+
+/* The lit tile breathes like candlelight on glass. */
+@keyframes tr-pulse-accent {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(77, 136, 207, 0); }
+    50%      { box-shadow: 0 0 16px 1px var(--tr-accent-glow); }
+}
+
+@keyframes tr-flash-danger {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(177, 65, 78, 0); }
+    50%      { box-shadow: 0 0 12px 1px var(--tr-danger-glow); }
+}
+
+@keyframes tr-shake {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(-4px); }
+    50%      { transform: translateX(4px); }
+    75%      { transform: translateX(-3px); }
+}
+
+@keyframes tr-shimmer {
+    0%   { transform: translateX(-130%) skewX(-18deg); }
+    100% { transform: translateX(130%) skewX(-18deg); }
+}
+
+@keyframes tr-rise {
+    0%   { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Shared base
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* This sheet is injected via <HeadContent> only while a Tracery room is mounted, so the page-level
+   rule below is scoped in practice to Tracery play. Tracery is phone-first (players trace on their
+   phones); disabling overscroll chaining stops a finger-trace that runs off the grid from triggering
+   the browser's pull-to-refresh — which would reload the page and drop the player mid-round. */
+html, body { overscroll-behavior: none; }
+
+.tr-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    width: min(640px, 100%);
+    text-align: center;
+    animation: tr-rise 0.5s ease both;
+}
+
+.tr-muted { color: var(--tr-ink-dim); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Shared buttons — engraved serif caps on stone, gilt-ruled.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.tr-btn {
+    font-family: var(--tr-font-display);
+    font-weight: 600;
+    font-size: 1.05rem;
+    letter-spacing: 0.18em;
+    text-indent: 0.18em;
+    text-transform: uppercase;
+    color: var(--tr-ink);
+    background: var(--tr-panel-2);
+    border: 1px solid var(--tr-border-strong);
+    border-radius: var(--tr-radius-sm);
+    padding: 0.7rem 1.7rem;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.tr-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: rgba(236, 227, 208, 0.10);
+    border-color: var(--tr-gold);
+    color: #f3ecda;
+}
+.tr-btn:active:not(:disabled) { transform: translateY(1px); }
+.tr-btn:disabled { opacity: 0.42; cursor: not-allowed; }
+
+.tr-btn-primary {
+    color: var(--tr-accent-ink);
+    background: var(--tr-accent);
+    border-color: rgba(201, 162, 39, 0.55);
+    box-shadow: 0 0 0 0 var(--tr-accent-glow);
+}
+
+.tr-btn-primary:hover:not(:disabled) {
+    background: #5a93d6;
+    border-color: var(--tr-gold);
+    color: var(--tr-accent-ink);
+    box-shadow: 0 6px 22px -10px var(--tr-accent-glow);
+}
+
+.tr-btn-danger {
+    color: #f3ecda;
+    background: var(--tr-danger);
+    border-color: var(--tr-danger);
+    box-shadow: 0 0 0 0 var(--tr-danger-glow);
+}
+
+.tr-btn-danger:hover:not(:disabled) {
+    background: #c64a57;
+    border-color: #d65c50;
+    color: #fff;
+    box-shadow: 0 6px 22px -10px var(--tr-danger-glow);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Shared standings board — Reveal, FinalStandings
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.tr-over {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    width: min(520px, 100%);
+    animation: tr-rise 0.5s ease both;
+}
+
+.tr-over-banner { display: flex; flex-direction: column; gap: 0.45rem; text-align: center; }
+.tr-over-banner-main {
+    font-family: var(--tr-font-display);
+    font-size: clamp(2.2rem, 9vw, 3.2rem);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--tr-ink);
+    text-shadow: 0 0 26px var(--tr-accent-glow);
+    animation: tr-slam 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.tr-over-banner-sub {
+    font-family: var(--tr-font-display);
+    font-size: 0.92rem;
+    font-weight: 600;
+    letter-spacing: 0.42em;
+    text-indent: 0.42em;
+    text-transform: uppercase;
+    color: var(--tr-accent);
+}
+
+.tr-over-board {
+    width: min(440px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.tr-over-row {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    background: var(--tr-panel);
+    border: 1px solid var(--tr-border);
+    border-radius: var(--tr-radius-sm);
+    padding: 0.7rem 1rem;
+    animation: tr-beat-in 0.5s ease both;
+}
+/* Stagger the rows as they settle in. */
+.tr-over-row:nth-child(1) { animation-delay: 0.05s; }
+.tr-over-row:nth-child(2) { animation-delay: 0.12s; }
+.tr-over-row:nth-child(3) { animation-delay: 0.19s; }
+.tr-over-row:nth-child(4) { animation-delay: 0.26s; }
+.tr-over-row:nth-child(5) { animation-delay: 0.33s; }
+.tr-over-row:nth-child(6) { animation-delay: 0.40s; }
+.tr-over-row:nth-child(n+7) { animation-delay: 0.47s; }
+
+.tr-over-rank {
+    font-family: var(--tr-font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: var(--tr-ink-mute);
+    min-width: 1.7rem;
+    text-align: center;
+}
+.tr-over-name { flex: 1; font-weight: 500; font-size: 1.1rem; color: var(--tr-ink); text-align: left; }
+.tr-over-delta {
+    font-family: var(--tr-font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: var(--tr-accent);
+    min-width: 2.6rem;
+    text-align: right;
+}
+.tr-over-score {
+    font-family: var(--tr-font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 1.3rem;
+    color: var(--tr-ink);
+    min-width: 2.5rem;
+    text-align: right;
+}
+
+.tr-over-row-me {
+    border-color: var(--tr-accent);
+    box-shadow: inset 0 0 0 1px var(--tr-accent);
+}
+
+.tr-over-row-winner {
+    position: relative;
+    overflow: hidden;
+    border-color: var(--tr-gold);
+    background: linear-gradient(100deg, rgba(217, 178, 74, 0.16), rgba(217, 178, 74, 0.04));
+}
+.tr-over-row-winner .tr-over-rank,
+.tr-over-row-winner .tr-over-score { color: var(--tr-gold); }
+.tr-over-row-winner::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: 45%;
+    background: linear-gradient(90deg, transparent, var(--tr-gold-glow), transparent);
+    animation: tr-shimmer 4s ease-in-out infinite;
+}
+
+.tr-over-exit { margin-top: 0.5rem; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Reveal chrome — shared by every reveal view (Standard + Search). Kept here,
+   not in a component's scoped CSS, so both reveal components pick them up.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.tr-reveal-title {
+    font-family: var(--tr-font-display);
+    font-size: clamp(1.5rem, 6vw, 2.1rem);
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-indent: 0.14em;
+    color: var(--tr-ink);
+    text-shadow: 0 0 30px var(--tr-accent-glow);
+}
+
+/* The board explorer is far wider than the 640px reveal stage; let it break out and centre on
+   its own width (vw-guarded so it never forces a horizontal scrollbar). */
+.tr-reveal-explorer {
+    width: min(1040px, 92vw);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.85rem;
+    margin-top: 0.5rem;
+}
+
+.tr-reveal-subtitle {
+    font-family: var(--tr-font-display);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.42em;
+    text-indent: 0.42em;
+    text-transform: uppercase;
+    color: var(--tr-accent);
+}
+
+/* The next-round indicator below the standings — what plays after this intermission. */
+.tr-reveal-next {
+    font-family: var(--tr-font-display);
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    text-indent: 0.2em;
+    text-transform: uppercase;
+    color: var(--tr-ink-mute);
+}
+
+.tr-reveal-skip { margin-top: 0.25rem; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Reduced motion — kill keyframe motion, keep layout intact
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+    .tr-stage,
+    .tr-over,
+    .tr-over-row,
+    .tr-over-banner-main,
+    .tr-bank-word,
+    .tr-chip,
+    .tr-toast,
+    .tr-beat,
+    .tr-intro-number,
+    .tr-cell-last,
+    .tr-timer-urgent .tr-timer-fill {
+        animation: none !important;
+    }
+    .tr-over-row-winner::after { display: none; }
+}

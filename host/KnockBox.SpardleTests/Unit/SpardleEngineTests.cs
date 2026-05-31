@@ -514,7 +514,7 @@ public class SpardleEngineTests
     public async Task StartAsync_NytStandard_FillsQueueWithFiveLetterWordsFromService()
     {
         var (state, host) = await CreateStateAsync();
-        state.UpdateSettings(s => s with { WordPoolMode = WordPoolMode.NytStandard });
+        state.UpdateSettings(s => s with { WordPoolMode = SpardleWordSource.NytStandard });
         state.UpdateSettings(s => s with { WordOrderMode = WordOrderMode.ListOrder });
         state.UpdateSettings(s => s with { TotalRounds = 3 });
 
@@ -530,7 +530,7 @@ public class SpardleEngineTests
     public async Task StartAsync_FullDictionaryConstantLength_UsesTargetLength()
     {
         var (state, host) = await CreateStateAsync();
-        state.UpdateSettings(s => s with { WordPoolMode = WordPoolMode.FullDictionary });
+        state.UpdateSettings(s => s with { WordPoolMode = SpardleWordSource.FullDictionary });
         state.UpdateSettings(s => s with { ConstantWordLength = true });
         state.UpdateSettings(s => s with { TargetWordLength = 7 });
         state.UpdateSettings(s => s with { WordOrderMode = WordOrderMode.ListOrder });
@@ -547,7 +547,7 @@ public class SpardleEngineTests
     public async Task StartAsync_FullDictionaryRange_AllWordsWithinBounds()
     {
         var (state, host) = await CreateStateAsync();
-        state.UpdateSettings(s => s with { WordPoolMode = WordPoolMode.FullDictionary });
+        state.UpdateSettings(s => s with { WordPoolMode = SpardleWordSource.FullDictionary });
         state.UpdateSettings(s => s with { ConstantWordLength = false });
         state.UpdateSettings(s => s with { MinWordLength = 5 });
         state.UpdateSettings(s => s with { MaxWordLength = 7 });
@@ -565,7 +565,7 @@ public class SpardleEngineTests
     public async Task StartAsync_FullDictionaryRange_ExcludesLengthsOutsideBounds()
     {
         var (state, host) = await CreateStateAsync();
-        state.UpdateSettings(s => s with { WordPoolMode = WordPoolMode.FullDictionary });
+        state.UpdateSettings(s => s with { WordPoolMode = SpardleWordSource.FullDictionary });
         state.UpdateSettings(s => s with { ConstantWordLength = false });
         state.UpdateSettings(s => s with { MinWordLength = 4 });
         state.UpdateSettings(s => s with { MaxWordLength = 4 });
@@ -583,7 +583,7 @@ public class SpardleEngineTests
     public async Task StartAsync_FullDictionaryRange_InvertedBounds_ProducesEmptyQueue()
     {
         var (state, host) = await CreateStateAsync();
-        state.UpdateSettings(s => s with { WordPoolMode = WordPoolMode.FullDictionary });
+        state.UpdateSettings(s => s with { WordPoolMode = SpardleWordSource.FullDictionary });
         state.UpdateSettings(s => s with { ConstantWordLength = false });
         state.UpdateSettings(s => s with { MinWordLength = 10 });
         state.UpdateSettings(s => s with { MaxWordLength = 5 });
@@ -599,7 +599,7 @@ public class SpardleEngineTests
     public async Task StartAsync_CustomPool_OverridesPoolModeAndIgnoresLength()
     {
         var (state, host) = await CreateStateAsync();
-        state.UpdateSettings(s => s with { WordPoolMode = WordPoolMode.FullDictionary });
+        state.UpdateSettings(s => s with { WordPoolMode = SpardleWordSource.FullDictionary });
         state.UpdateSettings(s => s with { ConstantWordLength = true });
         state.UpdateSettings(s => s with { TargetWordLength = 7 });
         state.CustomWordPool = ImmutableList.Create("alpha", "betas", "gamma");
@@ -1012,7 +1012,7 @@ public class SpardleEngineTests
     {
         // Full dictionary length 5 has ~10k entries — take=10 triggers rejection sampling.
         var (state, host) = await CreateStateAsync();
-        state.UpdateSettings(s => s with { WordPoolMode = WordPoolMode.FullDictionary });
+        state.UpdateSettings(s => s with { WordPoolMode = SpardleWordSource.FullDictionary });
         state.UpdateSettings(s => s with { ConstantWordLength = true });
         state.UpdateSettings(s => s with { TargetWordLength = 5 });
         state.UpdateSettings(s => s with { WordOrderMode = WordOrderMode.RandomNoRepeats });
@@ -1174,24 +1174,22 @@ public class SpardleEngineTests
     [TestMethod]
     public async Task ValidateGuess_RejectsDictionaryWordNotInPool_WhenFallbackDisabled()
     {
-        // No-fallback mode: a real word that ISN'T in the custom pool (and isn't in the
-        // built-in NYT pool either, since CustomWordPool overrides the round queue but
-        // WordPoolMode still drives IsInPool) should fail. We pick a guess of matching
-        // length that we know isn't in the NYT-standard 5-letter list.
+        // No-fallback mode: HostDefined has no library-backed pool, so the only valid words
+        // are those in the custom pool. A real word that ISN'T in the custom pool should fail.
         var (state, host) = await CreateStateAsync();
         state.UpdateSettings(s => s with { TotalRounds = 1 });
         state.UpdateSettings(s => s with { TransitionDuration = TimeSpan.FromMilliseconds(80) });
         state.UpdateSettings(s => s with { RoundTimer = TimeSpan.FromSeconds(30) });
         state.UpdateSettings(s => s with { AllowDictionaryFallback = false });
-        state.UpdateSettings(s => s with { WordPoolMode = WordPoolMode.HostDefined });
+        state.UpdateSettings(s => s with { WordPoolMode = SpardleWordSource.HostDefined });
         state.CustomWordPool = ["zorks"];
         state.UpdateSettings(s => s with { WordOrderMode = WordOrderMode.ListOrder });
 
         await _engine.StartAsync(host, state);
         await WaitForPhaseAsync(state, GamePhase.Playing, timeoutMs: 1500);
 
-        // "crane" is a real word but not in the custom pool. HostDefined mode has no
-        // backing pool in IsInPool, so the check returns false → rejection.
+        // "crane" is a real word but not in the custom pool. HostDefined maps to no library
+        // pool, so the no-fallback check has nothing to match against → rejection.
         var result = _engine.SubmitGuess(state, host, "crane");
 
         Assert.IsFalse(result.IsSuccess);
@@ -1224,7 +1222,7 @@ public class SpardleEngineTests
         // take/total ratio forces the Fisher–Yates branch and must terminate (the old
         // rejection-sampling implementation would stall near-completion).
         var (state, host) = await CreateStateAsync();
-        state.UpdateSettings(s => s with { WordPoolMode = WordPoolMode.NytStandard });
+        state.UpdateSettings(s => s with { WordPoolMode = SpardleWordSource.NytStandard });
         state.UpdateSettings(s => s with { WordOrderMode = WordOrderMode.RandomNoRepeats });
         state.UpdateSettings(s => s with { TotalRounds = int.MaxValue }); // engine clamps to total available
 

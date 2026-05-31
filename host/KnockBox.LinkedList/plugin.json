@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "name": "Linked List",
+  "description": "Build a chain of word pairs from a start word to a destination — a rotating human Auditor decides what counts.",
+  "routeIdentifier": "linked-list",
+  "version": "1.0.0",
+  "entryAssembly": "KnockBox.LinkedList",
+  "capabilities": [],
+  "tileAsset": "tile.svg"
+}

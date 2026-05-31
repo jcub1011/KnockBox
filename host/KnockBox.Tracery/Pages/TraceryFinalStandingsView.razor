@@ -1,0 +1,57 @@
+@using KnockBox.Core.Services.Navigation
+@using KnockBox.Core.Services.State.Games.Shared
+@using KnockBox.Core.Services.State.Users
+@inject IGameSessionService GameSessionService
+@inject IUserService UserService
+
+@{
+    // Render from the frozen start-of-match snapshot, not the live Players roster, so
+    // players who have disconnected still appear in the final standings.
+    var roster = State.Participants
+        .Select(entry => new
+        {
+            entry.User,
+            entry.DisplayName,
+            Score = State.PlayerStates.TryGetValue(entry.User.Id, out var ps) ? ps.CumulativeScore : 0
+        })
+        .OrderByDescending(x => x.Score)
+        .ToList();
+}
+
+<div class="tr-over">
+    <div class="tr-over-banner">
+        <span class="tr-over-banner-main">MATCH OVER</span>
+        <span class="tr-over-banner-sub">FINAL STANDINGS</span>
+    </div>
+
+    <div class="tr-over-board">
+        @{
+            // A clear winner only when the top score is strictly ahead of the runner-up; a tie at
+            // the top crowns nobody so the board reads honestly.
+            bool hasWinner = roster.Count > 0
+                && (roster.Count == 1 || roster[0].Score > roster[1].Score);
+            int rank = 1;
+            foreach (var row in roster)
+            {
+                bool isMe = row.User.Id == UserService.CurrentUser?.Id;
+                bool isWinner = hasWinner && rank == 1;
+                <div class="tr-over-row @(isWinner ? "tr-over-row-winner" : "") @(isMe ? "tr-over-row-me" : "")">
+                    <span class="tr-over-rank">@(isWinner ? "👑" : rank.ToString())</span>
+                    <span class="tr-over-name">@row.DisplayName</span>
+                    <span class="tr-over-score">@row.Score</span>
+                </div>
+                rank++;
+            }
+        }
+    </div>
+
+    <button class="tr-btn tr-btn-primary tr-over-exit" @onclick="ReturnHome">
+        Return Home
+    </button>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TraceryGameState State { get; set; } = default!;
+
+    private void ReturnHome() => GameSessionService.LeaveCurrentSession(navigateHome: true);
+}

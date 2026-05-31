@@ -69,11 +69,24 @@ public class WordListServiceTests
     }
 
     [TestMethod]
-    [DataRow(WordPoolMode.HostDefined)]
-    [DataRow(WordPoolMode.CsvUpload)]
-    public void IsInPool_UnbackedModes_ReturnFalse(WordPoolMode mode)
+    public void Reduced_ShipsCommonWords_AndIsAStrictSubsetOfFull()
     {
-        Assert.IsFalse(_service.IsInPool(mode, "apple"));
+        // reduced-dictionary.csv ships the curated common-word (Google-10k) list, so the pool
+        // is populated and answers lookups directly.
+        Assert.IsTrue(_service.GetAvailableLengths(WordPoolMode.ReducedDictionary).Any());
+        Assert.IsGreaterThan(0, _service.GetWordCount(WordPoolMode.ReducedDictionary, 5));
+        Assert.IsTrue(_service.IsInPool(WordPoolMode.ReducedDictionary, "about"));
+
+        // It is a common-word subset: fewer five-letter words than the full dictionary.
+        Assert.IsLessThan(
+            _service.GetWordCount(WordPoolMode.FullDictionary, 5),
+            _service.GetWordCount(WordPoolMode.ReducedDictionary, 5));
+    }
+
+    [TestMethod]
+    public void IsInPool_UnknownMode_ReturnsFalse()
+    {
+        Assert.IsFalse(_service.IsInPool((WordPoolMode)(-1), "apple"));
     }
 
     [TestMethod]
@@ -97,9 +110,9 @@ public class WordListServiceTests
     }
 
     [TestMethod]
-    public void GetWordCount_UnbackedMode_ReturnsZero()
+    public void GetWordCount_UnknownMode_ReturnsZero()
     {
-        Assert.AreEqual(0, _service.GetWordCount(WordPoolMode.HostDefined, 5));
+        Assert.AreEqual(0, _service.GetWordCount((WordPoolMode)(-1), 5));
     }
 
     [TestMethod]
@@ -141,10 +154,10 @@ public class WordListServiceTests
     }
 
     [TestMethod]
-    public void GetWord_UnbackedMode_Throws()
+    public void GetWord_UnknownMode_Throws()
     {
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(
-            () => { _ = _service.GetWord(WordPoolMode.HostDefined, 5, 0); });
+            () => { _ = _service.GetWord((WordPoolMode)(-1), 5, 0); });
     }
 
     [TestMethod]
@@ -171,9 +184,41 @@ public class WordListServiceTests
     }
 
     [TestMethod]
-    public void GetAvailableLengths_UnbackedMode_ReturnsEmpty()
+    public void GetAvailableLengths_UnknownMode_ReturnsEmpty()
     {
-        Assert.IsEmpty(_service.GetAvailableLengths(WordPoolMode.HostDefined));
-        Assert.IsEmpty(_service.GetAvailableLengths(WordPoolMode.CsvUpload));
+        Assert.IsEmpty(_service.GetAvailableLengths((WordPoolMode)(-1)));
+    }
+
+    [TestMethod]
+    public void RegisterCustomPool_BuildsLengthBucketedPool()
+    {
+        var pool = _service.RegisterCustomPool(
+            "custom-builds",
+            new[] { "cat", "dog", "apple", "brave", "Apple" });
+
+        // "Apple" dedupes against "apple"; total distinct = 4.
+        Assert.AreEqual(4, pool.TotalWordCount);
+        CollectionAssert.AreEqual(new[] { 3, 5 }, pool.AvailableLengths.ToArray());
+        Assert.IsTrue(pool.Contains("apple"));
+    }
+
+    [TestMethod]
+    public void RegisterCustomPool_IsIdempotentByName()
+    {
+        var first = _service.RegisterCustomPool("custom-idempotent", new[] { "cat", "dog" });
+        // Same name, different words — the original pool is returned unchanged.
+        var second = _service.RegisterCustomPool("custom-idempotent", new[] { "apple", "brave", "crane" });
+
+        Assert.AreSame(first, second);
+        Assert.AreEqual(2, second.TotalWordCount);
+    }
+
+    [TestMethod]
+    public void GetCustomPool_ReturnsRegisteredPool_OrNull()
+    {
+        var registered = _service.RegisterCustomPool("custom-lookup", new[] { "cat", "dog" });
+
+        Assert.AreSame(registered, _service.GetCustomPool("custom-lookup"));
+        Assert.IsNull(_service.GetCustomPool("never-registered"));
     }
 }
