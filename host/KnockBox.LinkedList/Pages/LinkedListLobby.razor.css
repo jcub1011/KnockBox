@@ -1,4 +1,4 @@
-/* Wrapper page: the transit-map canvas + the service-alert toast.
+/* Wrapper page: the brushed-metal canvas + the service-alert toast.
    Shared primitives (buttons, chain, standings) live in the global theme file
    (wwwroot/css/linked-list-theme.css); this file only owns page-level chrome. */
 
@@ -11,15 +11,16 @@
     align-items: center;
     padding: clamp(1rem, 3vw, 2rem) 1rem 3rem;
 
-    /* Backlit night map: a faint geographic grid + a soft route-glow vignette
-       over the deep navy base. */
+    /* Brushed-metal field: a soft top sheen + gentle vignette over gunmetal,
+       grazed by faint diagonal hairlines like the surface of polished steel. */
     background-color: var(--ll-bg);
     background-image:
-        radial-gradient(125% 75% at 50% -8%, color-mix(in srgb, var(--ll-line) 12%, transparent), transparent 55%),
-        radial-gradient(110% 70% at 50% 108%, color-mix(in srgb, #4aa3ff 9%, transparent), transparent 55%),
-        repeating-linear-gradient(0deg, transparent 0 39px, rgba(150, 180, 220, 0.035) 39px 40px),
-        repeating-linear-gradient(90deg, transparent 0 39px, rgba(150, 180, 220, 0.035) 39px 40px);
+        radial-gradient(125% 80% at 50% -10%, color-mix(in srgb, var(--ll-accent) 10%, transparent), transparent 55%),
+        radial-gradient(120% 90% at 50% 115%, rgba(0, 0, 0, 0.45), transparent 60%),
+        repeating-linear-gradient(48deg, transparent 0 6px, rgba(190, 210, 235, 0.018) 6px 7px),
+        repeating-linear-gradient(-48deg, transparent 0 9px, rgba(190, 210, 235, 0.014) 9px 10px);
     color: var(--ll-ink);
+    overflow-y: auto;
 }
 
 /* Fallback "setting up…" card. */
@@ -30,7 +31,7 @@
     border: 1px solid var(--ll-border);
     border-radius: 1rem;
     background: var(--ll-panel);
-    font-family: var(--ll-font-station);
+    font-family: var(--ll-font-body);
     color: var(--ll-ink-soft);
     text-align: center;
 }
@@ -47,7 +48,7 @@
     gap: 0.5rem;
     padding: 0.7rem 1.2rem;
     border-radius: 0.6rem;
-    font-family: var(--ll-font-station);
+    font-family: var(--ll-font-body);
     font-weight: 700;
     background: color-mix(in srgb, var(--ll-stop) 92%, #200);
     color: #fff;

@@ -1,5 +1,5 @@
-/* GAME OVER — "End of the Line". Standings, chain and buttons are global; this
-   file owns the final banner, the service-award plaques, and the passenger log. */
+/* GAME OVER — "The finished chain". Standings, chain and buttons are global;
+   this file owns the final banner, the award plaques, and the linksmith log. */
 
 .ll-gameover {
     width: 100%;
@@ -38,7 +38,7 @@
     color: var(--ll-ink-soft);
 }
 
-/* ── Service awards (superlatives) ─────────────────────────────────────── */
+/* ── Craft awards (superlatives) ───────────────────────────────────────── */
 .ll-go-superlatives {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
@@ -71,7 +71,7 @@
 }
 .ll-superlative-detail { font-size: 0.78rem; color: var(--ll-ink-soft); }
 
-/* ── Scoreboard / passenger log ────────────────────────────────────────── */
+/* ── Scoreboard / linksmith log ────────────────────────────────────────── */
 .ll-go-scoreboard {
     padding: 1.1rem 1.2rem;
     border: 1px solid var(--ll-border);
@@ -102,8 +102,8 @@
     border-color: color-mix(in srgb, var(--ll-dest) 45%, transparent);
 }
 .ll-go-row-me {
-    border-color: color-mix(in srgb, var(--ll-line) 60%, transparent);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ll-line) 30%, transparent);
+    border-color: color-mix(in srgb, var(--ll-accent) 60%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ll-accent) 30%, transparent);
 }
 .ll-go-rank { font-size: 1.1rem; min-width: 1.9rem; text-align: center; }
 .ll-go-name {

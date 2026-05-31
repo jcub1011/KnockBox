@@ -10,7 +10,7 @@
     @* ── Headline ── *@
     <div class="ll-go-banner">
         <span class="ll-go-emoji">🏆</span>
-        <h3 class="ll-go-headline">End of the Line</h3>
+        <h3 class="ll-go-headline">The Final Chain</h3>
         <p class="ll-go-sub">@GameState.RoundNumber round@(GameState.RoundNumber == 1 ? "" : "s") played</p>
     </div>
 
@@ -73,7 +73,7 @@
 
     @* ── Ranked scoreboard ── *@
     <div class="ll-go-scoreboard">
-        <h4 class="ll-go-section-title">Passenger Log</h4>
+        <h4 class="ll-go-section-title">Linksmiths</h4>
         <div class="ll-go-rows">
             @{ int rank = 1; }
             @foreach (var ps in ranked)
@@ -115,7 +115,7 @@
                         <span class="ll-link-by">@link.PlayerName</span>
                         @if (link.IsLoop)
                         {
-                            <span class="ll-loop-badge" title="This pair already appeared in the chain">↺ loop</span>
+                            <span class="ll-loop-badge" title="This pair already appeared in the chain">↺ kink</span>
                         }
                     </span>
                 }

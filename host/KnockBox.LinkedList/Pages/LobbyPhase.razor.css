@@ -1,5 +1,5 @@
-/* LOBBY — "The Station": a departure board where passengers gather before the
-   line departs. Buttons/chain/standings come from the global theme file. */
+/* LOBBY — "The Workshop": where links gather before the chain is forged.
+   Buttons/chain/standings come from the global theme file. */
 
 .ll-lobby {
     width: 100%;
@@ -31,20 +31,20 @@
     flex-direction: column;
 }
 .ll-title::before {
-    content: "● The Word Line";
+    content: "◆ The Word Chain";
     font-family: var(--ll-font-mono);
     font-size: 0.72rem;
-    font-weight: 500;
+    font-weight: 400;
     letter-spacing: 0.2em;
     text-transform: uppercase;
-    color: var(--ll-line);
+    color: var(--ll-accent);
     margin-bottom: 0.35rem;
 }
 .ll-title::after {
-    content: "Now Boarding";
+    content: "Assembling Links";
     font-family: var(--ll-font-mono);
     font-size: 0.7rem;
-    font-weight: 500;
+    font-weight: 400;
     letter-spacing: 0.24em;
     text-transform: uppercase;
     color: var(--ll-dest);
@@ -106,19 +106,24 @@
     background: var(--ll-panel-2);
     border: 1px solid transparent;
 }
-/* Station-dot avatar. */
+/* Open-ring marker — a link waiting to join the chain. */
 .ll-player::before {
     content: "";
-    width: 0.7rem;
-    height: 0.7rem;
+    width: 0.85rem;
+    height: 0.85rem;
     border-radius: 50%;
-    background: var(--ll-bg);
-    border: 0.2rem solid var(--ll-line);
+    background: transparent;
+    border: 0.18rem solid transparent;
+    background-image:
+        linear-gradient(var(--ll-panel-2), var(--ll-panel-2)),
+        var(--ll-edge);
+    background-origin: border-box;
+    background-clip: padding-box, border-box;
     flex: 0 0 auto;
 }
 .ll-player-me {
-    border-color: color-mix(in srgb, var(--ll-line) 65%, transparent);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ll-line) 35%, transparent);
+    border-color: color-mix(in srgb, var(--ll-accent) 65%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ll-accent) 35%, transparent);
 }
 
 .ll-player-name {
@@ -237,7 +242,7 @@
     font-size: 0.78rem;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--ll-line);
+    color: var(--ll-accent);
     padding-bottom: 0.3rem;
     border-bottom: 1px solid var(--ll-border);
 }
@@ -263,25 +268,25 @@
     border-radius: 0.5rem;
     background: var(--ll-bg);
     color: var(--ll-ink);
-    font-family: var(--ll-font-station);
+    font-family: var(--ll-font-body);
     font-size: 0.92rem;
 }
 .ll-input:focus-visible {
     outline: none;
-    border-color: var(--ll-line);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ll-line) 35%, transparent);
+    border-color: var(--ll-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ll-accent) 35%, transparent);
 }
 
 .ll-field-row input[type="checkbox"] {
     width: 1.15rem;
     height: 1.15rem;
-    accent-color: var(--ll-line);
+    accent-color: var(--ll-accent);
     cursor: pointer;
 }
 
 .ll-balance-btn { margin-bottom: 0.85rem; }
 
-/* ── Line assignments (teams) ──────────────────────────────────────────── */
+/* ── Chain assignments (teams) ─────────────────────────────────────────── */
 .ll-teams {
     display: flex;
     flex-direction: column;
@@ -291,9 +296,9 @@
 .ll-team-card {
     padding: 0.7rem 0.8rem;
     border: 1px solid var(--ll-border);
-    border-left: 4px solid var(--ll-route, var(--ll-line));
+    border-left: 4px solid var(--ll-route, var(--ll-accent));
     border-radius: 0.6rem;
-    background: color-mix(in srgb, var(--ll-route, var(--ll-line)) 7%, var(--ll-panel));
+    background: color-mix(in srgb, var(--ll-route, var(--ll-accent)) 7%, var(--ll-panel));
 }
 
 .ll-team-head {
@@ -314,8 +319,8 @@
     gap: 0.4rem;
 }
 .ll-team-name::before {
-    content: "●";
-    color: var(--ll-route, var(--ll-line));
+    content: "◆";
+    color: var(--ll-route, var(--ll-accent));
     font-size: 0.8em;
 }
 .ll-team-count {

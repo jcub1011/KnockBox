@@ -1,5 +1,5 @@
-/* ROUND OVER — "Arrival board". Chain, standings, round-chip and buttons are
-   styled globally; this file owns the arrival banner, score readout, the
+/* ROUND OVER — "The last weld". Chain, standings, round-chip and buttons are
+   styled globally; this file owns the outcome banner, score readout, the
    standings-card wrapper, and the progress strip. */
 
 .ll-roundover {
@@ -11,7 +11,7 @@
     gap: 1.1rem;
 }
 
-/* ── Arrival banner ────────────────────────────────────────────────────── */
+/* ── Outcome banner ────────────────────────────────────────────────────── */
 .ll-ro-banner {
     text-align: center;
     padding: 1.6rem 1.25rem;
@@ -63,7 +63,7 @@
     font-weight: 800;
     line-height: 0.9;
     font-variant-numeric: tabular-nums;
-    color: var(--ll-line);
+    color: var(--ll-accent);
 }
 .ll-ro-metric-label {
     font-family: var(--ll-font-mono);
@@ -89,7 +89,7 @@
     background: var(--ll-panel);
 }
 
-/* ── Progress + next operator ──────────────────────────────────────────── */
+/* ── Progress + next inspector ─────────────────────────────────────────── */
 .ll-ro-progress {
     display: flex;
     align-items: center;

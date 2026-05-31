@@ -18,7 +18,7 @@
                 <span class="ll-link-by">@link.PlayerName</span>
                 @if (link.IsLoop)
                 {
-                    <span class="ll-loop-badge" title="This pair already appeared in the chain">↺ loop</span>
+                    <span class="ll-loop-badge" title="This pair already appeared in the chain">↺ kink</span>
                 }
             </span>
         }
@@ -80,7 +80,7 @@
                         }
                         <div class="ll-timer-bar @(seconds < 5 ? "ll-timer-urgent" : "")">
                             <span class="ll-timer-mono">[@bar] @(seconds)s</span>
-                            <span class="ll-timer-caption">@activeName is on the clock</span>
+                            <span class="ll-timer-caption">@activeName is forging the next link</span>
                         </div>
                     </CountdownClock>
                 }
@@ -232,7 +232,7 @@
                             }
                             <div class="ll-timer-bar @(seconds < 5 ? "ll-timer-urgent" : "")">
                                 <span class="ll-timer-mono">@(seconds)s</span>
-                                <span class="ll-timer-caption">@activeName is on the clock</span>
+                                <span class="ll-timer-caption">@activeName is forging the next link</span>
                             </div>
                         </CountdownClock>
                     }

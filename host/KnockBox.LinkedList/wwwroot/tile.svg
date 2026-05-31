@@ -1,14 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Linked List">
-  <rect width="128" height="128" rx="16" fill="#1f2933" />
-  <g fill="none" stroke="#7dd3fc" stroke-width="4">
-    <rect x="14" y="52" width="28" height="24" rx="4" />
-    <rect x="58" y="52" width="28" height="24" rx="4" />
-    <rect x="102" y="52" width="20" height="24" rx="4" />
-    <line x1="42" y1="64" x2="58" y2="64" />
-    <line x1="86" y1="64" x2="102" y2="64" />
-  </g>
-  <g fill="#7dd3fc">
-    <circle cx="50" cy="64" r="4" />
-    <circle cx="94" cy="64" r="4" />
+  <defs>
+    <linearGradient id="ll-steel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e3ecf8" />
+      <stop offset="0.45" stop-color="#9aa8bc" />
+      <stop offset="0.62" stop-color="#5d6a7d" />
+      <stop offset="1" stop-color="#cfdcef" />
+    </linearGradient>
+    <linearGradient id="ll-gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff0cf" />
+      <stop offset="0.5" stop-color="#e8c069" />
+      <stop offset="0.65" stop-color="#9c7d2f" />
+      <stop offset="1" stop-color="#fff0cf" />
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="16" fill="#0d1018" />
+  <g fill="none" stroke-width="7" stroke-linecap="round">
+    <!-- start link (accent) -->
+    <ellipse cx="26" cy="64" rx="13" ry="20" stroke="#58c7e0" />
+    <!-- interlocking steel links -->
+    <ellipse cx="52" cy="64" rx="20" ry="13" stroke="url(#ll-steel)" />
+    <ellipse cx="78" cy="64" rx="13" ry="20" stroke="url(#ll-steel)" />
+    <!-- destination end-ring (gold) -->
+    <ellipse cx="104" cy="64" rx="20" ry="13" stroke="url(#ll-gold)" />
   </g>
 </svg>
