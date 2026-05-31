@@ -760,14 +760,18 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Se
                 <h2 class="cc-host-feed-title">ACTIVITY</h2>
                 <div class="cc-host-feed-list">
                     @{
-                        var feedEntries = GameState.DiscardHistory.Count > 12
-                            ? GameState.DiscardHistory.Skip(GameState.DiscardHistory.Count - 12).Reverse().ToList()
-                            : GameState.DiscardHistory.AsEnumerable().Reverse().ToList();
+                        var total = GameState.DiscardHistory.Count;
+                        var start = total > 12 ? total - 12 : 0;
+                        var feedEntries = new List<(int Index, DiscardHistoryEntry Entry)>(total - start);
+                        for (var i = total - 1; i >= start; i--)
+                        {
+                            feedEntries.Add((i, GameState.DiscardHistory[i]));
+                        }
                     }
-                    @foreach (var entry in feedEntries)
+                    @foreach (var (index, entry) in feedEntries)
                     {
                         <div class="cc-host-feed-entry @(entry.IsActionCard ? "cc-host-feed-action" : "cc-host-feed-draw")"
-                             @key="@($"feed-{entry.GetHashCode()}")">
+                             @key="@($"feed-{index}")">
                             <span class="cc-host-feed-desc">@entry.Description</span>
                             @if (entry.PlayerName != null)
                             {
