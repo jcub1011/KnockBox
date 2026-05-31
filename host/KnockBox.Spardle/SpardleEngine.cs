@@ -13,7 +13,7 @@ namespace KnockBox.Spardle;
 public class SpardleEngine(
     IWordListService wordListService,
     IRandomNumberService rng,
-    ILoggerFactory loggerFactory) : AbstractGameEngine(1, 20)
+    ILoggerFactory loggerFactory) : AbstractGameEngine<SpardleState>(1, 20)
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger<SpardleEngine>();
 
@@ -39,10 +39,8 @@ public class SpardleEngine(
         });
     }
 
-    protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
+    protected override Task<Result> StartAsyncCore(SpardleState s, CancellationToken ct = default)
     {
-        if (state is not SpardleState s) return Task.FromResult(Result.FromError("Invalid state"));
-
         var execResult = s.Execute(() =>
         {
             // SetJoinable(false) closes the join race before we read Players.Count;

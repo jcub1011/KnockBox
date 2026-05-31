@@ -100,7 +100,13 @@ namespace KnockBox.Services.Logic.Games.Shared
                 var stateResult = await game.Engine.CreateStateAsync(host, ct);
                 if (stateResult.IsCanceled) return ValueResult<LobbyRegistration>.FromCancellation();
                 if (!stateResult.TryGetSuccess(out var state))
+                {
+                    _logger.LogWarning(
+                        "Game [{RouteIdentifier}] failed to create state: {Error}",
+                        routeIdentifier,
+                        stateResult.Error.Error.InternalMessage);
                     return ValueResult<LobbyRegistration>.FromError(stateResult.Error.Error);
+                }
 
                 gameState = state;
 
@@ -154,7 +160,8 @@ namespace KnockBox.Services.Logic.Games.Shared
             catch (Exception ex)
             {
                 gameState?.Dispose();
-                return ValueResult<LobbyRegistration>.FromError("Error creating lobby.", $"Exception occured while creating lobby: {ex}");
+                _logger.LogError(ex, "Unexpected exception creating lobby for route [{RouteIdentifier}].", routeIdentifier);
+                return ValueResult<LobbyRegistration>.FromError("Error creating lobby.", $"Exception occurred while creating lobby: {ex}");
             }
         }
 

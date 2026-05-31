@@ -87,4 +87,51 @@ namespace KnockBox.Core.Services.Logic.Games.Engines.Shared
         /// </summary>
         protected bool IsLobbyOpen(AbstractGameState state) => state.IsJoinable;
     }
+
+    /// <summary>
+    /// Strongly-typed base for game engines whose per-room state is
+    /// <typeparamref name="TState"/>. Resolves the concrete state from the
+    /// untyped <see cref="AbstractGameState"/> exactly once, so concrete engines
+    /// override <see cref="StartAsyncCore(TState, CancellationToken)"/> and never
+    /// perform the cast themselves.
+    /// </summary>
+    /// <typeparam name="TState">The engine's concrete <see cref="AbstractGameState"/> subtype.</typeparam>
+    public abstract class AbstractGameEngine<TState> : AbstractGameEngine
+        where TState : AbstractGameState
+    {
+        /// <summary>
+        /// Initializes a new instance with default (zero) player count limits.
+        /// </summary>
+        protected AbstractGameEngine() { }
+
+        /// <summary>
+        /// Initializes a new instance with explicit player count limits.
+        /// </summary>
+        protected AbstractGameEngine(int minPlayerCount, int maxPlayerCount)
+            : base(minPlayerCount, maxPlayerCount) { }
+
+        /// <summary>
+        /// Casts the lobby's state to <typeparamref name="TState"/> and delegates to the
+        /// typed <see cref="StartAsyncCore(TState, CancellationToken)"/>. Sealed so concrete
+        /// engines cannot re-introduce an untyped override; a failed cast (which should never
+        /// happen, since the engine that created the state also starts it) returns a populated
+        /// error describing the actual-vs-expected type.
+        /// </summary>
+        protected sealed override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
+        {
+            if (state is not TState typed)
+                return Task.FromResult(Result.FromError(
+                    "Error starting game.",
+                    $"Game state of type [{state?.GetType().Name ?? "null"}] couldn't be cast to type [{typeof(TState).Name}]."));
+
+            return StartAsyncCore(typed, ct);
+        }
+
+        /// <summary>
+        /// Game-specific start logic with the engine's concrete state already resolved.
+        /// Invoked by <see cref="AbstractGameEngine.StartAsync"/> after host-identity
+        /// authorization has succeeded.
+        /// </summary>
+        protected abstract Task<Result> StartAsyncCore(TState state, CancellationToken ct = default);
+    }
 }

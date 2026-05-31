@@ -20,7 +20,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
     public class CardCounterGameEngine(
         IRandomNumberService randomNumberService,
         ILogger<CardCounterGameEngine> logger,
-        ILogger<CardCounterGameState> stateLogger) : AbstractGameEngine
+        ILogger<CardCounterGameState> stateLogger) : AbstractGameEngine<CardCounterGameState>
     {
         // ── AbstractGameEngine lifecycle ─────────────────────────────────────
 
@@ -39,13 +39,8 @@ namespace KnockBox.CardCounter.Services.Logic.Games
         }
 
         protected override async Task<Result> StartAsyncCore(
-            AbstractGameState state, CancellationToken ct = default)
+            CardCounterGameState gameState, CancellationToken ct = default)
         {
-            if (state is not CardCounterGameState gameState)
-                return Result.FromError(
-                    "Error starting game.",
-                    $"State type [{state?.GetType().Name}] cannot be cast to [{nameof(CardCounterGameState)}].");
-
             if (gameState.Players.Length == 0)
                 return Result.FromError("At least one other player must join before starting the game.");
 

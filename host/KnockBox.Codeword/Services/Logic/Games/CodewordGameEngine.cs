@@ -19,7 +19,7 @@ namespace KnockBox.Codeword.Services.Logic.Games
     public class CodewordGameEngine(
         IRandomNumberService randomNumberService,
         ILogger<CodewordGameEngine> logger,
-        ILogger<CodewordGameState> stateLogger) : AbstractGameEngine(minPlayerCount: 4, maxPlayerCount: 8)
+        ILogger<CodewordGameState> stateLogger) : AbstractGameEngine<CodewordGameState>(minPlayerCount: 4, maxPlayerCount: 8)
     {
         // ── AbstractGameEngine lifecycle ─────────────────────────────────────
 
@@ -51,13 +51,8 @@ namespace KnockBox.Codeword.Services.Logic.Games
         }
 
         protected override Task<Result> StartAsyncCore(
-            AbstractGameState state, CancellationToken ct = default)
+            CodewordGameState gameState, CancellationToken ct = default)
         {
-            if (state is not CodewordGameState gameState)
-                return Task.FromResult(Result.FromError(
-                    "Error starting game.",
-                    $"State type [{state?.GetType().Name}] cannot be cast to [{nameof(CodewordGameState)}]."));
-
             var context = new CodewordGameContext(gameState, randomNumberService, logger);
             var fsm = new FiniteStateMachine<CodewordGameContext, CodewordCommand>(logger);
             context.Fsm = fsm;

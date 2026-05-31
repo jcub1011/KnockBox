@@ -14,8 +14,11 @@ using System.Threading.Tasks;
 
 namespace KnockBox.Operator.Services.Logic.Games;
 
-public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger, IRandomNumberService randomNumberService)
-    : AbstractGameEngine(minPlayerCount: 2, maxPlayerCount: int.MaxValue)
+public class OperatorGameEngine(
+    ILogger<OperatorGameEngine> logger,
+    ILogger<OperatorGameState> stateLogger,
+    IRandomNumberService randomNumberService)
+    : AbstractGameEngine<OperatorGameState>(minPlayerCount: 2, maxPlayerCount: int.MaxValue)
 {
     public override Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
     {
@@ -25,21 +28,22 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger, IRandomN
         var state = new OperatorGameState(host, stateLogger);
         state.Context = new OperatorGameContext(state, randomNumberService);
         state.Execute(() => state.SetJoinable(true));
+        logger.LogInformation("Created Operator gameState with user [{userId}] as host.", host.Id);
         return Task.FromResult(ValueResult<AbstractGameState>.FromValue(state));
     }
 
-    protected override async Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
+    protected override async Task<Result> StartAsyncCore(OperatorGameState operatorState, CancellationToken ct = default)
     {
-        if (state is not OperatorGameState operatorState)
-        {
-            return Result.FromError("Invalid game state type.");
-        }
+        logger.LogInformation(
+            "Starting Operator game hosted by user [{hostId}] with {playerCount} player(s).",
+            operatorState.Host.Id,
+            operatorState.Players.Length);
 
         var context = new OperatorGameContext(operatorState, randomNumberService);
         var fsm = new FiniteStateMachine<OperatorGameContext, OperatorCommand>(stateLogger);
         context.Fsm = fsm;
 
-        return await state.ExecuteAsync(() =>
+        return await operatorState.ExecuteAsync(() =>
         {
             var allParticipants = operatorState.Players.ToList();
 

@@ -19,7 +19,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
     public class DrawnToDressGameEngine(
         ILogger<DrawnToDressGameEngine> logger,
         ILogger<DrawnToDressGameState> stateLogger,
-        IRandomNumberService randomNumberService) : AbstractGameEngine
+        IRandomNumberService randomNumberService) : AbstractGameEngine<DrawnToDressGameState>
     {
         // ── AbstractGameEngine lifecycle ──────────────────────────────────────
 
@@ -46,20 +46,16 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         }
 
         protected override Task<Result> StartAsyncCore(
-            AbstractGameState state, CancellationToken ct = default)
+            DrawnToDressGameState gameState, CancellationToken ct = default)
         {
-            if (state is not DrawnToDressGameState gameState)
-                return Task.FromResult(Result.FromError("Error starting game.",
-                    $"Game state of type [{state?.GetType().Name ?? "null"}] couldn't be cast to [{nameof(DrawnToDressGameState)}]."));
-
             if (gameState.Context is null)
                 return Task.FromResult(Result.FromError("Game context is not initialized."));
 
             var context = gameState.Context;
 
-            var executeResult = state.Execute(() =>
+            var executeResult = gameState.Execute(() =>
             {
-                state.SetJoinable(false);
+                gameState.SetJoinable(false);
 
                 // Snapshot all registered players into GamePlayers so FSM states can look
                 // them up by ID.

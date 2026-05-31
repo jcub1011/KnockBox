@@ -62,10 +62,15 @@ namespace KnockBox.Core.Primitives.Returns
     }
 
     /// <summary>
-    /// A result with a value and a custom error type.
+    /// Outcome of a fallible operation that yields a value on success, carrying a
+    /// custom error type. Encodes exactly one of three states — <b>success</b>
+    /// (<see cref="IsSuccess"/>, <see cref="Value"/> is set), <b>failure</b>
+    /// (<see cref="IsFailure"/>, <see cref="Error"/> holds a <typeparamref name="TError"/>),
+    /// or <b>cancellation</b> (<see cref="IsCanceled"/>) — so callers can branch without
+    /// exceptions. Inspect via <c>TryGetSuccess</c> / <c>TryGetFailure</c> / <see cref="IsCanceled"/>.
     /// </summary>
-    /// <typeparam name="TValue"></typeparam>
-    /// <typeparam name="TError"></typeparam>
+    /// <typeparam name="TValue">The value produced on success.</typeparam>
+    /// <typeparam name="TError">The error payload produced on failure.</typeparam>
     public readonly struct ValueResult<TValue, TError>
         where TError : notnull
     {
@@ -151,6 +156,9 @@ namespace KnockBox.Core.Primitives.Returns
             Error = error;
         }
 
+        // Sentinel ctor for the cancellation state. The int parameter exists only to
+        // give this a distinct signature from the success/failure ctors; its value is
+        // unused. Reached via FromCancellation()/the shared Canceled instance.
         private ValueResult(int _)
         {
             IsSuccess = false;
@@ -178,9 +186,14 @@ namespace KnockBox.Core.Primitives.Returns
     }
 
     /// <summary>
-    /// A result with a value and the default <see cref="ResultError"/> error type.
+    /// Outcome of a fallible operation that yields a value on success, using the default
+    /// <see cref="ResultError"/> (public + internal message) error type. Encodes exactly
+    /// one of three states — <b>success</b> (<see cref="Value"/> is set), <b>failure</b>
+    /// (<see cref="Error"/> holds a <see cref="ResultError"/>), or <b>cancellation</b> — so
+    /// callers branch without exceptions. Inspect via <c>TryGetSuccess</c> /
+    /// <c>TryGetFailure</c> / <c>IsCanceled</c>.
     /// </summary>
-    /// <typeparam name="TValue"></typeparam>
+    /// <typeparam name="TValue">The value produced on success.</typeparam>
     public readonly struct ValueResult<TValue>
     {
         /// <summary>
@@ -393,7 +406,12 @@ namespace KnockBox.Core.Primitives.Returns
     }
 
     /// <summary>
-    /// A result with no value and the default <see cref="ResultError"/> error type.
+    /// Outcome of a fallible operation that produces no value, using the default
+    /// <see cref="ResultError"/> (public + internal message) error type. Encodes exactly
+    /// one of three states — <b>success</b> (<see cref="Success"/>), <b>failure</b>
+    /// (<see cref="Error"/> holds a <see cref="ResultError"/>), or <b>cancellation</b> — so
+    /// callers branch without exceptions. Inspect via <see cref="IsSuccess"/> /
+    /// <c>TryGetFailure</c> / <c>IsCanceled</c>.
     /// </summary>
     public readonly struct Result
     {

@@ -12,7 +12,7 @@ namespace KnockBox.LinkedList.Services.Logic.Games
         IRandomNumberService randomNumberService,
         ILogger<LinkedListGameEngine> logger,
         ILogger<LinkedListGameState> stateLogger)
-        : AbstractGameEngine(minPlayerCount: 3, maxPlayerCount: 10)
+        : AbstractGameEngine<LinkedListGameState>(minPlayerCount: 3, maxPlayerCount: 10)
     {
         public override Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
@@ -25,11 +25,8 @@ namespace KnockBox.LinkedList.Services.Logic.Games
             return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
         }
 
-        protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
+        protected override Task<Result> StartAsyncCore(LinkedListGameState gameState, CancellationToken ct = default)
         {
-            if (state is not LinkedListGameState gameState)
-                return Task.FromResult(Result.FromError("Error starting game.", $"Game state of type [{(state?.GetType().Name ?? "null")}] couldn't be cast to type [{nameof(LinkedListGameState)}]."));
-
             Result inner = Result.Success;
             var executeResult = gameState.Execute(() =>
             {
