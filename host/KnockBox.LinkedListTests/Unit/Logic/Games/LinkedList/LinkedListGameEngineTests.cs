@@ -24,7 +24,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
         {
             _engineLoggerMock = new Mock<ILogger<LinkedListGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<LinkedListGameState>>();
-            _wordSource = new WordSource();
+            _wordSource = new WordSource(new FakeWordListService());
             _rng = new SequentialRng(0);
             _host = UserFactory.Create("Host", "host1");
 

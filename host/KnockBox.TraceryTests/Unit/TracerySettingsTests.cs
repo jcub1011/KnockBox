@@ -14,9 +14,9 @@ namespace KnockBox.Tracery.Tests.Unit
         {
             var settings = new TracerySettings();
 
-            // GDD §8 defaults.
-            Assert.AreEqual(4, settings.GridWidth);
-            Assert.AreEqual(4, settings.GridHeight);
+            // GDD §8 defaults (grid default set to 5x5 in commit 004bd84).
+            Assert.AreEqual(5, settings.GridWidth);
+            Assert.AreEqual(5, settings.GridHeight);
             Assert.AreEqual(TimeSpan.FromSeconds(90), settings.RoundTimer);
             Assert.AreEqual(3, settings.TotalRounds);
             Assert.AreEqual(4, settings.MinWordLength);

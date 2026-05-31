@@ -45,4 +45,24 @@ public interface IWordListService
     /// populating UI controls that need to know what lengths are available.
     /// </summary>
     IEnumerable<int> GetAvailableLengths(WordPoolMode mode);
+
+    /// <summary>
+    /// Registers a caller-supplied word list as a custom, named <see cref="IWordPool"/>
+    /// and returns it. The words are built into the same memory-efficient,
+    /// length-bucketed storage the built-in pools use (trimmed, lowercased, deduped,
+    /// sorted ordinal). Lets a consumer plugin supply its own, separately-audited list
+    /// without that list being baked into this library.
+    /// <para>Idempotent and thread-safe: the first call with a given
+    /// <paramref name="name"/> builds and caches the pool; later calls with the same
+    /// name return the cached pool and ignore <paramref name="words"/>.</para>
+    /// </summary>
+    /// <param name="name">Unique key identifying the custom pool.</param>
+    /// <param name="words">The word list to build the pool from. Enumerated at most once.</param>
+    IWordPool RegisterCustomPool(string name, IEnumerable<string> words);
+
+    /// <summary>
+    /// Returns a custom pool previously registered under <paramref name="name"/>,
+    /// or <c>null</c> if no such pool exists.
+    /// </summary>
+    IWordPool? GetCustomPool(string name);
 }
