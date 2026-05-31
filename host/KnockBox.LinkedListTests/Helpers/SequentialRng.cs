@@ -4,7 +4,7 @@ namespace KnockBox.LinkedList.Tests.Helpers
 {
     /// <summary>
     /// Deterministic RNG that returns a queue of pre-supplied values, so tests can
-    /// pin exactly which curated pair <c>WordPairSource.Random</c> picks.
+    /// pin exactly which words <c>WordSource.RandomPair</c> picks.
     /// </summary>
     internal sealed class SequentialRng : IRandomNumberService
     {

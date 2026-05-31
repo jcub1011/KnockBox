@@ -14,8 +14,6 @@ namespace KnockBox.LinkedList.Pages
 
         [Inject] protected IUserService UserService { get; set; } = default!;
 
-        [Inject] protected WordPairSource WordPairSource { get; set; } = default!;
-
         [Inject] protected ILocalStorageService LocalStorage { get; set; } = default!;
 
         [Inject] protected ILogger<LobbyPhase> Logger { get; set; } = default!;
@@ -200,18 +198,6 @@ namespace KnockBox.LinkedList.Pages
         {
             get => GameState.AuditorPlayerId;
             set => SetState(() => GameState.AuditorPlayerId = value ?? "");
-        }
-
-        /// <summary>Applies a curated pair by its index in <see cref="WordPairSource.Pairs"/>.</summary>
-        protected void ApplyCuratedPair(int index)
-        {
-            if (index < 0 || index >= WordPairSource.Pairs.Length) return;
-            var pair = WordPairSource.Pairs[index];
-            SetState(() =>
-            {
-                GameState.StartWord = pair.Start.ToUpperInvariant();
-                GameState.DestinationWord = pair.Destination.ToUpperInvariant();
-            });
         }
 
         /// <summary>Restores every host-configurable rule to its out-of-the-box value by

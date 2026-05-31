@@ -8,7 +8,7 @@ using KnockBox.LinkedList.Services.State.Games;
 namespace KnockBox.LinkedList.Services.Logic.Games
 {
     public class LinkedListGameEngine(
-        WordPairSource wordPairSource,
+        WordSource wordSource,
         IRandomNumberService randomNumberService,
         ILogger<LinkedListGameEngine> logger,
         ILogger<LinkedListGameState> stateLogger)
@@ -52,10 +52,10 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                 gameState.ParticipantOrder.Clear();
                 gameState.ParticipantOrder.AddRange(participantIds);
 
-                // Words: honor host-chosen values from the lobby, else pick a curated pair.
+                // Words: honor host-chosen values from the lobby, else pick two random words.
                 if (string.IsNullOrWhiteSpace(gameState.StartWord) || string.IsNullOrWhiteSpace(gameState.DestinationWord))
                 {
-                    var pair = wordPairSource.Random(randomNumberService);
+                    var pair = wordSource.RandomPair(randomNumberService);
                     gameState.StartWord = pair.Start;
                     gameState.DestinationWord = pair.Destination;
                 }
@@ -666,7 +666,7 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                 state.AuditorPlayerId = state.ParticipantOrder[state.AuditorRotationIndex];
 
                 // New journey for the round.
-                var pair = wordPairSource.Random(randomNumberService);
+                var pair = wordSource.RandomPair(randomNumberService);
                 state.StartWord = pair.Start;
                 state.DestinationWord = pair.Destination;
 

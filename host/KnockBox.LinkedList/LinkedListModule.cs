@@ -13,7 +13,7 @@ namespace KnockBox.LinkedList
 
         public void RegisterServices(IPluginRegistration registration)
         {
-            registration.AddSingleton<WordPairSource>(_ => new WordPairSource());
+            registration.AddSingleton<WordSource>(_ => new WordSource());
             registration.AddGameEngine<LinkedListGameEngine>();
         }
 

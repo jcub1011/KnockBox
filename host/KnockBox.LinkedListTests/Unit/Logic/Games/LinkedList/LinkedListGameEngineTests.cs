@@ -14,7 +14,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
     {
         private Mock<ILogger<LinkedListGameEngine>> _engineLoggerMock = default!;
         private Mock<ILogger<LinkedListGameState>> _stateLoggerMock = default!;
-        private WordPairSource _wordPairSource = default!;
+        private WordSource _wordSource = default!;
         private SequentialRng _rng = default!;
         private User _host = default!;
         private LinkedListGameEngine _engine = default!;
@@ -24,12 +24,12 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
         {
             _engineLoggerMock = new Mock<ILogger<LinkedListGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<LinkedListGameState>>();
-            _wordPairSource = new WordPairSource();
+            _wordSource = new WordSource();
             _rng = new SequentialRng(0);
             _host = UserFactory.Create("Host", "host1");
 
             _engine = new LinkedListGameEngine(
-                _wordPairSource,
+                _wordSource,
                 _rng,
                 _engineLoggerMock.Object,
                 _stateLoggerMock.Object);
