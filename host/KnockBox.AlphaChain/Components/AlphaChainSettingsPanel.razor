@@ -16,7 +16,7 @@
     @if (IsHost)
     {
         <div class="ac-settings-grid">
-            <fieldset class="ac-settings-field ac-settings-field-full">
+            <fieldset class="ac-settings-field ac-settings-field-full" title="@BanModeTip">
                 <legend>Ban Mode</legend>
                 <div class="ac-settings-radios">
                     <label class="ac-settings-radio">
@@ -40,7 +40,7 @@
                 </div>
             </fieldset>
 
-            <label class="ac-settings-field ac-settings-field-full">
+            <label class="ac-settings-field ac-settings-field-full" title="@ShotClockTip">
                 <span>Shot Clock <strong>@s.ShotClockSeconds s</strong></span>
                 <input type="range"
                        min="@AlphaChainSettings.MinShotClockSeconds"
@@ -50,7 +50,7 @@
                        @oninput="OnShotClockChanged" />
             </label>
 
-            <label class="ac-settings-field">
+            <label class="ac-settings-field" title="@EraIntervalTip">
                 <span>Era Interval (rounds)</span>
                 <input type="number"
                        min="@AlphaChainSettings.MinEraInterval"
@@ -59,7 +59,7 @@
                        @oninput="OnEraIntervalChanged" />
             </label>
 
-            <label class="ac-settings-field">
+            <label class="ac-settings-field" title="@EraCountTip">
                 <span>Era Count</span>
                 <input type="number"
                        min="@AlphaChainSettings.MinEraCount"
@@ -68,7 +68,7 @@
                        @oninput="OnEraCountChanged" />
             </label>
 
-            <label class="ac-settings-field">
+            <label class="ac-settings-field" title="@IntermissionTip">
                 <span>Intermission Timer (s)</span>
                 <input type="number"
                        min="@AlphaChainSettings.MinIntermissionSeconds"
@@ -77,7 +77,7 @@
                        @oninput="OnIntermissionChanged" />
             </label>
 
-            <label class="ac-settings-field">
+            <label class="ac-settings-field" title="@SniperBanTip">
                 <span>Sniper Ban Timer (s)</span>
                 <input type="number"
                        min="@AlphaChainSettings.MinSniperBanSeconds"
@@ -86,7 +86,7 @@
                        @oninput="OnSniperBanChanged" />
             </label>
 
-            <label class="ac-settings-field">
+            <label class="ac-settings-field" title="@ModifiersTip">
                 <span>Modifiers / Era</span>
                 <input type="number"
                        min="@AlphaChainSettings.MinCardsDealtPerEra"
@@ -95,7 +95,7 @@
                        @oninput="OnModifiersChanged" />
             </label>
 
-            <label class="ac-settings-field">
+            <label class="ac-settings-field" title="@ActionsTip">
                 <span>Actions / Era</span>
                 <input type="number"
                        min="@AlphaChainSettings.MinCardsDealtPerEra"
@@ -104,7 +104,7 @@
                        @oninput="OnActionsChanged" />
             </label>
 
-            <label class="ac-settings-field ac-settings-field-row">
+            <label class="ac-settings-field ac-settings-field-row" title="@SurvivalTip">
                 <span>Survival Mode</span>
                 <input type="checkbox"
                        checked="@s.SurvivalMode"
@@ -126,15 +126,15 @@
     {
         @* Non-host read-only view so joiners can see what they're signing up for. *@
         <dl class="ac-settings-readout">
-            <div><dt>Ban Mode</dt><dd>@BanModeLabel(s.BanMode)</dd></div>
-            <div><dt>Shot Clock</dt><dd>@s.ShotClockSeconds s</dd></div>
-            <div><dt>Era Interval</dt><dd>@s.EraInterval rounds</dd></div>
-            <div><dt>Era Count</dt><dd>@s.EraCount</dd></div>
-            <div><dt>Intermission Timer</dt><dd>@s.IntermissionCardSelectSeconds s</dd></div>
-            <div><dt>Sniper Ban Timer</dt><dd>@s.SniperBanSeconds s</dd></div>
-            <div><dt>Modifiers / Era</dt><dd>@s.ModifiersDealtPerEra</dd></div>
-            <div><dt>Actions / Era</dt><dd>@s.ActionsDealtPerEra</dd></div>
-            <div><dt>Survival Mode</dt><dd>@(s.SurvivalMode ? "On" : "Off")</dd></div>
+            <div title="@BanModeTip"><dt>Ban Mode</dt><dd>@BanModeLabel(s.BanMode)</dd></div>
+            <div title="@ShotClockTip"><dt>Shot Clock</dt><dd>@s.ShotClockSeconds s</dd></div>
+            <div title="@EraIntervalTip"><dt>Era Interval</dt><dd>@s.EraInterval rounds</dd></div>
+            <div title="@EraCountTip"><dt>Era Count</dt><dd>@s.EraCount</dd></div>
+            <div title="@IntermissionTip"><dt>Intermission Timer</dt><dd>@s.IntermissionCardSelectSeconds s</dd></div>
+            <div title="@SniperBanTip"><dt>Sniper Ban Timer</dt><dd>@s.SniperBanSeconds s</dd></div>
+            <div title="@ModifiersTip"><dt>Modifiers / Era</dt><dd>@s.ModifiersDealtPerEra</dd></div>
+            <div title="@ActionsTip"><dt>Actions / Era</dt><dd>@s.ActionsDealtPerEra</dd></div>
+            <div title="@SurvivalTip"><dt>Survival Mode</dt><dd>@(s.SurvivalMode ? "On" : "Off")</dd></div>
         </dl>
     }
 </section>
@@ -144,6 +144,18 @@
 
     /// <summary>True for the host (editable controls + persistence); false renders read-only.</summary>
     [Parameter] public bool IsHost { get; set; }
+
+    // Per-setting help text (GDD §2.1, §2.2, §3, §4, §6). Shared by the editable host controls
+    // and the read-only joiner view so both surface identical explanations as native tooltips.
+    private const string BanModeTip = "Which letters can become the per-round Banned Letter. A word containing the Banned Letter still keeps the chain alive but scores 0 for that turn.";
+    private const string ShotClockTip = "Seconds each player has to submit a valid word on their turn. GDD baseline is 10–15 s; go lower for frantic matches or higher for relaxed ones.";
+    private const string EraIntervalTip = "Rounds per Era. At the end of each Era the game pauses for an Intermission: deal cards, gain a Modifier slot, reorder your engine, and last place picks the next Banned Letter.";
+    private const string EraCountTip = "How many Eras are played before the match ends. Highest cumulative score at the end of the final Era wins.";
+    private const string IntermissionTip = "Seconds players have during an Intermission to draft and rearrange their Modifier and Action cards.";
+    private const string SniperBanTip = "Seconds the last-place player has to pick the next Banned Letter. If they don't choose in time, a legal letter is banned at random.";
+    private const string ModifiersTip = "Modifier cards dealt to each player every Intermission. Modifiers are persistent engine cards processed left-to-right (additives first, multipliers last).";
+    private const string ActionsTip = "Single-use Action cards dealt to each player every Intermission (e.g. Pivot, Amnesty, Time Thief).";
+    private const string SurvivalTip = "When on, a player who misses the shot clock is eliminated for good instead of being penalized and staying in.";
 
     private readonly CancellationTokenSource _cts = new();
     private Task? _saveTask;

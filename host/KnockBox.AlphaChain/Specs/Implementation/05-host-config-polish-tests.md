@@ -20,7 +20,7 @@ Expose `AlphaChainSettings` to the host through a lobby configuration panel, rep
 
 - `Pages/AlphaChainLobby.razor` — add a host-only `<AlphaChainSettingsPanel>` section:
   - **Ban Mode** radio group: `Vowels Only` / `Consonants Only` / `All Bannable`.
-  - **Shot Clock** slider, 5–20 s (default 12).
+  - **Shot Clock** slider, 5–60 s (default 12).
   - **Era Interval** numeric input, ≥1 (default 4).
   - **Era Count** numeric input, ≥1 (default 4).
   - **Survival Mode** toggle.
@@ -98,7 +98,7 @@ Add or expand under `host/KnockBox.AlphaChainTests/`:
   - **Era 1 is cardless** — players start with an empty Engine Bay and hand; the first Deal happens at the
     first Intermission (after `EraInterval` rounds).
   - **Starting `ModifierSlots = 3`** (GDD only specifies Expansion grants +1 per Intermission).
-  - **Shot clock configurable 5–20 s** vs. the GDD's stated 10–15 s window.
+  - **Shot clock configurable 5–60 s** vs. the GDD's stated 10–15 s window.
   - **"Fresh hand" = append**, not replace — dealt modifiers/actions accumulate on the existing bay/hand.
   - **Host-plays / two start buttons** — the host can start as a shared display (not a player) or as a
     player; not described in the GDD.

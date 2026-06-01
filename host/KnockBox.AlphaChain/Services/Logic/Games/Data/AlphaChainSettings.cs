@@ -18,7 +18,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         public const int MinShotClockSeconds = 5;
 
         /// <summary>Maximum legal shot-clock length, in seconds.</summary>
-        public const int MaxShotClockSeconds = 20;
+        public const int MaxShotClockSeconds = 60;
 
         /// <summary>Minimum rounds per era.</summary>
         public const int MinEraInterval = 1;

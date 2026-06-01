@@ -91,7 +91,7 @@ game actually does*.
     happens at the first Intermission (after `EraInterval` rounds), not at game start.
 *   **Starting `ModifierSlots = 3`.** The GDD only specifies that Expansion grants +1 slot per
     Intermission; the starting capacity of 3 is an implementation choice.
-*   **Shot clock configurable 5–20 s** rather than the GDD's stated 10–15 s window — the wider
+*   **Shot clock configurable 5–60 s** rather than the GDD's stated 10–15 s window — the wider
     range gives hosts more room for very fast or very relaxed matches.
 *   **"Fresh hand" = append, not replace.** Dealt modifiers/actions accumulate on the existing
     bay/hand; a Deal never clears what a player already holds.
