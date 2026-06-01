@@ -1,0 +1,48 @@
+@inherits DisposableComponent
+@using KnockBox.AlphaChain.Services.Logic.Games.Data
+@using KnockBox.AlphaChain.Services.State.Games
+
+@* In-game view. Rendered as a component by AlphaChainLobby when the lobby is no
+   longer joinable (the single-page approach recommended by the M1 spec's Risks
+   section — session validation lives once, in the lobby's LobbyPageBase). *@
+
+<div class="ac-game">
+    @if (GameState.Phase == AlphaChainGamePhase.GameOver)
+    {
+        <div class="ac-results">
+            <h2 class="ac-results-title">Game Over</h2>
+            <ol class="ac-standings">
+                @foreach (var row in GameState.Results?.Standings ?? [])
+                {
+                    <li class="ac-standings-row">
+                        <span class="ac-standings-rank">#@row.Rank</span>
+                        <span class="ac-standings-name">@row.DisplayName</span>
+                        <span class="ac-standings-score">@row.Score</span>
+                    </li>
+                }
+            </ol>
+            <p class="ac-results-note">Results screen is a placeholder — scoring lands in M2.</p>
+        </div>
+    }
+    else
+    {
+        <div class="ac-status">
+            <div class="ac-status-item">
+                <span class="ac-status-label">Era</span>
+                <span class="ac-status-value">@GameState.CurrentEra</span>
+            </div>
+            <div class="ac-status-item">
+                <span class="ac-status-label">Round</span>
+                <span class="ac-status-value">@GameState.CurrentRound</span>
+            </div>
+            <div class="ac-status-item">
+                <span class="ac-status-label">Active player</span>
+                <span class="ac-status-value">@CurrentPlayerName</span>
+            </div>
+        </div>
+
+        <button class="ac-advance-btn" @onclick="AdvanceTurnAsync">
+            Next turn (debug)
+        </button>
+    }
+</div>

@@ -1,12 +1,74 @@
+using KnockBox.AlphaChain.Services.Logic.Games.Data;
+using KnockBox.AlphaChain.Services.Logic.Games.FSM;
+using KnockBox.AlphaChain.Services.State.Games.Data;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Games.Shared.Components;
+using KnockBox.Core.Services.State.Games.Shared.Interfaces;
 using KnockBox.Core.Services.State.Users;
+using System.Collections.Concurrent;
 
 namespace KnockBox.AlphaChain.Services.State.Games
 {
+    /// <summary>
+    /// Per-room state for an Alpha Chain game. All mutation flows through
+    /// <c>Execute</c>/<c>ExecuteAsync</c>; reads use <c>WithExclusiveRead</c>.
+    /// </summary>
     public class AlphaChainGameState(
         User host,
         ILogger<AlphaChainGameState> logger)
-        : AbstractGameState(host, logger)
+        : AbstractGameState(host, logger),
+          IPhasedGameState<AlphaChainGamePhase>,
+          IPlayerTrackedGameState<AlphaChainPlayerState>,
+          IFsmContextGameState<AlphaChainGameContext>
     {
+        /// <summary>The FSM context for this game instance. Set once when the game starts.</summary>
+        public AlphaChainGameContext? Context { get; set; }
+
+        /// <summary>The current phase of the game.</summary>
+        public AlphaChainGamePhase Phase { get; private set; }
+
+        /// <summary>
+        /// Updates the current phase. Notification is intentionally NOT raised here —
+        /// callers run inside <c>Execute</c>/<c>ExecuteAsync</c>, which fires the change
+        /// notification once after the lock is released.
+        /// </summary>
+        public void SetPhase(AlphaChainGamePhase phase) => Phase = phase;
+
+        /// <summary>All player states, keyed by <c>User.Id</c>.</summary>
+        public ConcurrentDictionary<string, AlphaChainPlayerState> GamePlayers { get; } = new();
+
+        /// <summary>Manages turn order and the active player.</summary>
+        public TurnManager TurnManager { get; } = new();
+
+        /// <summary>Current round number, 1-based. Set to 1 in <c>SetupState</c>.</summary>
+        public int CurrentRound { get; set; }
+
+        /// <summary>Current era number, 1-based. Set to 1 in <c>SetupState</c>; advanced at Intermission (M4).</summary>
+        public int CurrentEra { get; set; }
+
+        /// <summary>When the current phase's timer expires. Set on entering <c>RoundState</c>; no consequence until M2.</summary>
+        public DateTimeOffset PhaseEndTime { get; set; }
+
+        /// <summary>Final standings, populated by <c>GameOverState</c>.</summary>
+        public GameResults? Results { get; set; }
+
+        /// <summary>
+        /// Host-configurable match rules. Replaced atomically via <see cref="UpdateSettings"/>;
+        /// the setter is private so callers can't bypass the lock.
+        /// </summary>
+        public AlphaChainSettings Settings { get; private set; } = new();
+
+        /// <summary>
+        /// Atomically replaces <see cref="Settings"/> with <paramref name="mutate"/>'s result
+        /// and reflects the new <c>HostPlays</c> value into <c>HostIsParticipant</c> in the same
+        /// critical section (mirrors <c>OperatorGameState.UpdateSettings</c>).
+        /// </summary>
+        public Result UpdateSettings(Func<AlphaChainSettings, AlphaChainSettings> mutate) =>
+            Execute(() =>
+            {
+                Settings = mutate(Settings);
+                SetHostIsParticipant(Settings.HostPlays);
+            });
     }
 }

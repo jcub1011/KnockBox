@@ -27,17 +27,41 @@
                     </button>
                 }
             </div>
+            <p>@GameState.Players.Length player(s)</p>
+
             @if (UserService.CurrentUser?.Id == GameState.Host.Id)
             {
-                <button class="btn btn-primary start-btn mt-3" @onclick="StartGame">Start Session</button>
+                @* Two start buttons (mirrors Operator): shared display vs. host as player. *@
+                <button class="btn btn-primary start-btn mt-3"
+                        disabled="@(GameState.Players.Length < GameEngine.MinPlayerCount)"
+                        @onclick="() => StartGame(false)">
+                    Start Game
+                </button>
+                <button class="btn btn-primary start-btn mt-3"
+                        disabled="@(GameState.Players.Length + 1 < GameEngine.MinPlayerCount)"
+                        @onclick="() => StartGame(true)">
+                    Start Game As Player
+                </button>
+                @if (GameState.Players.Length + 1 < GameEngine.MinPlayerCount)
+                {
+                    <p class="mt-2">Need at least @GameEngine.MinPlayerCount players (or @(GameEngine.MinPlayerCount - 1) plus the host).</p>
+                }
+                else if (GameState.Players.Length < GameEngine.MinPlayerCount)
+                {
+                    <p class="mt-2">Need @GameEngine.MinPlayerCount players to start, or start as a player to join in.</p>
+                }
+            }
+            else
+            {
+                <p class="mt-3">Waiting for host to start...</p>
             }
         </div>
     }
     else
     {
-        <div class="card">
-            <h4>Game in progress</h4>
-            <p>Alpha Chain placeholder lobby — game logic coming soon.</p>
-        </div>
+        @* In-game view. The host-as-shared-display vs. host-as-player split is identical
+           in M1 (both see the status + debug controls); a dedicated spectator view lands
+           with the real gameplay UI in later milestones. *@
+        <AlphaChainGame GameState="GameState" />
     }
 </div>

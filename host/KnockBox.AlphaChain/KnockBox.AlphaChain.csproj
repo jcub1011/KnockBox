@@ -16,6 +16,12 @@
     <Using Include="Microsoft.Extensions.Logging" />
   </ItemGroup>
 
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>KnockBox.AlphaChainTests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
   <Import Project="..\Directory.Plugin.targets" />
 
 </Project>
