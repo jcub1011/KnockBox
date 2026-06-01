@@ -3,7 +3,8 @@
 
 @{
     var myId = UserService.CurrentUser?.Id ?? "";
-    var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
+    var isHost = GameState.Host.Id == myId;
+    var isHostSpectator = isHost && !GameState.HostIsParticipant;
     var winResult = GameState.WinResult;
     bool isFinalGame = GameState.CurrentGameNumber >= GameState.Settings.TotalGames;
     var rankedPlayers = GameState.GamePlayers.Values
@@ -138,7 +139,28 @@ else
                 </div>
             </div>
 
-            <p class="ctc-waiting-text">Waiting for host...</p>
+            @if (isHost)
+            {
+                @* Host is playing, so the lifecycle controls live in the player view too. *@
+                <div class="ctc-gameover-actions">
+                    @if (!isFinalGame)
+                    {
+                        <button class="ctc-btn ctc-btn-primary" @onclick="StartNextGame">
+                            [ NEXT GAME ]
+                        </button>
+                    }
+                    <button class="ctc-btn ctc-btn-secondary" @onclick="ReturnToLobby">
+                        [ RETURN TO LOBBY ]
+                    </button>
+                    <button class="ctc-btn ctc-btn-secondary" @onclick="ResetGame">
+                        [ PLAY AGAIN ]
+                    </button>
+                </div>
+            }
+            else
+            {
+                <p class="ctc-waiting-text">Waiting for host...</p>
+            }
         </div>
     </div>
 }
