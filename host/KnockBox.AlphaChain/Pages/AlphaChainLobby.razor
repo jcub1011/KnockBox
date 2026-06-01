@@ -7,6 +7,7 @@
 
 <HeadContent>
     <link href="_content/KnockBox.AlphaChain/KnockBox.AlphaChain.styles.css" rel="stylesheet" />
+    <link href="_content/KnockBox.AlphaChain/css/cards.css" rel="stylesheet" />
 </HeadContent>
 
 <div class="content">
@@ -29,16 +30,23 @@
             </div>
             <p>@GameState.Players.Length player(s)</p>
 
-            @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+            @{
+                var isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
+                var settingsValid = GameState.Settings.Validate().IsValid;
+            }
+
+            @if (isHost)
             {
-                @* Two start buttons (mirrors Operator): shared display vs. host as player. *@
+                @* Two start buttons (mirrors Operator): shared display vs. host as player.
+                   Both are also gated on a valid config — Settings.Validate() is the single
+                   source of truth shared with StartAsyncCore. *@
                 <button class="btn btn-primary start-btn mt-3"
-                        disabled="@(GameState.Players.Length < GameEngine.MinPlayerCount)"
+                        disabled="@(GameState.Players.Length < GameEngine.MinPlayerCount || !settingsValid)"
                         @onclick="() => StartGame(false)">
                     Start Game
                 </button>
                 <button class="btn btn-primary start-btn mt-3"
-                        disabled="@(GameState.Players.Length + 1 < GameEngine.MinPlayerCount)"
+                        disabled="@(GameState.Players.Length + 1 < GameEngine.MinPlayerCount || !settingsValid)"
                         @onclick="() => StartGame(true)">
                     Start Game As Player
                 </button>
@@ -50,11 +58,20 @@
                 {
                     <p class="mt-2">Need @GameEngine.MinPlayerCount players to start, or start as a player to join in.</p>
                 }
+                else if (!settingsValid)
+                {
+                    <p class="mt-2">Fix the highlighted settings below before starting.</p>
+                }
             }
             else
             {
                 <p class="mt-3">Waiting for host to start...</p>
             }
+
+            @* Host edits the config here; non-host players see it read-only. The lobby
+               re-renders on every state change (LobbyPageBase subscription), so a host edit
+               immediately reflects in every joiner's read-only view. *@
+            <AlphaChainSettingsPanel GameState="GameState" IsHost="isHost" />
         </div>
     }
     else

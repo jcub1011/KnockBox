@@ -13,7 +13,9 @@ namespace KnockBox.AlphaChain.Tests.Unit
             Assert.AreEqual("Alpha Chain", module.Manifest.Name);
             Assert.AreEqual("alpha-chain", module.Manifest.RouteIdentifier);
             Assert.AreEqual("KnockBox.AlphaChain", module.Manifest.EntryAssembly);
-            Assert.IsTrue(module.Manifest.WorkInProgress);
+            // M5 ships the game: the WIP flag is cleared and the final tile art is declared.
+            Assert.IsFalse(module.Manifest.WorkInProgress);
+            Assert.AreEqual("tile.svg", module.Manifest.TileAsset);
         }
 
         [TestMethod]

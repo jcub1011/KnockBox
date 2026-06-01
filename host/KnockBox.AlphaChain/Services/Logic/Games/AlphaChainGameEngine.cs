@@ -60,6 +60,18 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
 
         protected override Task<Result> StartAsyncCore(AlphaChainGameState gameState, CancellationToken ct = default)
         {
+            // Validate() is the single source of truth for a legal config (the lobby gates its
+            // start buttons on the same call). Refuse to start an illegal match so a stale or
+            // tampered config can never reach the FSM.
+            var validation = gameState.Settings.Validate();
+            if (!validation.IsValid)
+            {
+                logger.LogError("Refused to start Alpha Chain with invalid settings: {Violations}", validation.Summary);
+                return Task.FromResult(Result.FromError(
+                    "The game settings are invalid. " + validation.Summary,
+                    "AlphaChainSettings.Validate reported: " + validation.Summary));
+            }
+
             var context = new AlphaChainGameContext(gameState, this, wordList, rng, scoreCalculator, logger);
             var fsm = new FiniteStateMachine<AlphaChainGameContext, AlphaChainCommand>(logger);
             context.Fsm = fsm;

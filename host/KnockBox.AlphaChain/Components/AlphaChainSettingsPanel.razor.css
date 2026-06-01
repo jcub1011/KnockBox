@@ -1,0 +1,122 @@
+.ac-settings {
+    margin-top: 1rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid rgba(128, 128, 128, 0.25);
+    border-radius: 0.75rem;
+    background: rgba(128, 128, 128, 0.05);
+    text-align: left;
+}
+
+.ac-settings-title {
+    margin: 0 0 0.75rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.75;
+}
+
+.ac-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.75rem 1rem;
+}
+
+.ac-settings-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: 0.85rem;
+    border: none;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+
+.ac-settings-field > span,
+.ac-settings-field > legend {
+    font-weight: 600;
+    opacity: 0.85;
+    padding: 0;
+}
+
+.ac-settings-field-full {
+    grid-column: 1 / -1;
+}
+
+.ac-settings-field-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ac-settings-field input[type="number"],
+.ac-settings-field input[type="range"] {
+    width: 100%;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid rgba(128, 128, 128, 0.4);
+    border-radius: 0.4rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+}
+
+.ac-settings-field input[type="range"] {
+    padding: 0;
+    accent-color: #4682b4;
+}
+
+.ac-settings-field-row input[type="checkbox"] {
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: #4682b4;
+}
+
+.ac-settings-radios {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.ac-settings-radio {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.ac-settings-errors {
+    margin: 0.75rem 0 0;
+    padding: 0.5rem 0.75rem 0.5rem 1.5rem;
+    border-radius: 0.5rem;
+    background: rgba(217, 83, 79, 0.12);
+    color: #d9534f;
+    font-size: 0.8rem;
+}
+
+/* ── Non-host read-only view ─────────────────────────────────────────── */
+.ac-settings-readout {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.5rem 1rem;
+    margin: 0;
+}
+
+.ac-settings-readout > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.ac-settings-readout dt {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.6;
+}
+
+.ac-settings-readout dd {
+    margin: 0;
+    font-weight: 700;
+}

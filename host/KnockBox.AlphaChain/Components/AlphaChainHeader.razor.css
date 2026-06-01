@@ -1,0 +1,93 @@
+.ac-header-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    box-sizing: border-box;
+}
+
+.ac-header-brand {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: inherit;
+    flex-shrink: 0;
+}
+
+.ac-header-text {
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    background: linear-gradient(90deg, #4682b4, #2e8b57);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+/* ── Live match-progress indicator ──────────────────────────────────── */
+.ac-header-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.2rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(128, 128, 128, 0.14);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.ac-header-progress-era {
+    color: #4682b4;
+}
+
+.ac-header-progress-round {
+    color: #2e8b57;
+}
+
+.ac-header-progress-sep {
+    opacity: 0.5;
+}
+
+.ac-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+.ac-header-leave {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: none;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.ac-header-leave:hover {
+    background: rgba(217, 83, 79, 0.18);
+    color: #d9534f;
+}
+
+@media (max-width: 32rem) {
+    .ac-header-text {
+        font-size: 0.95rem;
+        letter-spacing: 0.08em;
+    }
+
+    .ac-header-progress {
+        font-size: 0.7rem;
+        padding: 0.15rem 0.5rem;
+    }
+}

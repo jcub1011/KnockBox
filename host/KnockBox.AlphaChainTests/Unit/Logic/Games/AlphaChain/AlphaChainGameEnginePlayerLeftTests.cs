@@ -91,5 +91,91 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
             Assert.AreEqual(AlphaChainGamePhase.GameOver, state.Phase);
             Assert.IsNotNull(state.Results);
         }
+
+        // ── Leaves during Intermission ──────────────────────────────────────────
+
+        // Starts a 3-player, EraInterval=1 game on a real dictionary chain and plays round 1
+        // (cat → tea → ant) so the turn order wraps into the Intermission.
+        private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartAndEnterIntermissionAsync()
+        {
+            var engine = new AlphaChainGameEngine(
+                new StubWordListService("cat", "tea", "ant"), new FixedRandomNumberService(), new ScoreCalculator(),
+                _engineLoggerMock.Object, _stateLoggerMock.Object);
+
+            var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
+            for (int i = 0; i < 3; i++)
+                state.RegisterPlayer(MakePlayer(i));
+
+            // One round per era, several eras so the Intermission runs (not the final round).
+            state.UpdateSettings(s => s with { EraInterval = 1, EraCount = 3 });
+            await engine.StartAsync(_host, state);
+            state.Execute(() => state.BannedLetter = 'z');
+
+            // Round 1: every player submits once → the order wraps → Intermission.
+            await engine.SubmitWordAsync(state.TurnManager.TurnOrder[0], "cat", state);
+            await engine.SubmitWordAsync(state.TurnManager.TurnOrder[1], "tea", state);
+            await engine.SubmitWordAsync(state.TurnManager.TurnOrder[2], "ant", state);
+
+            Assert.AreEqual(AlphaChainGamePhase.Intermission, state.Phase);
+            return (engine, state);
+        }
+
+        // Ticks the FSM at t0 + `seconds`, advancing whichever timed sub-phase has elapsed.
+        private static void TickAt(AlphaChainGameEngine engine, AlphaChainGameState state, DateTimeOffset t0, int seconds)
+            => engine.Tick(state.Context!, t0.AddSeconds(seconds));
+
+        [TestMethod]
+        public async Task PlayerLeaves_DuringOptimization_DoesNotStallIntermission()
+        {
+            var (engine, state) = await StartAndEnterIntermissionAsync();
+            using var _ = state;
+            var t0 = DateTimeOffset.UtcNow;
+
+            // Deal → Expansion → Optimization.
+            TickAt(engine, state, t0, 10);
+            TickAt(engine, state, t0, 20);
+            Assert.AreEqual(IntermissionSubPhase.Optimization, state.IntermissionPhase);
+
+            // A player drops mid-optimization.
+            var leaving = state.TurnManager.TurnOrder[1];
+            engine.HandlePlayerLeft(UserFactory.Create("dummy", leaving), state);
+            Assert.IsTrue(state.GamePlayers[leaving].HasLeft);
+
+            // The Intermission still completes on its timers (Optimization → SniperBan → done),
+            // returning to the next era with a fresh banned letter.
+            TickAt(engine, state, t0, 60);   // Optimization times out → SniperBan
+            TickAt(engine, state, t0, 120);  // SniperBan times out → random draw → complete
+
+            Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
+            Assert.IsNotNull(state.BannedLetter);
+            Assert.AreEqual(2, state.CurrentEra);
+        }
+
+        [TestMethod]
+        public async Task PlayerLeaves_WhileHoldingSniperBan_FallsBackToTimeoutDraw()
+        {
+            var (engine, state) = await StartAndEnterIntermissionAsync();
+            using var _ = state;
+            var t0 = DateTimeOffset.UtcNow;
+
+            // Advance all the way to the SniperBan sub-phase.
+            TickAt(engine, state, t0, 10);   // → Expansion
+            TickAt(engine, state, t0, 20);   // → Optimization
+            TickAt(engine, state, t0, 60);   // → SniperBan
+            Assert.AreEqual(IntermissionSubPhase.SniperBan, state.IntermissionPhase);
+
+            // The resolved last-place picker leaves while holding the ban.
+            var picker = state.SniperBanUserId!;
+            Assert.IsNotNull(picker);
+            engine.HandlePlayerLeft(UserFactory.Create("dummy", picker), state);
+            Assert.IsTrue(state.GamePlayers[picker].HasLeft);
+
+            // With the picker gone, the SniperBan timer's fallback draw resolves the letter and
+            // the game proceeds — it never hangs waiting on a departed picker.
+            TickAt(engine, state, t0, 120);
+
+            Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
+            Assert.IsNotNull(state.BannedLetter);
+        }
     }
 }

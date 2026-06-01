@@ -117,8 +117,13 @@
         @if (MyPlayer is { } me)
         {
             <div class="ac-cards">
-                <EngineBay Cards="me.EngineBay" Slots="me.ModifierSlots" OnReorder="ReorderBayAsync" Title="Your Engine Bay" />
-                <ActionHand Cards="me.ActionHand" Opponents="ActionTargets" Disabled="false" OnPlay="PlayActionAsync" />
+                @* Reorder is locked during a live round — the scoring pipeline order is
+                   frozen and only resequenced at Intermission (Optimization). *@
+                <EngineBay Cards="me.EngineBay" Slots="me.ModifierSlots"
+                           Locked="@(GameState.Phase == AlphaChainGamePhase.Round)"
+                           OnReorder="ReorderBayAsync" Title="Your Engine Bay" />
+                <ActionHand Cards="me.ActionHand" Opponents="ActionTargets" Disabled="false"
+                            QueuedKind="me.PendingAction" OnPlay="PlayActionAsync" />
             </div>
         }
 

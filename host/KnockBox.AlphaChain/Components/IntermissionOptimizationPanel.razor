@@ -1,9 +1,9 @@
 @using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
 
 @* Optimization sub-phase: the local player privately resequences their Engine Bay and,
-   when it overflows the (newly expanded) slot count, discards the excess. Click-to-swap
-   reorder (drag-reorder is deferred to M5 per the milestone). Opponents' bays are hidden —
-   only a submitted/total tally is shown (fog-of-war). *@
+   when it overflows the (newly expanded) slot count, discards the excess. Reorder is HTML5
+   drag-and-drop with a keyboard fallback (focus a card, then ←/→ to move it). Opponents'
+   bays are hidden — only a submitted/total tally is shown (fog-of-war). *@
 
 <div class="ac-im-opt">
     <div class="ac-im-opt-head">
@@ -28,12 +28,18 @@
             var card = Kept[index];
             bool overCapacity = index >= Slots;
 
-            <li class="ac-im-opt-slot @(overCapacity ? "ac-im-opt-overflow" : "")">
+            <li class="ac-im-opt-slot @(overCapacity ? "ac-im-opt-overflow" : "")"
+                @ondragover:preventDefault="!HasSubmitted"
+                @ondrop="() => OnDrop(index)">
                 <CardTooltip Name="@card.Name" Description="@card.Description" Category="CardCategory.Modifier">
                     <button type="button"
-                            class="ac-card ac-card-modifier ac-card-@(card.Kind == ModifierKind.Additive ? "additive" : "multiplicative") @(_selectedIndex == index ? "ac-card-selected" : "")"
+                            class="ac-card ac-card-modifier ac-card-@(card.Kind == ModifierKind.Additive ? "additive" : "multiplicative") @(_dragIndex == index ? "ac-card-dragging" : "")"
                             disabled="@HasSubmitted"
-                            @onclick="() => OnSlotClicked(index)">
+                            draggable="@(HasSubmitted ? "false" : "true")"
+                            aria-grabbed="@(_dragIndex == index ? "true" : "false")"
+                            @ondragstart="() => _dragIndex = index"
+                            @ondragend="() => _dragIndex = null"
+                            @onkeydown="e => OnKeyDown(e, index)">
                         <span class="ac-card-pos">@(index + 1)</span>
                         <span class="ac-card-name">@card.Name</span>
                         <span class="ac-card-op">@(card.Kind == ModifierKind.Additive ? "+" : "×")</span>
@@ -92,7 +98,7 @@
 
     private List<ModifierCard> Kept = new();
     private List<ModifierCard> Discarded = new();
-    private int? _selectedIndex;
+    private int? _dragIndex;
     private string? _seededFor;
 
     /// <summary>Cards held beyond the slot capacity (must be discarded before locking in).</summary>
@@ -108,32 +114,48 @@
         {
             Kept = Cards.ToList();
             Discarded = new();
-            _selectedIndex = null;
+            _dragIndex = null;
             _seededFor = signature;
         }
     }
 
-    private void OnSlotClicked(int index)
+    private void OnDrop(int targetIndex)
     {
-        if (HasSubmitted || index >= Kept.Count) return;
+        if (HasSubmitted || _dragIndex is not { } from) return;
+        _dragIndex = null;
+        Move(from, targetIndex);
+    }
 
-        if (_selectedIndex is null)
+    /// <summary>Keyboard fallback: ←/→ move the focused card one slot in that direction.</summary>
+    private void OnKeyDown(KeyboardEventArgs e, int index)
+    {
+        if (HasSubmitted) return;
+        int target = e.Key switch
         {
-            _selectedIndex = index;
-            return;
-        }
+            "ArrowLeft" => index - 1,
+            "ArrowRight" => index + 1,
+            _ => index
+        };
+        if (target != index) Move(index, target);
+    }
 
-        int first = _selectedIndex.Value;
-        _selectedIndex = null;
-        if (first == index) return; // re-click cancels.
+    // Moves the card at `from` to `to` (clamped to the kept range). A move-and-insert keeps
+    // the player's intent intact across multi-step reorders better than a pairwise swap.
+    private void Move(int from, int to)
+    {
+        if (from < 0 || from >= Kept.Count) return;
+        to = Math.Clamp(to, 0, Kept.Count - 1);
+        if (from == to) return;
 
-        (Kept[first], Kept[index]) = (Kept[index], Kept[first]);
+        var card = Kept[from];
+        Kept.RemoveAt(from);
+        Kept.Insert(to, card);
     }
 
     private void Discard(int index)
     {
         if (HasSubmitted || index >= Kept.Count) return;
-        _selectedIndex = null;
+        _dragIndex = null;
         var card = Kept[index];
         Kept.RemoveAt(index);
         Discarded.Add(card);

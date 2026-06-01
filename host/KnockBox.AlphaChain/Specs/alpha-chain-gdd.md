@@ -76,3 +76,43 @@ $$Score = (L + \sum A_{i}) \times \prod M_{j}$$
 *   **Timer:** A configurable timer for time to enter words, time to select cards during card distribution stage, and time to select a letter to ban.
 *   **Era Interval:** Allow changing the interval of eras from 4 rounds to any number of rounds greater than 0.
 *   **Era Count:** Set the number of eras that must pass before the game ends. Default to 4 eras.
+
+---
+
+## 8. Implementation Deviations
+
+The shipped implementation makes the following confirmed, intentional departures from the
+design above. They are recorded here so the GDD stays the single source of truth for *what the
+game actually does*.
+
+*   **Time Thief targets any opponent** (and can shorten a clock that is already ticking), not
+    strictly "the next player" as written in §3.2. *(Confirmed intentional.)*
+*   **Era 1 is cardless.** Players start with an empty Engine Bay and empty hand; the first Deal
+    happens at the first Intermission (after `EraInterval` rounds), not at game start.
+*   **Starting `ModifierSlots = 3`.** The GDD only specifies that Expansion grants +1 slot per
+    Intermission; the starting capacity of 3 is an implementation choice.
+*   **Shot clock configurable 5–20 s** rather than the GDD's stated 10–15 s window — the wider
+    range gives hosts more room for very fast or very relaxed matches.
+*   **"Fresh hand" = append, not replace.** Dealt modifiers/actions accumulate on the existing
+    bay/hand; a Deal never clears what a player already holds.
+*   **Distinct modifiers.** Dealt modifiers are always distinct from the cards a player already
+    holds (the Engine Bay is keyed by card id for reordering), which caps a player's lifetime
+    modifiers at the catalogue size.
+*   **Host-plays / two start buttons.** The host may start as a shared display (not a player) or
+    as a player; this is chosen at start time by the two start buttons and is not described in
+    the GDD. The choice is never persisted to the host's saved settings.
+*   **Sniper-ban timeout fallback.** If the last-place picker never chooses (or leaves while
+    holding the ban), the SniperBan sub-phase times out and a legal banned letter is drawn at
+    random so the match never stalls.
+*   **Over-capacity discard rule.** When a Deal overflows a player's slot count, a submitter
+    discards explicitly during Optimization; a non-submitter keeps their current order and the
+    **oldest** cards (left side) are dropped to fit the expanded capacity.
+*   **Optional score cap.** A single word's score is clamped to `ScoreCalculator.MaxWordScore`
+    (10,000) so a stack of multiplicative conditionals can't blow out the UI.
+*   **Home-page tile.** The final tile art is supplied via the plugin manifest's `tileAsset`
+    (`wwwroot/tile.svg`) — the platform's home page renders manifest tiles directly — rather
+    than through a bespoke `AlphaChainTile` Razor component, which the host could not reference
+    across the plugin boundary.
+*   **Engine Bay reorder is Intermission-only.** Reorder is disabled during a live round (the
+    scoring pipeline order is frozen) and performed at the Intermission's Optimization sub-phase.
+    Reorder is HTML5 drag-and-drop with a keyboard fallback (focus a card, then ←/→ to move it).

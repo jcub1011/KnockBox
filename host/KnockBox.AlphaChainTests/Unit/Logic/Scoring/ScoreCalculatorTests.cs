@@ -124,5 +124,95 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Scoring
             var withoutBanned = Ctx("cat", banned: 'z');
             Assert.AreEqual(3, _calc.Calculate(withoutBanned, [taxCollector]));
         }
+
+        // ── Exhaustive coverage of every shipped ModifierLibrary card ───────
+
+        private static ModifierCard Card(string id) => ModifierLibrary.FindById(id)!;
+
+        [TestMethod]
+        public void Anchor_AddsFlatTwelve()
+        {
+            // "cat"(3) + 12 = 15, always.
+            Assert.AreEqual(15, _calc.Calculate(Ctx("cat"), [Card("anchor")]));
+        }
+
+        [TestMethod]
+        public void ConsonantCrunch_AddsTwoPerConsonant()
+        {
+            // "cat" → c,t consonants (2) → +4 → 3 + 4 = 7.
+            Assert.AreEqual(7, _calc.Calculate(Ctx("cat"), [Card("consonant-crunch")]));
+        }
+
+        [TestMethod]
+        public void Architect_MultipliesWhenEightOrLonger()
+        {
+            // "elephants" length 9 ≥ 8 → ×1.5 → 9 × 1.5 = 13.5 → 14 (half-up).
+            Assert.AreEqual(14, _calc.Calculate(Ctx("elephants"), [Card("architect")]));
+        }
+
+        [TestMethod]
+        public void Architect_SkippedWhenShorterThanEight()
+        {
+            // "cat" length 3 < 8 → trigger false → score == length.
+            Assert.AreEqual(3, _calc.Calculate(Ctx("cat"), [Card("architect")]));
+        }
+
+        [TestMethod]
+        public void BrickLayer_AddsLengthWhenSixOrLonger()
+        {
+            // "bridge" length 6 ≥ 6 → +6 → 6 + 6 = 12.
+            Assert.AreEqual(12, _calc.Calculate(Ctx("bridge"), [Card("brick-layer")]));
+        }
+
+        [TestMethod]
+        public void BrickLayer_SkippedWhenShorterThanSix()
+        {
+            // "cat" length 3 < 6 → trigger false → score == length.
+            Assert.AreEqual(3, _calc.Calculate(Ctx("cat"), [Card("brick-layer")]));
+        }
+
+        [TestMethod]
+        public void Sprinter_MultipliesWhenFourOrShorter()
+        {
+            // "cat" length 3 ≤ 4 → ×1.25 → 3 × 1.25 = 3.75 → 4 (half-up).
+            Assert.AreEqual(4, _calc.Calculate(Ctx("cat"), [Card("sprinter")]));
+        }
+
+        [TestMethod]
+        public void Sprinter_SkippedWhenLongerThanFour()
+        {
+            // "bridge" length 6 > 4 → trigger false → score == length.
+            Assert.AreEqual(6, _calc.Calculate(Ctx("bridge"), [Card("sprinter")]));
+        }
+
+        [TestMethod]
+        public void LetterHoarder_AddsOnePerDistinctLetter()
+        {
+            // "cat" → 3 distinct letters → +3 → 3 + 3 = 6.
+            Assert.AreEqual(6, _calc.Calculate(Ctx("cat"), [Card("letter-hoarder")]));
+        }
+
+        [TestMethod]
+        public void LetterHoarder_CountsDistinctNotTotalLetters()
+        {
+            // "letter" length 6, distinct = l,e,t,r (4) → +4 → 6 + 4 = 10.
+            Assert.AreEqual(10, _calc.Calculate(Ctx("letter"), [Card("letter-hoarder")]));
+        }
+
+        [TestMethod]
+        public void EveryLibraryCard_NeverThrows_AndStaysWithinCap()
+        {
+            // Smoke-test the whole catalogue against a couple of words, ensuring each card's
+            // Trigger/Value delegate is callable and the result is always a sane, capped int.
+            foreach (var card in ModifierLibrary.All)
+            {
+                foreach (var word in new[] { "cat", "bridge", "elephants", "aerie" })
+                {
+                    int score = _calc.Calculate(Ctx(word, banned: 'a'), [card]);
+                    Assert.IsTrue(score >= 0 && score <= ScoreCalculator.MaxWordScore,
+                        $"Card [{card.Id}] on '{word}' produced out-of-range score {score}.");
+                }
+            }
+        }
     }
 }

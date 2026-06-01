@@ -81,6 +81,26 @@
     outline-offset: 1px;
 }
 
+/* Card being dragged for reorder. */
+.ac-card-dragging {
+    opacity: 0.45;
+    outline: 2px dashed #4682b4;
+    outline-offset: 1px;
+}
+
+/* Owner's bay while reorder is suppressed (live round). */
+.ac-bay-locked .ac-card {
+    cursor: default;
+}
+
+.ac-card[draggable="true"] {
+    cursor: grab;
+}
+
+.ac-card[draggable="true"]:active {
+    cursor: grabbing;
+}
+
 .ac-card-empty {
     cursor: default;
     opacity: 0.4;

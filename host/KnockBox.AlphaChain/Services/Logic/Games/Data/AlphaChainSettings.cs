@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json.Serialization;
 
 namespace KnockBox.AlphaChain.Services.Logic.Games.Data
@@ -11,6 +12,46 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
     /// </summary>
     public sealed record AlphaChainSettings
     {
+        // ── Validation bounds (named constants; single source of truth) ────────
+
+        /// <summary>Minimum legal shot-clock length, in seconds.</summary>
+        public const int MinShotClockSeconds = 5;
+
+        /// <summary>Maximum legal shot-clock length, in seconds.</summary>
+        public const int MaxShotClockSeconds = 20;
+
+        /// <summary>Minimum rounds per era.</summary>
+        public const int MinEraInterval = 1;
+
+        /// <summary>Upper bound on rounds per era (keeps the number input bounded).</summary>
+        public const int MaxEraInterval = 50;
+
+        /// <summary>Minimum number of eras in a match.</summary>
+        public const int MinEraCount = 1;
+
+        /// <summary>Upper bound on eras (keeps the number input bounded).</summary>
+        public const int MaxEraCount = 50;
+
+        /// <summary>Minimum intermission card-select timer, in seconds.</summary>
+        public const int MinIntermissionSeconds = 5;
+
+        /// <summary>Upper bound on the intermission card-select timer, in seconds.</summary>
+        public const int MaxIntermissionSeconds = 300;
+
+        /// <summary>Minimum sniper-ban timer, in seconds.</summary>
+        public const int MinSniperBanSeconds = 5;
+
+        /// <summary>Upper bound on the sniper-ban timer, in seconds.</summary>
+        public const int MaxSniperBanSeconds = 120;
+
+        /// <summary>Minimum cards dealt per era (0 is legal — "deal none of this type").</summary>
+        public const int MinCardsDealtPerEra = 0;
+
+        /// <summary>Upper bound on cards dealt per era (sanity cap for the number input).</summary>
+        public const int MaxCardsDealtPerEra = 10;
+
+        // ── Settings ───────────────────────────────────────────────────────────
+
         /// <summary>Which letter class the per-round ban draws from.</summary>
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public BanLetterMode BanMode { get; init; } = BanLetterMode.All;
@@ -46,5 +87,46 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         /// <c>AbstractGameState.SetHostIsParticipant</c> at start.
         /// </summary>
         public bool HostPlays { get; init; } = false;
+
+        // ── Validation ───────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Enumerates every rule this config violates. The single source of truth for what's
+        /// a legal start — the lobby gates its start buttons on the result and
+        /// <c>StartAsyncCore</c> refuses to begin an illegal match. An empty result means the
+        /// config is legal. <see cref="HostPlays"/> is a start-time choice and is not validated.
+        /// </summary>
+        public ConfigValidationResult Validate()
+        {
+            var violations = ImmutableArray.CreateBuilder<string>();
+
+            if (ShotClockSeconds < MinShotClockSeconds || ShotClockSeconds > MaxShotClockSeconds)
+                violations.Add($"Shot clock must be between {MinShotClockSeconds} and {MaxShotClockSeconds} seconds.");
+
+            if (EraInterval < MinEraInterval || EraInterval > MaxEraInterval)
+                violations.Add($"Era interval must be between {MinEraInterval} and {MaxEraInterval} rounds.");
+
+            if (EraCount < MinEraCount || EraCount > MaxEraCount)
+                violations.Add($"Era count must be between {MinEraCount} and {MaxEraCount}.");
+
+            if (IntermissionCardSelectSeconds < MinIntermissionSeconds || IntermissionCardSelectSeconds > MaxIntermissionSeconds)
+                violations.Add($"Intermission timer must be between {MinIntermissionSeconds} and {MaxIntermissionSeconds} seconds.");
+
+            if (SniperBanSeconds < MinSniperBanSeconds || SniperBanSeconds > MaxSniperBanSeconds)
+                violations.Add($"Sniper-ban timer must be between {MinSniperBanSeconds} and {MaxSniperBanSeconds} seconds.");
+
+            if (ModifiersDealtPerEra < MinCardsDealtPerEra || ModifiersDealtPerEra > MaxCardsDealtPerEra)
+                violations.Add($"Modifiers dealt per era must be between {MinCardsDealtPerEra} and {MaxCardsDealtPerEra}.");
+
+            if (ActionsDealtPerEra < MinCardsDealtPerEra || ActionsDealtPerEra > MaxCardsDealtPerEra)
+                violations.Add($"Actions dealt per era must be between {MinCardsDealtPerEra} and {MaxCardsDealtPerEra}.");
+
+            if (!Enum.IsDefined(BanMode))
+                violations.Add("Ban mode is not a recognized value.");
+
+            return violations.Count == 0
+                ? ConfigValidationResult.Valid
+                : new ConfigValidationResult(violations.ToImmutable());
+        }
     }
 }

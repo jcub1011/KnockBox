@@ -1,0 +1,62 @@
+/*
+ * Shared Alpha Chain card visual styles.
+ *
+ * Loaded globally (linked from the lobby page's <HeadContent>) so card chips render
+ * consistently wherever they appear — the Engine Bay, the Action Hand, the Intermission
+ * panels, and tooltips. The per-component scoped CSS owns layout and the category-tinted
+ * borders; this file layers on PURELY ADDITIVE decoration (a faint category glyph
+ * watermark + hover lift) using ::after pseudo-elements, which no scoped stylesheet sets,
+ * so there is no specificity conflict with the component CSS.
+ */
+
+:root {
+    --ac-additive: #2e8b57;
+    --ac-multiplicative: #4682b4;
+    --ac-action: #e0a800;
+    --ac-tax: #d9534f;
+}
+
+/* Anchor for the glyph watermark. Only adds positioning context — no visual override. */
+.ac-card-additive,
+.ac-card-multiplicative,
+.ac-card-action {
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.ac-card-additive:not(:disabled):hover,
+.ac-card-multiplicative:not(:disabled):hover,
+.ac-card-action:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+/* Faint corner glyph keyed to the card category (decorative only). */
+.ac-card-additive::after,
+.ac-card-multiplicative::after,
+.ac-card-action::after {
+    content: "";
+    position: absolute;
+    right: -6px;
+    bottom: -6px;
+    width: 34px;
+    height: 34px;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    opacity: 0.14;
+    pointer-events: none;
+}
+
+.ac-card-additive::after {
+    background-image: url("../img/glyph-additive.svg");
+}
+
+.ac-card-multiplicative::after {
+    background-image: url("../img/glyph-multiplicative.svg");
+}
+
+.ac-card-action::after {
+    background-image: url("../img/glyph-action.svg");
+}
