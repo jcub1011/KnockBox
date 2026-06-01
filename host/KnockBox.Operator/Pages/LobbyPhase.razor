@@ -41,13 +41,22 @@
             @if (UserService.CurrentUser?.Id == GameState.Host.Id)
             {
                 <button class="op-btn op-btn-primary op-btn-lg"
-                        disabled="@(GameState.Players.Length < 2)"
-                        @onclick="StartGame">
+                        disabled="@(GameState.Players.Length < GameEngine.MinPlayerCount)"
+                        @onclick="() => StartGame(false)">
                     START GAME
                 </button>
-                @if (GameState.Players.Length < 2)
+                <button class="op-btn op-btn-primary op-btn-lg"
+                        disabled="@(GameState.Players.Length + 1 < GameEngine.MinPlayerCount)"
+                        @onclick="() => StartGame(true)">
+                    START GAME AS PLAYER
+                </button>
+                @if (GameState.Players.Length + 1 < GameEngine.MinPlayerCount)
                 {
-                    <p class="op-waiting-text">⚠️ Need at least 2 players</p>
+                    <p class="op-waiting-text">⚠️ Need at least @GameEngine.MinPlayerCount players (or @(GameEngine.MinPlayerCount - 1) plus the host)</p>
+                }
+                else if (GameState.Players.Length < GameEngine.MinPlayerCount)
+                {
+                    <p class="op-waiting-text">⚠️ Need @GameEngine.MinPlayerCount players to start, or start as a player to join in</p>
                 }
             }
             else

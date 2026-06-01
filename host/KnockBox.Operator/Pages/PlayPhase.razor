@@ -19,7 +19,7 @@
     
     @* Opponents *@
     <div class="op-opponents-grid">
-        @foreach (var entry in GameState.Players.Where(p => p.User.Id != UserService.CurrentUser?.Id))
+        @foreach (var entry in GameState.Participants.Where(p => p.User.Id != UserService.CurrentUser?.Id))
         {
             var pState = GameState.Context?.GamePlayers.GetValueOrDefault(entry.User.Id);
             if (pState != null)
@@ -220,7 +220,7 @@
         else
         {
             <div class="op-waiting-text">
-                Waiting for @(GameState.Players.FirstOrDefault(p => p.User.Id == GameState.TurnManager.CurrentPlayer).DisplayName ?? "another player")...
+                Waiting for @(GameState.Participants.FirstOrDefault(p => p.User.Id == GameState.TurnManager.CurrentPlayer).DisplayName ?? "another player")...
             </div>
         }
     </div>

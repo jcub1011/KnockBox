@@ -39,9 +39,9 @@ else
         {
             <LobbyPhase GameState="GameState" />
         }
-        else if (IsHost())
+        else if (IsHost() && !GameState.HostIsParticipant)
         {
-            @* Host spectator routing *@
+            @* Host spectator routing — only when the host is the shared display, not playing *@
             @switch (GameState.Phase)
             {
                 case OperatorGamePhase.Setup:

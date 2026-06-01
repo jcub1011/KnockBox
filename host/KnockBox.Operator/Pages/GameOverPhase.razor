@@ -2,7 +2,7 @@
 @using KnockBox.Operator.Services.State
 
 @{
-    var sortedPlayers = GameState.Players
+    var sortedPlayers = GameState.Participants
         .Select(p => new { Player = p, State = GameState.Context?.GamePlayers.GetValueOrDefault(p.User.Id) })
         .Where(x => x.State != null)
         .OrderBy(x => Math.Abs(x.State!.CurrentPoints))

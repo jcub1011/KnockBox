@@ -20,6 +20,19 @@ public class OperatorGameEngine(
     IRandomNumberService randomNumberService)
     : AbstractGameEngine<OperatorGameState>(minPlayerCount: 2, maxPlayerCount: int.MaxValue)
 {
+    /// <summary>
+    /// Operator counts the host as a participant when <see cref="OperatorSettings.HostPlays"/>
+    /// is on, so readiness is gated on <see cref="AbstractGameState.Participants"/>.<c>Length</c>
+    /// rather than the base check's <c>Players.Length</c>. (Start gating is enforced by the
+    /// lobby button; this keeps the readiness API correct for any caller that consults it.)
+    /// </summary>
+    public override Task<bool> CanStartAsync(AbstractGameState state, CancellationToken ct = default)
+    {
+        int count = state.Participants.Length;
+        bool valid = MinPlayerCount <= count && count <= MaxPlayerCount && state.IsJoinable;
+        return Task.FromResult(valid);
+    }
+
     public override Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
     {
         if (host is null)
@@ -45,7 +58,12 @@ public class OperatorGameEngine(
 
         return await operatorState.ExecuteAsync(() =>
         {
-            var allParticipants = operatorState.Players.ToList();
+            // Fix the host's participation from settings at start time so the snapshot below
+            // is self-contained regardless of button ordering. When HostPlays is false,
+            // Participants == Players and behavior is unchanged.
+            operatorState.SetHostIsParticipant(operatorState.Settings.HostPlays);
+
+            var allParticipants = operatorState.Participants.ToList();
 
             // Initialize GamePlayers (deck generation and dealing happen in SetupState after choices)
             foreach (var entry in allParticipants)

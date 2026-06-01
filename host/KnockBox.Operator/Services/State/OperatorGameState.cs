@@ -37,11 +37,17 @@ public class OperatorGameState(
 
     /// <summary>
     /// Atomically replaces <see cref="Settings"/> with <paramref name="mutate"/>'s result
+    /// and reflects the new <c>HostPlays</c> value into
+    /// <see cref="AbstractGameState.HostIsParticipant"/> in the same critical section,
     /// inside <see cref="AbstractGameState.Execute(Action)"/>, so subscribers observe a
     /// single consistent transition and notification fires once after the lock releases.
     /// </summary>
     public Result UpdateSettings(Func<OperatorSettings, OperatorSettings> mutate) =>
-        Execute(() => { Settings = mutate(Settings); });
+        Execute(() =>
+        {
+            Settings = mutate(Settings);
+            SetHostIsParticipant(Settings.HostPlays);
+        });
 
     public DateTimeOffset StateStartTime { get; set; } = DateTimeOffset.UtcNow;
     

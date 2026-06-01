@@ -111,7 +111,7 @@ namespace KnockBox.Operator.Pages
         protected string GetAttackerName()
         {
             return GameState.PendingGameActionCommand != null
-                ? GameState.Players.FirstOrDefault(p => p.User.Id == GameState.PendingGameActionCommand.InitiatorPlayerId).DisplayName ?? "Unknown"
+                ? GameState.Participants.FirstOrDefault(p => p.User.Id == GameState.PendingGameActionCommand.InitiatorPlayerId).DisplayName ?? "Unknown"
                 : "Unknown";
         }
 
