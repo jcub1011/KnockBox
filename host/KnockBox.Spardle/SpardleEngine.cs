@@ -161,11 +161,12 @@ public class SpardleEngine(
         }
     }
 
-    // The caller enumerates the result exactly once (a foreach that immediately maps each
-    // index to a word). Only RandomNoRepeats needs a materialized buffer (it shuffles a
-    // pool); the other three modes are produced lazily so we don't allocate a `take`-sized
-    // array — which is up to the full dictionary size in FullDictionary mode — just to walk
-    // it once.
+    // Only the deterministic generators (ReverseListIndices / AscendingIndices) are produced
+    // lazily — re-enumerating them is harmless, and staying lazy avoids allocating a `take`-sized
+    // array (up to the full dictionary size in FullDictionary mode) just to walk it once. The two
+    // RNG-driven modes are materialized: RandomNoRepeats shuffles a pool, and RandomWithRepeats
+    // draws into a buffer up front so repeated or partial enumeration can't desync the RNG stream
+    // (a lazy `yield return rng.GetRandomInt(...)` would advance the RNG on every enumeration).
     private IEnumerable<int> PickIndices(WordOrderMode mode, int total, int take) => mode switch
     {
         WordOrderMode.RandomNoRepeats => SampleUniqueIndices(total, take),
@@ -174,9 +175,11 @@ public class SpardleEngine(
         _ => AscendingIndices(take),
     };
 
-    private IEnumerable<int> RandomWithRepeatIndices(int total, int take)
+    private int[] RandomWithRepeatIndices(int total, int take)
     {
-        for (int i = 0; i < take; i++) yield return rng.GetRandomInt(total);
+        var indices = new int[take];
+        for (int i = 0; i < take; i++) indices[i] = rng.GetRandomInt(total);
+        return indices;
     }
 
     private static IEnumerable<int> ReverseListIndices(int total, int take)
