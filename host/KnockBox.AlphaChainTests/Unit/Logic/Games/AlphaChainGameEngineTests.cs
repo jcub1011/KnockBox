@@ -1,6 +1,7 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.State.Games;
+using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -21,7 +22,11 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
             _host = UserFactory.Create("Host", "host1");
-            _engine = new AlphaChainGameEngine(_engineLoggerMock.Object, _stateLoggerMock.Object);
+            _engine = new AlphaChainGameEngine(
+                new StubWordListService(),
+                new FixedRandomNumberService(),
+                _engineLoggerMock.Object,
+                _stateLoggerMock.Object);
         }
 
         private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");

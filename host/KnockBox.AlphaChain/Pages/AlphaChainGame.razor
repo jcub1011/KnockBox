@@ -1,5 +1,6 @@
 @inherits DisposableComponent
 @using KnockBox.AlphaChain.Services.Logic.Games.Data
+@using KnockBox.AlphaChain.Services.Logic.Games.FSM
 @using KnockBox.AlphaChain.Services.State.Games
 
 @* In-game view. Rendered as a component by AlphaChainLobby when the lobby is no
@@ -21,11 +22,26 @@
                     </li>
                 }
             </ol>
-            <p class="ac-results-note">Results screen is a placeholder — scoring lands in M2.</p>
         </div>
     }
     else
     {
+        @* ── Banner: chain rule + banned letter + shot clock ── *@
+        <div class="ac-banner">
+            <div class="ac-banner-cell">
+                <span class="ac-banner-label">Start with</span>
+                <span class="ac-banner-letter">@RequiredStartDisplay</span>
+            </div>
+            <div class="ac-banner-cell ac-banner-banned">
+                <span class="ac-banner-label">Banned</span>
+                <span class="ac-banner-letter">@BannedLetterDisplay</span>
+            </div>
+            <div class="ac-banner-cell">
+                <span class="ac-banner-label">Shot clock</span>
+                <span class="ac-banner-clock @(SecondsRemaining <= 3 ? "ac-clock-urgent" : "")">@SecondsRemaining s</span>
+            </div>
+        </div>
+
         <div class="ac-status">
             <div class="ac-status-item">
                 <span class="ac-status-label">Era</span>
@@ -41,8 +57,69 @@
             </div>
         </div>
 
-        <button class="ac-advance-btn" @onclick="AdvanceTurnAsync">
-            Next turn (debug)
-        </button>
+        @* ── Word entry ── *@
+        <EditForm Model="this" OnValidSubmit="SubmitWordAsync" class="ac-entry">
+            <input class="ac-word-input"
+                   @bind="WordInput"
+                   @bind:event="oninput"
+                   placeholder="@(IsMyTurn ? "Type a word…" : "Waiting for your turn…")"
+                   disabled="@(!IsMyTurn || IsSubmitting)"
+                   autocomplete="off" />
+            <button type="submit" class="ac-submit-btn"
+                    disabled="@(!IsMyTurn || IsSubmitting || string.IsNullOrWhiteSpace(WordInput))">
+                Submit
+            </button>
+        </EditForm>
+
+        @if (FeedbackMessage is { } feedback)
+        {
+            <p class="ac-feedback @(LastResultIsRejection ? "ac-feedback-bad" : "ac-feedback-good")">@feedback</p>
+        }
+
+        <div class="ac-panels">
+            @* ── Live leaderboard ── *@
+            <div class="ac-panel">
+                <h3 class="ac-panel-title">Leaderboard</h3>
+                <ol class="ac-leaderboard">
+                    @foreach (var p in Leaderboard)
+                    {
+                        <li class="ac-leaderboard-row @(p.IsEliminated ? "ac-eliminated" : "")">
+                            <span class="ac-leaderboard-name">
+                                @p.DisplayName
+                                @if (p.IsEliminated)
+                                {
+                                    <span class="ac-tag">out</span>
+                                }
+                                else if (p.HasLeft)
+                                {
+                                    <span class="ac-tag">left</span>
+                                }
+                            </span>
+                            <span class="ac-leaderboard-score">@p.Score</span>
+                        </li>
+                    }
+                </ol>
+            </div>
+
+            @* ── Submitted-words log ── *@
+            <div class="ac-panel">
+                <h3 class="ac-panel-title">Words played</h3>
+                <ul class="ac-feed">
+                    @foreach (var play in PlayFeed)
+                    {
+                        <li class="ac-feed-row @(play.ZeroPointTax ? "ac-feed-taxed" : "")">
+                            <span class="ac-feed-time">@play.PlayedAt.ToLocalTime().ToString("HH:mm:ss")</span>
+                            <span class="ac-feed-player">@play.DisplayName</span>
+                            <span class="ac-feed-word">@play.Word</span>
+                            <span class="ac-feed-score">@play.Score</span>
+                            @if (play.ZeroPointTax)
+                            {
+                                <span class="ac-tag ac-tag-tax">zero-point tax</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
     }
 </div>

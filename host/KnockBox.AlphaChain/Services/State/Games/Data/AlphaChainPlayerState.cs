@@ -22,6 +22,12 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         /// <summary>Whether the player has disconnected/left. Their turns are skipped.</summary>
         public bool HasLeft { get; set; } = false;
 
+        /// <summary>
+        /// How many times this player ran out the shot clock. Tracked in non-survival
+        /// mode (in survival mode a timeout eliminates instead). Surfaced for stats/UI.
+        /// </summary>
+        public int TurnTimeouts { get; set; } = 0;
+
         // Reserved for M3: modifier-card and action-card hand collections are added here.
         // Kept off the public surface for now so M1 stays minimal.
     }

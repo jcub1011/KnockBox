@@ -47,8 +47,43 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// <summary>Current era number, 1-based. Set to 1 in <c>SetupState</c>; advanced at Intermission (M4).</summary>
         public int CurrentEra { get; set; }
 
-        /// <summary>When the current phase's timer expires. Set on entering <c>RoundState</c>; no consequence until M2.</summary>
+        /// <summary>When the current phase's timer expires. Set on entering <c>RoundState</c> and reset after every turn via <see cref="ResetTurnTimer"/>.</summary>
         public DateTimeOffset PhaseEndTime { get; set; }
+
+        /// <summary>
+        /// Every word played this match, used for O(1) duplicate rejection. Case-insensitive
+        /// (words are normalized to lower-case before insertion, but the comparer keeps the
+        /// check robust). Order is not preserved here — <see cref="PlayLog"/> backs the UI feed.
+        /// </summary>
+        public HashSet<string> PlayedWords { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Chronological log of accepted plays, backing the UI's submitted-words feed.</summary>
+        public List<AlphaChainWordPlay> PlayLog { get; } = new();
+
+        /// <summary>The most recently accepted word (normalized), or null before the first play.</summary>
+        public string? LastWord { get; set; }
+
+        /// <summary>
+        /// The letter the next word must start with (lower-case), or null when the next
+        /// player has a free choice — at game start, after a banned-letter-as-last-letter
+        /// play, and after a Pivot (Pivot lands in M3).
+        /// </summary>
+        public char? RequiredStartLetter { get; set; }
+
+        /// <summary>
+        /// The match's banned letter (lower-case), chosen in <c>SetupState</c>. Using it
+        /// anywhere in a word triggers the Zero-Point Tax; using it as the last letter also
+        /// clears <see cref="RequiredStartLetter"/> for the next player.
+        /// </summary>
+        public char? BannedLetter { get; set; }
+
+        /// <summary>
+        /// Re-arms the shot clock from <paramref name="now"/>. Called on entering
+        /// <c>RoundState</c> and after every turn (submission or timeout). Caller must
+        /// already hold the execute lock.
+        /// </summary>
+        public void ResetTurnTimer(DateTimeOffset now)
+            => PhaseEndTime = now.AddSeconds(Settings.ShotClockSeconds);
 
         /// <summary>Final standings, populated by <c>GameOverState</c>.</summary>
         public GameResults? Results { get; set; }

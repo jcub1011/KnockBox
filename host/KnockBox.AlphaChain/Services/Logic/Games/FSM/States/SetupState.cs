@@ -31,7 +31,16 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.CurrentEra = 1;
             state.CurrentRound = 1;
 
-            context.Logger.LogDebug("Alpha Chain FSM → SetupState ({count} participants)", state.GamePlayers.Count);
+            // Pick the match's banned letter from the configured letter class. Stored
+            // lower-case so chain/contains checks against the normalized word are direct.
+            state.BannedLetter = PickBannedLetter(context, state.Settings.BanMode);
+
+            // First player has a free choice — no required start letter yet.
+            state.RequiredStartLetter = null;
+
+            context.Logger.LogDebug(
+                "Alpha Chain FSM → SetupState ({count} participants, banned letter '{banned}')",
+                state.GamePlayers.Count, state.BannedLetter);
 
             return new RoundState();
         }
@@ -40,5 +49,22 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
         public ValueResult<IGameState<AlphaChainGameContext, AlphaChainCommand>?> HandleCommand(
             AlphaChainGameContext context, AlphaChainCommand command) => null;
+
+        // Lower-case letter pools the ban draws from, per BanLetterMode.
+        private const string Vowels = "aeiou";
+        private const string Consonants = "bcdfghjklmnpqrstvwxyz"; // 21 letters
+        private const string AllLetters = "abcdefghijklmnopqrstuvwxyz";
+
+        /// <summary>Draws a banned letter (lower-case) from the pool selected by <paramref name="mode"/>.</summary>
+        private static char PickBannedLetter(AlphaChainGameContext context, BanLetterMode mode)
+        {
+            string pool = mode switch
+            {
+                BanLetterMode.Vowels => Vowels,
+                BanLetterMode.Consonants => Consonants,
+                _ => AllLetters,
+            };
+            return pool[context.Rng.GetRandomInt(pool.Length)];
+        }
     }
 }
