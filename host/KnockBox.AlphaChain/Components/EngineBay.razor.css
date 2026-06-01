@@ -3,13 +3,15 @@
     flex-direction: column;
     gap: 0.5rem;
     padding: 0.75rem;
-    border: 1px solid rgba(128, 128, 128, 0.25);
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
     border-radius: 0.75rem;
+    background: var(--ac-panel, rgba(18, 24, 44, 0.72));
     min-width: 14rem;
 }
 
 .ac-bay-readonly {
     opacity: 0.9;
+    min-width: 9rem;
 }
 
 .ac-bay-header {
@@ -20,17 +22,22 @@
 }
 
 .ac-bay-title {
-    font-size: 0.85rem;
-    font-weight: 700;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.78rem;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    opacity: 0.8;
+    letter-spacing: 0.1em;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
 }
 
 .ac-bay-flow {
-    font-size: 0.7rem;
-    opacity: 0.55;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.68rem;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
     font-variant-numeric: tabular-nums;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.3rem;
+    background: rgba(255, 255, 255, 0.04);
 }
 
 .ac-bay-slots {
@@ -54,11 +61,12 @@
     justify-content: center;
     gap: 0.15rem;
     width: 100%;
-    min-height: 3.5rem;
+    min-height: 3.75rem;
     padding: 0.4rem 0.3rem;
-    border: 1px solid rgba(128, 128, 128, 0.4);
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
     border-radius: 0.5rem;
-    background: rgba(128, 128, 128, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ac-ink, #eaf2ff);
     cursor: pointer;
     font: inherit;
     text-align: center;
@@ -69,23 +77,30 @@
 }
 
 .ac-card-additive {
-    border-color: rgba(46, 139, 87, 0.6);
+    border-color: color-mix(in srgb, var(--ac-additive) 70%, transparent);
+    background: color-mix(in srgb, var(--ac-additive) 12%, transparent);
 }
+
+.ac-card-additive .ac-card-op { color: var(--ac-additive); }
 
 .ac-card-multiplicative {
-    border-color: rgba(70, 130, 180, 0.6);
+    border-color: color-mix(in srgb, var(--ac-multiplicative) 70%, transparent);
+    background: color-mix(in srgb, var(--ac-multiplicative) 12%, transparent);
 }
 
+.ac-card-multiplicative .ac-card-op { color: var(--ac-multiplicative); }
+
 .ac-card-selected {
-    outline: 2px solid #e0a800;
+    outline: 2px solid var(--ac-amber, #ffb020);
     outline-offset: 1px;
 }
 
 /* Card being dragged for reorder. */
 .ac-card-dragging {
-    opacity: 0.45;
-    outline: 2px dashed #4682b4;
+    opacity: 0.5;
+    outline: 2px dashed var(--ac-cyan, #00e5ff);
     outline-offset: 1px;
+    box-shadow: var(--ac-glow-cyan);
 }
 
 /* Owner's bay while reorder is suppressed (live round). */
@@ -103,19 +118,22 @@
 
 .ac-card-empty {
     cursor: default;
-    opacity: 0.4;
-    font-size: 0.75rem;
+    background: transparent;
+    border-style: dashed;
+    border-color: var(--ac-border, rgba(255, 255, 255, 0.08));
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+    font-size: 0.7rem;
     font-style: italic;
 }
 
 .ac-card-name {
     font-size: 0.72rem;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.1;
 }
 
 .ac-card-op {
-    font-size: 1rem;
+    font-family: var(--font-mono, monospace);
+    font-size: 1.05rem;
     font-weight: 800;
-    opacity: 0.7;
 }

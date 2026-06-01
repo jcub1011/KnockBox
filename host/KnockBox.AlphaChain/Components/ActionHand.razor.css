@@ -3,24 +3,26 @@
     flex-direction: column;
     gap: 0.5rem;
     padding: 0.75rem;
-    border: 1px solid rgba(128, 128, 128, 0.25);
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
     border-radius: 0.75rem;
+    background: var(--ac-panel, rgba(18, 24, 44, 0.72));
     min-width: 12rem;
 }
 
 .ac-hand-title {
-    font-size: 0.85rem;
-    font-weight: 700;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.78rem;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    opacity: 0.8;
+    letter-spacing: 0.1em;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
 }
 
 .ac-hand-empty {
     margin: 0;
     font-size: 0.8rem;
     font-style: italic;
-    opacity: 0.55;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
 }
 
 .ac-hand-cards {
@@ -36,16 +38,17 @@
     position: relative;
 }
 
-/* ── Card chip (scoped to this component's markup) ───────────────────── */
+/* ── Action card chip (scoped to this component's markup) ────────────── */
 .ac-card {
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 2.75rem;
-    padding: 0.4rem 0.7rem;
-    border: 1px solid rgba(218, 165, 32, 0.6);
+    padding: 0.4rem 0.8rem;
+    border: 1px solid color-mix(in srgb, var(--ac-action) 70%, transparent);
     border-radius: 0.5rem;
-    background: rgba(218, 165, 32, 0.1);
+    background: color-mix(in srgb, var(--ac-action) 14%, transparent);
+    color: var(--ac-ink, #eaf2ff);
     cursor: pointer;
     font: inherit;
 }
@@ -56,26 +59,28 @@
 }
 
 .ac-card-selected {
-    outline: 2px solid #e0a800;
+    outline: 2px solid var(--ac-action, #b97bff);
     outline-offset: 1px;
+    box-shadow: 0 0 16px color-mix(in srgb, var(--ac-action) 45%, transparent);
 }
 
 .ac-card-name {
     font-size: 0.78rem;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 /* "Queued for your next word" badge on a pending Pivot/Amnesty card. */
 .ac-card-queued-badge {
     margin-left: 0.4rem;
     padding: 0.05rem 0.4rem;
-    font-size: 0.6rem;
-    font-weight: 700;
+    font-size: 0.58rem;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     border-radius: 0.4rem;
-    background: rgba(70, 130, 180, 0.85);
-    color: #fff;
+    background: var(--ac-violet, #b97bff);
+    color: #16082b;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--ac-violet) 55%, transparent);
 }
 
 /* ── Time Thief target-picker modal ──────────────────────────────────── */
@@ -86,21 +91,22 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(2, 4, 10, 0.7);
+    backdrop-filter: blur(3px);
 }
 
 .ac-modal {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.6rem;
     min-width: min(20rem, 90vw);
     max-width: 90vw;
     padding: 1rem 1.25rem;
-    border: 1px solid rgba(128, 128, 128, 0.35);
-    border-radius: 0.75rem;
-    background: var(--ac-picker-bg, #1f1f1f);
-    color: #f5f5f5;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    border-radius: 0.85rem;
+    background: var(--ac-picker-bg, rgba(10, 14, 28, 0.96));
+    color: var(--ac-ink, #eaf2ff);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 24px color-mix(in srgb, var(--ac-violet) 30%, transparent);
 }
 
 .ac-modal-head {
@@ -111,8 +117,9 @@
 }
 
 .ac-modal-title {
-    font-size: 0.85rem;
-    font-weight: 700;
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: var(--ac-violet, #b97bff);
 }
 
 .ac-modal-close {
@@ -120,8 +127,9 @@
     background: transparent;
     color: inherit;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 1.1rem;
     opacity: 0.7;
+    line-height: 1;
 }
 
 .ac-modal-close:hover {
@@ -131,26 +139,31 @@
 .ac-modal-body {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.4rem;
 }
 
 .ac-target-none {
-    font-size: 0.75rem;
+    font-size: 0.78rem;
     font-style: italic;
-    opacity: 0.6;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
 }
 
 .ac-target-btn {
-    padding: 0.3rem 0.5rem;
-    border: 1px solid rgba(128, 128, 128, 0.4);
-    border-radius: 0.4rem;
-    background: rgba(128, 128, 128, 0.12);
+    min-height: 44px;
+    padding: 0.45rem 0.7rem;
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ac-ink, #eaf2ff);
     cursor: pointer;
     font: inherit;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
+    font-weight: 600;
     text-align: left;
+    transition: background 0.15s, border-color 0.15s;
 }
 
 .ac-target-btn:hover {
-    background: rgba(128, 128, 128, 0.25);
+    background: color-mix(in srgb, var(--ac-violet) 22%, transparent);
+    border-color: var(--ac-violet, #b97bff);
 }

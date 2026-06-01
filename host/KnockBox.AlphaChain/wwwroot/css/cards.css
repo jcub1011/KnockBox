@@ -10,10 +10,10 @@
  */
 
 :root {
-    --ac-additive: #2e8b57;
-    --ac-multiplicative: #4682b4;
-    --ac-action: #e0a800;
-    --ac-tax: #d9534f;
+    --ac-additive: #14f195;
+    --ac-multiplicative: #ffb020;
+    --ac-action: #b97bff;
+    --ac-tax: #ff3b5c;
 }
 
 /* Anchor for the glyph watermark. Only adds positioning context — no visual override. */

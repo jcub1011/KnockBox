@@ -1,7 +1,9 @@
 @inherits DisposableComponent
+@using System.Globalization
 @using KnockBox.AlphaChain.Services.Logic.Games.Data
 @using KnockBox.AlphaChain.Services.Logic.Games.FSM
 @using KnockBox.AlphaChain.Services.State.Games
+@using KnockBox.Core.Components.Shared
 
 @* In-game view. Rendered as a component by AlphaChainLobby when the lobby is no
    longer joinable (the single-page approach recommended by the M1 spec's Risks
@@ -16,8 +18,14 @@
     {
         <div class="ac-intermission">
             <div class="ac-im-header">
-                <span class="ac-im-era">Era @GameState.CurrentEra → @(GameState.CurrentEra + 1)</span>
-                <span class="ac-im-clock @(SubPhaseSecondsRemaining <= 3 ? "ac-clock-urgent" : "")">@SubPhaseSecondsRemaining s</span>
+                <span class="ac-im-era">Era @GameState.CurrentEra <span class="ac-im-arrow">→</span> @(GameState.CurrentEra + 1)</span>
+                <div class="ac-im-timer">
+                    <span class="ac-im-clock @(SubPhaseSecondsRemaining <= 3 ? "ac-clock-urgent" : "")">@SubPhaseSecondsRemaining<span class="ac-im-clock-unit">s</span></span>
+                    @if (SubPhaseDurationSeconds > 0)
+                    {
+                        <span class="ac-im-bar"><span class="ac-im-bar-fill" style="width:@((SubPhaseFraction * 100).ToString("0.#", CultureInfo.InvariantCulture))%"></span></span>
+                    }
+                </div>
             </div>
 
             @switch (GameState.IntermissionPhase)
@@ -58,135 +66,184 @@
     }
     else
     {
-        @* ── Banner: chain rule + banned letter + shot clock ── *@
-        <div class="ac-banner">
-            <div class="ac-banner-cell">
-                <span class="ac-banner-label">Start with</span>
-                <span class="ac-banner-letter">@RequiredStartDisplay</span>
-            </div>
-            <div class="ac-banner-cell ac-banner-banned">
-                <span class="ac-banner-label">Banned</span>
-                <span class="ac-banner-letter">@BannedLetterDisplay</span>
-            </div>
-            <div class="ac-banner-cell">
-                <span class="ac-banner-label">Shot clock</span>
-                <span class="ac-banner-clock @(SecondsRemaining <= 3 ? "ac-clock-urgent" : "")">@SecondsRemaining s</span>
-            </div>
-        </div>
+        <div class="ac-round">
+            <section class="ac-stage">
+                @* ── Command rail: chain rule + banned letter + shot clock ── *@
+                <div class="ac-command">
+                    <div class="ac-cmd-cell">
+                        <span class="ac-cmd-label">Start with</span>
+                        <span class="ac-cmd-letter ac-cmd-start">@RequiredStartDisplay</span>
+                    </div>
+                    <div class="ac-cmd-clock">
+                        <CountdownClock EndTimeUtc="GameState.PhaseEndTime" Duration="ShotClockDuration" Context="clock">
+                            @{
+                                var frac = Math.Clamp(clock.Fraction, 0f, 1f);
+                                var offset = (276.46 * (1 - frac)).ToString("0.0", CultureInfo.InvariantCulture);
+                                var ringClass = clock.RemainingSeconds <= 3 ? "ac-ring-danger"
+                                    : clock.RemainingSeconds <= 6 ? "ac-ring-warn" : "ac-ring-go";
+                            }
+                            <div class="ac-ring @ringClass">
+                                <svg class="ac-ring-svg" viewBox="0 0 100 100" aria-hidden="true">
+                                    <circle class="ac-ring-track" cx="50" cy="50" r="44" />
+                                    <circle class="ac-ring-fill" cx="50" cy="50" r="44" style="stroke-dashoffset:@offset" />
+                                </svg>
+                                <span class="ac-ring-num">@((int)Math.Ceiling(Math.Max(0, clock.RemainingSeconds)))</span>
+                            </div>
+                        </CountdownClock>
+                    </div>
+                    <div class="ac-cmd-cell ac-cmd-banned">
+                        <span class="ac-cmd-label">Banned</span>
+                        <span class="ac-cmd-letter">@BannedLetterDisplay</span>
+                    </div>
+                </div>
 
-        <div class="ac-status">
-            <div class="ac-status-item">
-                <span class="ac-status-label">Era</span>
-                <span class="ac-status-value">@GameState.CurrentEra</span>
-            </div>
-            <div class="ac-status-item">
-                <span class="ac-status-label">Round</span>
-                <span class="ac-status-value">@GameState.CurrentRound</span>
-            </div>
-            <div class="ac-status-item">
-                <span class="ac-status-label">Active player</span>
-                <span class="ac-status-value">@CurrentPlayerName</span>
-            </div>
-        </div>
-
-        @* ── Word entry ── *@
-        <EditForm Model="this" OnValidSubmit="SubmitWordAsync" class="ac-entry">
-            <input class="ac-word-input"
-                   @bind="WordInput"
-                   @bind:event="oninput"
-                   placeholder="@(IsMyTurn ? "Type a word…" : "Waiting for your turn…")"
-                   disabled="@(!IsMyTurn || IsSubmitting)"
-                   autocomplete="off" />
-            <button type="submit" class="ac-submit-btn"
-                    disabled="@(!IsMyTurn || IsSubmitting || string.IsNullOrWhiteSpace(WordInput))">
-                Submit
-            </button>
-        </EditForm>
-
-        @if (PendingActionBadge is { } badge)
-        {
-            <p class="ac-pending-badge">@badge</p>
-        }
-
-        @if (FeedbackMessage is { } feedback)
-        {
-            <p class="ac-feedback @(LastResultIsRejection ? "ac-feedback-bad" : "ac-feedback-good")">@feedback</p>
-        }
-
-        @* ── Cards: own Engine Bay + Action Hand, host debug deal ── *@
-        @if (MyPlayer is { } me)
-        {
-            <div class="ac-cards">
-                @* Reorder is locked during a live round — the scoring pipeline order is
-                   frozen and only resequenced at Intermission (Optimization). *@
-                <EngineBay Cards="me.EngineBay" Slots="me.ModifierSlots"
-                           Locked="@(GameState.Phase == AlphaChainGamePhase.Round)"
-                           OnReorder="ReorderBayAsync" Title="Your Engine Bay" />
-                <ActionHand Cards="me.ActionHand" Opponents="ActionTargets" Disabled="false"
-                            QueuedKind="me.PendingAction" OnPlay="PlayActionAsync" />
-            </div>
-        }
-
-        @if (IsHost)
-        {
-            <button type="button" class="ac-debug-grant" @onclick="GrantCardsAsync">Grant Cards (debug)</button>
-        }
-
-        @* ── Opponent Engine Bays (read-only summary; becomes fog-of-war in M4) ── *@
-        @if (Opponents.Count > 0)
-        {
-            <div class="ac-opponent-bays">
-                @foreach (var opp in Opponents)
-                {
-                    <EngineBay Cards="opp.EngineBay" Slots="opp.ModifierSlots" ReadOnly="true" Title="@opp.DisplayName" />
-                }
-            </div>
-        }
-
-        <div class="ac-panels">
-            @* ── Live leaderboard ── *@
-            <div class="ac-panel">
-                <h3 class="ac-panel-title">Leaderboard</h3>
-                <ol class="ac-leaderboard">
-                    @foreach (var p in Leaderboard)
+                @* ── Turn spotlight ── *@
+                <div class="ac-turnflag @(IsMyTurn ? "ac-turnflag-me" : "")"
+                     style="--accent: var(--ac-p@(AccentSlot(GameState.TurnManager.CurrentPlayer ?? string.Empty)))">
+                    @if (IsMyTurn)
                     {
-                        <li class="ac-leaderboard-row @(p.IsEliminated ? "ac-eliminated" : "")">
-                            <span class="ac-leaderboard-name">
-                                @p.DisplayName
-                                @if (p.IsEliminated)
+                        <span class="ac-turnflag-text">YOUR TURN</span>
+                    }
+                    else
+                    {
+                        <span class="ac-turnflag-now">NOW</span>
+                        <span class="ac-turnflag-name">@CurrentPlayerName</span>
+                    }
+                    <span class="ac-turnflag-meta">Era @GameState.CurrentEra · Round @GameState.CurrentRound</span>
+                </div>
+
+                @* ── Word entry: client-owned input (no @bind — see alpha-chain-input.js) ── *@
+                <div class="ac-entry @(IsMyTurn ? "ac-entry-live" : "ac-entry-wait")">
+                    <span class="ac-entry-prefix @(GameState.RequiredStartLetter is null ? "ac-entry-prefix-free" : "")"
+                          title="@(GameState.RequiredStartLetter is null ? "Free choice — any letter" : "Your word must start with this letter")">
+                        @(GameState.RequiredStartLetter is { } req ? char.ToUpperInvariant(req).ToString() : "∗")
+                    </span>
+                    <input @ref="_wordInputRef" class="ac-word-input" type="text"
+                           placeholder="@(IsMyTurn ? "type a word…" : $"{CurrentPlayerName} is playing…")"
+                           disabled="@(!IsMyTurn)"
+                           autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+                    <button type="button" class="ac-submit-btn" disabled="@(!IsMyTurn || IsSubmitting)"
+                            @onclick="SubmitFromButtonAsync">GO</button>
+                </div>
+
+                <div class="ac-entry-status">
+                    @if (PendingActionBadge is { } badge)
+                    {
+                        <span class="ac-pending-badge">@badge</span>
+                    }
+                    @if (FeedbackMessage is { } feedback)
+                    {
+                        <span class="ac-feedback @(LastResultIsRejection ? "ac-feedback-bad" : "ac-feedback-good")">@feedback</span>
+                    }
+                </div>
+
+                @* ── Chain trail ── *@
+                @if (ChainTrail.Count > 0)
+                {
+                    <div class="ac-trail" aria-label="Recent chain">
+                        @foreach (var play in ChainTrail)
+                        {
+                            <span class="ac-trail-word @(play.ZeroPointTax ? "ac-trail-taxed" : "")">
+                                @for (int i = 0; i < play.Word.Length; i++)
                                 {
-                                    <span class="ac-tag">out</span>
-                                }
-                                else if (p.HasLeft)
-                                {
-                                    <span class="ac-tag">left</span>
+                                    <span class="ac-trail-letter @(i == play.Word.Length - 1 ? "ac-trail-link" : "")">@char.ToUpperInvariant(play.Word[i])</span>
                                 }
                             </span>
-                            <span class="ac-leaderboard-score">@p.Score</span>
-                        </li>
-                    }
-                </ol>
-            </div>
+                        }
+                    </div>
+                }
 
-            @* ── Submitted-words log ── *@
-            <div class="ac-panel">
-                <h3 class="ac-panel-title">Words played</h3>
-                <ul class="ac-feed">
-                    @foreach (var play in PlayFeed)
-                    {
-                        <li class="ac-feed-row @(play.ZeroPointTax ? "ac-feed-taxed" : "")">
-                            <span class="ac-feed-time">@play.PlayedAt.ToLocalTime().ToString("HH:mm:ss")</span>
-                            <span class="ac-feed-player">@play.DisplayName</span>
-                            <span class="ac-feed-word">@play.Word</span>
-                            <span class="ac-feed-score">@play.Score</span>
-                            @if (play.ZeroPointTax)
-                            {
-                                <span class="ac-tag ac-tag-tax">zero-point tax</span>
-                            }
-                        </li>
-                    }
-                </ul>
-            </div>
+                @* ── Cards: own Engine Bay + Action Hand, host debug deal ── *@
+                @if (MyPlayer is { } myCards)
+                {
+                    <div class="ac-cards">
+                        @* Reorder is locked during a live round — the scoring pipeline order is
+                           frozen and only resequenced at Intermission (Optimization). *@
+                        <EngineBay Cards="myCards.EngineBay" Slots="myCards.ModifierSlots"
+                                   Locked="@(GameState.Phase == AlphaChainGamePhase.Round)"
+                                   OnReorder="ReorderBayAsync" Title="Your Engine Bay" />
+                        <ActionHand Cards="myCards.ActionHand" Opponents="ActionTargets" Disabled="false"
+                                    QueuedKind="myCards.PendingAction" OnPlay="PlayActionAsync" />
+                    </div>
+                }
+
+                @if (IsHost)
+                {
+                    <button type="button" class="ac-debug-grant" @onclick="GrantCardsAsync">Grant Cards (debug)</button>
+                }
+
+                @* ── Opponent Engine Bays (read-only summary; becomes fog-of-war in M4) ── *@
+                @if (Opponents.Count > 0)
+                {
+                    <div class="ac-opponent-bays">
+                        @foreach (var opp in Opponents)
+                        {
+                            <EngineBay Cards="opp.EngineBay" Slots="opp.ModifierSlots" ReadOnly="true" Title="@opp.DisplayName" />
+                        }
+                    </div>
+                }
+            </section>
+
+            <aside class="ac-rail">
+                @* ── Live leaderboard ── *@
+                <div class="ac-panel ac-panel-leaderboard">
+                    <h3 class="ac-panel-title">Leaderboard</h3>
+                    <ol class="ac-leaderboard">
+                        @{ var rank = 0; }
+                        @foreach (var p in Leaderboard)
+                        {
+                            rank++;
+                            var slot = AccentSlot(p.UserId);
+                            var arrow = RankArrow(p.UserId);
+                            var isMe = p.UserId == CurrentUserId;
+                            var isActive = p.UserId == GameState.TurnManager.CurrentPlayer;
+                            <li class="ac-lb-row @(p.IsEliminated ? "ac-eliminated" : "") @(isMe ? "ac-lb-me" : "") @(isActive ? "ac-lb-active" : "")"
+                                style="--accent: var(--ac-p@(slot))">
+                                <span class="ac-lb-rank">@rank</span>
+                                <span class="ac-lb-name">
+                                    @p.DisplayName
+                                    @if (p.IsEliminated)
+                                    {
+                                        <span class="ac-tag">out</span>
+                                    }
+                                    else if (p.HasLeft)
+                                    {
+                                        <span class="ac-tag">left</span>
+                                    }
+                                </span>
+                                @if (!string.IsNullOrEmpty(arrow))
+                                {
+                                    <span class="ac-lb-arrow @(arrow == "▲" ? "ac-lb-up" : "ac-lb-down")">@arrow</span>
+                                }
+                                <span class="ac-lb-score">@p.Score</span>
+                                @if (LatestPlay is { } lp && lp.UserId == p.UserId && lp.Score > 0)
+                                {
+                                    <span class="ac-score-pop" @key="LatestPlayKey">+@lp.Score</span>
+                                }
+                            </li>
+                        }
+                    </ol>
+                </div>
+
+                @* ── Submitted-words log ── *@
+                <div class="ac-panel ac-panel-feed">
+                    <h3 class="ac-panel-title">Words played</h3>
+                    <ul class="ac-feed">
+                        @foreach (var play in PlayFeed)
+                        {
+                            <li class="ac-feed-row @(play.ZeroPointTax ? "ac-feed-taxed" : "")">
+                                <span class="ac-feed-word">@play.Word</span>
+                                <span class="ac-feed-player">@play.DisplayName</span>
+                                @if (play.ZeroPointTax)
+                                {
+                                    <span class="ac-tag ac-tag-tax">tax</span>
+                                }
+                                <span class="ac-feed-score">+@play.Score</span>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </aside>
         </div>
     }
 </div>

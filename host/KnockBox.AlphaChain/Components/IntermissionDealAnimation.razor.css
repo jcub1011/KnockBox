@@ -8,27 +8,30 @@
 
 .ac-im-deal-title {
     margin: 0;
+    font-family: var(--font-display, system-ui);
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: var(--ac-ink, #eaf2ff);
 }
 
 .ac-im-deal-sub {
     margin: 0;
-    font-size: 0.85rem;
-    opacity: 0.7;
+    font-size: 0.88rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
 }
 
 .ac-im-slot-badge {
-    padding: 0.3rem 0.9rem;
+    padding: 0.35rem 1rem;
+    font-family: var(--font-mono, monospace);
     font-weight: 800;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.12em;
     border-radius: 999px;
-    background: rgba(46, 139, 87, 0.18);
-    border: 1px solid rgba(46, 139, 87, 0.6);
-    animation: ac-pop 0.4s ease-out;
-}
-
-@keyframes ac-pop {
-    from { transform: scale(0.6); opacity: 0; }
-    to   { transform: scale(1);   opacity: 1; }
+    color: var(--ac-mint, #14f195);
+    background: color-mix(in srgb, var(--ac-mint) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ac-mint) 60%, transparent);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--ac-mint) 35%, transparent);
+    animation: ac-pop 0.4s ease-out, ac-pulse 1.4s ease-in-out infinite 0.4s;
 }
 
 .ac-im-deal-cards {
@@ -47,27 +50,47 @@
     justify-content: center;
     gap: 0.15rem;
     min-width: 6rem;
-    min-height: 3.5rem;
+    min-height: 3.75rem;
     padding: 0.4rem 0.5rem;
-    border: 1px solid rgba(128, 128, 128, 0.4);
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
     border-radius: 0.5rem;
-    background: rgba(128, 128, 128, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ac-ink, #eaf2ff);
     text-align: center;
-    animation: ac-pop 0.4s ease-out;
+    animation: ac-pop 0.4s ease-out backwards;
 }
 
-.ac-card-additive { border-color: rgba(46, 139, 87, 0.6); }
-.ac-card-multiplicative { border-color: rgba(70, 130, 180, 0.6); }
-.ac-card-action { border-color: rgba(186, 85, 211, 0.6); }
+.ac-im-deal-cards .ac-card:nth-child(2) { animation-delay: 0.07s; }
+.ac-im-deal-cards .ac-card:nth-child(3) { animation-delay: 0.14s; }
+.ac-im-deal-cards .ac-card:nth-child(4) { animation-delay: 0.21s; }
+.ac-im-deal-cards .ac-card:nth-child(5) { animation-delay: 0.28s; }
+.ac-im-deal-cards .ac-card:nth-child(n+6) { animation-delay: 0.35s; }
+
+.ac-card-additive {
+    border-color: color-mix(in srgb, var(--ac-additive) 70%, transparent);
+    background: color-mix(in srgb, var(--ac-additive) 12%, transparent);
+}
+.ac-card-additive .ac-card-op { color: var(--ac-additive); }
+
+.ac-card-multiplicative {
+    border-color: color-mix(in srgb, var(--ac-multiplicative) 70%, transparent);
+    background: color-mix(in srgb, var(--ac-multiplicative) 12%, transparent);
+}
+.ac-card-multiplicative .ac-card-op { color: var(--ac-multiplicative); }
+
+.ac-card-action {
+    border-color: color-mix(in srgb, var(--ac-action) 70%, transparent);
+    background: color-mix(in srgb, var(--ac-action) 12%, transparent);
+}
 
 .ac-card-name {
     font-size: 0.72rem;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.1;
 }
 
 .ac-card-op {
-    font-size: 1rem;
+    font-family: var(--font-mono, monospace);
+    font-size: 1.05rem;
     font-weight: 800;
-    opacity: 0.7;
 }
