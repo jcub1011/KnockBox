@@ -50,6 +50,35 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// <summary>When the current phase's timer expires. Set on entering <c>RoundState</c> and reset after every turn via <see cref="ResetTurnTimer"/>.</summary>
         public DateTimeOffset PhaseEndTime { get; set; }
 
+        /// <summary>When the match started (set in <c>SetupState</c>). Used to compute <c>GameResults.Duration</c>.</summary>
+        public DateTimeOffset StartedAt { get; set; }
+
+        // ── Intermission (M4) ─────────────────────────────────────────────────
+
+        /// <summary>The current Intermission sub-phase. Only meaningful while <see cref="Phase"/> is <c>Intermission</c>.</summary>
+        public IntermissionSubPhase IntermissionPhase { get; set; }
+
+        /// <summary>
+        /// When the current Intermission sub-phase's timer expires. Kept separate from
+        /// <see cref="PhaseEndTime"/> so the round shot clock and the intermission countdowns
+        /// never clobber one another.
+        /// </summary>
+        public DateTimeOffset SubPhaseEndTime { get; set; }
+
+        /// <summary>
+        /// Pending Optimization orderings, keyed by <c>User.Id</c>. Seeded with each active
+        /// player's current bay order (<c>Submitted = false</c>) when Optimization begins;
+        /// applied to the live bays only when the sub-phase ends.
+        /// </summary>
+        public Dictionary<string, OptimizationSubmission> OptimizationSubmissions { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The player resolved to pick the next era's banned letter (lowest-score active
+        /// player; ties broken by earliest turn-order index). Resolved when the Sniper Ban
+        /// sub-phase begins; null outside it.
+        /// </summary>
+        public string? SniperBanUserId { get; set; }
+
         /// <summary>
         /// Every word played this match, used for O(1) duplicate rejection. Case-insensitive
         /// (words are normalized to lower-case before insertion, but the comparer keeps the
@@ -84,6 +113,22 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// </summary>
         public void ResetTurnTimer(DateTimeOffset now)
             => PhaseEndTime = now.AddSeconds(Settings.ShotClockSeconds);
+
+        /// <summary>Monotonic counter feeding <see cref="AlphaChainPlayerState.EliminationOrder"/>.</summary>
+        private int _eliminationCounter;
+
+        /// <summary>
+        /// Marks <paramref name="player"/> eliminated and stamps its
+        /// <see cref="AlphaChainPlayerState.EliminationOrder"/> the first time it happens, so
+        /// <c>GameOverState</c> can rank eliminated players by how long they lasted. Idempotent —
+        /// re-marking an already-eliminated player keeps the original order. Caller must hold the
+        /// execute lock.
+        /// </summary>
+        public void MarkEliminated(AlphaChainPlayerState player)
+        {
+            player.EliminationOrder ??= ++_eliminationCounter;
+            player.IsEliminated = true;
+        }
 
         /// <summary>Final standings, populated by <c>GameOverState</c>.</summary>
         public GameResults? Results { get; set; }

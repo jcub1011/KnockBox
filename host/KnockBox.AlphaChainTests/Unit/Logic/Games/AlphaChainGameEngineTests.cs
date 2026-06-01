@@ -176,7 +176,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
 
             Assert.AreEqual(AlphaChainGamePhase.GameOver, state.Phase);
             Assert.IsNotNull(state.Results);
-            Assert.AreEqual(2, state.Results!.Standings.Count);
+            Assert.AreEqual(2, state.Results!.Rankings.Count);
         }
 
         // ── Player-leave ──────────────────────────────────────────────────────

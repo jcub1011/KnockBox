@@ -372,7 +372,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             {
                 // Survival: running out the clock eliminates the current player.
                 if (player is not null)
-                    player.IsEliminated = true;
+                    state.MarkEliminated(player);
 
                 context.Logger.LogDebug("Alpha Chain shot clock expired (survival) — eliminated {player}.", current);
 
@@ -413,11 +413,18 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 int completedRound = state.CurrentRound;
                 int lastScheduledRound = state.Settings.EraInterval * state.Settings.EraCount;
 
-                // Game over on the final scheduled round (no Intermission ever follows it).
+                // Canonical era/round rule (defined in M1, evaluated at the wrap point):
+                //   1. Game over on the final scheduled round — no Intermission ever follows it.
                 if (completedRound == lastScheduledRound)
                     return new GameOverState();
 
-                // Era-boundary → Intermission (Rule 2) is a no-op until M4; just continue.
+                //   2. Era boundary → Intermission. IntermissionState advances CurrentEra and
+                //      bumps CurrentRound on its way back to RoundState, so we do NOT increment
+                //      CurrentRound here.
+                if (completedRound % state.Settings.EraInterval == 0)
+                    return new IntermissionState();
+
+                //   3. Otherwise continue the current era with the next round.
                 state.CurrentRound++;
             }
 

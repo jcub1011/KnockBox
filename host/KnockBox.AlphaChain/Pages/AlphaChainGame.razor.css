@@ -85,6 +85,43 @@
     50% { opacity: 0.45; }
 }
 
+/* ── Intermission overlay (M4) ──────────────────────────────────────── */
+.ac-intermission {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 1.5rem 1rem;
+    border: 1px solid rgba(128, 128, 128, 0.25);
+    border-radius: 1rem;
+    background: rgba(128, 128, 128, 0.05);
+}
+
+.ac-im-header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.ac-im-era {
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.75;
+}
+
+.ac-im-clock {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.ac-im-spectate {
+    margin: 0;
+    opacity: 0.7;
+}
+
 /* ── Word entry ─────────────────────────────────────────────────────── */
 .ac-entry {
     display: flex;

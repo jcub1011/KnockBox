@@ -21,6 +21,14 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         /// <summary>Whether the player has been eliminated. Elimination rules land in M2 (Survival Mode).</summary>
         public bool IsEliminated { get; set; } = false;
 
+        /// <summary>
+        /// 1-based order in which this player was eliminated (1 = first out), or null while still
+        /// in play. Assigned by <c>AlphaChainGameState.MarkEliminated</c> and used by
+        /// <c>GameOverState</c> to rank eliminated players: surviving longer (a higher order)
+        /// ranks above being knocked out early.
+        /// </summary>
+        public int? EliminationOrder { get; set; } = null;
+
         /// <summary>Whether the player has disconnected/left. Their turns are skipped.</summary>
         public bool HasLeft { get; set; } = false;
 

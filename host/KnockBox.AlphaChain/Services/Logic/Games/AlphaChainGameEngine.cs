@@ -130,6 +130,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
         public Task<Result> GrantCardsAsync(string actorUserId, AlphaChainGameState state, int modifierCount = 2, int actionCount = 1)
             => ProcessCommandAsync(state, new GrantCardsDebugCommand(actorUserId, modifierCount, actionCount));
 
+        /// <summary>Convenience wrapper for the UI: commits an Engine Bay ordering during Intermission Optimization.</summary>
+        public Task<Result> SubmitOptimizationAsync(string actorUserId, IReadOnlyList<string> modifierBayIds, AlphaChainGameState state)
+            => ProcessCommandAsync(state, new SubmitOptimizationCommand(actorUserId, modifierBayIds));
+
+        /// <summary>Convenience wrapper for the UI: the last-place player picks the next era's banned letter.</summary>
+        public Task<Result> SelectSniperBanAsync(string actorUserId, char letter, AlphaChainGameState state)
+            => ProcessCommandAsync(state, new SelectSniperBanCommand(actorUserId, letter));
+
         /// <summary>
         /// Submits a word for <paramref name="actorUserId"/> and returns the typed
         /// <see cref="SubmitWordResult"/> the UI renders. The FSM computes the result inside
@@ -207,7 +215,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
                     // In Survival mode a departure is also an elimination — the player is
                     // out for good, mirroring the timeout consequence.
                     if (state.Settings.SurvivalMode)
-                        ps.IsEliminated = true;
+                        state.MarkEliminated(ps);
                 }
 
                 // If the departing player held the turn, advance past them.

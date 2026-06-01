@@ -10,18 +10,50 @@
 <div class="ac-game">
     @if (GameState.Phase == AlphaChainGamePhase.GameOver)
     {
-        <div class="ac-results">
-            <h2 class="ac-results-title">Game Over</h2>
-            <ol class="ac-standings">
-                @foreach (var row in GameState.Results?.Standings ?? [])
-                {
-                    <li class="ac-standings-row">
-                        <span class="ac-standings-rank">#@row.Rank</span>
-                        <span class="ac-standings-name">@row.DisplayName</span>
-                        <span class="ac-standings-score">@row.Score</span>
-                    </li>
-                }
-            </ol>
+        <GameOverPanel Results="GameState.Results" />
+    }
+    else if (GameState.Phase == AlphaChainGamePhase.Intermission)
+    {
+        <div class="ac-intermission">
+            <div class="ac-im-header">
+                <span class="ac-im-era">Era @GameState.CurrentEra → @(GameState.CurrentEra + 1)</span>
+                <span class="ac-im-clock @(SubPhaseSecondsRemaining <= 3 ? "ac-clock-urgent" : "")">@SubPhaseSecondsRemaining s</span>
+            </div>
+
+            @switch (GameState.IntermissionPhase)
+            {
+                case IntermissionSubPhase.Deal:
+                case IntermissionSubPhase.Expansion:
+                    <IntermissionDealAnimation SubPhase="GameState.IntermissionPhase"
+                                               Modifiers="MyPlayer?.EngineBay ?? []"
+                                               Actions="MyPlayer?.ActionHand ?? []"
+                                               Slots="MyPlayer?.ModifierSlots ?? 0" />
+                    break;
+
+                case IntermissionSubPhase.Optimization:
+                    @if (MyPlayer is { } me)
+                    {
+                        <IntermissionOptimizationPanel Cards="me.EngineBay"
+                                                       Slots="me.ModifierSlots"
+                                                       SubmittedCount="OptimizationSubmittedCount"
+                                                       TotalCount="OptimizationTotalCount"
+                                                       HasSubmitted="HasSubmittedOptimization"
+                                                       OnSubmit="SubmitOptimizationAsync" />
+                    }
+                    else
+                    {
+                        <p class="ac-im-spectate">Players are optimizing their Engine Bays… (@OptimizationSubmittedCount / @OptimizationTotalCount ready)</p>
+                    }
+                    break;
+
+                case IntermissionSubPhase.SniperBan:
+                    <SniperBanPicker IsPicker="IsSniperBanPicker"
+                                     LegalLetters="LegalBanLetters"
+                                     PickerName="SniperBanPickerName"
+                                     BannedLetter="GameState.BannedLetter"
+                                     OnSelect="SelectSniperBanAsync" />
+                    break;
+            }
         </div>
     }
     else

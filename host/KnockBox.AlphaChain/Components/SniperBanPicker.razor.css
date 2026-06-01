@@ -1,0 +1,46 @@
+.ac-im-sniper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    text-align: center;
+}
+
+.ac-im-sniper-title {
+    margin: 0;
+}
+
+.ac-im-sniper-sub {
+    margin: 0;
+    font-size: 0.85rem;
+    opacity: 0.7;
+}
+
+.ac-im-sniper-letters {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem;
+    max-width: min(30rem, 92vw);
+}
+
+.ac-im-sniper-letter {
+    width: 2.6rem;
+    height: 2.6rem;
+    border: 1px solid rgba(128, 128, 128, 0.45);
+    border-radius: 0.5rem;
+    background: rgba(128, 128, 128, 0.08);
+    font-size: 1.1rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.ac-im-sniper-letter:hover {
+    border-color: #c0392b;
+    background: rgba(192, 57, 43, 0.12);
+}
+
+.ac-im-sniper-chosen {
+    border-color: #c0392b;
+    background: rgba(192, 57, 43, 0.25);
+}

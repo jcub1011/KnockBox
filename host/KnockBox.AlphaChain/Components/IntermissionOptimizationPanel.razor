@@ -1,0 +1,156 @@
+@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
+
+@* Optimization sub-phase: the local player privately resequences their Engine Bay and,
+   when it overflows the (newly expanded) slot count, discards the excess. Click-to-swap
+   reorder (drag-reorder is deferred to M5 per the milestone). Opponents' bays are hidden —
+   only a submitted/total tally is shown (fog-of-war). *@
+
+<div class="ac-im-opt">
+    <div class="ac-im-opt-head">
+        <h3 class="ac-im-opt-title">Optimize your Engine Bay</h3>
+        <span class="ac-im-opt-count">@SubmittedCount / @TotalCount ready</span>
+    </div>
+
+    @if (HasSubmitted)
+    {
+        <p class="ac-im-opt-locked">Locked in — waiting for the other players…</p>
+    }
+
+    @if (Overflow > 0)
+    {
+        <p class="ac-im-opt-warn">Your bay holds @Kept.Count cards but only @Slots slots — discard @Overflow to continue.</p>
+    }
+
+    <ol class="ac-im-opt-slots">
+        @for (int i = 0; i < Kept.Count; i++)
+        {
+            int index = i;
+            var card = Kept[index];
+            bool overCapacity = index >= Slots;
+
+            <li class="ac-im-opt-slot @(overCapacity ? "ac-im-opt-overflow" : "")">
+                <CardTooltip Name="@card.Name" Description="@card.Description" Category="CardCategory.Modifier">
+                    <button type="button"
+                            class="ac-card ac-card-modifier ac-card-@(card.Kind == ModifierKind.Additive ? "additive" : "multiplicative") @(_selectedIndex == index ? "ac-card-selected" : "")"
+                            disabled="@HasSubmitted"
+                            @onclick="() => OnSlotClicked(index)">
+                        <span class="ac-card-pos">@(index + 1)</span>
+                        <span class="ac-card-name">@card.Name</span>
+                        <span class="ac-card-op">@(card.Kind == ModifierKind.Additive ? "+" : "×")</span>
+                    </button>
+                </CardTooltip>
+                <button type="button" class="ac-im-opt-discard"
+                        disabled="@HasSubmitted"
+                        title="Discard this card"
+                        @onclick="() => Discard(index)">✕</button>
+            </li>
+        }
+    </ol>
+
+    @if (Discarded.Count > 0)
+    {
+        <div class="ac-im-opt-bin">
+            <span class="ac-im-opt-bin-label">Discarded</span>
+            @foreach (var card in Discarded)
+            {
+                <button type="button" class="ac-card ac-card-discarded"
+                        disabled="@HasSubmitted"
+                        title="Put back"
+                        @onclick="() => Restore(card.Id)">
+                    <span class="ac-card-name">@card.Name</span>
+                    <span class="ac-im-opt-restore">↩</span>
+                </button>
+            }
+        </div>
+    }
+
+    <button type="button" class="ac-im-opt-confirm"
+            disabled="@(HasSubmitted || Overflow > 0)"
+            @onclick="ConfirmAsync">
+        @(HasSubmitted ? "Locked in" : "Lock in order")
+    </button>
+</div>
+
+@code {
+    /// <summary>The local player's candidate cards (current bay + just-dealt), in current order.</summary>
+    [Parameter] public IReadOnlyList<ModifierCard> Cards { get; set; } = [];
+
+    /// <summary>The local player's (post-expansion) slot capacity.</summary>
+    [Parameter] public int Slots { get; set; }
+
+    /// <summary>How many players have locked in.</summary>
+    [Parameter] public int SubmittedCount { get; set; }
+
+    /// <summary>How many players are optimizing in total.</summary>
+    [Parameter] public int TotalCount { get; set; }
+
+    /// <summary>Whether the local player has already locked in.</summary>
+    [Parameter] public bool HasSubmitted { get; set; }
+
+    /// <summary>Raised with the kept ordering (≤ Slots) when the player locks in.</summary>
+    [Parameter] public EventCallback<IReadOnlyList<string>> OnSubmit { get; set; }
+
+    private List<ModifierCard> Kept = new();
+    private List<ModifierCard> Discarded = new();
+    private int? _selectedIndex;
+    private string? _seededFor;
+
+    /// <summary>Cards held beyond the slot capacity (must be discarded before locking in).</summary>
+    private int Overflow => Math.Max(0, Kept.Count - Slots);
+
+    protected override void OnParametersSet()
+    {
+        // Seed the working lists once from the incoming card order. Re-seed only if the
+        // candidate set changes identity (e.g., a fresh optimization), never on every render,
+        // so the player's in-progress reorder isn't clobbered by state-change re-renders.
+        var signature = string.Join(",", Cards.Select(c => c.Id));
+        if (_seededFor != signature)
+        {
+            Kept = Cards.ToList();
+            Discarded = new();
+            _selectedIndex = null;
+            _seededFor = signature;
+        }
+    }
+
+    private void OnSlotClicked(int index)
+    {
+        if (HasSubmitted || index >= Kept.Count) return;
+
+        if (_selectedIndex is null)
+        {
+            _selectedIndex = index;
+            return;
+        }
+
+        int first = _selectedIndex.Value;
+        _selectedIndex = null;
+        if (first == index) return; // re-click cancels.
+
+        (Kept[first], Kept[index]) = (Kept[index], Kept[first]);
+    }
+
+    private void Discard(int index)
+    {
+        if (HasSubmitted || index >= Kept.Count) return;
+        _selectedIndex = null;
+        var card = Kept[index];
+        Kept.RemoveAt(index);
+        Discarded.Add(card);
+    }
+
+    private void Restore(string id)
+    {
+        if (HasSubmitted) return;
+        var card = Discarded.FirstOrDefault(c => c.Id == id);
+        if (card is null) return;
+        Discarded.Remove(card);
+        Kept.Add(card);
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (HasSubmitted || Overflow > 0) return;
+        await OnSubmit.InvokeAsync(Kept.Select(c => c.Id).ToList());
+    }
+}

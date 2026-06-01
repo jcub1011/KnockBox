@@ -1,0 +1,156 @@
+.ac-im-opt {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+    width: min(34rem, 92vw);
+}
+
+.ac-im-opt-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.ac-im-opt-title {
+    margin: 0;
+}
+
+.ac-im-opt-count {
+    font-size: 0.8rem;
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+}
+
+.ac-im-opt-locked {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #2e8b57;
+    font-weight: 600;
+}
+
+.ac-im-opt-warn {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #c0392b;
+    font-weight: 600;
+}
+
+.ac-im-opt-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ac-im-opt-slot {
+    position: relative;
+    width: 7rem;
+}
+
+.ac-im-opt-slot.ac-im-opt-overflow .ac-card {
+    border-color: rgba(192, 57, 43, 0.8);
+    border-style: dashed;
+}
+
+.ac-im-opt-discard {
+    position: absolute;
+    top: -0.4rem;
+    right: -0.4rem;
+    width: 1.3rem;
+    height: 1.3rem;
+    border-radius: 50%;
+    border: 1px solid rgba(192, 57, 43, 0.6);
+    background: rgba(192, 57, 43, 0.15);
+    cursor: pointer;
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+.ac-im-opt-discard:disabled { cursor: default; opacity: 0.4; }
+
+.ac-im-opt-bin {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem;
+    border: 1px dashed rgba(128, 128, 128, 0.35);
+    border-radius: 0.5rem;
+}
+
+.ac-im-opt-bin-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.6;
+}
+
+.ac-im-opt-restore { font-size: 0.85rem; opacity: 0.7; }
+
+.ac-im-opt-confirm {
+    align-self: flex-start;
+    padding: 0.45rem 1.1rem;
+    border: 1px solid rgba(46, 139, 87, 0.7);
+    border-radius: 0.5rem;
+    background: rgba(46, 139, 87, 0.15);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.ac-im-opt-confirm:disabled { cursor: default; opacity: 0.5; }
+
+/* ── Card chip (scoped to this component) ───────────────────────────── */
+.ac-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    width: 100%;
+    min-height: 3.5rem;
+    padding: 0.4rem 0.3rem;
+    border: 1px solid rgba(128, 128, 128, 0.4);
+    border-radius: 0.5rem;
+    background: rgba(128, 128, 128, 0.08);
+    cursor: pointer;
+    font: inherit;
+    text-align: center;
+}
+
+.ac-card:disabled { cursor: default; }
+.ac-card-additive { border-color: rgba(46, 139, 87, 0.6); }
+.ac-card-multiplicative { border-color: rgba(70, 130, 180, 0.6); }
+.ac-card-selected { outline: 2px solid #e0a800; outline-offset: 1px; }
+
+.ac-card-discarded {
+    opacity: 0.6;
+    min-height: 2.4rem;
+    flex-direction: row;
+    gap: 0.3rem;
+}
+
+.ac-card-pos {
+    position: absolute;
+    top: 0.15rem;
+    left: 0.3rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    opacity: 0.5;
+}
+
+.ac-card-name {
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.1;
+}
+
+.ac-card-op {
+    font-size: 1rem;
+    font-weight: 800;
+    opacity: 0.7;
+}

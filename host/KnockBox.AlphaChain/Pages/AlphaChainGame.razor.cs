@@ -1,5 +1,6 @@
 using KnockBox.AlphaChain.Components;
 using KnockBox.AlphaChain.Services.Logic.Games;
+using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
 using KnockBox.AlphaChain.Services.State.Games;
@@ -79,6 +80,63 @@ namespace KnockBox.AlphaChain.Pages
         /// <summary>The play feed, newest first.</summary>
         protected IReadOnlyList<AlphaChainWordPlay> PlayFeed =>
             GameState.PlayLog.AsEnumerable().Reverse().ToList();
+
+        // ── Intermission (M4) ───────────────────────────────────────────────
+
+        /// <summary>Whole seconds left on the current Intermission sub-phase timer (never negative).</summary>
+        protected int SubPhaseSecondsRemaining
+        {
+            get
+            {
+                var remaining = GameState.SubPhaseEndTime - DateTimeOffset.UtcNow;
+                return remaining > TimeSpan.Zero ? (int)Math.Ceiling(remaining.TotalSeconds) : 0;
+            }
+        }
+
+        /// <summary>How many players have locked in their Optimization ordering.</summary>
+        protected int OptimizationSubmittedCount =>
+            GameState.OptimizationSubmissions.Values.Count(s => s.Submitted);
+
+        /// <summary>How many players are optimizing this Intermission.</summary>
+        protected int OptimizationTotalCount => GameState.OptimizationSubmissions.Count;
+
+        /// <summary>Whether the local player has already locked in their ordering.</summary>
+        protected bool HasSubmittedOptimization =>
+            CurrentUserId is { } id
+            && GameState.OptimizationSubmissions.TryGetValue(id, out var sub)
+            && sub.Submitted;
+
+        /// <summary>Whether the local player is the resolved Sniper Ban picker.</summary>
+        protected bool IsSniperBanPicker =>
+            CurrentUserId is not null && CurrentUserId == GameState.SniperBanUserId;
+
+        /// <summary>Display name of the Sniper Ban picker, for the waiting message.</summary>
+        protected string SniperBanPickerName =>
+            GameState.SniperBanUserId is { } id && GameState.GamePlayers.TryGetValue(id, out var ps)
+                ? ps.DisplayName
+                : "the last-place player";
+
+        /// <summary>The legal banned letters for the picker, filtered by the match's ban mode.</summary>
+        protected IReadOnlyList<char> LegalBanLetters =>
+            BanLetterPool.For(GameState.Settings.BanMode).ToCharArray();
+
+        /// <summary>Commits the local player's Engine Bay ordering during Optimization.</summary>
+        protected async Task SubmitOptimizationAsync(IReadOnlyList<string> cardIds)
+        {
+            if (CurrentUserId is not { } id) return;
+            var result = await GameEngine.SubmitOptimizationAsync(id, cardIds, GameState);
+            if (result.TryGetFailure(out var error))
+                Logger.LogWarning("Submit optimization failed: {Error}", error.PublicMessage);
+        }
+
+        /// <summary>Picks the next era's banned letter (last-place player only).</summary>
+        protected async Task SelectSniperBanAsync(char letter)
+        {
+            if (CurrentUserId is not { } id) return;
+            var result = await GameEngine.SelectSniperBanAsync(id, letter, GameState);
+            if (result.TryGetFailure(out var error))
+                Logger.LogWarning("Select Sniper Ban failed: {Error}", error.PublicMessage);
+        }
 
         // ── Cards (M3) ──────────────────────────────────────────────────────
 
