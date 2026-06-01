@@ -1,6 +1,7 @@
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM.States;
+using KnockBox.AlphaChain.Services.Logic.Scoring;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
@@ -26,6 +27,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
     public class AlphaChainGameEngine(
         IWordListService wordList,
         IRandomNumberService rng,
+        IScoreCalculator scoreCalculator,
         ILogger<AlphaChainGameEngine> logger,
         ILogger<AlphaChainGameState> stateLogger) : AbstractGameEngine<AlphaChainGameState>(2, 8)
     {
@@ -58,7 +60,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
 
         protected override Task<Result> StartAsyncCore(AlphaChainGameState gameState, CancellationToken ct = default)
         {
-            var context = new AlphaChainGameContext(gameState, this, wordList, rng, logger);
+            var context = new AlphaChainGameContext(gameState, this, wordList, rng, scoreCalculator, logger);
             var fsm = new FiniteStateMachine<AlphaChainGameContext, AlphaChainCommand>(logger);
             context.Fsm = fsm;
 
@@ -115,6 +117,18 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
         /// <summary>Convenience wrapper for the UI: advances the active player's turn.</summary>
         public Task<Result> AdvanceTurnAsync(string actorUserId, AlphaChainGameState state)
             => ProcessCommandAsync(state, new AdvanceTurnCommand(actorUserId));
+
+        /// <summary>Convenience wrapper for the UI: plays an action card from the actor's hand.</summary>
+        public Task<Result> PlayActionAsync(string actorUserId, string cardId, string? targetUserId, AlphaChainGameState state)
+            => ProcessCommandAsync(state, new PlayActionCommand(actorUserId, cardId, targetUserId));
+
+        /// <summary>Convenience wrapper for the UI: re-orders the actor's Engine Bay.</summary>
+        public Task<Result> ReorderEngineBayAsync(string actorUserId, IReadOnlyList<string> cardIds, AlphaChainGameState state)
+            => ProcessCommandAsync(state, new ReorderEngineBayCommand(actorUserId, cardIds));
+
+        /// <summary>Convenience wrapper for the host-only debug "Grant Cards" button.</summary>
+        public Task<Result> GrantCardsAsync(string actorUserId, AlphaChainGameState state, int modifierCount = 2, int actionCount = 1)
+            => ProcessCommandAsync(state, new GrantCardsDebugCommand(actorUserId, modifierCount, actionCount));
 
         /// <summary>
         /// Submits a word for <paramref name="actorUserId"/> and returns the typed

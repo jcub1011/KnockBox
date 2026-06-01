@@ -71,9 +71,39 @@
             </button>
         </EditForm>
 
+        @if (PendingActionBadge is { } badge)
+        {
+            <p class="ac-pending-badge">@badge</p>
+        }
+
         @if (FeedbackMessage is { } feedback)
         {
             <p class="ac-feedback @(LastResultIsRejection ? "ac-feedback-bad" : "ac-feedback-good")">@feedback</p>
+        }
+
+        @* ── Cards: own Engine Bay + Action Hand, host debug deal ── *@
+        @if (MyPlayer is { } me)
+        {
+            <div class="ac-cards">
+                <EngineBay Cards="me.EngineBay" Slots="me.ModifierSlots" OnReorder="ReorderBayAsync" Title="Your Engine Bay" />
+                <ActionHand Cards="me.ActionHand" Opponents="ActionTargets" Disabled="false" OnPlay="PlayActionAsync" />
+            </div>
+        }
+
+        @if (IsHost)
+        {
+            <button type="button" class="ac-debug-grant" @onclick="GrantCardsAsync">Grant Cards (debug)</button>
+        }
+
+        @* ── Opponent Engine Bays (read-only summary; becomes fog-of-war in M4) ── *@
+        @if (Opponents.Count > 0)
+        {
+            <div class="ac-opponent-bays">
+                @foreach (var opp in Opponents)
+                {
+                    <EngineBay Cards="opp.EngineBay" Slots="opp.ModifierSlots" ReadOnly="true" Title="@opp.DisplayName" />
+                }
+            </div>
         }
 
         <div class="ac-panels">

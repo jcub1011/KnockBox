@@ -1,5 +1,6 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
+using KnockBox.AlphaChain.Services.Logic.Scoring;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -25,6 +26,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
             _engine = new AlphaChainGameEngine(
                 new StubWordListService(),
                 new FixedRandomNumberService(),
+                new ScoreCalculator(),
                 _engineLoggerMock.Object,
                 _stateLoggerMock.Object);
         }

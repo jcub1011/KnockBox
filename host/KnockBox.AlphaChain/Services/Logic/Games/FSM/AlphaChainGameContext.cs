@@ -1,4 +1,5 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
+using KnockBox.AlphaChain.Services.Logic.Scoring;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 using KnockBox.Core.Services.Logic.RandomGeneration;
@@ -17,6 +18,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
         AlphaChainGameEngine engine,
         IWordListService wordList,
         IRandomNumberService rng,
+        IScoreCalculator scoreCalculator,
         ILogger logger)
     {
         /// <summary>The underlying game state for this game instance.</summary>
@@ -35,6 +37,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
 
         /// <summary>Randomness source (forwarded from the engine) for the banned-letter draw.</summary>
         public IRandomNumberService Rng { get; } = rng;
+
+        /// <summary>
+        /// The deterministic scoring pipeline (singleton, forwarded from the engine). FSM
+        /// states score submissions through this so scoring is centralised and testable.
+        /// </summary>
+        public IScoreCalculator ScoreCalculator { get; } = scoreCalculator;
 
         /// <summary>
         /// The outcome of the most recent <see cref="SubmitWordCommand"/>. The FSM writes

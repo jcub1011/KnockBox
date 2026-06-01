@@ -1,6 +1,7 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
+using KnockBox.AlphaChain.Services.Logic.Scoring;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -35,7 +36,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             StubWordListService words, int playerCount = 2, bool survival = false, char? banned = null)
         {
             var engine = new AlphaChainGameEngine(
-                words, new FixedRandomNumberService(), _engineLoggerMock.Object, _stateLoggerMock.Object);
+                words, new FixedRandomNumberService(), new ScoreCalculator(),
+                _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
             for (int i = 0; i < playerCount; i++)

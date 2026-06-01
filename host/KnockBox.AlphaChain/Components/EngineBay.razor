@@ -1,0 +1,85 @@
+@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
+
+@* A player's Engine Bay: an ordered row of modifier slots, left → right is the scoring
+   pipeline order. In M3 reordering is click-to-swap (drag-reorder is deferred to M5):
+   click one card to select it, click another to swap their positions. The opponent
+   summary passes ReadOnly=true to render the same row without interaction. *@
+
+<div class="ac-bay @(ReadOnly ? "ac-bay-readonly" : "")">
+    <div class="ac-bay-header">
+        <span class="ac-bay-title">@Title</span>
+        <span class="ac-bay-flow" title="Additives stack first (left); multipliers explode last (right).">L + ΣA → ×ΠM</span>
+    </div>
+
+    <ol class="ac-bay-slots">
+        @for (int i = 0; i < Slots; i++)
+        {
+            int index = i;
+            var card = index < Cards.Count ? Cards[index] : null;
+
+            <li class="ac-bay-slot">
+                @if (card is not null)
+                {
+                    <CardTooltip Name="@card.Name" Description="@card.Description" Category="CardCategory.Modifier">
+                        <button type="button"
+                                class="ac-card ac-card-modifier ac-card-@(card.Kind == ModifierKind.Additive ? "additive" : "multiplicative") @(_selectedIndex == index ? "ac-card-selected" : "")"
+                                disabled="@ReadOnly"
+                                @onclick="() => OnSlotClicked(index)">
+                            <span class="ac-card-name">@card.Name</span>
+                            <span class="ac-card-op">@(card.Kind == ModifierKind.Additive ? "+" : "×")</span>
+                        </button>
+                    </CardTooltip>
+                }
+                else
+                {
+                    <div class="ac-card ac-card-empty">empty</div>
+                }
+            </li>
+        }
+    </ol>
+</div>
+
+@code {
+    /// <summary>The ordered modifier cards in the bay (left → right = pipeline order).</summary>
+    [Parameter] public IReadOnlyList<ModifierCard> Cards { get; set; } = [];
+
+    /// <summary>How many slots to render (capacity). Empty slots render as placeholders.</summary>
+    [Parameter] public int Slots { get; set; } = 3;
+
+    /// <summary>When true, the bay is display-only (opponent summary or locked round).</summary>
+    [Parameter] public bool ReadOnly { get; set; }
+
+    /// <summary>Heading shown above the slots.</summary>
+    [Parameter] public string Title { get; set; } = "Engine Bay";
+
+    /// <summary>Raised with the new ordering of card ids when the player swaps two slots.</summary>
+    [Parameter] public EventCallback<IReadOnlyList<string>> OnReorder { get; set; }
+
+    private int? _selectedIndex;
+
+    /// <summary>
+    /// Click-to-swap: the first click selects a filled slot; the second click on a different
+    /// filled slot swaps the two and raises <see cref="OnReorder"/> with the new id ordering.
+    /// Clicking the selected slot again cancels the selection.
+    /// </summary>
+    private async Task OnSlotClicked(int index)
+    {
+        if (ReadOnly || index >= Cards.Count) return;
+
+        if (_selectedIndex is null)
+        {
+            _selectedIndex = index;
+            return;
+        }
+
+        int first = _selectedIndex.Value;
+        _selectedIndex = null;
+
+        if (first == index) return; // re-click cancels.
+
+        var ids = Cards.Select(c => c.Id).ToList();
+        (ids[first], ids[index]) = (ids[index], ids[first]);
+
+        await OnReorder.InvokeAsync(ids);
+    }
+}

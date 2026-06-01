@@ -288,3 +288,48 @@
     font-size: 0.8rem;
     opacity: 0.6;
 }
+
+/* ── Cards (M3) ──────────────────────────────────────────────────────── */
+.ac-pending-badge {
+    margin: 0;
+    padding: 0.2rem 0.7rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-radius: 0.5rem;
+    background: rgba(70, 130, 180, 0.2);
+    color: #4682b4;
+}
+
+.ac-cards {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 1.5rem;
+    width: 100%;
+}
+
+.ac-opponent-bays {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    width: 100%;
+    opacity: 0.85;
+}
+
+.ac-debug-grant {
+    padding: 0.4rem 1rem;
+    border: 1px dashed rgba(128, 128, 128, 0.6);
+    border-radius: 0.5rem;
+    background: transparent;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.ac-debug-grant:hover {
+    background: rgba(128, 128, 128, 0.12);
+}

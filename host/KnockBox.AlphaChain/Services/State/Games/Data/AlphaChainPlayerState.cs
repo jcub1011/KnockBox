@@ -1,3 +1,5 @@
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
+
 namespace KnockBox.AlphaChain.Services.State.Games.Data
 {
     /// <summary>
@@ -28,7 +30,33 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         /// </summary>
         public int TurnTimeouts { get; set; } = 0;
 
-        // Reserved for M3: modifier-card and action-card hand collections are added here.
-        // Kept off the public surface for now so M1 stays minimal.
+        // ── Cards (M3) ──────────────────────────────────────────────────────
+
+        /// <summary>
+        /// How many modifier cards this player's Engine Bay can hold. Starts at 3; the
+        /// Intermission Expansion grows it in M4.
+        /// </summary>
+        public int ModifierSlots { get; set; } = 3;
+
+        /// <summary>
+        /// The player's Engine Bay: an ordered list of modifier cards (left → right is the
+        /// scoring pipeline order). Bounded by <see cref="ModifierSlots"/>.
+        /// </summary>
+        public List<ModifierCard> EngineBay { get; } = new();
+
+        /// <summary>The action cards currently in the player's hand.</summary>
+        public List<ActionCard> ActionHand { get; } = new();
+
+        /// <summary>
+        /// A Pivot/Amnesty queued for the player's next submission, or null when none is
+        /// pending. Consumed by the next accepted submission (see <c>RoundState</c>).
+        /// </summary>
+        public ActionKind? PendingAction { get; set; } = null;
+
+        /// <summary>
+        /// Shot-clock seconds owed to this player from Time Thief plays made while they were
+        /// not the active player. Applied (and cleared) the next time they take a turn.
+        /// </summary>
+        public int QueuedTimePenaltySeconds { get; set; } = 0;
     }
 }

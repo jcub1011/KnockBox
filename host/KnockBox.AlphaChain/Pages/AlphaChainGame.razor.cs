@@ -1,4 +1,6 @@
+using KnockBox.AlphaChain.Components;
 using KnockBox.AlphaChain.Services.Logic.Games;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Services.State.Games.Data;
@@ -77,6 +79,63 @@ namespace KnockBox.AlphaChain.Pages
         /// <summary>The play feed, newest first.</summary>
         protected IReadOnlyList<AlphaChainWordPlay> PlayFeed =>
             GameState.PlayLog.AsEnumerable().Reverse().ToList();
+
+        // ── Cards (M3) ──────────────────────────────────────────────────────
+
+        /// <summary>The local player's per-player state, or null before init / if spectating.</summary>
+        protected AlphaChainPlayerState? MyPlayer =>
+            CurrentUserId is { } id && GameState.GamePlayers.TryGetValue(id, out var ps) ? ps : null;
+
+        /// <summary>Whether the local user is the room host (gates the debug "Grant Cards" button).</summary>
+        protected bool IsHost => CurrentUserId is not null && CurrentUserId == GameState.Host.Id;
+
+        /// <summary>Opponents still in play, for the opponent bay summaries and Time Thief targeting.</summary>
+        protected IReadOnlyList<AlphaChainPlayerState> Opponents =>
+            GameState.GamePlayers.Values
+                .Where(p => p.UserId != CurrentUserId && !p.HasLeft)
+                .OrderBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+        /// <summary>Targetable opponents for the Time Thief picker (active opponents only).</summary>
+        protected IReadOnlyList<ActionHand.ActionTarget> ActionTargets =>
+            Opponents.Where(p => !p.IsEliminated)
+                .Select(p => new ActionHand.ActionTarget(p.UserId, p.DisplayName))
+                .ToList();
+
+        /// <summary>Badge text for a queued Pivot/Amnesty, or null when none is pending.</summary>
+        protected string? PendingActionBadge => MyPlayer?.PendingAction switch
+        {
+            ActionKind.Pivot => "Pivot pending",
+            ActionKind.Amnesty => "Amnesty pending",
+            _ => null
+        };
+
+        /// <summary>Re-orders the local player's Engine Bay via the engine command path.</summary>
+        protected async Task ReorderBayAsync(IReadOnlyList<string> cardIds)
+        {
+            if (CurrentUserId is not { } id) return;
+            var result = await GameEngine.ReorderEngineBayAsync(id, cardIds, GameState);
+            if (result.TryGetFailure(out var error))
+                Logger.LogWarning("Reorder Engine Bay failed: {Error}", error.PublicMessage);
+        }
+
+        /// <summary>Plays an action card for the local player.</summary>
+        protected async Task PlayActionAsync(ActionHand.ActionPlayRequest request)
+        {
+            if (CurrentUserId is not { } id) return;
+            var result = await GameEngine.PlayActionAsync(id, request.CardId, request.TargetUserId, GameState);
+            if (result.TryGetFailure(out var error))
+                Logger.LogWarning("Play action failed: {Error}", error.PublicMessage);
+        }
+
+        /// <summary>Host-only debug deal so the card pipeline can be exercised before M4.</summary>
+        protected async Task GrantCardsAsync()
+        {
+            if (CurrentUserId is not { } id) return;
+            var result = await GameEngine.GrantCardsAsync(id, GameState);
+            if (result.TryGetFailure(out var error))
+                Logger.LogWarning("Grant cards failed: {Error}", error.PublicMessage);
+        }
 
         protected override void OnInitialized()
         {

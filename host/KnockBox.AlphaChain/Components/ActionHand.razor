@@ -1,0 +1,105 @@
+@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
+
+@* The player's action hand. Clicking a self-targeted card (Pivot/Amnesty) queues it
+   immediately; clicking Time Thief opens a small inline target-picker listing the
+   available opponents, and choosing one plays the card against them. *@
+
+<div class="ac-hand">
+    <div class="ac-hand-header">
+        <span class="ac-hand-title">Action Hand</span>
+    </div>
+
+    @if (Cards.Count == 0)
+    {
+        <p class="ac-hand-empty">No action cards.</p>
+    }
+    else
+    {
+        <ul class="ac-hand-cards">
+            @foreach (var card in Cards)
+            {
+                var current = card;
+                <li class="ac-hand-card-wrap">
+                    <CardTooltip Name="@current.Name" Description="@current.Description" Category="CardCategory.Action">
+                        <button type="button"
+                                class="ac-card ac-card-action @(_pickerCard == current ? "ac-card-selected" : "")"
+                                disabled="@Disabled"
+                                @onclick="() => OnCardClicked(current)">
+                            <span class="ac-card-name">@current.Name</span>
+                        </button>
+                    </CardTooltip>
+
+                    @if (_pickerCard == current && current.Kind == ActionKind.TimeThief)
+                    {
+                        <div class="ac-target-picker">
+                            <span class="ac-target-label">Steal from…</span>
+                            @if (Opponents.Count == 0)
+                            {
+                                <span class="ac-target-none">No opponents available.</span>
+                            }
+                            else
+                            {
+                                @foreach (var opp in Opponents)
+                                {
+                                    var target = opp;
+                                    <button type="button" class="ac-target-btn"
+                                            @onclick="() => OnTargetPicked(current, target.Id)">
+                                        @target.Name
+                                    </button>
+                                }
+                            }
+                            <button type="button" class="ac-target-cancel" @onclick="() => _pickerCard = null">Cancel</button>
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    /// <summary>A possible Time Thief victim.</summary>
+    public record ActionTarget(string Id, string Name);
+
+    /// <summary>A request to play a card, optionally against a target (Time Thief).</summary>
+    public record ActionPlayRequest(string CardId, string? TargetUserId);
+
+    /// <summary>The cards currently in the player's hand.</summary>
+    [Parameter] public IReadOnlyList<ActionCard> Cards { get; set; } = [];
+
+    /// <summary>Opponents the player may target with Time Thief.</summary>
+    [Parameter] public IReadOnlyList<ActionTarget> Opponents { get; set; } = [];
+
+    /// <summary>When true, all cards are non-interactive.</summary>
+    [Parameter] public bool Disabled { get; set; }
+
+    /// <summary>Raised when the player commits to playing a card.</summary>
+    [Parameter] public EventCallback<ActionPlayRequest> OnPlay { get; set; }
+
+    /// <summary>The card whose target-picker is currently open, if any.</summary>
+    private ActionCard? _pickerCard;
+
+    /// <summary>
+    /// Self-targeted cards (Pivot/Amnesty) play immediately; Time Thief opens the inline
+    /// target-picker (a second click on the same card cancels it).
+    /// </summary>
+    private async Task OnCardClicked(ActionCard card)
+    {
+        if (Disabled) return;
+
+        if (card.Kind == ActionKind.TimeThief)
+        {
+            _pickerCard = _pickerCard == card ? null : card;
+            return;
+        }
+
+        _pickerCard = null;
+        await OnPlay.InvokeAsync(new ActionPlayRequest(card.Id, null));
+    }
+
+    private async Task OnTargetPicked(ActionCard card, string targetUserId)
+    {
+        _pickerCard = null;
+        await OnPlay.InvokeAsync(new ActionPlayRequest(card.Id, targetUserId));
+    }
+}
