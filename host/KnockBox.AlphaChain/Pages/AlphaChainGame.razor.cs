@@ -237,15 +237,6 @@ namespace KnockBox.AlphaChain.Pages
             _ => null
         };
 
-        /// <summary>Re-orders the local player's Engine Bay via the engine command path.</summary>
-        protected async Task ReorderBayAsync(IReadOnlyList<string> cardIds)
-        {
-            if (CurrentUserId is not { } id) return;
-            var result = await GameEngine.ReorderEngineBayAsync(id, cardIds, GameState);
-            if (result.TryGetFailure(out var error))
-                Logger.LogWarning("Reorder Engine Bay failed: {Error}", error.PublicMessage);
-        }
-
         /// <summary>Plays an action card for the local player.</summary>
         protected async Task PlayActionAsync(ActionHand.ActionPlayRequest request)
         {
@@ -253,15 +244,6 @@ namespace KnockBox.AlphaChain.Pages
             var result = await GameEngine.PlayActionAsync(id, request.CardId, request.TargetUserId, GameState);
             if (result.TryGetFailure(out var error))
                 Logger.LogWarning("Play action failed: {Error}", error.PublicMessage);
-        }
-
-        /// <summary>Host-only debug deal so the card pipeline can be exercised before M4.</summary>
-        protected async Task GrantCardsAsync()
-        {
-            if (CurrentUserId is not { } id) return;
-            var result = await GameEngine.GrantCardsAsync(id, GameState);
-            if (result.TryGetFailure(out var error))
-                Logger.LogWarning("Grant cards failed: {Error}", error.PublicMessage);
         }
 
         protected override void OnInitialized()

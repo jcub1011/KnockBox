@@ -364,23 +364,6 @@
     opacity: 0.85;
 }
 
-.ac-debug-grant {
-    align-self: flex-start;
-    padding: 0.35rem 0.9rem;
-    border: 1px dashed color-mix(in srgb, var(--ac-amber) 55%, transparent);
-    border-radius: 0.5rem;
-    background: transparent;
-    color: var(--ac-amber);
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    cursor: pointer;
-}
-
-.ac-debug-grant:hover {
-    background: color-mix(in srgb, var(--ac-amber) 12%, transparent);
-}
-
 /* ── Panels (leaderboard + feed) ──────────────────────────────────────── */
 .ac-panel {
     background: var(--ac-panel);

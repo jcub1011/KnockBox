@@ -11,11 +11,16 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
     /// <param name="Word">The normalized (trimmed, lower-case) word.</param>
     /// <param name="Score">Points awarded (0 when the Zero-Point Tax applied).</param>
     /// <param name="ZeroPointTax">True when the word contained the banned letter.</param>
+    /// <param name="TaxBounty">
+    /// Points each Tax Collector owner collected from this (taxed) word, or 0 when none applied.
+    /// Non-zero only on a Zero-Point Tax play that one or more opponents taxed.
+    /// </param>
     public record AlphaChainWordPlay(
         DateTimeOffset PlayedAt,
         string UserId,
         string DisplayName,
         string Word,
         int Score,
-        bool ZeroPointTax);
+        bool ZeroPointTax,
+        int TaxBounty = 0);
 }

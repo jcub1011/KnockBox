@@ -134,14 +134,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
         public Task<Result> PlayActionAsync(string actorUserId, string cardId, string? targetUserId, AlphaChainGameState state)
             => ProcessCommandAsync(state, new PlayActionCommand(actorUserId, cardId, targetUserId));
 
-        /// <summary>Convenience wrapper for the UI: re-orders the actor's Engine Bay.</summary>
-        public Task<Result> ReorderEngineBayAsync(string actorUserId, IReadOnlyList<string> cardIds, AlphaChainGameState state)
-            => ProcessCommandAsync(state, new ReorderEngineBayCommand(actorUserId, cardIds));
-
-        /// <summary>Convenience wrapper for the host-only debug "Grant Cards" button.</summary>
-        public Task<Result> GrantCardsAsync(string actorUserId, AlphaChainGameState state, int modifierCount = 2, int actionCount = 1)
-            => ProcessCommandAsync(state, new GrantCardsDebugCommand(actorUserId, modifierCount, actionCount));
-
         /// <summary>Convenience wrapper for the UI: commits an Engine Bay ordering during Intermission Optimization.</summary>
         public Task<Result> SubmitOptimizationAsync(string actorUserId, IReadOnlyList<string> modifierBayIds, AlphaChainGameState state)
             => ProcessCommandAsync(state, new SubmitOptimizationCommand(actorUserId, modifierBayIds));
@@ -234,10 +226,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
                 if (state.TurnManager.CurrentPlayer == user.Id)
                     state.TurnManager.NextTurn();
 
-                // Survival: if the field is down to a single active player, end the match.
-                if (state.Settings.SurvivalMode
-                    && state.Phase != AlphaChainGamePhase.GameOver
-                    && CountActivePlayers(state) < 2)
+                // End the match when no one is left to play: an empty field ends it in any mode
+                // (there's no active seat to advance to), and Survival also ends on a lone
+                // survivor. This keeps the FSM from limping along on a departed turn-holder.
+                int active = CountActivePlayers(state);
+                if (state.Phase != AlphaChainGamePhase.GameOver
+                    && (active == 0 || (state.Settings.SurvivalMode && active < 2)))
                 {
                     state.Context.Fsm.TransitionTo(state.Context, new GameOverState());
                 }

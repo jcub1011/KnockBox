@@ -1,4 +1,8 @@
 using KnockBox.AlphaChain;
+using KnockBox.AlphaChain.Services.Logic.Games;
+using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.Core.Plugins;
+using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 
 namespace KnockBox.AlphaChain.Tests.Unit
 {
@@ -24,6 +28,54 @@ namespace KnockBox.AlphaChain.Tests.Unit
             var module = new AlphaChainModule();
 
             Assert.IsNotNull(module.GetCustomHeader());
+        }
+
+        [TestMethod]
+        public void RegisterServices_RegistersScoreCalculatorSingleton_AndGameEngine()
+        {
+            var module = new AlphaChainModule();
+            var registration = new RecordingRegistration();
+
+            module.RegisterServices(registration);
+
+            CollectionAssert.Contains(
+                registration.Singletons,
+                (typeof(IScoreCalculator), typeof(ScoreCalculator)),
+                "IScoreCalculator must be registered as a singleton backed by ScoreCalculator.");
+            CollectionAssert.Contains(
+                registration.GameEngines,
+                typeof(AlphaChainGameEngine),
+                "The Alpha Chain engine must be registered via AddGameEngine.");
+            Assert.AreEqual(1, registration.GameEngines.Count, "Exactly one engine registration is expected.");
+        }
+
+        /// <summary>Minimal <see cref="IPluginRegistration"/> that records what a module registers.</summary>
+        private sealed class RecordingRegistration : IPluginRegistration
+        {
+            public List<(Type Service, Type Implementation)> Singletons { get; } = new();
+            public List<Type> GameEngines { get; } = new();
+
+            public IPluginManifest Manifest => throw new NotSupportedException();
+
+            public void AddGameEngine<TEngine>() where TEngine : AbstractGameEngine
+                => GameEngines.Add(typeof(TEngine));
+
+            public void AddSingleton<TService, TImplementation>()
+                where TService : class
+                where TImplementation : class, TService
+                => Singletons.Add((typeof(TService), typeof(TImplementation)));
+
+            public void AddScoped<TService, TImplementation>()
+                where TService : class
+                where TImplementation : class, TService { }
+
+            public void AddTransient<TService, TImplementation>()
+                where TService : class
+                where TImplementation : class, TService { }
+
+            public void AddSingleton<TService>(Func<IPluginContext, TService> factory) where TService : class { }
+            public void AddScoped<TService>(Func<IPluginContext, TService> factory) where TService : class { }
+            public void AddTransient<TService>(Func<IPluginContext, TService> factory) where TService : class { }
         }
     }
 }

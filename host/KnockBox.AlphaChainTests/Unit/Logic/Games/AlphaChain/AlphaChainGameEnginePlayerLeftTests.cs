@@ -80,6 +80,21 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
         }
 
         [TestMethod]
+        public async Task AllPlayersLeave_NonSurvival_EndsGame()
+        {
+            // Non-survival doesn't eliminate on leave, but once the field is empty there's no one
+            // left to take a turn, so the match must still end rather than limp along.
+            var (engine, state) = await StartGameAsync(playerCount: 2, survival: false);
+            using var _ = state;
+
+            foreach (var id in state.TurnManager.TurnOrder.ToList())
+                engine.HandlePlayerLeft(UserFactory.Create("dummy", id), state);
+
+            Assert.AreEqual(AlphaChainGamePhase.GameOver, state.Phase);
+            Assert.IsNotNull(state.Results);
+        }
+
+        [TestMethod]
         public async Task PlayerLeaves_Survival_EndsGameWhenOneActivePlayerRemains()
         {
             var (engine, state) = await StartGameAsync(playerCount: 2, survival: true);

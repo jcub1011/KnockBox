@@ -112,17 +112,17 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Scoring
         }
 
         [TestMethod]
-        public void TaxCollector_FiresOnlyWhenBannedLetterPresent()
+        public void TaxCollector_IsInertInOwnWordScoring()
         {
-            var taxCollector = ModifierLibrary.FindById("tax-collector")!;
+            // Tax Collector is a reactive bounty card (resolved in RoundState), not a normal
+            // pipeline modifier — it must never affect the owner's own word, banned letter or not.
+            var taxCollector = ModifierLibrary.FindById(ModifierLibrary.TaxCollectorId)!;
 
-            // Banned 'a' present in "cat" → ×1.5 → 3 × 1.5 = 4.5 → 5.
-            var withBanned = Ctx("cat", banned: 'a');
-            Assert.AreEqual(5, _calc.Calculate(withBanned, [taxCollector]));
+            // Banned 'a' present in "cat" → still just the length (no own-word multiplier).
+            Assert.AreEqual(3, _calc.Calculate(Ctx("cat", banned: 'a'), [taxCollector]));
 
-            // Banned 'z' absent from "cat" → trigger false → score == length.
-            var withoutBanned = Ctx("cat", banned: 'z');
-            Assert.AreEqual(3, _calc.Calculate(withoutBanned, [taxCollector]));
+            // Banned 'z' absent from "cat" → still just the length.
+            Assert.AreEqual(3, _calc.Calculate(Ctx("cat", banned: 'z'), [taxCollector]));
         }
 
         // ── Exhaustive coverage of every shipped ModifierLibrary card ───────

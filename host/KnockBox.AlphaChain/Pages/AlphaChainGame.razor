@@ -157,19 +157,14 @@
                 @if (MyPlayer is { } myCards)
                 {
                     <div class="ac-cards">
-                        @* Reorder is locked during a live round — the scoring pipeline order is
-                           frozen and only resequenced at Intermission (Optimization). *@
+                        @* Reorder is disabled during a live round — the scoring pipeline order is
+                           frozen and only resequenced at Intermission (Optimization). The bay is
+                           always Locked here, so no OnReorder handler is wired. *@
                         <EngineBay Cards="myCards.EngineBay" Slots="myCards.ModifierSlots"
-                                   Locked="@(GameState.Phase == AlphaChainGamePhase.Round)"
-                                   OnReorder="ReorderBayAsync" Title="Your Engine Bay" />
+                                   Locked="true" Title="Your Engine Bay" />
                         <ActionHand Cards="myCards.ActionHand" Opponents="ActionTargets" Disabled="false"
                                     QueuedKind="myCards.PendingAction" OnPlay="PlayActionAsync" />
                     </div>
-                }
-
-                @if (IsHost)
-                {
-                    <button type="button" class="ac-debug-grant" @onclick="GrantCardsAsync">Grant Cards (debug)</button>
                 }
 
                 @* ── Opponent Engine Bays (read-only summary; becomes fog-of-war in M4) ── *@

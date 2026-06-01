@@ -13,6 +13,17 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
         /// <summary>Always-true trigger for unconditional cards.</summary>
         private static readonly Func<WordContext, bool> Always = static _ => true;
 
+        /// <summary>Always-false trigger for cards that never fold into the owner's own scoring
+        /// pipeline (their effect is resolved elsewhere — e.g. Tax Collector's reactive bounty).</summary>
+        private static readonly Func<WordContext, bool> Never = static _ => false;
+
+        /// <summary>Stable id of the Tax Collector card (resolved by the round's bounty payout).</summary>
+        public const string TaxCollectorId = "tax-collector";
+
+        /// <summary>Fraction of an opponent's would-be (taxed-away) word score that each Tax
+        /// Collector owner collects.</summary>
+        public const double TaxCollectorRate = 0.5;
+
         /// <summary>Every modifier card, in catalogue order.</summary>
         public static readonly ImmutableArray<ModifierCard> All =
         [
@@ -65,12 +76,16 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
                 Always,
                 static ctx => ctx.Word.Distinct().Count()),
 
+            // Tax Collector does NOT fold into its owner's own scoring pipeline (Trigger is
+            // Never). Instead it is a passive bounty: when an *opponent* plays a banned-letter
+            // word (Zero-Point Tax), each owner collects half of the points it would have scored.
+            // That reactive payout is resolved in RoundState; here the card is inert.
             new ModifierCard(
-                "tax-collector", "Tax Collector",
-                "×1.5 when your word contains the banned letter (rewards the risk).",
+                TaxCollectorId, "Tax Collector",
+                "When an opponent plays a banned-letter word, collect half the points it would have scored.",
                 ModifierKind.Multiplicative,
-                static ctx => ctx.ContainsBannedLetter,
-                static _ => 1.5),
+                Never,
+                static _ => TaxCollectorRate),
         ];
 
         /// <summary>Fast id → card lookup for resolving network ids against the catalogue.</summary>

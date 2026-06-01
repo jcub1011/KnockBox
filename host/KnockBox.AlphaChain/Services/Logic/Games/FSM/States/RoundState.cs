@@ -1,5 +1,6 @@
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
+using KnockBox.AlphaChain.Services.Logic.Scoring;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 using KnockBox.Core.Primitives.Returns;
@@ -49,8 +50,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 SubmitWordCommand cmd => HandleSubmitWord(context, cmd),
                 AdvanceTurnCommand cmd => HandleAdvanceTurn(context, cmd),
                 PlayActionCommand cmd => HandlePlayAction(context, cmd),
-                ReorderEngineBayCommand cmd => HandleReorderEngineBay(context, cmd),
-                GrantCardsDebugCommand cmd => HandleGrantCards(context, cmd),
                 _ => (ValueResult<FsmState?>)null!
             };
         }
@@ -141,6 +140,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             if (player is not null)
                 player.Score += score;
 
+            // 11b. Tax Collector bounty: a taxed (banned-letter) word pays nothing to the
+            //      submitter, but every *other* active player holding a Tax Collector collects
+            //      half of what the word would have scored. The submitter never collects from
+            //      their own taxed word.
+            int bounty = PayTaxCollectorBounty(state, cmd.ActorUserId, taxed, baseScore);
+
             // Log the accepted play for the UI feed.
             state.PlayLog.Add(new AlphaChainWordPlay(
                 DateTimeOffset.UtcNow,
@@ -148,7 +153,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 player?.DisplayName ?? cmd.ActorUserId,
                 word,
                 score,
-                taxed));
+                taxed,
+                bounty));
 
             // 12. Result is set before advancing so it reflects this submission.
             context.LastSubmitResult = taxed
@@ -157,6 +163,40 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             // 13. Advance the turn (round increment / game-over check) and re-arm the clock.
             return AdvanceTurnAndEvaluate(context, DateTimeOffset.UtcNow);
+        }
+
+        /// <summary>
+        /// Pays the Tax Collector bounty for a submission. When <paramref name="taxed"/> is true,
+        /// every active player other than the submitter who holds a Tax Collector in their Engine
+        /// Bay collects <see cref="ModifierLibrary.TaxCollectorRate"/> × <paramref name="wouldBeScore"/>
+        /// (rounded half-up, clamped to <see cref="ScoreCalculator.MaxWordScore"/>). Returns the
+        /// per-owner bounty (0 when nothing was paid). Runs inside the execute lock.
+        /// </summary>
+        private static int PayTaxCollectorBounty(
+            AlphaChainGameState state, string submitterUserId, bool taxed, int wouldBeScore)
+        {
+            if (!taxed || wouldBeScore <= 0)
+                return 0;
+
+            int bounty = Math.Clamp(
+                (int)Math.Round(wouldBeScore * ModifierLibrary.TaxCollectorRate, MidpointRounding.AwayFromZero),
+                0, ScoreCalculator.MaxWordScore);
+            if (bounty == 0)
+                return 0;
+
+            bool anyPaid = false;
+            foreach (var other in state.GamePlayers.Values)
+            {
+                if (other.UserId == submitterUserId || other.IsEliminated || other.HasLeft)
+                    continue;
+                if (other.EngineBay.Any(c => c.Id == ModifierLibrary.TaxCollectorId))
+                {
+                    other.Score += bounty;
+                    anyPaid = true;
+                }
+            }
+
+            return anyPaid ? bounty : 0;
         }
 
         // ── Action cards ─────────────────────────────────────────────────────
@@ -249,97 +289,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             }
 
             return Result.Success;
-        }
-
-        // ── Engine Bay reorder ───────────────────────────────────────────────
-
-        /// <summary>
-        /// Replaces the actor's Engine Bay with a new ordering. The request must be a
-        /// permutation of the bay's current cards: every id present exactly once, none unknown,
-        /// and no more than <see cref="AlphaChainPlayerState.ModifierSlots"/> entries. M3 allows
-        /// this during the round to ease testing; M4 will lock it to Intermission.
-        /// </summary>
-        private static ValueResult<FsmState?> HandleReorderEngineBay(AlphaChainGameContext context, ReorderEngineBayCommand cmd)
-        {
-            var state = context.State;
-
-            if (!state.GamePlayers.TryGetValue(cmd.ActorUserId, out var player))
-                return new ResultError("You are not in this game.",
-                    $"ReorderEngineBayCommand from unknown player [{cmd.ActorUserId}].");
-
-            var ids = cmd.CardIds;
-
-            // Capacity guard.
-            if (ids.Count > player.ModifierSlots)
-                return new ResultError("That's more cards than your Engine Bay can hold.",
-                    $"Reorder of {ids.Count} exceeds {player.ModifierSlots} slots for [{cmd.ActorUserId}].");
-
-            // Duplicate guard.
-            if (ids.Distinct(StringComparer.Ordinal).Count() != ids.Count)
-                return new ResultError("A card appears more than once in that ordering.",
-                    $"Duplicate card id in reorder for [{cmd.ActorUserId}].");
-
-            // Must be a permutation of the current bay: same count and every id present.
-            if (ids.Count != player.EngineBay.Count)
-                return new ResultError("That ordering doesn't match your Engine Bay.",
-                    $"Reorder count {ids.Count} != bay count {player.EngineBay.Count} for [{cmd.ActorUserId}].");
-
-            var byId = player.EngineBay.ToDictionary(c => c.Id, StringComparer.Ordinal);
-            var reordered = new List<ModifierCard>(ids.Count);
-            foreach (var id in ids)
-            {
-                if (!byId.TryGetValue(id, out var card))
-                    return new ResultError("That card isn't in your Engine Bay.",
-                        $"Reorder referenced unknown card id [{id}] for [{cmd.ActorUserId}].");
-                reordered.Add(card);
-            }
-
-            player.EngineBay.Clear();
-            player.EngineBay.AddRange(reordered);
-
-            return (ValueResult<FsmState?>)null!;
-        }
-
-        // ── Debug: grant cards ───────────────────────────────────────────────
-
-        /// <summary>
-        /// Host-only debug deal: gives every player a random set of distinct modifiers (up to
-        /// their free Engine Bay slots) and a random set of actions, so the scoring pipeline and
-        /// card UI can be exercised before the Intermission card-draft lands in M4. Removed (or
-        /// gated behind a debug flag) before release.
-        /// </summary>
-        private static ValueResult<FsmState?> HandleGrantCards(AlphaChainGameContext context, GrantCardsDebugCommand cmd)
-        {
-            var state = context.State;
-
-            if (cmd.ActorUserId != state.Host.Id)
-                return new ResultError("Only the host can grant cards.",
-                    $"Non-host [{cmd.ActorUserId}] issued GrantCardsDebugCommand.");
-
-            foreach (var player in state.GamePlayers.Values)
-            {
-                // Distinct modifiers (ids must be unique within a bay so reorder stays valid).
-                var modPool = ModifierLibrary.All.ToList();
-                for (int i = 0; i < cmd.ModifierCount && player.EngineBay.Count < player.ModifierSlots && modPool.Count > 0; i++)
-                {
-                    int idx = context.Rng.GetRandomInt(modPool.Count);
-                    player.EngineBay.Add(modPool[idx]);
-                    modPool.RemoveAt(idx);
-                }
-
-                // Actions may repeat in hand.
-                for (int i = 0; i < cmd.ActionCount && ActionLibrary.All.Length > 0; i++)
-                {
-                    int idx = context.Rng.GetRandomInt(ActionLibrary.All.Length);
-                    player.ActionHand.Add(ActionLibrary.All[idx]);
-                }
-            }
-
-            context.Logger.LogDebug(
-                "Alpha Chain debug grant: {mods} modifiers + {actions} actions to {count} players.",
-                cmd.ModifierCount, cmd.ActionCount, state.GamePlayers.Count);
-
-            return (ValueResult<FsmState?>)null!;
         }
 
         // ── Debug turn advance (kept from M1) ────────────────────────────────
