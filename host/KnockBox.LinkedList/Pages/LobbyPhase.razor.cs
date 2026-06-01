@@ -31,16 +31,26 @@ namespace KnockBox.LinkedList.Pages
 
         protected bool IsHost => UserService.CurrentUser?.Id == GameState.Host.Id;
 
-        /// <summary>Bodies that actually play — registered players plus the host when
-        /// "Host plays the game" is on. This is what the start gate and the player-count
-        /// readout measure against, so toggling host-plays moves the count immediately.</summary>
-        protected int ParticipantCount => GameState.Participants.Length;
+        /// <summary>Registered players (never the host). The lobby keeps the host a
+        /// spectator until they pick a start button, so this is the stable count both
+        /// start gates and the player-count readout measure against.</summary>
+        protected int PlayerCount => GameState.Players.Length;
 
+        /// <summary>Gate for starting with the host as the display only (host not playing).
+        /// Counts registered players alone.</summary>
         protected bool CanStart =>
             GameState.IsJoinable
-            && ParticipantCount >= GameEngine.MinPlayerCount
-            && ParticipantCount <= GameEngine.MaxPlayerCount
+            && PlayerCount >= GameEngine.MinPlayerCount
+            && PlayerCount <= GameEngine.MaxPlayerCount
             && (Structure != PlayerStructure.Groups || TeamsValidity().Ok);
+
+        /// <summary>Gate for starting with the host playing. Counts the host alongside the
+        /// registered players, and (in Groups mode) validates teams with the host seated.</summary>
+        protected bool CanStartAsPlayer =>
+            GameState.IsJoinable
+            && PlayerCount + 1 >= GameEngine.MinPlayerCount
+            && PlayerCount + 1 <= GameEngine.MaxPlayerCount
+            && (Structure != PlayerStructure.Groups || TeamsValidityIncludingHost().Ok);
 
         protected void ToggleSettings() => SettingsOpen = !SettingsOpen;
 
@@ -111,9 +121,19 @@ namespace KnockBox.LinkedList.Pages
         }
 
         /// <summary>Whether the current team layout can legally start a Groups match.</summary>
-        protected (bool Ok, string? Message) TeamsValidity()
+        protected (bool Ok, string? Message) TeamsValidity() => ValidateTeams(ReconcileTeams());
+
+        /// <summary>Team validity for the "start as player" gate: the host is dropped into
+        /// the smallest team first, mirroring how <see cref="StartGameAsPlayer"/> seats them.</summary>
+        protected (bool Ok, string? Message) TeamsValidityIncludingHost()
         {
             var teams = ReconcileTeams();
+            teams.OrderBy(t => t.Count).First().Add(GameState.Host.Id);
+            return ValidateTeams(teams);
+        }
+
+        private static (bool Ok, string? Message) ValidateTeams(List<List<string>> teams)
+        {
             if (teams.Count < 2) return (false, "Need at least 2 groups.");
             if (teams.Any(t => t.Count < 2)) return (false, "Each group needs at least 2 players.");
             return (true, null);
@@ -154,12 +174,6 @@ namespace KnockBox.LinkedList.Pages
         {
             get => GameState.Settings.NoImmediateRepeat;
             set => UpdateSettings(s => s with { NoImmediateRepeat = value });
-        }
-
-        protected bool HostPlaysGame
-        {
-            get => GameState.Settings.HostPlaysGame;
-            set => UpdateSettings(s => s with { HostPlaysGame = value });
         }
 
         protected int RoundsPerMatch
@@ -236,12 +250,29 @@ namespace KnockBox.LinkedList.Pages
                 Logger.LogWarning("Error kicking player: {Error}", error.PublicMessage);
         }
 
-        protected async Task StartGame()
+        /// <summary>Starts the match with the host as the shared display only (not playing).</summary>
+        protected Task StartGame() => StartGameInternal(hostPlays: false);
+
+        /// <summary>Starts the match with the host seated as a participant. In Groups mode the
+        /// host is reconciled into the smallest team by <see cref="ReconcileTeams"/>.</summary>
+        protected Task StartGameAsPlayer() => StartGameInternal(hostPlays: true);
+
+        private async Task StartGameInternal(bool hostPlays)
         {
             if (UserService.CurrentUser is null) return;
 
+            // Settle whether the host plays before building the roster. Applied straight to
+            // state (not via UpdateSettings) so this start-time choice isn't persisted to the
+            // host's saved settings.
+            if (GameState.UpdateSettings(s => s with { HostPlaysGame = hostPlays }).TryGetFailure(out var settingsError))
+            {
+                Logger.LogError("Failed to set host-plays before start: {Error}", settingsError.PublicMessage);
+                return;
+            }
+
             // Lock in a roster-consistent team layout so the engine sees a valid,
-            // fully-assigned set of groups.
+            // fully-assigned set of groups. With the host now a participant, ReconcileTeams
+            // drops them into the smallest team.
             if (Structure == PlayerStructure.Groups)
                 PersistAssignments(ReconcileTeams());
 
@@ -270,6 +301,10 @@ namespace KnockBox.LinkedList.Pages
                 // the user's edit wins — the saved snapshot would clobber it.
                 if (saved is not null && !_userHasEdited)
                 {
+                    // Host-plays is no longer a persisted toggle — it's decided by the start
+                    // button — so force it off here. This also stops a value saved by the old
+                    // checkbox from making the host show up as a participant in the lobby.
+                    saved = saved with { HostPlaysGame = false };
                     // Apply through GameState directly (not the local UpdateSettings) so the
                     // load doesn't flip _userHasEdited or re-persist the just-loaded value.
                     if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
