@@ -14,9 +14,25 @@ using System.Threading.Tasks;
 
 namespace KnockBox.Operator.Services.Logic.Games;
 
-public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger, IRandomNumberService randomNumberService)
-    : AbstractGameEngine(minPlayerCount: 2, maxPlayerCount: int.MaxValue)
+public class OperatorGameEngine(
+    ILogger<OperatorGameEngine> logger,
+    ILogger<OperatorGameState> stateLogger,
+    IRandomNumberService randomNumberService)
+    : AbstractGameEngine<OperatorGameState>(minPlayerCount: 2, maxPlayerCount: int.MaxValue)
 {
+    /// <summary>
+    /// Operator counts the host as a participant when <see cref="OperatorSettings.HostPlays"/>
+    /// is on, so readiness is gated on <see cref="AbstractGameState.Participants"/>.<c>Length</c>
+    /// rather than the base check's <c>Players.Length</c>. (Start gating is enforced by the
+    /// lobby button; this keeps the readiness API correct for any caller that consults it.)
+    /// </summary>
+    public override Task<bool> CanStartAsync(AbstractGameState state, CancellationToken ct = default)
+    {
+        int count = state.Participants.Length;
+        bool valid = MinPlayerCount <= count && count <= MaxPlayerCount && state.IsJoinable;
+        return Task.FromResult(valid);
+    }
+
     public override Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
     {
         if (host is null)
@@ -25,23 +41,29 @@ public class OperatorGameEngine(ILogger<OperatorGameState> stateLogger, IRandomN
         var state = new OperatorGameState(host, stateLogger);
         state.Context = new OperatorGameContext(state, randomNumberService);
         state.Execute(() => state.SetJoinable(true));
+        logger.LogInformation("Created Operator gameState with user [{userId}] as host.", host.Id);
         return Task.FromResult(ValueResult<AbstractGameState>.FromValue(state));
     }
 
-    protected override async Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
+    protected override async Task<Result> StartAsyncCore(OperatorGameState operatorState, CancellationToken ct = default)
     {
-        if (state is not OperatorGameState operatorState)
-        {
-            return Result.FromError("Invalid game state type.");
-        }
+        logger.LogInformation(
+            "Starting Operator game hosted by user [{hostId}] with {playerCount} player(s).",
+            operatorState.Host.Id,
+            operatorState.Players.Length);
 
         var context = new OperatorGameContext(operatorState, randomNumberService);
         var fsm = new FiniteStateMachine<OperatorGameContext, OperatorCommand>(stateLogger);
         context.Fsm = fsm;
 
-        return await state.ExecuteAsync(() =>
+        return await operatorState.ExecuteAsync(() =>
         {
-            var allParticipants = operatorState.Players.ToList();
+            // Fix the host's participation from settings at start time so the snapshot below
+            // is self-contained regardless of button ordering. When HostPlays is false,
+            // Participants == Players and behavior is unchanged.
+            operatorState.SetHostIsParticipant(operatorState.Settings.HostPlays);
+
+            var allParticipants = operatorState.Participants.ToList();
 
             // Initialize GamePlayers (deck generation and dealing happen in SetupState after choices)
             foreach (var entry in allParticipants)

@@ -144,12 +144,6 @@
                        @bind:get="State.Settings.RareLetterBonusEnabled"
                        @bind:set="v => OnUpdate(s => s with { RareLetterBonusEnabled = v })" />
             </label>
-            <label class="tr-field tr-field-row">
-                <span>Host Plays Along</span>
-                <input type="checkbox"
-                       @bind:get="State.Settings.HostPlaysAlong"
-                       @bind:set="v => OnUpdate(s => s with { HostPlaysAlong = v })" />
-            </label>
         </div>
     </section>
 </div>

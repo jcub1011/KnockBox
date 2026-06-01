@@ -17,7 +17,7 @@ namespace KnockBox.Tracery.Services.Logic.Games
         IWordListService wordListService,
         IRandomNumberService rng,
         ILogger<TraceryGameEngine> logger,
-        ILogger<TraceryGameState> stateLogger) : AbstractGameEngine(2, 8)
+        ILogger<TraceryGameState> stateLogger) : AbstractGameEngine<TraceryGameState>(2, 8)
     {
         // The trie is shared across every lobby this singleton serves, so it is built
         // with the smallest word length the game ever allows (the settings panel clamps
@@ -109,11 +109,8 @@ namespace KnockBox.Tracery.Services.Logic.Games
             });
         }
 
-        protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
+        protected override Task<Result> StartAsyncCore(TraceryGameState s, CancellationToken ct = default)
         {
-            if (state is not TraceryGameState s)
-                return Task.FromResult(Result.FromError("Error starting game.", $"Game state of type [{state?.GetType().Name ?? "null"}] couldn't be cast to type [{nameof(TraceryGameState)}]."));
-
             var execResult = s.Execute(() =>
             {
                 // SetJoinable(false) closes the join race before we read Players.Length;

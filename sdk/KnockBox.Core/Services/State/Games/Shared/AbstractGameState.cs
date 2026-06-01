@@ -76,7 +76,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
     /// Execute will <see cref="InvalidOperationException">throw</see>,
     /// because that is the lock-violation the assertion exists to catch.</para>
     /// </remarks>
-    public abstract class AbstractGameState : IDisposable
+    public abstract class AbstractGameState : IDisposable, IReadOnlyGameState
     {
         // Single process-wide marker: holds the state whose Execute lambda is
         // currently running on this async flow. One AsyncLocal slot regardless
@@ -509,6 +509,11 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// Executes the provided action sync, holding the write lock for its duration
         /// and firing state-change notifications after the lock is released.
         /// </summary>
+        /// <remarks>
+        /// This is the state-mutation entry point and is intended for engine / command
+        /// code. UI components that only read state should depend on
+        /// <see cref="IReadOnlyGameState"/> and use <see cref="WithExclusiveRead"/>.
+        /// </remarks>
         public Result Execute(Action action) => RunSync(action, writer: true);
 
         /// <summary>

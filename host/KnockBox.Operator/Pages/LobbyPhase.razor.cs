@@ -148,9 +148,21 @@ namespace KnockBox.Operator.Pages
             }
         }
 
-        protected async Task StartGame()
+        // Two lobby buttons share this handler: "Start Game" (hostPlays: false) runs the host
+        // as the shared display; "Start Game As Player" (hostPlays: true) deals the host in.
+        // The choice is written straight to state (not the persisting UpdateSettings wrapper)
+        // so this start-time decision never lands in the host's localStorage. UpdateSettings
+        // reflects HostPlays into HostIsParticipant before the engine snapshots participants.
+        protected async Task StartGame(bool hostPlays)
         {
             if (UserService.CurrentUser is null) return;
+
+            if (GameState.UpdateSettings(s => s with { HostPlays = hostPlays }).TryGetFailure(out var settingsError))
+            {
+                Logger.LogError("Failed to set host-plays before start: {Error}", settingsError.PublicMessage);
+                return;
+            }
+
             var result = await GameEngine.StartAsync(UserService.CurrentUser, GameState);
             if (result.TryGetFailure(out var error))
                 Logger.LogError("Failed to start game: {Error}", error);

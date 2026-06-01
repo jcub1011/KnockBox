@@ -308,6 +308,32 @@
     margin: 0 auto;
 }
 
+/* Deal buttons stack a bold main label over a smaller, grayed subtitle line.
+   Override the base .cc-btn nowrap/row layout and the .cc-btn-primary width cap
+   so the button sizes to its content instead of clipping the longer label.
+   The doubled class raises specificity above the parent's `::deep .cc-btn`. */
+.cc-btn.cc-deal-btn {
+    flex-direction: column;
+    gap: 1px;
+    white-space: normal;
+    max-width: none;
+    margin: 0 auto;
+    line-height: 1.15;
+}
+
+.cc-deal-btn-main {
+    display: block;
+}
+
+.cc-deal-btn-sub {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0.3px;
+    opacity: 0.7;
+}
+
 button.cc-lobby-player:hover {
     cursor: pointer;
 }

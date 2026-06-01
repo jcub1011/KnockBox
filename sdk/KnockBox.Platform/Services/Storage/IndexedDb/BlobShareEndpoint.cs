@@ -171,18 +171,21 @@ public static class BlobShareEndpoint
         // budget and 503 purely from contention.
         watchdog.CancelAfter(PerStreamTimeout);
 
-        byte[]? payload;
+        ReadOnlyMemory<byte> payload = default;
         try
         {
             // Re-check cache after acquiring — a peer may have just populated
             // it while we waited at the gate.
             if (byteCache is not null && byteCache.TryGetBytes(token, out var fresh))
             {
-                payload = fresh.ToArray();
+                // Serve the cached memory directly — no defensive copy. The
+                // ReadOnlyMemory pins its backing array for the GC even if the
+                // cache evicts this entry before we finish writing the response.
+                payload = fresh;
             }
             else
             {
-                payload = await registry.RunSingleFlight(token, async () =>
+                payload = (await registry.RunSingleFlight(token, async () =>
                 {
                     // Inside the gate: open the JS stream, drain into RAM,
                     // store in the byte cache (if it fits), and return the
@@ -253,7 +256,7 @@ public static class BlobShareEndpoint
                         }
                         return bytes;
                     }
-                }).ConfigureAwait(false);
+                }).ConfigureAwait(false))!;
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -304,24 +307,22 @@ public static class BlobShareEndpoint
             catch (SemaphoreFullException) { /* defensive — should not happen */ }
         }
 
-        // payload is non-null here: the cache-hit branch returns fresh.ToArray()
-        // (never null), and RunSingleFlight's factory either returns a non-null
-        // byte[] or throws (every throw path is handled by one of the catches
-        // above and returns early). The compiler can't see that through the
-        // Task<byte[]?> contract, hence the `!`.
-        var bytes = payload!;
+        // payload is populated here: the cache-hit branch assigns the cached
+        // memory (never empty for a stored entry), and RunSingleFlight's factory
+        // either returns a non-null byte[] or throws (every throw path is handled
+        // by one of the catches above and returns early).
 
-        // Write response from the materialized buffer. Headers are set here
-        // (not before stream open) so any failure path above can land a
-        // clean status code without HasStarted blocking it.
+        // Write response from the buffer. Headers are set here (not before
+        // stream open) so any failure path above can land a clean status code
+        // without HasStarted blocking it.
         context.Response.ContentType = entry.ContentType;
-        context.Response.ContentLength = bytes.Length;
+        context.Response.ContentLength = payload.Length;
         context.Response.Headers.XContentTypeOptions = "nosniff";
         context.Response.Headers.CacheControl = entry.CacheControl ?? DefaultCacheControl;
         context.Response.Headers.ETag = etag;
         try
         {
-            await context.Response.Body.WriteAsync(bytes, ct).ConfigureAwait(false);
+            await context.Response.Body.WriteAsync(payload, ct).ConfigureAwait(false);
             await context.Response.Body.FlushAsync(ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

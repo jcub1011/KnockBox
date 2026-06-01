@@ -19,13 +19,13 @@ namespace KnockBox.Codeword.Services.Logic.Games
     public class CodewordGameEngine(
         IRandomNumberService randomNumberService,
         ILogger<CodewordGameEngine> logger,
-        ILogger<CodewordGameState> stateLogger) : AbstractGameEngine(minPlayerCount: 4, maxPlayerCount: 8)
+        ILogger<CodewordGameState> stateLogger) : AbstractGameEngine<CodewordGameState>(minPlayerCount: 4, maxPlayerCount: 8)
     {
         // ── AbstractGameEngine lifecycle ─────────────────────────────────────
 
         /// <summary>
         /// Codeword counts the host as a participant when
-        /// <see cref="CodewordSettings.HostPlaysGame"/> is on, so readiness is
+        /// <see cref="CodewordSettings.HostPlays"/> is on, so readiness is
         /// gated on <see cref="AbstractGameState.Participants"/>.<c>Count</c>
         /// rather than the base check's <c>Players.Count</c>.
         /// </summary>
@@ -51,13 +51,8 @@ namespace KnockBox.Codeword.Services.Logic.Games
         }
 
         protected override Task<Result> StartAsyncCore(
-            AbstractGameState state, CancellationToken ct = default)
+            CodewordGameState gameState, CancellationToken ct = default)
         {
-            if (state is not CodewordGameState gameState)
-                return Task.FromResult(Result.FromError(
-                    "Error starting game.",
-                    $"State type [{state?.GetType().Name}] cannot be cast to [{nameof(CodewordGameState)}]."));
-
             var context = new CodewordGameContext(gameState, randomNumberService, logger);
             var fsm = new FiniteStateMachine<CodewordGameContext, CodewordCommand>(logger);
             context.Fsm = fsm;
@@ -68,7 +63,7 @@ namespace KnockBox.Codeword.Services.Logic.Games
                 gameState.Context = context;
 
                 // Snapshot all participants into GamePlayers. Participants is Players
-                // by default, or {host, ...Players} when CodewordSettings.HostPlaysGame
+                // by default, or {host, ...Players} when CodewordSettings.HostPlays
                 // is on (the host appears as a synthetic PlayerEntry with a null Token).
                 foreach (var entry in gameState.Participants)
                 {
@@ -266,7 +261,7 @@ namespace KnockBox.Codeword.Services.Logic.Games
                 state.WinResult = null;
                 state.EndGameVoteStatus = new EndGameVoteStatus([], 0);
 
-                // Re-snapshot participants (host included if HostPlaysGame is on).
+                // Re-snapshot participants (host included if HostPlays is on).
                 foreach (var entry in state.Participants)
                 {
                     state.GamePlayers[entry.User.Id] = new CodewordPlayerState

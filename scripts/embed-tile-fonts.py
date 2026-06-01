@@ -13,6 +13,7 @@ Requires: pyftsubset (fonttools) on PATH, internet access to fonts.googleapis.co
 """
 
 import base64
+import html
 import re
 import subprocess
 import sys
@@ -24,25 +25,20 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
-# Per-SVG configuration. `fonts` is a list of (family, weight, italic) faces; the
-# union of all glyph strings in `texts` is subsetted from each face.
+# Per-SVG configuration. `fonts` is a list of (family, weight, italic) faces; each face
+# is subsetted to the glyphs actually rendered by the SVG. The glyph set is derived
+# directly from the SVG's <text>/<tspan> content (see glyphs_from_svg) rather than a
+# hand-maintained list — that list kept drifting out of sync with the SVGs and left tile
+# taglines partially rendered in system-fallback fonts.
 TILES = {
     "sdk/KnockBox.Platform/wwwroot/wip-overlay.svg": {
         "fonts": [("Lexend", 900, False)],
-        "texts": ["WORK IN PROGRESS"],
     },
     "host/KnockBox.CardCounter/wwwroot/tile.svg": {
         "fonts": [("Lexend", 900, False), ("Lexend", 700, False)],
-        "texts": ["CARD COUNTER", "Bluff, count cards, bust the table."],
     },
     "host/KnockBox.Codeword/wwwroot/tile.svg": {
         "fonts": [("Share Tech Mono", 400, False)],
-        "texts": [
-            "> CODEWORD",
-            "[INTEL]",
-            "CLASSIFIED",
-            "Decode the intel. Smoke out the spy.",
-        ],
     },
     "host/KnockBox.DiceSimulator/wwwroot/tile.svg": {
         "fonts": [
@@ -50,12 +46,6 @@ TILES = {
             ("Lexend", 600, False),
             ("Google Sans Code", 800, False),
             ("Google Sans Code", 700, False),
-        ],
-        "texts": [
-            "DICE SIMULATOR",
-            "Roll any dice. Chase the nat-20.",
-            "20",
-            "3d20+5",
         ],
     },
     "host/KnockBox.DndMapper/wwwroot/tile.svg": {
@@ -65,36 +55,24 @@ TILES = {
             ("Lexend", 700, False),
             ("Lexend", 600, False),
         ],
-        "texts": [
-            "D",
-            "nD Mapper",
-            "Collaborative Tabletop Maps",
-            "20",
-        ],
     },
     "host/KnockBox.DrawnToDress/wwwroot/tile.svg": {
         "fonts": [("Lexend", 900, False), ("Lexend", 700, False)],
-        "texts": ["DRAWN TO DRESS", "Sketch outfits. Vote the runway."],
     },
     "host/KnockBox.HiddenAgenda/wwwroot/tile.svg": {
         "fonts": [
             ("Playfair Display", 700, False),
             ("Playfair Display", 400, True),
         ],
-        "texts": ["Hidden Agenda", "The Great Exhibition"],
+    },
+    "host/KnockBox.LinkedList/wwwroot/tile.svg": {
+        "fonts": [("Chakra Petch", 700, False)],
     },
     "host/KnockBox.Operator/wwwroot/tile.svg": {
         "fonts": [
             ("Lexend", 900, False),
             ("Google Sans Code", 800, False),
             ("Google Sans Code", 700, False),
-        ],
-        "texts": [
-            "OPERATOR",
-            "Stack operators. Strike opponents.",
-            "+",
-            "+1",
-            "7",
         ],
     },
     "host/KnockBox.Spardle/wwwroot/tile.svg": {
@@ -103,15 +81,14 @@ TILES = {
             ("JetBrains Mono", 700, False),
             ("Manrope", 600, False),
         ],
-        "texts": [
-            "SPARDLE–",
-            "Head-to-head word combat.",
-        ],
     },
     "host/KnockBox.TaskMaster/wwwroot/tile.svg": {
         # Lexend has no italic — tag uses regular Lexend with browser-synthesized italics.
         "fonts": [("Lexend", 700, False), ("Lexend", 400, False)],
-        "texts": ["Task Master", "Complete tasks before time runs out."],
+    },
+    "host/KnockBox.Tracery/wwwroot/tile.svg": {
+        # Declared `font-weight: 700 800` in the SVG; fetch the static 700 latin instance.
+        "fonts": [("Hanken Grotesk", 700, False)],
     },
 }
 
@@ -234,6 +211,26 @@ def inject_into_svg(svg_path: Path, css_block: str) -> None:
     svg_path.write_text(content, encoding="utf-8")
 
 
+_TEXT_BLOCK_RE = re.compile(r"<text\b[^>]*>(.*?)</text>", re.DOTALL)
+_INNER_TAG_RE = re.compile(r"<[^>]*>")
+_WS_RE = re.compile(r"\s+")
+
+
+def glyphs_from_svg(svg: str) -> str:
+    """Return every character rendered by the SVG's <text> elements.
+
+    Concatenates the text content of all <text>...</text> blocks (stripping nested
+    tags like <tspan> and decoding entities such as &gt; or &#9998;), collapsing
+    runs of whitespace. This is the source of truth for what the subset must cover —
+    keeping a hand-maintained list in sync with the SVGs proved unreliable.
+    """
+    parts = []
+    for inner in _TEXT_BLOCK_RE.findall(svg):
+        text = html.unescape(_INNER_TAG_RE.sub("", inner))
+        parts.append(_WS_RE.sub(" ", text))
+    return "".join(parts)
+
+
 def main() -> None:
     cache: dict[tuple[str, int, bool], bytes] = {}
 
@@ -242,14 +239,15 @@ def main() -> None:
         if not path.exists():
             sys.exit(f"Missing SVG: {path}")
 
-        # Include both case variants so subsets cover CSS text-transform:
-        # uppercase / lowercase. Cheap (a few extra glyphs per face) and
-        # avoids per-tile per-class scraping of the SVG.
-        raw = "".join(conf["texts"])
+        # Derive the glyph set straight from the SVG's text nodes, then include both
+        # case variants so subsets cover CSS text-transform: uppercase / lowercase.
+        raw = glyphs_from_svg(path.read_text(encoding="utf-8"))
         glyph_set = set(raw) | set(raw.upper()) | set(raw.lower())
         glyphs = "".join(sorted(glyph_set))
         print(f"\n{rel_path}")
-        print(f"  glyphs: {sorted(glyph_set)!r}")
+        # ascii() (not !r) so the Windows cp1252 console can print non-Latin glyphs
+        # like the pencil ✎ (U+270E) without a UnicodeEncodeError.
+        print(f"  glyphs: {ascii(sorted(glyph_set))}")
 
         css_parts = []
         for family, weight, italic in conf["fonts"]:

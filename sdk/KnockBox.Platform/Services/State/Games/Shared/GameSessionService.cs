@@ -87,7 +87,7 @@ namespace KnockBox.Services.State.Games.Shared
             logger.LogInformation(
                 "User [{userId}] left session [{sessionId}].",
                 userService.CurrentUser?.Id ?? "Unknown",
-                previousSession?.LobbyRegistration.Uri);
+                previousSession?.LobbyRegistration.Uri ?? "none");
 
             try
             {

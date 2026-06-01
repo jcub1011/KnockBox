@@ -29,6 +29,38 @@ namespace KnockBox.Operator.Tests.Unit.State
         }
 
         [TestMethod]
+        public void Settings_DefaultHostPlays_IsFalse()
+        {
+            Assert.IsFalse(new OperatorSettings().HostPlays);
+            Assert.IsFalse(_state.Settings.HostPlays);
+        }
+
+        [TestMethod]
+        public void UpdateSettings_HostPlaysTrue_SetsHostIsParticipant()
+        {
+            var result = _state.UpdateSettings(s => s with { HostPlays = true });
+
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsTrue(_state.Settings.HostPlays);
+            Assert.IsTrue(_state.HostIsParticipant);
+            // Host appears in Participants (as a synthetic entry) but never in Players.
+            Assert.AreEqual(_state.Players.Length + 1, _state.Participants.Length);
+        }
+
+        [TestMethod]
+        public void UpdateSettings_HostPlaysFalse_ClearsHostIsParticipant()
+        {
+            _state.UpdateSettings(s => s with { HostPlays = true });
+
+            var result = _state.UpdateSettings(s => s with { HostPlays = false });
+
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsFalse(_state.Settings.HostPlays);
+            Assert.IsFalse(_state.HostIsParticipant);
+            Assert.AreEqual(_state.Players.Length, _state.Participants.Length);
+        }
+
+        [TestMethod]
         public void UpdateSettings_FiresStateChangedNotification()
         {
             // Notification fires outside the Execute lock and may be dispatched

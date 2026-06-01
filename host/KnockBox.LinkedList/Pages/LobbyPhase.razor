@@ -10,7 +10,7 @@
     </div>
 
     <div class="ll-players-card">
-        <h4>Players (@GameState.Participants.Length)</h4>
+        <h4>Players (@GameState.Players.Length)</h4>
         <div class="ll-player-list">
             @foreach (var entry in GameState.RosterIncludingHost)
             {
@@ -33,16 +33,20 @@
         </div>
 
         <p class="ll-player-count">
-            @ParticipantCount player@(ParticipantCount == 1 ? "" : "s") (need @GameEngine.MinPlayerCount–@GameEngine.MaxPlayerCount)
+            @PlayerCount player@(PlayerCount == 1 ? "" : "s") (need @GameEngine.MinPlayerCount–@GameEngine.MaxPlayerCount)
         </p>
 
         @if (IsHost)
         {
             <button class="ll-btn ll-btn-primary" @onclick="StartGame" disabled="@(!CanStart)"
-                    title="@(CanStart ? "Start the game" : $"Need {GameEngine.MinPlayerCount}–{GameEngine.MaxPlayerCount} players")">
+                    title="@(CanStart ? "Start the game — you run the display and don't play" : $"Need {GameEngine.MinPlayerCount}–{GameEngine.MaxPlayerCount} players")">
                 Start Game
             </button>
-            @if (!CanStart)
+            <button class="ll-btn ll-btn-primary" @onclick="StartGameAsPlayer" disabled="@(!CanStartAsPlayer)"
+                    title="@(CanStartAsPlayer ? "Start the game and play along — you count toward the player total" : $"Need {GameEngine.MinPlayerCount}–{GameEngine.MaxPlayerCount} players including you")">
+                Start Game As Player
+            </button>
+            @if (!CanStart && !CanStartAsPlayer)
             {
                 <p class="ll-hint">⚠️ Need @GameEngine.MinPlayerCount–@GameEngine.MaxPlayerCount players to start.</p>
             }
@@ -94,10 +98,6 @@
                 <label class="ll-field ll-field-row">
                     <span>Block repeat pairs (loops)</span>
                     <input type="checkbox" @bind="NoImmediateRepeat" />
-                </label>
-                <label class="ll-field ll-field-row">
-                    <span>Host plays the game</span>
-                    <input type="checkbox" @bind="HostPlaysGame" />
                 </label>
 
                 @if (Structure == PlayerStructure.Collective)

@@ -125,6 +125,78 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             Assert.IsFalse(state.IsJoinable, "Game should not be joinable after starting.");
         }
 
+        // ── Host as participant ───────────────────────────────────────────────
+
+        private async Task<CardCounterGameState> CreateStartedHostAsPlayerGameAsync(params User[] players)
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (CardCounterGameState)stateResult.Value!;
+            state.UpdateSettings(s => s with { HostPlays = true });
+            foreach (var p in players)
+                state.RegisterPlayer(p);
+            await _engine.StartAsync(_host, state);
+            return state;
+        }
+
+        [TestMethod]
+        public async Task StartAsync_HostPlays_AddsHostToGamePlayers()
+        {
+            using var state = await CreateStartedHostAsPlayerGameAsync(_player1);
+
+            Assert.IsTrue(state.GamePlayers.ContainsKey(_host.Id),
+                "Host should be dealt into GamePlayers when configured as a participant.");
+            Assert.Contains(_host.Id, state.TurnManager.TurnOrder,
+                "Host should hold a slot in the turn order when configured as a participant.");
+        }
+
+        [TestMethod]
+        public async Task StartAsync_HostPlays_WithNoOtherPlayers_Succeeds()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            using var state = (CardCounterGameState)stateResult.Value!;
+            state.UpdateSettings(s => s with { HostPlays = true });
+            // No other players registered — the host alone is a valid participant.
+
+            var result = await _engine.StartAsync(_host, state);
+
+            Assert.IsTrue((bool)result.IsSuccess,
+                "A host-as-player game should start even with no other players, since the host counts.");
+            Assert.IsTrue(state.GamePlayers.ContainsKey(_host.Id));
+        }
+
+        [TestMethod]
+        public async Task StartAsync_HostPlays_SetsHostIsParticipantFlag()
+        {
+            using var state = await CreateStartedHostAsPlayerGameAsync(_player1);
+
+            Assert.IsTrue(state.HostIsParticipant,
+                "The state's HostIsParticipant flag should be synced from the setting at start.");
+        }
+
+        [TestMethod]
+        public async Task StartAsync_SharedDisplay_DoesNotAddHost()
+        {
+            using var state = await CreateStartedGameAsync(_player1);
+
+            Assert.IsFalse(state.GamePlayers.ContainsKey(_host.Id),
+                "Host should not be a player by default (shared-display path).");
+            Assert.IsFalse(state.HostIsParticipant,
+                "HostIsParticipant should be false on the default shared-display path.");
+        }
+
+        [TestMethod]
+        public async Task ResetGame_HostPlays_KeepsHostInGamePlayers()
+        {
+            using var state = await CreateStartedHostAsPlayerGameAsync(_player1);
+            state.SetPhase(GamePhase.GameOver);
+
+            var result = _engine.ResetGame(_host, state);
+
+            Assert.IsTrue((bool)result.IsSuccess);
+            Assert.IsTrue(state.GamePlayers.ContainsKey(_host.Id),
+                "Play Again should re-deal the host in when the setting is enabled.");
+        }
+
         // ── ActiveOperatorMode start ──────────────────────────────────────────
 
         private async Task<CardCounterGameState> CreateStartedActiveOperatorGameAsync(params User[] players)

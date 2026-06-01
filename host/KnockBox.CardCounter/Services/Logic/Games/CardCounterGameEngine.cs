@@ -20,7 +20,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
     public class CardCounterGameEngine(
         IRandomNumberService randomNumberService,
         ILogger<CardCounterGameEngine> logger,
-        ILogger<CardCounterGameState> stateLogger) : AbstractGameEngine
+        ILogger<CardCounterGameState> stateLogger) : AbstractGameEngine<CardCounterGameState>
     {
         // ── AbstractGameEngine lifecycle ─────────────────────────────────────
 
@@ -39,15 +39,13 @@ namespace KnockBox.CardCounter.Services.Logic.Games
         }
 
         protected override async Task<Result> StartAsyncCore(
-            AbstractGameState state, CancellationToken ct = default)
+            CardCounterGameState gameState, CancellationToken ct = default)
         {
-            if (state is not CardCounterGameState gameState)
-                return Result.FromError(
-                    "Error starting game.",
-                    $"State type [{state?.GetType().Name}] cannot be cast to [{nameof(CardCounterGameState)}].");
-
-            if (gameState.Players.Length == 0)
-                return Result.FromError("At least one other player must join before starting the game.");
+            // The host counts as a participant when configured to play, so a host-as-player game
+            // can start with no other players. A shared-display game still needs a joined player.
+            int participantCount = gameState.Players.Length + (gameState.Settings.HostPlays ? 1 : 0);
+            if (participantCount == 0)
+                return Result.FromError("At least one player must be in the game before starting.");
 
             var context = new CardCounterGameContext(gameState, randomNumberService, logger);
             var fsm = new FiniteStateMachine<CardCounterGameContext, CardCounterCommand>(logger);
@@ -56,6 +54,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
             var executeResult = gameState.Execute(() =>
             {
                 gameState.SetJoinable(false);
+                gameState.SetHostIsParticipant(gameState.Settings.HostPlays);
                 gameState.Context = context;
                 InitializeGame(context);
             });
@@ -270,6 +269,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
                 state.IsNotMyMoneySelecting = false;
                 state.PendingNotMyMoneyOperator = null;
                 state.ForceDrawStack.Clear();
+                state.SetHostIsParticipant(state.Settings.HostPlays);
                 InitializeGame(context);
 
                 // Respect Active Operator Mode on reset: same logic as StartAsync.
@@ -369,9 +369,11 @@ namespace KnockBox.CardCounter.Services.Logic.Games
             state.TurnManager.SetTurnOrder([]);
             state.ShoeIndex = 0;
 
-            // Register every non-host player
+            // Register every participant. When the host is configured as a participant,
+            // state.Participants includes the host (at index 0) alongside the joined players;
+            // otherwise it equals state.Players (non-host only), preserving prior behavior.
             var playerIds = new List<string>();
-            foreach (var entry in state.Players)
+            foreach (var entry in state.Participants)
             {
                 var ps = new PlayerState
                 {

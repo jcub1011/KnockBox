@@ -16,7 +16,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 {
     // M01 verb names use the GDD's `Async` suffix for cross-reference with the design doc,
     // but the bodies are synchronous (Execute is sync). Return types are plain Result / ValueResult<T>.
-    public sealed class DndMapperGameEngine : AbstractGameEngine
+    public sealed class DndMapperGameEngine : AbstractGameEngine<DndMapperGameState>
     {
         private const int MaxRollDiceCount = 20;
         private const int MaxNameLength = 60;
@@ -62,13 +62,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return Task.FromResult<ValueResult<AbstractGameState>>(state);
         }
 
-        protected override Task<Result> StartAsyncCore(AbstractGameState abstractState, CancellationToken ct = default)
+        protected override Task<Result> StartAsyncCore(DndMapperGameState state, CancellationToken ct = default)
         {
-            if (abstractState is not DndMapperGameState state)
-                return Task.FromResult(Result.FromError(
-                    "Error starting game.",
-                    $"Game state of type [{(abstractState?.GetType().Name ?? "null")}] couldn't be cast to type [{nameof(DndMapperGameState)}]."));
-
             var executeResult = state.Execute(() =>
             {
                 state.SetPhase(DndMapperPhase.Playing);

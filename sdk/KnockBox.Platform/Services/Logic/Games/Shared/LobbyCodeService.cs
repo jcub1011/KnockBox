@@ -5,7 +5,9 @@ using KnockBox.Platform.Games;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
-    internal sealed class LobbyCodeService(IProfanityFilter profanityFilter) : ILobbyCodeService
+    internal sealed class LobbyCodeService(
+        IProfanityFilter profanityFilter,
+        ILogger<LobbyCodeService> logger) : ILobbyCodeService
     {
         private const int CodeLength = 6;
         private const int MaxAttempts = 1024;
@@ -37,7 +39,9 @@ namespace KnockBox.Services.Logic.Games.Shared
                     }
                 }
 
-                return ValueResult<string>.FromError("Error occured while generating error code.");
+                logger.LogError(
+                    "Exhausted {MaxAttempts} attempts generating a unique lobby code.", MaxAttempts);
+                return ValueResult<string>.FromError("Error occurred while generating lobby code.");
             }
             catch (OperationCanceledException)
             {
@@ -45,6 +49,7 @@ namespace KnockBox.Services.Logic.Games.Shared
             }
             catch (Exception ex)
             {
+                logger.LogError(ex, "Error generating lobby code.");
                 return ValueResult<string>.FromError("Error generating lobby code.", $"Error generating lobby code: {ex}");
             }
         }
@@ -73,6 +78,7 @@ namespace KnockBox.Services.Logic.Games.Shared
             }
             catch (Exception ex)
             {
+                logger.LogError(ex, "Error releasing lobby code [{LobbyCode}].", lobbyCode);
                 return Result.FromError("Unable to release lobby code.", $"Error releasing lobby code: {ex}");
             }
         }

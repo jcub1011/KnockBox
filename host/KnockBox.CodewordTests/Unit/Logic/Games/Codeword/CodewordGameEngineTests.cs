@@ -191,40 +191,40 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         public async Task CanStartAsync_WithThreePlayersAndHostPlays_ReturnsTrue()
         {
             var state = await CreateStateWithPlayersAsync(3);
-            state.UpdateSettings(s => s with { HostPlaysGame = true });
+            state.UpdateSettings(s => s with { HostPlays = true });
 
             var canStart = await _engine.CanStartAsync(state);
 
-            Assert.IsTrue(canStart, "Host should count toward the 4-player minimum when HostPlaysGame is on.");
+            Assert.IsTrue(canStart, "Host should count toward the 4-player minimum when HostPlays is on.");
         }
 
         [TestMethod]
         public async Task CanStartAsync_WithEightPlayersAndHostPlays_ReturnsFalse()
         {
             var state = await CreateStateWithPlayersAsync(8);
-            state.UpdateSettings(s => s with { HostPlaysGame = true });
+            state.UpdateSettings(s => s with { HostPlays = true });
 
             var canStart = await _engine.CanStartAsync(state);
 
-            Assert.IsFalse(canStart, "Host should count toward the 8-player maximum when HostPlaysGame is on.");
+            Assert.IsFalse(canStart, "Host should count toward the 8-player maximum when HostPlays is on.");
         }
 
         [TestMethod]
-        public async Task StartAsync_HostPlaysGameOn_HostInGamePlayersAndTurnOrder()
+        public async Task StartAsync_HostPlaysOn_HostInGamePlayersAndTurnOrder()
         {
             var state = await CreateStateWithPlayersAsync(3);
-            state.UpdateSettings(s => s with { HostPlaysGame = true });
+            state.UpdateSettings(s => s with { HostPlays = true });
 
             await _engine.StartAsync(_host, state);
 
             Assert.HasCount(4, state.GamePlayers);
             Assert.IsTrue(state.GamePlayers.ContainsKey(_host.Id),
-                "Host should be in GamePlayers when HostPlaysGame is on.");
+                "Host should be in GamePlayers when HostPlays is on.");
             Assert.Contains(_host.Id, state.TurnManager.TurnOrder);
         }
 
         [TestMethod]
-        public async Task StartAsync_HostPlaysGameOff_HostNotInGamePlayers()
+        public async Task StartAsync_HostPlaysOff_HostNotInGamePlayers()
         {
             using var state = await CreateStartedGameAsync(4);
 
@@ -238,7 +238,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         {
             // Host is "Host"; register a player whose name also resolves to "Host" so
             // the disambiguator must rename the player. The host's entry must keep its
-            // original name even after HostPlaysGame flips on.
+            // original name even after HostPlays flips on.
             var result = await _engine.CreateStateAsync(_host);
             using var state = (CodewordGameState)result.Value!;
 
@@ -246,7 +246,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             state.RegisterPlayer(MakePlayer(1));
             state.RegisterPlayer(MakePlayer(2));
 
-            state.UpdateSettings(s => s with { HostPlaysGame = true });
+            state.UpdateSettings(s => s with { HostPlays = true });
             await _engine.StartAsync(_host, state);
 
             Assert.AreEqual("Host", state.GamePlayers[_host.Id].DisplayName,

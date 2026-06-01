@@ -35,7 +35,9 @@ namespace KnockBox.Operator.Pages
         protected bool ShouldShowWaiting()
         {
             if (UserService.CurrentUser == null) return false;
-            if (IsHost()) return true;
+            // A non-playing host (shared display) always shows the waiting state; a playing
+            // host falls through to the normal per-player "have I chosen yet?" logic below.
+            if (IsHost() && !GameState.HostIsParticipant) return true;
             if (GameState.Context == null) return false;
             
             return GameState.Context.GamePlayers.TryGetValue(UserService.CurrentUser.Id, out var playerState)
