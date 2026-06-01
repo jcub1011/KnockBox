@@ -78,7 +78,7 @@ Introduce Modifier cards (the Engine Bay) and Action cards plus the full scoring
 
 ### FSM updates
 
-- `Services/Logic/Games/FSM/States/RoundState.HandleCommandAsync`:
+- `Services/Logic/Games/FSM/States/RoundState.HandleCommand`:
   - For `SubmitWordCommand`:
     - Build `WordContext`.
     - If `PendingAction == Pivot`, set `RequiredStartLetter = null` (only for this submission), consume Pivot.
@@ -142,7 +142,7 @@ Introduce Modifier cards (the Engine Bay) and Action cards plus the full scoring
 2. Author `ModifierLibrary` and `ActionLibrary` static lists.
 3. Implement and test `ScoreCalculator` in isolation.
 4. Extend `AlphaChainPlayerState` with hand/bay fields.
-5. Add the three commands and wire them through `RoundState.HandleCommandAsync`.
+5. Add the three commands and wire them through `RoundState.HandleCommand`.
 6. Update `RoundState` submission flow to use `ScoreCalculator` and honor pending actions.
 7. Build `EngineBay`, `ActionHand`, `CardTooltip` components.
 8. Add the debug `Grant Cards` button.

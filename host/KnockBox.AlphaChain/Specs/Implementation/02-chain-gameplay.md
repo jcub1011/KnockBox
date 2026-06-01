@@ -13,18 +13,27 @@ Wire up real word play. This milestone adds dictionary-backed validation, the Sh
 
 ## New / changed files
 
-### Word list
+### Word validation — reuse the `KnockBox.WordService` library plugin
 
-- `Services/Logic/WordList/IAlphaChainWordList.cs`:
-  - `bool IsValidWord(ReadOnlySpan<char> word);`
-  - This is the swappable boundary. The M2 implementation is a small local CSV; the end-goal implementation is a Spardle-style in-process word list (likely a larger dataset and/or shared lookup structure). Keeping the contract sync + span-based matches Spardle's existing `WordListService` shape and avoids forcing callers into `await` for what is always an in-memory check.
-- `Services/Logic/WordList/AlphaChainWordList.cs`:
-  - Port of `host/KnockBox.Spardle/Services/WordListService.cs` (cannot reference Spardle directly — re-implement inside this plugin).
-  - Loads a CSV at construction. Source path resolves via `IPluginStorage` (preferred) or embedded resource fallback.
-  - Builds a `HashSet<string>` (or per-length `byte[][]` pools if memory becomes a concern) for O(1) lookup.
-- `wwwroot/dictionary.csv` — dictionary asset.
-  - Decide between NY-Times-style (~5k common) vs. full (~250k); milestone defaults to NY-style to keep plugin staging small. Document the chosen source + license.
-- `AlphaChainModule.cs` — add `registration.AddSingleton<IAlphaChainWordList, AlphaChainWordList>();`.
+Do **not** port or re-implement a word list, and do **not** ship a `dictionary.csv`. The repo already
+provides dictionary validation through the `KnockBox.WordService` **library plugin** (the sanctioned
+cross-plugin reuse mechanism); `KnockBox.Spardle` consumes it today. Alpha Chain consumes the same
+contract.
+
+- `host/KnockBox.AlphaChain/KnockBox.AlphaChain.csproj` — add a compile-time reference to the contracts
+  assembly: `<ProjectReference Include="..\KnockBox.WordService.Contracts\KnockBox.WordService.Contracts.csproj" />`
+  (mirror `KnockBox.Spardle/KnockBox.Spardle.csproj`). The runtime `IWordListService` implementation lives
+  in the `KnockBox.WordService` library plugin, which the host loads **before** any game plugin, so no
+  host wiring is needed.
+- `Services/Logic/Games/AlphaChainGameEngine.cs` — inject `IWordListService` in the constructor (as
+  `SpardleEngine` does) and forward it onto `AlphaChainGameContext` so the FSM can validate words
+  deterministically in tests (mock `IWordListService`).
+- Validation call: `wordList.IsValidWord(word)` — `IWordListService.IsValidWord(ReadOnlySpan<char>)` is
+  already sync + span-based (case-insensitive; non-ASCII → false), exactly the contract this milestone
+  needs. Use `WordPoolMode.FullDictionary` for broad Shiritori coverage (document the choice; it can be
+  promoted to a setting later if play-testing shows it's too permissive/restrictive).
+- No `AlphaChainModule` registration for word lists — the library plugin already registers
+  `IWordListService` as a singleton.
 
 ### Commands and results
 
@@ -57,7 +66,7 @@ Wire up real word play. This milestone adds dictionary-backed validation, the Sh
   - Uses an injected `IRandomNumberService` (existing in core — see Codeword's DI).
   - Then transitions to `RoundState` with `RequiredStartLetter = null` (first player has free choice).
 - `Services/Logic/Games/FSM/States/RoundState.cs` — handle `SubmitWordCommand`:
-  1. Validate actor is `TurnManager.CurrentPlayerId`; else return `RejectedNotYourTurn`.
+  1. Validate actor is `TurnManager.CurrentPlayer`; else return `RejectedNotYourTurn`.
   2. Normalize: trim, lower-case.
   3. Empty → `RejectedEmpty`.
   4. If `RequiredStartLetter != null` and `word[0] != RequiredStartLetter` → `RejectedChainBroken`.
@@ -70,7 +79,7 @@ Wire up real word play. This milestone adds dictionary-backed validation, the Sh
   11. Advance turn; if turn order wrapped, increment `CurrentRound`. If round count exhausts era×interval, transition to `GameOverState` (intermission still lands in M4).
   12. Reset `PhaseEndTime`.
   13. Return `Accepted` or `AcceptedZeroPointTax`.
-- `Services/Logic/Games/FSM/States/RoundState.cs` — `TickAsync`:
+- `Services/Logic/Games/FSM/States/RoundState.cs` — `Tick`:
   - If `now < state.PhaseEndTime`, return.
   - On timeout:
     - Survival mode: mark current player `IsEliminated = true`. If active (non-eliminated, non-left) count drops below 2, transition to `GameOverState`.
@@ -81,7 +90,11 @@ Wire up real word play. This milestone adds dictionary-backed validation, the Sh
 
 - `Services/Logic/Games/AlphaChainGameEngine.cs`:
   - Inject `IRandomNumberService` (forward to `AlphaChainGameContext` so FSM can use it deterministically in tests).
-  - Subscribe a periodic tick driver — see how `KnockBox.HiddenAgenda` drives `Tick(state, now)` (typically a hosted service or `ITickService`); follow that exact pattern. If no host-side ticker is available to plugins, drive ticks from the Razor page's `ITickService` subscription via a `TickCommand`.
+  - Drive the shot clock via `ITickService`, which is platform-wide and **already injected by
+    `LobbyPageBase<>`** (`[Inject] protected ITickService TickService`) — it is not a HiddenAgenda-specific
+    pattern. Register a tick callback with `TickService.RegisterTickCallback(...)` and dispose the returned
+    `IDisposable`. To avoid every viewer firing the engine `Tick`, gate it to a single designated driver
+    (e.g. the host/shared-display circuit) and document the choice.
 
 ### UI
 
@@ -97,7 +110,9 @@ Wire up real word play. This milestone adds dictionary-backed validation, the Sh
 
 ### Tests
 
-- `Unit/Logic/WordList/AlphaChainWordListTests.cs` — known-good / known-bad words; punctuation rejected.
+- No dedicated word-list test — validation is owned by the `KnockBox.WordService` library. In
+  `RoundStateTests` inject a `Mock<IWordListService>` to exercise the `RejectedNotInDictionary` path
+  (return false) and the accept path (return true).
 - `Unit/Logic/Games/AlphaChain/States/RoundStateTests.cs`:
   - Each rejection reason returns the right `SubmitWordResult`.
   - Banned letter inside word → `AcceptedZeroPointTax`, score = 0, chain continues.
@@ -110,24 +125,34 @@ Wire up real word play. This milestone adds dictionary-backed validation, the Sh
 
 ## Key types & contracts
 
-- `AlphaChainWordList` must be **fully loaded before** the first `IsValidWord` call — initialize eagerly in the constructor, or expose `Task EnsureLoadedAsync()` and call it during `StartAsyncCore`.
+- `IWordListService` is provided by the host's DI container (registered by the `KnockBox.WordService`
+  library plugin, loaded before any game) and is ready to use as soon as it is injected — no eager-load
+  step is required in this plugin.
 - All FSM transitions and state mutations remain inside `state.Execute`/`ExecuteAsync`. The `SubmitWordResult` returned to the page is computed inside the lock and returned via the engine's command dispatcher.
 
 ## Step-by-step build order
 
-1. Build and unit-test `AlphaChainWordList` in isolation.
+1. Add the `KnockBox.WordService.Contracts` project reference and inject `IWordListService` into the engine/context.
 2. Add `SubmitWordCommand` + `SubmitWordResult`.
 3. Extend `AlphaChainGameState` with the new fields.
 4. Extend `SetupState` to pick a banned letter.
-5. Extend `RoundState.HandleCommandAsync` with the 13-step submission flow above.
-6. Add the timeout branch to `RoundState.TickAsync`.
+5. Extend `RoundState.HandleCommand` with the 13-step submission flow above.
+6. Add the timeout branch to `RoundState.Tick`.
 7. Wire UI (input, banners, leaderboard, countdown).
 8. Tests; manual end-to-end smoke test with 2 browsers.
 
 ## Risks & notes
 
-- **Dictionary file size:** A multi-MB CSV inside `wwwroot/` increases plugin staging time and memory. Mitigation: ship the smaller NY-Times-style word list by default; document how to swap a larger one via `{KNOCKBOX_DATA_ROOT}/plugins/alpha-chain/dictionary.csv`.
-- **Tick source:** Plugins do not own a hosted background service. Either rely on `ITickService` from the Razor circuit (problematic if every viewer fires ticks — gate to one designated tick driver, e.g., the host), or extend `AbstractGameEngine` with a server-side scheduler. Pick the simplest viable option and document it.
-- **Banned letter on first turn:** GDD does not say if the first word can include the banned letter. Default: yes, but it incurs the Zero-Point Tax. Document this in the milestone close-out notes.
-- **Casing & accents:** Normalize input to ASCII-lowercase; reject non-letters. The Spardle CSV is already ASCII; if a different dictionary is used, define the normalization rules here.
-- **Swappable dictionary boundary:** `IAlphaChainWordList` is the seam where the dictionary backend can change. The M2 implementation is a local CSV; the end-goal is a Spardle-style in-process word list. Both are sync + span-based, so the contract stays sync + span-based — do not introduce `async`/`Task` to "future-proof" for an API backend, because the planned backend is not an API.
+- **No dictionary asset to ship:** word data lives in the `KnockBox.WordService` library, so there is no
+  CSV in this plugin's `wwwroot/` and no staging/memory cost here. The only knob is the chosen
+  `WordPoolMode` (`NytStandard` / `ReducedDictionary` / `FullDictionary`).
+- **Tick source:** use `ITickService` (already injected by `LobbyPageBase<>`). Gate ticks to one
+  designated driver so multiple viewers don't each fire the engine `Tick`. Document the chosen driver.
+- **Banned letter on first turn (RULE):** the first word **may** contain the banned letter, but doing so
+  incurs the Zero-Point Tax (score 0). This is a stated rule, not an open question.
+- **Casing & accents:** `IWordListService.IsValidWord` is case-insensitive and treats non-ASCII as
+  invalid. Still normalize submitted input to trimmed lower-case before chain/uniqueness checks; reject
+  non-letters.
+- **Swappable dictionary boundary:** the seam is now `IWordListService` itself (an interface owned by the
+  library contracts). It is sync + span-based; do not introduce `async`/`Task` — the backend is an
+  in-process pool, not an API.
