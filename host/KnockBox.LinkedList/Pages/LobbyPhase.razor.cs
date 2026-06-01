@@ -264,7 +264,7 @@ namespace KnockBox.LinkedList.Pages
             // Settle whether the host plays before building the roster. Applied straight to
             // state (not via UpdateSettings) so this start-time choice isn't persisted to the
             // host's saved settings.
-            if (GameState.UpdateSettings(s => s with { HostPlaysGame = hostPlays }).TryGetFailure(out var settingsError))
+            if (GameState.UpdateSettings(s => s with { HostPlays = hostPlays }).TryGetFailure(out var settingsError))
             {
                 Logger.LogError("Failed to set host-plays before start: {Error}", settingsError.PublicMessage);
                 return;
@@ -304,7 +304,7 @@ namespace KnockBox.LinkedList.Pages
                     // Host-plays is no longer a persisted toggle — it's decided by the start
                     // button — so force it off here. This also stops a value saved by the old
                     // checkbox from making the host show up as a participant in the lobby.
-                    saved = saved with { HostPlaysGame = false };
+                    saved = saved with { HostPlays = false };
                     // Apply through GameState directly (not the local UpdateSettings) so the
                     // load doesn't flip _userHasEdited or re-persist the just-loaded value.
                     if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))

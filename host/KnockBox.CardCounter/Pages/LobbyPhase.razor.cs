@@ -142,8 +142,8 @@ namespace KnockBox.CardCounter.Pages
         {
             if (UserService.CurrentUser is null) return;
             // Persist the host's play-vs-display choice into the settings record (same path as every
-            // other rule) before starting; the engine reads Settings.HostIsParticipant at game start.
-            UpdateSettings(s => s with { HostIsParticipant = hostAsPlayer });
+            // other rule) before starting; the engine reads Settings.HostPlays at game start.
+            UpdateSettings(s => s with { HostPlays = hostAsPlayer });
             var result = await GameEngine.StartAsync(UserService.CurrentUser, GameState);
             if (result.TryGetFailure(out var error))
                 Logger.LogError("Failed to start game: {Error}", error);

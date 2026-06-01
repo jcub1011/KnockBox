@@ -74,7 +74,7 @@ namespace KnockBox.Codeword.Pages
         protected void SetTotalGames(int value) => UpdateSettings(s => s with { TotalGames = value });
 
         // Delegates the atomic mutation to the state (which enforces Execute + reflects
-        // HostPlaysGame into HostIsParticipant) and then persists. _userHasEdited blocks
+        // HostPlays into HostIsParticipant) and then persists. _userHasEdited blocks
         // any in-flight localStorage load from clobbering this edit.
         private void UpdateSettings(Func<CodewordSettings, CodewordSettings> mutate)
         {
@@ -151,11 +151,11 @@ namespace KnockBox.Codeword.Pages
         // Two lobby buttons share this handler: "Start Game" (hostAsPlayer: false) runs the host
         // as a shared display; "Start Game As Player" (hostAsPlayer: true) deals the host in. The
         // choice is persisted through the same UpdateSettings path as every other setting, which
-        // reflects HostPlaysGame into HostIsParticipant before the engine snapshots participants.
+        // reflects HostPlays into HostIsParticipant before the engine snapshots participants.
         protected async Task StartGame(bool hostAsPlayer)
         {
             if (UserService.CurrentUser is null) return;
-            UpdateSettings(s => s with { HostPlaysGame = hostAsPlayer });
+            UpdateSettings(s => s with { HostPlays = hostAsPlayer });
             var result = await GameEngine.StartAsync(UserService.CurrentUser, GameState);
             if (result.TryGetFailure(out var error))
                 Logger.LogError("Failed to start game: {Error}", error);

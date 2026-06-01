@@ -47,7 +47,7 @@ namespace KnockBox.LinkedList.Tests.Unit.State
             Assert.AreEqual(PlayerStructure.Collective, state.Settings.PlayerStructure);
             Assert.AreEqual(3, state.Settings.RejectionCap);
             Assert.IsFalse(state.Settings.NoImmediateRepeat);
-            Assert.IsFalse(state.Settings.HostPlaysGame);
+            Assert.IsFalse(state.Settings.HostPlays);
             Assert.IsNull(state.Settings.Par);
             Assert.IsTrue(state.Settings.EnableTimers);
         }
@@ -89,15 +89,15 @@ namespace KnockBox.LinkedList.Tests.Unit.State
         }
 
         [TestMethod]
-        public void UpdateSettings_ReflectsHostPlaysGameIntoHostIsParticipant()
+        public void UpdateSettings_ReflectsHostPlaysIntoHostIsParticipant()
         {
             using var state = new LinkedListGameState(_host, _loggerMock.Object);
             Assert.IsFalse(state.HostIsParticipant);
 
-            state.UpdateSettings(s => s with { HostPlaysGame = true });
+            state.UpdateSettings(s => s with { HostPlays = true });
             Assert.IsTrue(state.HostIsParticipant);
 
-            state.UpdateSettings(s => s with { HostPlaysGame = false });
+            state.UpdateSettings(s => s with { HostPlays = false });
             Assert.IsFalse(state.HostIsParticipant);
         }
     }

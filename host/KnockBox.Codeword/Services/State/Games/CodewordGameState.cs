@@ -102,7 +102,7 @@ namespace KnockBox.Codeword.Services.State.Games
 
         /// <summary>
         /// Atomically replaces <see cref="Settings"/> with <paramref name="mutate"/>'s
-        /// result and reflects the new <c>HostPlaysGame</c> value into
+        /// result and reflects the new <c>HostPlays</c> value into
         /// <see cref="AbstractGameState.HostIsParticipant"/> in the same critical
         /// section. The replacement + participation update happen inside one
         /// <see cref="AbstractGameState.Execute(Action)"/>, so subscribers observe a
@@ -112,7 +112,7 @@ namespace KnockBox.Codeword.Services.State.Games
             Execute(() =>
             {
                 Settings = mutate(Settings);
-                SetHostIsParticipant(Settings.HostPlaysGame);
+                SetHostIsParticipant(Settings.HostPlays);
             });
 
         /// <summary>

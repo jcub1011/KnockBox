@@ -65,6 +65,15 @@ namespace KnockBox.Tooling.Collections
         /// typed as <see cref="IEnumerable{T}"/> but is frequently already a list — for example
         /// when the same collection is threaded through several methods that each only enumerate
         /// it. No copy is made on the fast path; a single copy is made only for lazy sequences.
+        /// <para>
+        /// <b>Not a defensive copy on the fast path.</b> When <paramref name="source"/> already
+        /// implements <see cref="IReadOnlyList{T}"/> the <i>same instance</i> is returned, so a
+        /// later mutation of the source (e.g. adding to the backing <see cref="List{T}"/>) is
+        /// observable through the returned reference. Callers that need an isolated snapshot must
+        /// copy themselves (e.g. <see cref="Enumerable.ToList{TSource}"/>). This is safe when the
+        /// source is already an immutable snapshot — for example <c>ConcurrentDictionary.Values</c>,
+        /// which hands back a fresh <c>ReadOnlyCollection</c> on each access.
+        /// </para>
         /// </remarks>
         /// <typeparam name="T">The element type.</typeparam>
         /// <param name="source">The source sequence.</param>

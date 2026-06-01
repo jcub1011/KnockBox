@@ -135,7 +135,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
         public async Task StartAsync_WithHostPlaying_SeatsHostAsParticipant()
         {
             var state = await CreateWithPlayersAsync(3);
-            state.UpdateSettings(s => s with { HostPlaysGame = true });
+            state.UpdateSettings(s => s with { HostPlays = true });
 
             var startResult = await _engine.StartAsync(_host, state);
 
@@ -164,7 +164,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
 
         /// <summary>
         /// Starts a 3-player game with fixed start/destination words so tests can
-        /// drive the loop deterministically. With HostPlaysGame off the turn order
+        /// drive the loop deterministically. With HostPlays off the turn order
         /// is [p0, p1, p2], the first submitter is p0, and the auto-assigned
         /// Auditor is p1 (first id that isn't the submitter).
         /// </summary>

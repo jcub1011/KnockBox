@@ -43,7 +43,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
         {
             // The host counts as a participant when configured to play, so a host-as-player game
             // can start with no other players. A shared-display game still needs a joined player.
-            int participantCount = gameState.Players.Length + (gameState.Settings.HostIsParticipant ? 1 : 0);
+            int participantCount = gameState.Players.Length + (gameState.Settings.HostPlays ? 1 : 0);
             if (participantCount == 0)
                 return Result.FromError("At least one player must be in the game before starting.");
 
@@ -54,7 +54,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
             var executeResult = gameState.Execute(() =>
             {
                 gameState.SetJoinable(false);
-                gameState.SetHostIsParticipant(gameState.Settings.HostIsParticipant);
+                gameState.SetHostIsParticipant(gameState.Settings.HostPlays);
                 gameState.Context = context;
                 InitializeGame(context);
             });
@@ -269,7 +269,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
                 state.IsNotMyMoneySelecting = false;
                 state.PendingNotMyMoneyOperator = null;
                 state.ForceDrawStack.Clear();
-                state.SetHostIsParticipant(state.Settings.HostIsParticipant);
+                state.SetHostIsParticipant(state.Settings.HostPlays);
                 InitializeGame(context);
 
                 // Respect Active Operator Mode on reset: same logic as StartAsync.

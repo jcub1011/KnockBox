@@ -52,7 +52,7 @@ public sealed record LinkedListSettings
     /// <summary>Optional §7.4 rigor: block a pair identical to the immediately previous pair.</summary>
     public bool NoImmediateRepeat { get; init; } = false;
 
-    public bool HostPlaysGame { get; init; } = false;
+    public bool HostPlays { get; init; } = false;
 
     /// <summary>Collective co-op target the host sets by hand (§8.1). Null = no par.</summary>
     public int? Par { get; init; } = null;
@@ -91,7 +91,7 @@ public Result UpdateSettings(Func<LinkedListSettings, LinkedListSettings> mutate
     Execute(() =>
     {
         Settings = mutate(Settings);
-        SetHostIsParticipant(Settings.HostPlaysGame);
+        SetHostIsParticipant(Settings.HostPlays);
     });
 ```
 
@@ -143,7 +143,7 @@ Replace the placeholder description, e.g. `"Build a chain of word pairs from a s
 ## Tests (`host/KnockBox.LinkedListTests/`)
 
 Extend the existing files:
-- **State** (`Unit/State/Games/LinkedList/LinkedListGameStateTests.cs`): `UpdateSettings` replaces settings atomically and reflects `HostPlaysGame` into `HostIsParticipant`; `SetPhase` changes `Phase`; default settings values.
+- **State** (`Unit/State/Games/LinkedList/LinkedListGameStateTests.cs`): `UpdateSettings` replaces settings atomically and reflects `HostPlays` into `HostIsParticipant`; `SetPhase` changes `Phase`; default settings values.
 - **Engine** (`Unit/Logic/Games/LinkedList/LinkedListGameEngineTests.cs`): `CreateStateAsync` returns a joinable `Setup`-phase state; after registering 3 participants and starting, `Phase == Playing`, `IsJoinable == false`, `TurnManager.TurnOrder` is populated, `CarriedWord == StartWord`, and `AuditorPlayerId` is set; starting with < 3 players fails `CanStartAsync`/start.
 - **WordPairSource**: returns a non-empty start/destination pair; deterministic with a stubbed `IRandomNumberService`.
 

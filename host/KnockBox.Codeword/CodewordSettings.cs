@@ -16,7 +16,7 @@ public sealed record CodewordSettings
     /// role assignment, scoring, turn order, and the 4–8 participant count.
     /// Off by default, preserving the "host is the shared display" behavior.
     /// </summary>
-    public bool HostPlaysGame { get; init; } = false;
+    public bool HostPlays { get; init; } = false;
 
     public bool EnableTimers { get; init; } = true;
     public int TotalGames { get; init; } = 5;

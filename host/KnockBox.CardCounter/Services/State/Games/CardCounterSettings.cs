@@ -26,7 +26,7 @@ public sealed record CardCounterSettings
     /// When true, the host is dealt into the game as an active participant instead of acting
     /// as a shared spectator display. Set by the lobby's deal buttons (not the House Rules drawer).
     /// </summary>
-    public bool HostIsParticipant { get; init; } = false;
+    public bool HostPlays { get; init; } = false;
 
     /// <summary>
     /// When true, players have no pot. Drawing a number card applies it directly to the

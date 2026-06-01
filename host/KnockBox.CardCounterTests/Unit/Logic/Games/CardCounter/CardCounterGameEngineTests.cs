@@ -131,7 +131,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (CardCounterGameState)stateResult.Value!;
-            state.UpdateSettings(s => s with { HostIsParticipant = true });
+            state.UpdateSettings(s => s with { HostPlays = true });
             foreach (var p in players)
                 state.RegisterPlayer(p);
             await _engine.StartAsync(_host, state);
@@ -139,7 +139,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         }
 
         [TestMethod]
-        public async Task StartAsync_HostIsParticipant_AddsHostToGamePlayers()
+        public async Task StartAsync_HostPlays_AddsHostToGamePlayers()
         {
             using var state = await CreateStartedHostAsPlayerGameAsync(_player1);
 
@@ -150,11 +150,11 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         }
 
         [TestMethod]
-        public async Task StartAsync_HostIsParticipant_WithNoOtherPlayers_Succeeds()
+        public async Task StartAsync_HostPlays_WithNoOtherPlayers_Succeeds()
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             using var state = (CardCounterGameState)stateResult.Value!;
-            state.UpdateSettings(s => s with { HostIsParticipant = true });
+            state.UpdateSettings(s => s with { HostPlays = true });
             // No other players registered — the host alone is a valid participant.
 
             var result = await _engine.StartAsync(_host, state);
@@ -165,7 +165,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         }
 
         [TestMethod]
-        public async Task StartAsync_HostIsParticipant_SetsHostIsParticipantFlag()
+        public async Task StartAsync_HostPlays_SetsHostIsParticipantFlag()
         {
             using var state = await CreateStartedHostAsPlayerGameAsync(_player1);
 
@@ -185,7 +185,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         }
 
         [TestMethod]
-        public async Task ResetGame_HostIsParticipant_KeepsHostInGamePlayers()
+        public async Task ResetGame_HostPlays_KeepsHostInGamePlayers()
         {
             using var state = await CreateStartedHostAsPlayerGameAsync(_player1);
             state.SetPhase(GamePhase.GameOver);
