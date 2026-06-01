@@ -47,8 +47,13 @@
 
         @if (IsHost)
         {
-            <button class="spd-btn spd-btn-primary spd-btn-lg spd-lobby-start" @onclick="StartGame" disabled="@(!CanStart)">
+            <button class="spd-btn spd-btn-primary spd-btn-lg spd-lobby-start" @onclick="() => StartGame(false)"
+                    disabled="@(!CanStart)" title="Start the match — you run the shared display and don't play">
                 ⚔ ENTER THE ARENA
+            </button>
+            <button class="spd-btn spd-btn-ghost spd-btn-lg spd-lobby-start" @onclick="() => StartGame(true)"
+                    disabled="@(!CanStart)" title="Start the match and fight as a challenger">
+                🗡 ENTER AS CHALLENGER
             </button>
             @if (!CanStart)
             {
@@ -231,10 +236,6 @@
                             <input type="checkbox" @bind:get="State.Settings.HardModeEnabled" @bind:set="SetHardModeEnabled" />
                         </label>
                         <label class="spd-lobby-field spd-lobby-field-row">
-                            <span>Host Plays Along</span>
-                            <input type="checkbox" @bind:get="State.Settings.HostPlaysAlong" @bind:set="SetHostPlaysAlong" />
-                        </label>
-                        <label class="spd-lobby-field spd-lobby-field-row">
                             <span>Wait For All Players</span>
                             <input type="checkbox" @bind:get="State.Settings.WaitForAll" @bind:set="SetWaitForAll" />
                         </label>
@@ -367,7 +368,6 @@
     private void SetWinCondition(WinConditionMode value) => UpdateSettings(s => s with { WinCondition = value });
     private void SetDifficultyMultiplier(double value) => UpdateSettings(s => s with { DifficultyMultiplier = value });
     private void SetHardModeEnabled(bool value) => UpdateSettings(s => s with { HardModeEnabled = value });
-    private void SetHostPlaysAlong(bool value) => UpdateSettings(s => s with { HostPlaysAlong = value });
     private void SetWaitForAll(bool value) => UpdateSettings(s => s with { WaitForAll = value });
     private void SetRevealAnswer(bool value) => UpdateSettings(s => s with { RevealAnswer = value });
     private void SetAllowDictionaryFallback(bool value) => UpdateSettings(s => s with { AllowDictionaryFallback = value });
@@ -505,6 +505,9 @@
             // the user's edit wins — the saved snapshot would clobber it.
             if (saved is not null && !_userHasEdited)
             {
+                // Host participation is now an explicit start-button choice, not a saved
+                // setting. Clear any legacy persisted value so it can't auto-seat the host.
+                saved = saved with { HostPlaysAlong = false };
                 if (State.UpdateSettings(_ => saved).TryGetFailure(out var error))
                 {
                     Logger.LogError("Failed to apply saved Spardle settings: {Error}", error.PublicMessage);
@@ -552,9 +555,16 @@
         }
     }
 
-    private async Task StartGame()
+    private async Task StartGame(bool hostAsPlayer)
     {
         if (UserService.CurrentUser is null) return;
+        // Decide host participation at start time; applied straight to state so it isn't
+        // persisted to the host's saved settings.
+        if (State.UpdateSettings(s => s with { HostPlaysAlong = hostAsPlayer }).TryGetFailure(out var settingsError))
+        {
+            await ShowStartError(settingsError.PublicMessage);
+            return;
+        }
         var result = await GameEngine.StartAsync(UserService.CurrentUser, State);
         if (result.TryGetFailure(out var failure))
         {

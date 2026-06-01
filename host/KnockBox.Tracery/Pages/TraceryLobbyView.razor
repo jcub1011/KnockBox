@@ -38,8 +38,11 @@
     {
         <TracerySettingsPanel State="State" OnUpdate="UpdateSettings" />
 
-        <button class="tr-btn tr-btn-primary tr-lobby-start" @onclick="StartGame">
+        <button class="tr-btn tr-btn-primary tr-lobby-start" @onclick="() => StartGame(false)">
             Start Session
+        </button>
+        <button class="tr-btn tr-lobby-start" @onclick="() => StartGame(true)">
+            Start Session As Player
         </button>
         <button type="button"
                 class="tr-btn @(_resetArmed ? "tr-btn-danger" : "") tr-lobby-reset"
@@ -122,9 +125,17 @@
         });
     }
 
-    private async Task StartGame()
+    private async Task StartGame(bool hostAsPlayer)
     {
         if (UserService.CurrentUser is null) return;
+        // Decide host participation at start time; applied straight to state so it isn't
+        // persisted to the host's saved settings.
+        if (State.UpdateSettings(s => s with { HostPlaysAlong = hostAsPlayer }).TryGetFailure(out var settingsError))
+        {
+            _startError = settingsError.PublicMessage;
+            StateHasChanged();
+            return;
+        }
         var result = await GameEngine.StartAsync(UserService.CurrentUser, State);
         if (result.TryGetFailure(out var failure))
         {
@@ -151,6 +162,9 @@
             // edit wins — the saved snapshot would clobber it.
             if (saved is not null && !_userHasEdited)
             {
+                // Host participation is now an explicit start-button choice, not a saved
+                // setting. Clear any legacy persisted value so it can't auto-seat the host.
+                saved = saved with { HostPlaysAlong = false };
                 if (State.UpdateSettings(_ => saved).TryGetFailure(out var error))
                 {
                     Logger.LogError("Failed to apply saved Tracery settings: {Error}", error.PublicMessage);
