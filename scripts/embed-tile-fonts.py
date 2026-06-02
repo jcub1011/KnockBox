@@ -34,6 +34,12 @@ TILES = {
     "sdk/KnockBox.Platform/wwwroot/wip-overlay.svg": {
         "fonts": [("Lexend", 900, False)],
     },
+    "host/KnockBox.AlphaChain/wwwroot/tile.svg": {
+        "fonts": [
+            ("Bricolage Grotesque", 800, False),
+            ("Google Sans Code", 700, False),
+        ],
+    },
     "host/KnockBox.CardCounter/wwwroot/tile.svg": {
         "fonts": [("Lexend", 900, False), ("Lexend", 700, False)],
     },
