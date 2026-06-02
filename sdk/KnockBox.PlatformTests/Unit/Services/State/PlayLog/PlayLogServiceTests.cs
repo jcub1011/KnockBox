@@ -101,6 +101,86 @@ public sealed class PlayLogServiceTests
         Assert.IsNull(stored.GetMetadata("missing"));
     }
 
+    [TestMethod]
+    public async Task GetLogsAsync_SelfHeals_OnCorruptStoredJson()
+    {
+        var service = NewService(out var storage);
+        storage.SeedRaw("play-log", "history", "{ not a valid json array ]");
+
+        var logs = await service.GetLogsAsync();
+
+        Assert.AreEqual(0, logs.Count, "Corrupt history must read as empty.");
+
+        // Self-heal: the corrupt key was cleared, so a subsequent append works cleanly.
+        await service.StoreLogAsync(GameLog.Create("codeword"));
+        var after = await service.GetLogsAsync();
+        Assert.AreEqual(1, after.Count);
+        Assert.AreEqual("codeword", after[0].GameIdentifier);
+    }
+
+    [TestMethod]
+    public async Task GetLogsAsync_TrimsToCap_WhenStorageHoldsMore()
+    {
+        var service = NewService(out var storage);
+        var oversized = Enumerable.Range(0, PlayLogService.MaxEntries + 15)
+            .Select(i => GameLog.Create($"game-{i}"))
+            .ToList();
+        await storage.SetAsync("play-log", "history", oversized);
+
+        var logs = await service.GetLogsAsync();
+
+        Assert.AreEqual(PlayLogService.MaxEntries, logs.Count, "Reads must honor the cap even if storage holds more.");
+    }
+
+    [TestMethod]
+    public async Task StoreLogAsync_ConcurrentAppends_DoNotLoseEntries()
+    {
+        var service = NewService(out _);
+        const int count = 25;
+
+        await Task.WhenAll(Enumerable.Range(0, count)
+            .Select(i => service.StoreLogAsync(GameLog.Create($"game-{i}")).AsTask()));
+
+        var logs = await service.GetLogsAsync();
+        Assert.AreEqual(count, logs.Count, "The write lock must prevent lost appends under concurrency.");
+        for (int i = 0; i < count; i++)
+            Assert.IsTrue(logs.Any(l => l.GameIdentifier == $"game-{i}"), $"game-{i} was lost.");
+    }
+
+    [TestMethod]
+    public async Task GetLogsAsync_ReturnsEmpty_WhenCanceled()
+    {
+        var service = NewService(out _);
+        await service.StoreLogAsync(GameLog.Create("codeword"));
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        var logs = await service.GetLogsAsync(cts.Token);
+
+        Assert.AreEqual(0, logs.Count, "A canceled read must return empty, not throw.");
+    }
+
+    [TestMethod]
+    public async Task StoreLogAsync_DropsSilently_WhenCanceled()
+    {
+        var service = NewService(out _);
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await service.StoreLogAsync(GameLog.Create("codeword"), cts.Token); // must not throw
+
+        var logs = await service.GetLogsAsync();
+        Assert.AreEqual(0, logs.Count, "A canceled store must not persist.");
+    }
+
+    [TestMethod]
+    public async Task StoreLogAsync_Throws_OnNullLog()
+    {
+        var service = NewService(out _);
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => service.StoreLogAsync(null!).AsTask());
+    }
+
     // ─── fixtures ───────────────────────────────────────────────────────────
 
     private static PlayLogService NewService(out JsonLocalStorage storage)
@@ -120,13 +200,23 @@ public sealed class PlayLogServiceTests
         private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
         private readonly Dictionary<(string, string), string> _store = new();
 
+        /// <summary>Writes raw text under a key, bypassing serialization — to simulate
+        /// corrupt/legacy JSON already sitting in browser storage.</summary>
+        public void SeedRaw(string scope, string key, string rawJson) => _store[(scope, key)] = rawJson;
+
         public ValueTask<TType> GetAsync<TType>(string scope, string key, CancellationToken ct = default)
-            => new(_store.TryGetValue((scope, key), out var json)
+        {
+            // The real (JS-interop) storage observes cancellation; mirror that so the service's
+            // cancellation handling is exercised.
+            ct.ThrowIfCancellationRequested();
+            return new(_store.TryGetValue((scope, key), out var json)
                 ? JsonSerializer.Deserialize<TType>(json, Options)!
                 : default!);
+        }
 
         public ValueTask SetAsync<TType>(string scope, string key, TType value, CancellationToken ct = default)
         {
+            ct.ThrowIfCancellationRequested();
             _store[(scope, key)] = JsonSerializer.Serialize(value, Options);
             return ValueTask.CompletedTask;
         }

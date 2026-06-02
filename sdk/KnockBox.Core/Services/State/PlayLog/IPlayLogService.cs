@@ -6,6 +6,12 @@ namespace KnockBox.Core.Services.State.PlayLog;
 /// <see cref="StoreLogAsync"/>; the log keeps only the most recent entries
 /// (capped — see the implementation) so it can't grow without bound. Scoped
 /// per browser circuit, mirroring <c>IUserService</c>.
+/// <para>
+/// <b>Prerendering:</b> every method reaches the browser via JS interop, which is
+/// unavailable during server prerendering. Consumers must call these from
+/// <c>OnAfterRenderAsync</c> (or a later interactive event), never from
+/// <c>OnInitialized</c>/<c>OnInitializedAsync</c> of a prerendered component.
+/// </para>
 /// </summary>
 public interface IPlayLogService
 {

@@ -59,47 +59,41 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
         }
 
         /// <summary>
-        /// Returns the game to the lobby so players can join/leave and settings can be
-        /// changed. Host-only, and only after the game is over. Flipping the state back to
+        /// Returns the game to the lobby (host-only, terminal-phase-only) via the base
+        /// <see cref="AbstractGameEngine{TState}.ReturnToLobby"/>. Flipping the state back to
         /// joinable re-renders every player's page at the lobby — no navigation needed.
         /// </summary>
-        public Result ReturnToLobby(User host, AlphaChainGameState state)
-        {
-            if (state.Host.Id != host.Id)
-                return Result.FromError("Only the host can return the game to the lobby.");
-            if (state.Phase != AlphaChainGamePhase.GameOver)
-                return Result.FromError("Can only return to the lobby after the game is over.");
+        protected override bool IsTerminalPhase(AlphaChainGameState state) => state.Phase == AlphaChainGamePhase.GameOver;
 
-            return state.Execute(() =>
-            {
-                // SetupState re-snapshots GamePlayers from the roster on the next start, so
-                // clearing the per-match state here is sufficient. Settings are preserved.
-                state.Context = null;
-                state.GamePlayers.Clear();
-                state.TurnManager.TurnOrder.Clear();
-                state.OptimizationSubmissions.Clear();
-                state.PlayedWords.Clear();
-                state.PlayLog.Clear();
-                state.CensorExemptUserIds.Clear();
-                state.CurrentRound = 0;
-                state.CurrentEra = 0;
-                state.IntermissionPhase = default;
-                state.SniperBanUserId = null;
-                state.LatestScoreReplay = null;
-                state.ScoreReplaySequence = 0;
-                state.PendingTransitionAt = null;
-                state.PendingTransitionIsGameOver = false;
-                state.LastWord = null;
-                state.RequiredStartLetter = null;
-                state.BannedLetter = null;
-                state.CensorBannedLetter = null;
-                state.CensorImposedAtRound = 0;
-                state.LatestReactionNotices = [];
-                state.ReactionNoticeSequence = 0;
-                state.Results = null;
-                state.SetPhase(AlphaChainGamePhase.Setup);
-                state.SetJoinable(true);
-            });
+        /// <inheritdoc />
+        protected override void ResetForLobby(AlphaChainGameState state)
+        {
+            // SetupState re-snapshots GamePlayers from the roster on the next start, so
+            // clearing the per-match state here is sufficient. Settings are preserved.
+            state.Context = null;
+            state.GamePlayers.Clear();
+            state.TurnManager.TurnOrder.Clear();
+            state.OptimizationSubmissions.Clear();
+            state.PlayedWords.Clear();
+            state.PlayLog.Clear();
+            state.CensorExemptUserIds.Clear();
+            state.CurrentRound = 0;
+            state.CurrentEra = 0;
+            state.IntermissionPhase = default;
+            state.SniperBanUserId = null;
+            state.LatestScoreReplay = null;
+            state.ScoreReplaySequence = 0;
+            state.PendingTransitionAt = null;
+            state.PendingTransitionIsGameOver = false;
+            state.LastWord = null;
+            state.RequiredStartLetter = null;
+            state.BannedLetter = null;
+            state.CensorBannedLetter = null;
+            state.CensorImposedAtRound = 0;
+            state.LatestReactionNotices = [];
+            state.ReactionNoticeSequence = 0;
+            state.Results = null;
+            state.SetPhase(AlphaChainGamePhase.Setup);
         }
 
         protected override Task<Result> StartAsyncCore(AlphaChainGameState gameState, CancellationToken ct = default)

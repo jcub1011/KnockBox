@@ -141,43 +141,36 @@ namespace KnockBox.LinkedList.Services.Logic.Games
         }
 
         /// <summary>
-        /// Returns the game to the lobby so players can join/leave and settings can be
-        /// changed. Host-only, and only after the match is over. Flipping the state back
+        /// Returns the game to the lobby (host-only, terminal-phase-only) via the base
+        /// <see cref="AbstractGameEngine{TState}.ReturnToLobby"/>. Flipping the state back
         /// to joinable re-renders every player's page at the lobby — no navigation needed.
         /// </summary>
-        public Result ReturnToLobby(User host, LinkedListGameState state)
+        protected override bool IsTerminalPhase(LinkedListGameState state) => state.Phase == LinkedListGamePhase.GameOver;
+
+        /// <inheritdoc />
+        protected override void ResetForLobby(LinkedListGameState state)
         {
-            if (state is null) return Result.FromError("No game state.");
-            if (state.Host.Id != host.Id)
-                return Result.FromError("Only the host can return the game to the lobby.");
-            if (state.Phase != LinkedListGamePhase.GameOver)
-                return Result.FromError("Can only return to the lobby after the game is over.");
-
-            return state.Execute(() =>
+            // Cancel any lingering per-group turn timers before discarding the groups.
+            foreach (var g in state.Groups)
             {
-                // Cancel any lingering per-group turn timers before discarding the groups.
-                foreach (var g in state.Groups)
-                {
-                    g.TurnTimeoutHandle?.Cancel();
-                    g.TurnTimeoutHandle = null;
-                }
+                g.TurnTimeoutHandle?.Cancel();
+                g.TurnTimeoutHandle = null;
+            }
 
-                state.Groups.Clear();
-                state.GamePlayers.Clear();
-                state.ParticipantOrder.Clear();
-                state.GroupAssignments.Clear();
-                state.AuditQueue.Clear();
-                state.StartWord = "";
-                state.DestinationWord = "";
-                state.AuditorPlayerId = "";
-                state.AuditorRotationIndex = 0;
-                state.RoundNumber = 0;
-                state.LastRoundResult = null;
-                state.LastStandings = [];
-                state.Superlatives = [];
-                state.SetPhase(LinkedListGamePhase.Setup);
-                state.SetJoinable(true);
-            });
+            state.Groups.Clear();
+            state.GamePlayers.Clear();
+            state.ParticipantOrder.Clear();
+            state.GroupAssignments.Clear();
+            state.AuditQueue.Clear();
+            state.StartWord = "";
+            state.DestinationWord = "";
+            state.AuditorPlayerId = "";
+            state.AuditorRotationIndex = 0;
+            state.RoundNumber = 0;
+            state.LastRoundResult = null;
+            state.LastStandings = [];
+            state.Superlatives = [];
+            state.SetPhase(LinkedListGamePhase.Setup);
         }
 
         // ── Group construction (§8.2) ────────────────────────────────────────

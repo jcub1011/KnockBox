@@ -203,40 +203,33 @@ namespace KnockBox.CardCounter.Services.Logic.Games
         }
 
         /// <summary>
-        /// Returns the game to the lobby so players can join/leave and settings can be changed.
-        /// Only the host can trigger this, and only after the game has ended.
+        /// Hooks for the base <see cref="AbstractGameEngine{TState}.ReturnToLobby"/> (host-only,
+        /// terminal-phase-only) so players can join/leave and settings can change before the next game.
         /// </summary>
-        public Result ReturnToLobby(User host, CardCounterGameState state)
+        protected override bool IsTerminalPhase(CardCounterGameState state) => state.Phase == GamePhase.GameOver;
+
+        /// <inheritdoc />
+        protected override void ResetForLobby(CardCounterGameState state)
         {
-            if (state.Host.Id != host.Id)
-                return Result.FromError("Only the host can return the game to the lobby.");
-
-            if (state.Phase != GamePhase.GameOver)
-                return Result.FromError("Can only return to the lobby after the game is over.");
-
-            return state.Execute(() =>
-            {
-                state.Context = null;
-                state.GamePlayers.Clear();
-                state.TurnManager.SetTurnOrder([]);
-                state.ShoeIndex = 0;
-                state.DiscardHistory.Clear();
-                state.MainDeck.Clear();
-                state.CurrentShoe.Clear();
-                state.DiscardPile.Clear();
-                state.LastPlayedAction = null;
-                state.LastDrawnCard = null;
-                state.LastOperatorResult = null;
-                state.LastOperatorChange = null;
-                state.PendingReaction = null;
-                state.FeelingLuckyTargetId = null;
-                state.IsNotMyMoneySelecting = false;
-                state.PendingNotMyMoneyOperator = null;
-                state.ForceDrawStack.Clear();
-                state.IsNewShoe = false;
-                state.HedgeYourBetPlayerId = null;
-                state.SetJoinable(true);
-            });
+            state.Context = null;
+            state.GamePlayers.Clear();
+            state.TurnManager.SetTurnOrder([]);
+            state.ShoeIndex = 0;
+            state.DiscardHistory.Clear();
+            state.MainDeck.Clear();
+            state.CurrentShoe.Clear();
+            state.DiscardPile.Clear();
+            state.LastPlayedAction = null;
+            state.LastDrawnCard = null;
+            state.LastOperatorResult = null;
+            state.LastOperatorChange = null;
+            state.PendingReaction = null;
+            state.FeelingLuckyTargetId = null;
+            state.IsNotMyMoneySelecting = false;
+            state.PendingNotMyMoneyOperator = null;
+            state.ForceDrawStack.Clear();
+            state.IsNewShoe = false;
+            state.HedgeYourBetPlayerId = null;
         }
 
         // ── Player-leave handling ─────────────────────────────────────────────

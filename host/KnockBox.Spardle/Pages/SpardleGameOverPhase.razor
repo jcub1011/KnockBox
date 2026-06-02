@@ -3,6 +3,7 @@
 @using KnockBox.Spardle.Models
 @inject IUserService UserService
 @inject SpardleEngine GameEngine
+@inject ILogger<SpardleGameOverPhase> Logger
 
 @{
     // Render from the frozen start-of-match snapshot, not the live Players roster,
@@ -87,9 +88,13 @@
     <div class="spd-over-actions">
         @if (UserService.CurrentUser?.Id == State.Host.Id)
         {
-            <button class="spd-btn spd-btn-primary spd-btn-lg spd-over-exit" @onclick="ReturnToLobby">
+            <button class="spd-btn spd-btn-primary spd-btn-lg spd-over-exit" @onclick="ReturnToLobby" disabled="@_returning">
                 RETURN TO LOBBY
             </button>
+            @if (_error is not null)
+            {
+                <span class="spd-over-error" role="alert">@_error</span>
+            }
         }
         else
         {
@@ -101,9 +106,27 @@
 @code {
     [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
 
+    private bool _returning;
+    private string? _error;
+
     private void ReturnToLobby()
     {
-        if (UserService.CurrentUser is null) return;
-        GameEngine.ReturnToLobby(UserService.CurrentUser, State);
+        if (_returning || UserService.CurrentUser is null) return;
+
+        _returning = true;
+        try
+        {
+            _error = null;
+            var result = GameEngine.ReturnToLobby(UserService.CurrentUser, State);
+            if (result.TryGetFailure(out var error))
+            {
+                Logger.LogError("Failed to return Spardle to the lobby: {Error}", error.InternalMessage);
+                _error = error.PublicMessage;
+            }
+        }
+        finally
+        {
+            _returning = false;
+        }
     }
 }

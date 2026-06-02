@@ -110,24 +110,17 @@ namespace KnockBox.Tracery.Services.Logic.Games
         }
 
         /// <summary>
-        /// Returns the game to the lobby so players can join/leave and settings can be
-        /// changed. Host-only, and only after the match is over. Flipping the phase back to
-        /// <see cref="GamePhase.Lobby"/> and re-enabling joins re-renders every player's page
-        /// at the lobby — no navigation needed.
+        /// Hooks for the base <see cref="AbstractGameEngine{TState}.ReturnToLobby"/> (host-only,
+        /// terminal-phase-only). Resetting to <see cref="GamePhase.Lobby"/> and re-enabling joins
+        /// re-renders every player's page at the lobby — no navigation needed.
         /// </summary>
-        public Result ReturnToLobby(User host, TraceryGameState state)
-        {
-            if (state.Host.Id != host.Id)
-                return Result.FromError("Only the host can return the game to the lobby.");
-            if (state.Phase != GamePhase.FinalStandings)
-                return Result.FromError("Can only return to the lobby after the match is over.");
+        protected override bool IsTerminalPhase(TraceryGameState state) => state.Phase == GamePhase.FinalStandings;
 
-            return state.Execute(() =>
-            {
-                state.ResetForLobby();
-                state.Phase = GamePhase.Lobby;
-                state.SetJoinable(true);
-            });
+        /// <inheritdoc />
+        protected override void ResetForLobby(TraceryGameState state)
+        {
+            state.ResetForLobby();
+            state.Phase = GamePhase.Lobby;
         }
 
         protected override Task<Result> StartAsyncCore(TraceryGameState s, CancellationToken ct = default)

@@ -88,37 +88,31 @@ public class OperatorGameEngine(
     }
 
     /// <summary>
-    /// Returns the game to the lobby so players can join/leave and settings can be
-    /// changed. Host-only, and only after the game is over. Flipping the state back to
+    /// Returns the game to the lobby (host-only, terminal-phase-only) via the base
+    /// <see cref="AbstractGameEngine{TState}.ReturnToLobby"/>. Flipping the state back to
     /// joinable re-renders every player's page at the lobby — no navigation needed.
     /// </summary>
-    public Result ReturnToLobby(User host, OperatorGameState state)
-    {
-        if (state.Host.Id != host.Id)
-            return Result.FromError("Only the host can return the game to the lobby.");
-        if (state.Phase != OperatorGamePhase.GameOver)
-            return Result.FromError("Can only return to the lobby after the game is over.");
+    protected override bool IsTerminalPhase(OperatorGameState state) => state.Phase == OperatorGamePhase.GameOver;
 
-        return state.Execute(() =>
-        {
-            // Fresh context mirrors CreateStateAsync; StartAsyncCore replaces it again on
-            // the next start. Keeps the lobby's pre-start invariant (non-null Context).
-            state.Context = new OperatorGameContext(state, randomNumberService);
-            state.GamePlayers.Clear();
-            state.Deck = [];
-            state.DiscardPile = [];
-            state.ActionLog = [];
-            state.LastBlockedActionMessage = null;
-            state.BlockedAttackerId = null;
-            state.TurnManager.SetTurnOrder([]);
-            state.PendingGameActionCommand = null;
-            state.ReactionTargetPlayerIds = [];
-            state.PlayerReactions = [];
-            state.TurnCount = 0;
-            state.WinnerPlayerId = null;
-            state.Phase = OperatorGamePhase.Setup;
-            state.SetJoinable(true);
-        });
+    /// <inheritdoc />
+    protected override void ResetForLobby(OperatorGameState state)
+    {
+        // Fresh context mirrors CreateStateAsync; StartAsyncCore replaces it again on
+        // the next start. Keeps the lobby's pre-start invariant (non-null Context).
+        state.Context = new OperatorGameContext(state, randomNumberService);
+        state.GamePlayers.Clear();
+        state.Deck = [];
+        state.DiscardPile = [];
+        state.ActionLog = [];
+        state.LastBlockedActionMessage = null;
+        state.BlockedAttackerId = null;
+        state.TurnManager.SetTurnOrder([]);
+        state.PendingGameActionCommand = null;
+        state.ReactionTargetPlayerIds = [];
+        state.PlayerReactions = [];
+        state.TurnCount = 0;
+        state.WinnerPlayerId = null;
+        state.Phase = OperatorGamePhase.Setup;
     }
 
     /// <summary>

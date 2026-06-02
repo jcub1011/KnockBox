@@ -317,6 +317,78 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.AreEqual(1, CountOf(state, p0, ReactionTrigger.Riposte), "Exemption must not consume Riposte.");
         }
 
+        [TestMethod]
+        public async Task SingleRiposte_BlocksFirstAttackOnly_WhenSubmitterEatsJinxAndFrostbite()
+        {
+            // One opponent holds BOTH attacks; the submitter holds a SINGLE Riposte. The fixed
+            // firing order is Jinx (1a) → Frostbite (1b), so the Riposte reflects the Jinx and the
+            // Frostbite then lands. Locks in the deterministic "blocks the first, not the worst"
+            // priority documented on ReactionResolver.
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
+            using var _ = state;
+            string p0 = "p0-id", p1 = "p1-id";
+            GiveReaction(state, p0, ReactionLibrary.RiposteId);
+            GiveReaction(state, p1, ReactionLibrary.JinxId);
+            GiveReaction(state, p1, ReactionLibrary.FrostbiteId);
+
+            // p0 climbs from last to first, taking the lead (→ Jinx) AND overtaking p1 (→ Frostbite).
+            ResolveSwing(state, p0, finalScore: 20,
+                [(p0, 0, 20), (p1, 10, 10)], new List<ReactionEvent>());
+
+            Assert.IsNull(state.GamePlayers[p0].PersonalBannedLetter, "Jinx was reflected, not landed on p0.");
+            Assert.IsNotNull(state.GamePlayers[p1].PersonalBannedLetter, "Reflected Jinx landed on the caster.");
+            Assert.AreEqual(ReactionLibrary.FrostbitePenaltySeconds, state.GamePlayers[p0].QueuedTimePenaltySeconds,
+                "Frostbite lands because the single Riposte was already spent on the Jinx.");
+            Assert.AreEqual(0, CountOf(state, p0, ReactionTrigger.Riposte), "Riposte consumed.");
+            Assert.AreEqual(0, CountOf(state, p1, ReactionTrigger.Jinx), "Jinx consumed.");
+            Assert.AreEqual(0, CountOf(state, p1, ReactionTrigger.Frostbite), "Frostbite consumed.");
+        }
+
+        [TestMethod]
+        public async Task Jinx_FiresThroughSubmitWordPath_WhenSubmissionTakesLead()
+        {
+            // End-to-end through the real engine.SubmitWordAsync so HandleSubmitWord's pre/post-rank
+            // capture and bounty-before-resolve ordering are exercised — not just the resolver in
+            // isolation via ResolveSwing.
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
+            using var _ = state;
+            var submitter = state.TurnManager.CurrentPlayer!;
+            var opponent = state.GamePlayers.Keys.First(id => id != submitter);
+
+            // Opponent leads by 2; the submitter's accepted "cat" (+3) takes the overall lead.
+            SetScore(state, opponent, 2);
+            GiveReaction(state, opponent, ReactionLibrary.JinxId);
+
+            var outcome = await engine.SubmitWordAsync(submitter, "cat", state);
+            Assert.IsTrue(outcome.TryGetSuccess(out var result));
+            Assert.IsInstanceOfType<SubmitWordResult.Accepted>(result);
+
+            Assert.IsNotNull(state.GamePlayers[submitter].PersonalBannedLetter,
+                "The submitter who took the lead should be jinxed via the real submit path.");
+            Assert.AreEqual(0, CountOf(state, opponent, ReactionTrigger.Jinx), "Jinx consumed.");
+        }
+
+        [TestMethod]
+        public async Task Overtime_PreventsElimination_InSurvivalMode()
+        {
+            // In Survival, a shot-clock expiry eliminates the current player — unless they hold
+            // Overtime, which fires first and extends the clock. Covers the survival branch of the
+            // Tick path that the existing Overtime test (non-survival) does not.
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
+            using var _ = state;
+            state.UpdateSettings(s => s with { SurvivalMode = true });
+            var current = state.TurnManager.CurrentPlayer!;
+            GiveReaction(state, current, ReactionLibrary.OvertimeId);
+
+            state.Execute(() => state.PhaseEndTime = DateTimeOffset.UtcNow.AddSeconds(-1));
+            engine.Tick(state.Context!, DateTimeOffset.UtcNow);
+
+            Assert.IsFalse(state.GamePlayers[current].IsEliminated,
+                "Overtime should rescue the player from survival elimination.");
+            Assert.AreEqual(current, state.TurnManager.CurrentPlayer, "Turn must not advance.");
+            Assert.AreEqual(0, CountOf(state, current, ReactionTrigger.Overtime), "Overtime consumed.");
+        }
+
         // ── Ranking ─────────────────────────────────────────────────────────
 
         [TestMethod]

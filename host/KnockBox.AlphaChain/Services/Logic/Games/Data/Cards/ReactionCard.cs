@@ -4,7 +4,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
     /// The game event that auto-fires a reaction. Unlike the old action cards, reactions are
     /// never played by hand: the FSM watches for these moments and fires a held reaction
     /// automatically (and only when it would actually help). The resolver interprets the
-    /// <see cref="ReactionTrigger"/> directly — reactions carry no delegates.
+    /// <see cref="ReactionTrigger"/> directly — reactions carry no delegates. Adding a value
+    /// here therefore requires a matching firing branch in
+    /// <see cref="KnockBox.AlphaChain.Services.Logic.Games.FSM.ReactionResolver"/>; see
+    /// <see cref="ReactionLibrary"/> for the full add-a-reaction checklist.
     /// </summary>
     public enum ReactionTrigger
     {

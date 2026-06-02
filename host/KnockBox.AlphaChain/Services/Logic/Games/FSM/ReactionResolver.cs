@@ -93,6 +93,11 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
 
             // The submitter's single Riposte negates the FIRST attack of this event only; the
             // reflection it produces always lands and is never itself Riposte'd (loop guard).
+            // "First" is by the fixed, deterministic firing order below — Jinx (1a) → Frostbite
+            // (1b) → Toll Booth (1c) — so when the submitter would eat several attacks in one
+            // submission, the Riposte always reflects the earliest in that order and the rest
+            // land. This is intentional (blocks the first, not the "worst", attack); keep the
+            // order stable so replays are reproducible.
             bool riposteAvailable = submitter.ReactionHand.Any(c => c.Trigger == ReactionTrigger.Riposte);
 
             // 1a. Jinx — fires when the submitter takes the overall lead.
@@ -248,6 +253,11 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
             notices.Add(Self(card, holder, $"Drew {drawn} reaction{(drawn == 1 ? "" : "s")}"));
         }
 
+        // Censor's exemption set is a SNAPSHOT taken at impose time: every player who holds a
+        // Riposte at this instant is spared for the round. This is deliberately not retroactive —
+        // a player who acquires a Riposte later in the same round (e.g. via a Windfall draw) is
+        // NOT added to the exempt set and is bound by the ban. Keep the card text in
+        // ReactionLibrary aligned with this "spared if holding Riposte when Censor lands" rule.
         private static void ApplyCensor(AlphaChainGameState state, ReactionCard card,
             AlphaChainPlayerState holder, List<ReactionEvent> notices)
         {

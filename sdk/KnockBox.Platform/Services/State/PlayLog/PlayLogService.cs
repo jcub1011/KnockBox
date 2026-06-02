@@ -1,3 +1,4 @@
+using System.Text.Json;
 using KnockBox.Core.Services.State.PlayLog;
 using KnockBox.Core.Services.Storage.ClientStorage;
 
@@ -100,7 +101,19 @@ public sealed class PlayLogService(
 
     private async ValueTask<List<GameLog>> ReadAsync(CancellationToken ct)
     {
-        var stored = await localStorage.GetAsync<List<GameLog>>(Scope, Key, ct).ConfigureAwait(false);
-        return stored ?? [];
+        try
+        {
+            var stored = await localStorage.GetAsync<List<GameLog>>(Scope, Key, ct).ConfigureAwait(false);
+            return stored ?? [];
+        }
+        catch (JsonException ex)
+        {
+            // Corrupt or legacy-shaped JSON under the key would otherwise wedge every read and
+            // append permanently. Discard it so the log self-heals rather than staying broken.
+            logger.LogWarning(ex, "Discarding corrupt play-log history; resetting storage.");
+            try { await localStorage.RemoveAsync(Scope, Key).ConfigureAwait(false); }
+            catch (Exception removeEx) { logger.LogError(removeEx, "Failed to clear corrupt play-log history."); }
+            return [];
+        }
     }
 }

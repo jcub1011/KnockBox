@@ -5,7 +5,19 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
     /// <summary>
     /// The canonical, immutable catalogue of every reaction card, plus the tunable constants
     /// the resolver reads. Reactions sit in a player's hand and auto-fire on game events — see
-    /// <see cref="ReactionTrigger"/>. Add new reactions here and they become draftable everywhere.
+    /// <see cref="ReactionTrigger"/>.
+    /// <para>
+    /// Adding an entry here makes a card <b>dealable/draftable</b>, but the card stays inert
+    /// until its firing behavior is implemented imperatively. Reactions carry no behavior
+    /// delegates (unlike <see cref="ModifierCard"/>); the resolver interprets each
+    /// <see cref="ReactionTrigger"/> directly. The full "add a new reaction" checklist is:
+    /// (1) add a <see cref="ReactionTrigger"/> value, (2) add the catalogue entry + any tunable
+    /// constant here, (3) add a firing branch in
+    /// <see cref="KnockBox.AlphaChain.Services.Logic.Games.FSM.ReactionResolver"/> (a block in
+    /// <c>ResolveAfterScore</c> for standings triggers, or a <c>TryXxx</c> method for
+    /// off-submission triggers), and (4) wire any new call site in
+    /// <see cref="KnockBox.AlphaChain.Services.Logic.Games.FSM.States.RoundState"/>.
+    /// </para>
     /// </summary>
     public static class ReactionLibrary
     {
@@ -110,7 +122,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
 
             new ReactionCard(
                 CensorId, "Censor",
-                "Auto: when you fall to last place, ban an extra letter for everyone for one round (Riposte holders are spared).",
+                "Auto: when you fall to last place, ban an extra letter for everyone for one round (players already holding a Riposte are spared).",
                 ReactionTrigger.Censor)
             { Icon = "censor", Class = ReactionClass.Special },
 

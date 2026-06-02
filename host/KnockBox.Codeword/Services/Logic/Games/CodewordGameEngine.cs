@@ -199,37 +199,30 @@ namespace KnockBox.Codeword.Services.Logic.Games
         }
 
         /// <summary>
-        /// Returns the game to the lobby so players can join/leave and settings can be changed.
-        /// Only the host can trigger this.
+        /// Hooks for the base <see cref="AbstractGameEngine{TState}.ReturnToLobby"/> (host-only,
+        /// terminal-phase-only) so players can join/leave and settings can change before the next game.
         /// </summary>
-        public Result ReturnToLobby(User host, CodewordGameState state)
+        protected override bool IsTerminalPhase(CodewordGameState state) => state.Phase == CodewordGamePhase.GameOver;
+
+        /// <inheritdoc />
+        protected override void ResetForLobby(CodewordGameState state)
         {
-            if (state.Host.Id != host.Id)
-                return Result.FromError("Only the host can return the game to the lobby.");
-
-            if (state.Phase != CodewordGamePhase.GameOver)
-                return Result.FromError("Can only return to the lobby after the game is over.");
-
-            return state.Execute(() =>
-            {
-                state.Context = null;
-                state.GamePlayers.Clear();
-                state.TurnManager.TurnOrder.Clear();
-                state.TurnManager.SetCurrentPlayerIndex(0);
-                state.CurrentEliminationCycle = 0;
-                state.CurrentWordPair = null;
-                state.CurrentRoundClues.Clear();
-                state.CurrentRoundVotes.Clear();
-                state.UsedClues.Clear();
-                state.LastElimination = null;
-                state.LastInformantGuess = null;
-                state.AwaitingInformantGuess = false;
-                state.WinResult = null;
-                state.CurrentGameNumber = 1;
-                state.EndGameVoteStatus = new EndGameVoteStatus([], 0);
-                state.GameScores.Clear();
-                state.SetJoinable(true);
-            });
+            state.Context = null;
+            state.GamePlayers.Clear();
+            state.TurnManager.TurnOrder.Clear();
+            state.TurnManager.SetCurrentPlayerIndex(0);
+            state.CurrentEliminationCycle = 0;
+            state.CurrentWordPair = null;
+            state.CurrentRoundClues.Clear();
+            state.CurrentRoundVotes.Clear();
+            state.UsedClues.Clear();
+            state.LastElimination = null;
+            state.LastInformantGuess = null;
+            state.AwaitingInformantGuess = false;
+            state.WinResult = null;
+            state.CurrentGameNumber = 1;
+            state.EndGameVoteStatus = new EndGameVoteStatus([], 0);
+            state.GameScores.Clear();
         }
 
         // ── Player-leave handling ────────────────────────────────────────────
