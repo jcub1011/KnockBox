@@ -98,6 +98,34 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.AreEqual(0, state.GamePlayers[behind].QueuedTimePenaltySeconds, "A lower-scored player is not shaved.");
         }
 
+        [TestMethod]
+        public async Task QueuedTimeShave_IsDebitedFromTheVictimsNextClock()
+        {
+            // 2 players: the shaved player (index 1) IS the immediate next seat, so the queued shave
+            // is applied to their freshly-armed clock the moment the turn advances to them — this
+            // verifies the shave is actually consumed, not merely queued forever.
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
+            using var _ = state;
+            var submitter = state.TurnManager.CurrentPlayer!;
+            var victim = state.TurnManager.TurnOrder[1];
+
+            GiveModifier(state, submitter, "flak-cannon");
+            SetScore(state, victim, 100); // ahead of the submitter → a Flak Cannon target
+
+            var t0 = DateTimeOffset.UtcNow;
+            await engine.SubmitWordAsync(submitter, "cat", state, t0);
+
+            Assert.AreEqual(victim, state.TurnManager.CurrentPlayer, "Turn advanced to the shaved next-seat player.");
+            Assert.AreEqual(0, state.GamePlayers[victim].QueuedTimePenaltySeconds, "Queued shave was consumed, not left pending.");
+
+            // The freshly-armed clock is the base shot clock minus the 2s shave. Assert the duration
+            // (tolerant of the sub-ms gap between t0 and the arm's own timestamp) — an un-shaved clock
+            // would be 2s longer, far outside the tolerance.
+            double armedSeconds = (state.PhaseEndTime - t0).TotalSeconds;
+            Assert.AreEqual(state.Settings.ShotClockSeconds - 2, armedSeconds, 0.5,
+                "Victim's freshly-armed clock is debited the 2s shave.");
+        }
+
         // ── Scattershot (time-shave at double-letter opponents) ──────────────
 
         [TestMethod]
@@ -204,6 +232,23 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.AreEqual(0.9, state.GamePlayers[ahead].ShieldMultiplier, 1e-9, "Mirror decays 1.0 → 0.9 per block.");
         }
 
+        [TestMethod]
+        public async Task TitaniumMirror_SeedsShieldAtOne_AndFoldsInAsTimesOne()
+        {
+            // A fresh, undamaged Titanium Mirror seeds ShieldMultiplier at 1.0 and, since the card's
+            // factor IS that multiplier, folds into the pipeline as a no-op ×1.0 — length 10 → 10.
+            var (engine, state) = await StartGameAsync(new StubWordListService("basketball"), banned: 'z');
+            using var _ = state;
+            var submitter = state.TurnManager.CurrentPlayer!;
+            GiveModifier(state, submitter, "titanium-mirror");
+
+            Assert.AreEqual(1.0, state.GamePlayers[submitter].ShieldMultiplier, 1e-9, "Shield seeds at 1.0 at game start.");
+
+            await engine.SubmitWordAsync(submitter, "basketball", state);
+
+            Assert.AreEqual(10, state.GamePlayers[submitter].Score, "Undamaged mirror folds in as ×1.0 → length 10.");
+        }
+
         // ── Standings helpers ────────────────────────────────────────────────
 
         [TestMethod]
@@ -219,7 +264,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var ranks = EngineEffectResolver.RankByScore(state);
 
             Assert.AreEqual(1, ranks[p2]);          // highest score first
-            Assert.IsTrue(ranks[p0] < ranks[p1]);   // tie broken by earlier turn-order index
+            Assert.AreEqual(2, ranks[p0]);          // tie at 5 → earlier turn-order index ranks ahead
+            Assert.AreEqual(3, ranks[p1]);          // later turn-order index of the tie
         }
 
         [TestMethod]

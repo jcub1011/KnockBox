@@ -153,5 +153,42 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.IsInstanceOfType<SubmitWordResult.RejectedNotInDictionary>(r2);
             Assert.AreEqual(t0.AddSeconds(2), state.PhaseEndTime, "No second refill this turn.");
         }
+
+        // ── The Catalyst (Y/W/H count as both vowel and consonant) ───────────
+
+        [TestMethod]
+        public async Task Catalyst_FlipsAVowelConditional_ThroughTheSubmitPath()
+        {
+            // "yew": normally vowels=1 (e), consonants=2 (y, w) → Vowel Surge (×2 when vowels >
+            // consonants) does NOT trigger. With The Catalyst, y and w count as both, so vowels=3 >
+            // consonants=2 and Vowel Surge fires: length 3 → ×2 = 6.
+            var (engine, state) = await StartGameAsync(new StubWordListService("yew"), banned: 'z');
+            using var _ = state;
+            var submitter = state.TurnManager.CurrentPlayer!;
+
+            GiveModifier(state, submitter, "vowel-surge");
+            GiveModifier(state, submitter, "catalyst");
+
+            await engine.SubmitWordAsync(submitter, "yew", state);
+
+            Assert.AreEqual(6, state.GamePlayers[submitter].Score,
+                "Catalyst makes y/w vowels too → Vowel Surge triggers ×2 on the length-3 word.");
+        }
+
+        [TestMethod]
+        public async Task WithoutCatalyst_VowelConditionalStaysFalse()
+        {
+            // Control: same word and Vowel Surge, no Catalyst → vowels (1) ≤ consonants (2), so the
+            // multiplier does not fire and the word just scores its length.
+            var (engine, state) = await StartGameAsync(new StubWordListService("yew"), banned: 'z');
+            using var _ = state;
+            var submitter = state.TurnManager.CurrentPlayer!;
+
+            GiveModifier(state, submitter, "vowel-surge");
+
+            await engine.SubmitWordAsync(submitter, "yew", state);
+
+            Assert.AreEqual(3, state.GamePlayers[submitter].Score, "No Catalyst → Vowel Surge stays inert.");
+        }
     }
 }
