@@ -12,7 +12,7 @@ public class CodewordSettingsTests
 
     private static CodewordSettings NonDefaultSettings() => new()
     {
-        HostPlaysGame = true,
+        HostPlays = true,
         EnableTimers = false,
         TotalGames = 8,
         SetupPhaseTimeoutMs = 7500,
@@ -41,7 +41,7 @@ public class CodewordSettingsTests
     {
         var settings = new CodewordSettings();
 
-        Assert.IsFalse(settings.HostPlaysGame);
+        Assert.IsFalse(settings.HostPlays);
         Assert.IsTrue(settings.EnableTimers);
         Assert.AreEqual(5, settings.TotalGames);
         Assert.AreEqual(5000, settings.SetupPhaseTimeoutMs);

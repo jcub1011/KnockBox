@@ -2,7 +2,7 @@
 @using KnockBox.Operator.Services.State
 
 <div class="op-setup">
-    @if (IsHost())
+    @if (IsHost() && !GameState.HostIsParticipant)
     {
         int totalPlayers = GameState.Players.Length;
         int scoresSubmitted = GameState.GamePlayers.Values.Count(state => state.CurrentPoints != 0m);

@@ -1,0 +1,297 @@
+@inherits DisposableComponent
+@using System.Globalization
+@using KnockBox.AlphaChain.Services.Logic.Games.Data
+@using KnockBox.AlphaChain.Services.Logic.Games.FSM
+@using KnockBox.AlphaChain.Services.State.Games
+@using KnockBox.Core.Components.Shared
+
+@* In-game view. Rendered as a component by AlphaChainLobby when the lobby is no
+   longer joinable (the single-page approach recommended by the M1 spec's Risks
+   section — session validation lives once, in the lobby's LobbyPageBase). *@
+
+<div class="ac-game">
+    @if (GameState.Phase == AlphaChainGamePhase.GameOver)
+    {
+        <GameOverPanel Results="GameState.Results" />
+        @if (IsHost)
+        {
+            <div class="ac-results-actions">
+                <button class="ac-start-btn ac-start-primary" @onclick="ReturnToLobbyAsync">
+                    Return to Lobby
+                </button>
+            </div>
+        }
+        else
+        {
+            <p class="ac-results-wait">Waiting for host…</p>
+        }
+    }
+    else if (GameState.Phase == AlphaChainGamePhase.Intermission)
+    {
+        <div class="ac-intermission">
+            <div class="ac-im-header">
+                <span class="ac-im-era">Era @GameState.CurrentEra <span class="ac-im-arrow">→</span> @(GameState.CurrentEra + 1)</span>
+                @if (SubPhaseDuration > TimeSpan.Zero)
+                {
+                    <CountdownClock EndTimeUtc="GameState.SubPhaseEndTime" Duration="SubPhaseDuration" Context="im">
+                        @{
+                            int imSecs = (int)Math.Ceiling(Math.Max(0, im.RemainingSeconds));
+                            float imFrac = Math.Clamp(im.Fraction, 0f, 1f);
+                        }
+                        <div class="ac-im-timer">
+                            <span class="ac-im-clock @(im.RemainingSeconds <= 3 ? "ac-clock-urgent" : "")">@imSecs<span class="ac-im-clock-unit">s</span></span>
+                            <span class="ac-im-bar"><span class="ac-im-bar-fill" style="width:@((imFrac * 100).ToString("0.#", CultureInfo.InvariantCulture))%"></span></span>
+                        </div>
+                    </CountdownClock>
+                }
+            </div>
+
+            @switch (GameState.IntermissionPhase)
+            {
+                case IntermissionSubPhase.Optimization:
+                    @if (MyPlayer is { } me)
+                    {
+                        <IntermissionOptimizationPanel Cards="me.EngineBay"
+                                                       Slots="me.ModifierSlots"
+                                                       NewCardIds="me.NewlyDealtModifierIds"
+                                                       SubmittedCount="OptimizationSubmittedCount"
+                                                       TotalCount="OptimizationTotalCount"
+                                                       HasSubmitted="HasSubmittedOptimization"
+                                                       OnSubmit="SubmitOptimizationAsync" />
+                    }
+                    else
+                    {
+                        <p class="ac-im-spectate">Players are optimizing their Engine Bays… (@OptimizationSubmittedCount / @OptimizationTotalCount ready)</p>
+                    }
+                    break;
+
+                case IntermissionSubPhase.TaxTutorial:
+                    <TutorialOverlay @key="100" Kind="TutorialKind.Tax" IsHost="IsHost" OnSkip="SkipTutorialAsync" />
+                    break;
+
+                case IntermissionSubPhase.SniperBan:
+                    <SniperBanPicker IsPicker="IsSniperBanPicker"
+                                     LegalLetters="LegalBanLetters"
+                                     PickerName="SniperBanPickerName"
+                                     BannedLetter="GameState.BannedLetter"
+                                     OnSelect="SelectSniperBanAsync" />
+                    break;
+            }
+        </div>
+    }
+    else if (GameState.Phase == AlphaChainGamePhase.Tutorial)
+    {
+        <TutorialOverlay @key="GameState.CurrentTutorial" Kind="GameState.CurrentTutorial"
+                         IsHost="IsHost" OnSkip="SkipTutorialAsync" />
+    }
+    else
+    {
+        <div class="ac-round">
+            <section class="ac-stage">
+                @* ── Command rail: chain rule + banned letter + shot clock ── *@
+                <div class="ac-command">
+                    <div class="ac-cmd-cell">
+                        <span class="ac-cmd-label">Start with</span>
+                        <span class="ac-cmd-letter ac-cmd-start">@RequiredStartDisplay</span>
+                    </div>
+                    <div class="ac-cmd-clock">
+                        <CountdownClock EndTimeUtc="GameState.PhaseEndTime" Duration="ShotClockDuration" Context="clock">
+                            @{
+                                var frac = Math.Clamp(clock.Fraction, 0f, 1f);
+                                var offset = (276.46 * (1 - frac)).ToString("0.0", CultureInfo.InvariantCulture);
+                                var ringClass = clock.RemainingSeconds <= 3 ? "ac-ring-danger"
+                                    : clock.RemainingSeconds <= 6 ? "ac-ring-warn" : "ac-ring-go";
+                            }
+                            <div class="ac-ring @ringClass">
+                                <svg class="ac-ring-svg" viewBox="0 0 100 100" aria-hidden="true">
+                                    <circle class="ac-ring-track" cx="50" cy="50" r="44" />
+                                    <circle class="ac-ring-fill" cx="50" cy="50" r="44" style="stroke-dashoffset:@offset" />
+                                </svg>
+                                <span class="ac-ring-num">@((int)Math.Ceiling(Math.Max(0, clock.RemainingSeconds)))</span>
+                            </div>
+                        </CountdownClock>
+                    </div>
+                    <div class="ac-cmd-cell ac-cmd-banned">
+                        <span class="ac-cmd-label">Banned</span>
+                        <span class="ac-cmd-letters">
+                            <span class="ac-cmd-letter">@BannedLetterDisplay</span>
+                            @if (PersonalBannedLetterDisplay is { } hijack)
+                            {
+                                <span class="ac-cmd-letter ac-cmd-jinx"
+                                      title="A personal banned letter forced onto your next word (Tracer Round / Bait & Switch)">@hijack</span>
+                            }
+                        </span>
+                    </div>
+                </div>
+
+                @* ── Turn spotlight ── *@
+                <div class="ac-turnflag @(IsMyTurn ? "ac-turnflag-me" : "")"
+                     style="--accent: var(--ac-p@(AccentSlot(GameState.TurnManager.CurrentPlayer ?? string.Empty)))">
+                    @if (IsMyTurn)
+                    {
+                        <span class="ac-turnflag-text">YOUR TURN</span>
+                    }
+                    else
+                    {
+                        <span class="ac-turnflag-now">NOW</span>
+                        <span class="ac-turnflag-name">@CurrentPlayerName</span>
+                    }
+                    <span class="ac-turnflag-meta">Era @GameState.CurrentEra · Round @GameState.CurrentRound</span>
+                </div>
+
+                @* ── Word entry: client-owned input (no @bind — see alpha-chain-input.js) ── *@
+                <div class="ac-entry @(CanSubmit ? "ac-entry-live" : "ac-entry-wait")">
+                    <span class="ac-entry-prefix @(GameState.RequiredStartLetter is null ? "ac-entry-prefix-free" : "")"
+                          title="@(GameState.RequiredStartLetter is null ? "Free choice — any letter" : "Your word must start with this letter")">
+                        @(GameState.RequiredStartLetter is { } req ? char.ToUpperInvariant(req).ToString() : "∗")
+                    </span>
+                    <input @ref="_wordInputRef" class="ac-word-input @(LocalPlayerHidesInput ? "ac-word-input-blind" : "")" type="text"
+                           placeholder="@(AwaitingTransition ? TransitionHoldMessage : CanSubmit ? (LocalPlayerHidesInput ? "blind — type a word…" : "type a word…") : $"{CurrentPlayerName} is playing…")"
+                           disabled="@(!CanSubmit)"
+                           autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+                    <button type="button" class="ac-submit-btn" disabled="@(!CanSubmit || IsSubmitting)"
+                            @onclick="SubmitFromButtonAsync">GO</button>
+                </div>
+
+                <div class="ac-entry-status">
+                    @if (FeedbackMessage is { } feedback)
+                    {
+                        <span class="ac-feedback ac-feedback-bad">@feedback</span>
+                    }
+                </div>
+
+                @* ── Score replay: one fixed spot, same for every player; names the submitter
+                      and lingers as a readout until the next word lands. *@
+                @if (LatestReplay is { } replay)
+                {
+                    <ScoreReplayStrip @key="GameState.ScoreReplaySequence" Replay="replay"
+                                      ReplayTotalSeconds="GameState.Settings.EngineAnimationSeconds" />
+                }
+
+                @* ── Engine-effect strike overlay: announces auto-fired modifier effects, emphasising
+                      hits against the local player. Keyed on the notice sequence so it replays once. *@
+                <EngineEffectOverlay @key="GameState.EngineNoticeSequence"
+                                     Notices="GameState.LatestEngineNotices" CurrentUserId="CurrentUserId" />
+
+                @* ── Chain trail ── *@
+                @if (ChainTrail.Count > 0)
+                {
+                    int lastTrailIndex = ChainTrail.Count - 1;
+                    <div class="ac-trail" aria-label="Recent chain">
+                        @for (int t = 0; t < ChainTrail.Count; t++)
+                        {
+                            var play = ChainTrail[t];
+                            // Tunnel Vision masks the first & last letter of the most recent word for
+                            // its holder only — you must remember it (or read the required-start letter).
+                            bool maskWord = LocalPlayerHasTunnelVision && t == lastTrailIndex;
+                            <span class="ac-trail-word @(play.ZeroPointTax ? "ac-trail-taxed" : "")">
+                                @for (int i = 0; i < play.Word.Length; i++)
+                                {
+                                    bool hideLetter = maskWord && (i == 0 || i == play.Word.Length - 1);
+                                    <span class="ac-trail-letter @(i == play.Word.Length - 1 ? "ac-trail-link" : "") @(hideLetter ? "ac-trail-hidden" : "")">@(hideLetter ? '·' : char.ToUpperInvariant(play.Word[i]))</span>
+                                }
+                            </span>
+                        }
+                    </div>
+                }
+
+                @* ── Cards: own Engine Bay (the only card tier) ── *@
+                @if (MyPlayer is { } myCards)
+                {
+                    <div class="ac-cards">
+                        @* Reorder is disabled during a live round — the scoring pipeline order is
+                           frozen and only resequenced at Intermission (Optimization). The bay is
+                           always Locked here, so no OnReorder handler is wired. *@
+                        <EngineBay Cards="myCards.EngineBay" Slots="myCards.ModifierSlots"
+                                   Locked="true" Title="Your Engine Bay"
+                                   ShieldMultiplier="myCards.ShieldMultiplier" />
+                    </div>
+                }
+
+                @* ── Opponent Engine Bays (read-only summary; becomes fog-of-war in M4) ── *@
+                @if (Opponents.Count > 0)
+                {
+                    <div class="ac-opponent-bays">
+                        @foreach (var opp in Opponents)
+                        {
+                            <EngineBay Cards="opp.EngineBay" Slots="opp.ModifierSlots" ReadOnly="true"
+                                       Title="@opp.DisplayName" ShieldMultiplier="opp.ShieldMultiplier" />
+                        }
+                    </div>
+                }
+            </section>
+
+            <aside class="ac-rail">
+                @* ── Live leaderboard ── *@
+                <div class="ac-panel ac-panel-leaderboard">
+                    <h3 class="ac-panel-title">Leaderboard</h3>
+                    <ol class="ac-leaderboard">
+                        @{ var rank = 0; }
+                        @foreach (var p in Leaderboard)
+                        {
+                            rank++;
+                            var slot = AccentSlot(p.UserId);
+                            var arrow = RankArrow(p.UserId);
+                            var isMe = p.UserId == CurrentUserId;
+                            var isActive = p.UserId == GameState.TurnManager.CurrentPlayer;
+                            <li class="ac-lb-row @(p.IsEliminated ? "ac-eliminated" : "") @(isMe ? "ac-lb-me" : "") @(isActive ? "ac-lb-active" : "")"
+                                style="--accent: var(--ac-p@(slot))">
+                                <span class="ac-lb-rank">@rank</span>
+                                <span class="ac-lb-name">
+                                    @p.DisplayName
+                                    @if (isMe)
+                                    {
+                                        <span class="ac-tag ac-tag-you">you</span>
+                                    }
+                                    @if (p.IsEliminated)
+                                    {
+                                        <span class="ac-tag">out</span>
+                                    }
+                                    else if (p.HasLeft)
+                                    {
+                                        <span class="ac-tag">left</span>
+                                    }
+                                </span>
+                                @if (!string.IsNullOrEmpty(arrow))
+                                {
+                                    <span class="ac-lb-arrow @(arrow == "▲" ? "ac-lb-up" : "ac-lb-down")">@arrow</span>
+                                }
+                                <span class="ac-lb-score">@p.Score</span>
+                                @if (LatestPlay is { } lp && lp.UserId == p.UserId && lp.Score > 0)
+                                {
+                                    <span class="ac-score-pop" @key="LatestPlayKey">+@lp.Score</span>
+                                }
+                            </li>
+                        }
+                    </ol>
+                </div>
+
+                @* ── Submitted-words log ── *@
+                <div class="ac-panel ac-panel-feed">
+                    <h3 class="ac-panel-title">Words played</h3>
+                    <ul class="ac-feed">
+                        @foreach (var play in PlayFeed)
+                        {
+                            <li class="ac-feed-row @(play.ZeroPointTax ? "ac-feed-taxed" : "")">
+                                <span class="ac-feed-word">@play.Word</span>
+                                <span class="ac-feed-player">@play.DisplayName</span>
+                                @if (play.ZeroPointTax)
+                                {
+                                    <span class="ac-tag ac-tag-tax">tax</span>
+                                }
+                                <span class="ac-feed-score">+@play.Score</span>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </aside>
+        </div>
+    }
+
+    @* The just-ended tutorial slides away on top of the now-rendered next phase. It is a fixed,
+       pointer-events:none layer, so the revealed phase is immediately interactive. *@
+    @if (ExitingTutorial is { } exitingKind)
+    {
+        <TutorialOverlay Kind="exitingKind" IsHost="IsHost" Exiting="true" />
+    }
+</div>

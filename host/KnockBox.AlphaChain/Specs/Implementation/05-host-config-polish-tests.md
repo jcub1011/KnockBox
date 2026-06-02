@@ -20,17 +20,29 @@ Expose `AlphaChainSettings` to the host through a lobby configuration panel, rep
 
 - `Pages/AlphaChainLobby.razor` — add a host-only `<AlphaChainSettingsPanel>` section:
   - **Ban Mode** radio group: `Vowels Only` / `Consonants Only` / `All Bannable`.
-  - **Shot Clock** slider, 5–20 s (default 12).
+  - **Shot Clock** slider, 5–60 s (default 12).
   - **Era Interval** numeric input, ≥1 (default 4).
   - **Era Count** numeric input, ≥1 (default 4).
   - **Survival Mode** toggle.
   - **Intermission Timer** numeric input, ≥5 s (default 30).
   - **Sniper Ban Timer** numeric input, ≥5 s (default 15).
-  - Cards-per-era numeric inputs (`ModifiersDealtPerEra`, `ActionsDealtPerEra`) if those were left configurable in M4.
-- `Components/AlphaChainSettingsPanel.razor` — the panel itself; two-way bound to a local `AlphaChainSettings` instance owned by the page.
-- `Pages/AlphaChainLobby.razor.cs`:
-  - On every change, validate via `config.Validate()`; gate "Start Session" until valid.
-  - On Start, persist via `state.UpdateSettings(_ => config)` before calling `engine.StartAsync`.
+  - Cards-per-era numeric inputs (`ModifiersDealtPerEra`, `ActionsDealtPerEra`) — these are real settings
+    on the record (defined in M1), so expose them here. `HostPlays` is **not** shown in the panel — it is
+    chosen at start time by the two start buttons added in M1.
+- `Components/AlphaChainSettingsPanel.razor` — the panel itself; binds to `GameState.Settings` and pushes
+  edits through `GameState.UpdateSettings(s => s with { ... })` so every change goes through the state's
+  `Execute` and notifies non-host viewers (mirror the Spardle/Operator settings drawers).
+- `Pages/AlphaChainLobby.razor.cs` — follow the established settings-persistence pattern
+  (`Spardle/Pages/SpardleLobbyPhase.razor.cs`, `Codeword/Pages/LobbyPhase.razor.cs`):
+  - On every edit, call `GameState.UpdateSettings(...)`, validate via `Settings.Validate()`, gate **both
+    start buttons** until valid, then persist (see below).
+  - **Persist via `ILocalStorageService`** (host-side; `sdk/KnockBox.Core/Services/Storage/ClientStorage/`):
+    load saved settings in `OnAfterRenderAsync(firstRender)` for the host only (skip if the user has
+    already edited); save sequentially on each edit (await the prior save before the next); flush the
+    in-flight save in `DisposeAsync`. Scope `"alpha-chain"`, key `"settings"`.
+  - **Exclude `HostPlays` from persistence** — it is a start-time choice, not a saved preference; the two
+    start buttons set it via `UpdateSettings(s => s with { HostPlays = ... })` immediately before
+    `engine.StartAsync` (per M1). Mirrors `OperatorSettings.HostPlays`.
   - Subscribe to `StateChangedEventManager` so non-host viewers re-render when the host edits the config.
 - `Services/Logic/Games/Data/AlphaChainSettings.cs`:
   - Add `ConfigValidationResult Validate()` method enumerating violations.
@@ -56,10 +68,16 @@ Expose `AlphaChainSettings` to the host through a lobby configuration panel, rep
 Add or expand under `host/KnockBox.AlphaChainTests/`:
 
 - `Unit/Logic/Games/Data/AlphaChainSettingsTests.cs` — every validation rule has a positive and negative test.
-- `Unit/Logic/Games/AlphaChain/States/RoundStateTests.cs` — expand from M2/M3 to cover:
-  - Pivot + Banned Letter interactions.
-  - Amnesty interacting with a word whose last char is banned (still clears `RequiredStartLetter`?).
-  - Time Thief on a player who just submitted (clock already reset for next player).
+- `Unit/Logic/Games/AlphaChain/States/RoundStateTests.cs` — expand from M2/M3 to cover the **stated
+  rules** below (these are resolved decisions, not open questions):
+  - **Pivot + Banned Letter:** Pivot only clears `RequiredStartLetter` for that submission; it does not
+    affect the Zero-Point Tax. If the played word contains the banned letter, the turn still scores 0
+    (unless Amnesty is also queued).
+  - **Amnesty + word whose last char is banned:** Amnesty suppresses the tax (full points) AND the
+    banned-letter-as-last-letter still clears `RequiredStartLetter` for the next player — the
+    chain-clearing effect is independent of scoring.
+  - **First-turn banned letter:** allowed, but incurs the Zero-Point Tax (rule stated in M2).
+  - **Time Thief on a player who just submitted** (clock already reset for next player).
 - `Unit/Logic/Games/AlphaChain/States/IntermissionStateTests.cs` — full sub-phase coverage from M4.
 - `Unit/Logic/Games/AlphaChain/States/GameOverStateTests.cs` — rankings, ties, survival winner.
 - `Unit/Logic/Scoring/ScoreCalculatorTests.cs` — exhaustive coverage of every shipped modifier in `ModifierLibrary`.
@@ -73,7 +91,19 @@ Add or expand under `host/KnockBox.AlphaChainTests/`:
 
 ### Documentation
 
-- `Specs/alpha-chain-gdd.md` — append an "Implementation Deviations" section if the final mechanics differ from the GDD (e.g., starting hand, sniper-ban fallback rules, score cap).
+- `Specs/alpha-chain-gdd.md` — append an "Implementation Deviations" section recording the
+  already-confirmed deviations from the GDD:
+  - **Time Thief** targets any opponent (and can shorten a clock already ticking), not strictly "the next
+    player" (GDD §3.2). *(Confirmed intentional.)*
+  - **Era 1 is cardless** — players start with an empty Engine Bay and hand; the first Deal happens at the
+    first Intermission (after `EraInterval` rounds).
+  - **Starting `ModifierSlots = 3`** (GDD only specifies Expansion grants +1 per Intermission).
+  - **Shot clock configurable 5–60 s** vs. the GDD's stated 10–15 s window.
+  - **"Fresh hand" = append**, not replace — dealt modifiers/actions accumulate on the existing bay/hand.
+  - **Host-plays / two start buttons** — the host can start as a shared display (not a player) or as a
+    player; not described in the GDD.
+  - Plus any late additions surfaced during implementation (sniper-ban timeout fallback, optional score
+    cap, over-capacity discard rule).
 - `Specs/Implementation/README.md` — short index pointing to the five milestone files and the GDD.
 
 ## Key types & contracts
@@ -85,7 +115,7 @@ Add or expand under `host/KnockBox.AlphaChainTests/`:
 
 1. Add validation + constants to `AlphaChainSettings`.
 2. Build `AlphaChainSettingsPanel` and integrate into the lobby; non-host read-only view first, then host editable.
-3. Wire validation gating + persist on Start.
+3. Wire validation gating on both start buttons; persist settings to `localStorage` on each edit (load on first render, flush on dispose); apply `HostPlays` from the chosen start button just before `engine.StartAsync`.
 4. Replace tile + header art; finalize game-page CSS.
 5. Implement drag-reorder for Engine Bay; verify keyboard accessibility.
 6. Polish Intermission overlay (discard affordance, animations).

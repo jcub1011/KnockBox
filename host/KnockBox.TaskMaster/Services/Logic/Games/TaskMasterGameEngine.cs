@@ -8,7 +8,7 @@ namespace KnockBox.TaskMaster.Services.Logic.Games
 {
     public class TaskMasterGameEngine(
         ILogger<TaskMasterGameEngine> logger,
-        ILogger<TaskMasterGameState> stateLogger) : AbstractGameEngine
+        ILogger<TaskMasterGameState> stateLogger) : AbstractGameEngine<TaskMasterGameState>
     {
         public override async Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
@@ -22,15 +22,12 @@ namespace KnockBox.TaskMaster.Services.Logic.Games
             return gameState;
         }
 
-        protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
+        protected override Task<Result> StartAsyncCore(TaskMasterGameState state, CancellationToken ct = default)
         {
-            if (state is not TaskMasterGameState gameState)
-                return Task.FromResult(Result.FromError("Error starting game.", $"Game state of type [{(state?.GetType().Name ?? "null")}] couldn't be cast to type [{nameof(TaskMasterGameState)}]."));
-
             var executeResult = state.Execute(() =>
             {
                 state.SetJoinable(false);
-                gameState.SetPhase(GamePhase.Playing);
+                state.SetPhase(GamePhase.Playing);
             });
 
             if (executeResult.IsFailure) return Task.FromResult(executeResult);

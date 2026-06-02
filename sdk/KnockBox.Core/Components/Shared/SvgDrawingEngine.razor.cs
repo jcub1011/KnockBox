@@ -340,9 +340,13 @@ namespace KnockBox.Core.Components.Shared
         {
             var handler = StateChanged;
             if (handler is null) return;
-            foreach (Func<ValueTask> sub in handler.GetInvocationList().Cast<Func<ValueTask>>())
+            // Iterate the invocation-list array directly — casting each element
+            // inline avoids the LINQ Cast<> iterator allocation on every fire,
+            // and this runs on every stroke/undo/redo/clear/fill/tool change.
+            var subs = handler.GetInvocationList();
+            for (int i = 0; i < subs.Length; i++)
             {
-                try { await sub(); }
+                try { await ((Func<ValueTask>)subs[i])(); }
                 catch (Exception ex)
                 {
                     Logger.LogWarning(ex, "[SVGEngine] StateChanged subscriber threw — svgId={SvgId}", TargetSvgId);

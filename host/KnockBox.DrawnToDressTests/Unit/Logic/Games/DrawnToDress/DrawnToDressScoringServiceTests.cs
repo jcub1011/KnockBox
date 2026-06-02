@@ -95,6 +95,33 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             Assert.AreEqual(2.0, bScore);
         }
 
+        [TestMethod]
+        public void CriterionScores_IgnoresOtherMatchupsCriteriaAndStrayEntrants()
+        {
+            // Locks in the single-pass tally: votes for a different matchup, a different
+            // criterion, or an entrant that is neither A nor B must all be skipped.
+            var matchup = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
+            var otherMatchup = MakeMatchup(new EntrantId("pA", 1), new EntrantId("pB", 1));
+            var votes = new List<VoteSubmission>
+            {
+                // Counted: this matchup + this criterion.
+                Vote(matchup.Id, "creativity", new EntrantId("pA", 1), "v1"),
+                Vote(matchup.Id, "creativity", new EntrantId("pB", 1), "v2"),
+                // Ignored: same criterion, different matchup.
+                Vote(otherMatchup.Id, "creativity", new EntrantId("pA", 1), "v3"),
+                // Ignored: same matchup, different criterion.
+                Vote(matchup.Id, "theme_match", new EntrantId("pA", 1), "v4"),
+                // Ignored: right matchup + criterion, but the chosen entrant is in neither slot.
+                Vote(matchup.Id, "creativity", new EntrantId("pC", 1), "v5"),
+            };
+
+            var (aScore, bScore) = DrawnToDressScoringService.CalculateCriterionScores(
+                matchup, "creativity", 1.0, votes);
+
+            Assert.AreEqual(1.0, aScore, "Only the single in-scope A vote should count.");
+            Assert.AreEqual(1.0, bScore, "Only the single in-scope B vote should count.");
+        }
+
         // ── FindTiedCriteria ────────────────────────────────────────────────────
 
         [TestMethod]

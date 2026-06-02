@@ -98,7 +98,7 @@
                     <div class="op-redirect-section">
                         <p class="op-waiting-text">Select a player to redirect Hot Potato to:</p>
                         <div class="op-redirect-players">
-                            @foreach (var entry in GameState.Players.Where(p => p.User.Id != UserService.CurrentUser?.Id))
+                            @foreach (var entry in GameState.Participants.Where(p => p.User.Id != UserService.CurrentUser?.Id))
                             {
                                 <button class="op-redirect-player-btn" @onclick="() => RedirectHotPotato(entry.User.Id)">
                                     @entry.DisplayName
@@ -137,7 +137,7 @@
                 <p class="op-reaction-subtitle">
                     @{
                         var reactedIds = GameState.PlayerReactions.Select(r => r.PlayerId).ToHashSet();
-                        var targetNames = GameState.Players
+                        var targetNames = GameState.Participants
                             .Where(p => GameState.ReactionTargetPlayerIds.Contains(p.User.Id) && !reactedIds.Contains(p.User.Id))
                             .Select(p => p.DisplayName)
                             .ToList();

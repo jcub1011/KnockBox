@@ -131,8 +131,8 @@
     @if (IsHost)
     {
         <div class="ll-go-actions">
-            <button class="ll-btn ll-btn-primary" @onclick="PlayAgain" disabled="@_starting">
-                @(_starting ? "Starting…" : "Play again")
+            <button class="ll-btn ll-btn-primary" @onclick="ReturnToLobby" disabled="@_starting">
+                @(_starting ? "Returning…" : "Return to Lobby")
             </button>
         </div>
     }

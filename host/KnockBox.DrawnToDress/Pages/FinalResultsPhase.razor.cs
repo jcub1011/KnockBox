@@ -77,7 +77,7 @@ namespace KnockBox.DrawnToDress.Pages
             return new PlayerBreakdown(outfitScores, bonus, byeRounds);
         }
 
-        protected async Task PlayAgainAsync()
+        protected async Task ReturnToLobbyAsync()
         {
             if (GameState.Context is null) return;
 
@@ -92,46 +92,12 @@ namespace KnockBox.DrawnToDress.Pages
                 if (result.TryGetFailure(out var err))
                 {
                     _errorMessage = err.PublicMessage;
-                    Logger.LogWarning("PlayAgain failed: {msg}", err.PublicMessage);
+                    Logger.LogWarning("ReturnToLobby failed: {msg}", err.PublicMessage);
                 }
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Unexpected error requesting play again.");
-                _errorMessage = "An unexpected error occurred.";
-            }
-            finally
-            {
-                _submitting = false;
-                StateHasChanged();
-            }
-        }
-
-        protected async Task ReturnToMenuAsync()
-        {
-            if (GameState.Context is null) return;
-
-            _errorMessage = null;
-            _submitting = true;
-            StateHasChanged();
-
-            try
-            {
-                var cmd = new ReturnToMenuCommand(CurrentPlayerId);
-                var result = GameEngine.ProcessCommand(GameState.Context, cmd);
-                if (result.TryGetFailure(out var err))
-                {
-                    _errorMessage = err.PublicMessage;
-                    Logger.LogWarning("ReturnToMenu failed: {msg}", err.PublicMessage);
-                }
-                else
-                {
-                    GameSessionService.LeaveCurrentSession(navigateHome: true);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Unexpected error returning to menu.");
+                Logger.LogError(ex, "Unexpected error requesting return to lobby.");
                 _errorMessage = "An unexpected error occurred.";
             }
             finally

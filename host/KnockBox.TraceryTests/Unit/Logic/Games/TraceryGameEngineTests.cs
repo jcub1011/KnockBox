@@ -559,5 +559,51 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             }
             return players;
         }
+
+        // ── ReturnToLobby ───────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task ReturnToLobby_NonHost_ReturnsError()
+        {
+            var state = await CreateStateAsync();
+            RegisterPlayers(state, 2);
+            await _engine.StartAsync(_host, state);
+            state.Execute(() => _engine.EnterFinalStandings(state));
+            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+
+            var result = _engine.ReturnToLobby(nonHost, state);
+
+            Assert.IsTrue((bool)result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_BeforeMatchOver_ReturnsError()
+        {
+            var state = await CreateStateAsync();
+            RegisterPlayers(state, 2);
+            await _engine.StartAsync(_host, state);
+            // Not in FinalStandings yet — the replay path is rejected.
+
+            var result = _engine.ReturnToLobby(_host, state);
+
+            Assert.IsTrue((bool)result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_AfterFinalStandings_ReturnsToJoinableLobby()
+        {
+            var state = await CreateStateAsync();
+            RegisterPlayers(state, 2);
+            await _engine.StartAsync(_host, state);
+            state.Execute(() => _engine.EnterFinalStandings(state));
+
+            var result = _engine.ReturnToLobby(_host, state);
+
+            Assert.IsTrue((bool)result.IsSuccess);
+            Assert.AreEqual(GamePhase.Lobby, state.Phase);
+            Assert.IsTrue(state.IsJoinable);
+            Assert.IsEmpty(state.PlayerStates);
+            Assert.AreEqual(0, state.CurrentRound);
+        }
     }
 }

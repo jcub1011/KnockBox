@@ -1,8 +1,7 @@
-@using KnockBox.Core.Services.Navigation
-@using KnockBox.Core.Services.State.Games.Shared
 @using KnockBox.Core.Services.State.Users
-@inject IGameSessionService GameSessionService
 @inject IUserService UserService
+@inject KnockBox.Tracery.Services.Logic.Games.TraceryGameEngine GameEngine
+@inject ILogger<TraceryFinalStandingsView> Logger
 
 @{
     // Render from the frozen start-of-match snapshot, not the live Players roster, so
@@ -45,13 +44,48 @@
         }
     </div>
 
-    <button class="tr-btn tr-btn-primary tr-over-exit" @onclick="ReturnHome">
-        Return Home
-    </button>
+    <div class="tr-over-actions">
+        @if (UserService.CurrentUser?.Id == State.Host.Id)
+        {
+            <button class="tr-btn tr-btn-primary tr-over-exit" @onclick="ReturnToLobby" disabled="@_returning">
+                Return to Lobby
+            </button>
+            @if (_error is not null)
+            {
+                <span class="tr-over-error" role="alert">@_error</span>
+            }
+        }
+        else
+        {
+            <span class="tr-over-wait">Waiting for host…</span>
+        }
+    </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public TraceryGameState State { get; set; } = default!;
 
-    private void ReturnHome() => GameSessionService.LeaveCurrentSession(navigateHome: true);
+    private bool _returning;
+    private string? _error;
+
+    private void ReturnToLobby()
+    {
+        if (_returning || UserService.CurrentUser is null) return;
+
+        _returning = true;
+        try
+        {
+            _error = null;
+            var result = GameEngine.ReturnToLobby(UserService.CurrentUser, State);
+            if (result.TryGetFailure(out var error))
+            {
+                Logger.LogError("Failed to return Tracery to the lobby: {Error}", error.InternalMessage);
+                _error = error.PublicMessage;
+            }
+        }
+        finally
+        {
+            _returning = false;
+        }
+    }
 }

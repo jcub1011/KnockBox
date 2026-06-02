@@ -13,7 +13,7 @@ namespace KnockBox.Spardle;
 public class SpardleEngine(
     IWordListService wordListService,
     IRandomNumberService rng,
-    ILoggerFactory loggerFactory) : AbstractGameEngine(1, 20)
+    ILoggerFactory loggerFactory) : AbstractGameEngine<SpardleState>(1, 20)
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger<SpardleEngine>();
 
@@ -39,10 +39,8 @@ public class SpardleEngine(
         });
     }
 
-    protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
+    protected override Task<Result> StartAsyncCore(SpardleState s, CancellationToken ct = default)
     {
-        if (state is not SpardleState s) return Task.FromResult(Result.FromError("Invalid state"));
-
         var execResult = s.Execute(() =>
         {
             // SetJoinable(false) closes the join race before we read Players.Count;
@@ -75,6 +73,20 @@ public class SpardleEngine(
         if (execResult.TryGetSuccess(out var inner)) return Task.FromResult(inner);
         if (execResult.TryGetFailure(out var err)) return Task.FromResult(Result.FromError(err));
         return Task.FromResult(Result.FromCancellation());
+    }
+
+    /// <summary>
+    /// Hooks for the base <see cref="AbstractGameEngine{TState}.ReturnToLobby"/> (host-only,
+    /// terminal-phase-only). Resetting to <see cref="GamePhase.Lobby"/> and re-enabling joins
+    /// re-renders every player's page at the lobby — no navigation needed.
+    /// </summary>
+    protected override bool IsTerminalPhase(SpardleState state) => state.Phase == GamePhase.GameOver;
+
+    /// <inheritdoc />
+    protected override void ResetForLobby(SpardleState state)
+    {
+        state.ResetForLobby();
+        state.Phase = GamePhase.Lobby;
     }
 
     private void GenerateRoundQueue(SpardleState state)
@@ -163,29 +175,35 @@ public class SpardleEngine(
         }
     }
 
-    private IEnumerable<int> PickIndices(WordOrderMode mode, int total, int take)
+    // Only the deterministic generators (ReverseListIndices / AscendingIndices) are produced
+    // lazily — re-enumerating them is harmless, and staying lazy avoids allocating a `take`-sized
+    // array (up to the full dictionary size in FullDictionary mode) just to walk it once. The two
+    // RNG-driven modes are materialized: RandomNoRepeats shuffles a pool, and RandomWithRepeats
+    // draws into a buffer up front so repeated or partial enumeration can't desync the RNG stream
+    // (a lazy `yield return rng.GetRandomInt(...)` would advance the RNG on every enumeration).
+    private IEnumerable<int> PickIndices(WordOrderMode mode, int total, int take) => mode switch
     {
-        switch (mode)
-        {
-            case WordOrderMode.RandomNoRepeats:
-                return SampleUniqueIndices(total, take);
+        WordOrderMode.RandomNoRepeats => SampleUniqueIndices(total, take),
+        WordOrderMode.RandomWithRepeats => RandomWithRepeatIndices(total, take),
+        WordOrderMode.ReverseListOrder => ReverseListIndices(total, take),
+        _ => AscendingIndices(take),
+    };
 
-            case WordOrderMode.RandomWithRepeats:
-                var withRepeats = new int[take];
-                for (int i = 0; i < take; i++) withRepeats[i] = rng.GetRandomInt(total);
-                return withRepeats;
+    private int[] RandomWithRepeatIndices(int total, int take)
+    {
+        var indices = new int[take];
+        for (int i = 0; i < take; i++) indices[i] = rng.GetRandomInt(total);
+        return indices;
+    }
 
-            case WordOrderMode.ReverseListOrder:
-                var rev = new int[take];
-                for (int i = 0; i < take; i++) rev[i] = total - 1 - i;
-                return rev;
+    private static IEnumerable<int> ReverseListIndices(int total, int take)
+    {
+        for (int i = 0; i < take; i++) yield return total - 1 - i;
+    }
 
-            case WordOrderMode.ListOrder:
-            default:
-                var asc = new int[take];
-                for (int i = 0; i < take; i++) asc[i] = i;
-                return asc;
-        }
+    private static IEnumerable<int> AscendingIndices(int take)
+    {
+        for (int i = 0; i < take; i++) yield return i;
     }
 
     // Fisher–Yates when the sampling ratio is high (or the universe is small); rejection

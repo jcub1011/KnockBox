@@ -10,10 +10,24 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
+    <!--
+      Reference the word-service contracts assembly so Alpha Chain can inject
+      IWordListService at compile time (mirrors KnockBox.Spardle). The runtime
+      resolves the interface via the host's DI container; the implementation
+      lives in the sibling KnockBox.WordService library plugin, which the host
+      loads before any game plugin, so no host wiring is needed here.
+    -->
+    <ProjectReference Include="..\KnockBox.WordService.Contracts\KnockBox.WordService.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>KnockBox.AlphaChainTests</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
   <Import Project="..\Directory.Plugin.targets" />

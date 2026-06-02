@@ -101,4 +101,24 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     /// </summary>
     public bool TryGetPlayerState(string userId, out PlayerState state)
         => _playerStates.TryGetValue(userId, out state!);
+
+    /// <summary>
+    /// Clears all per-match data so the room can return to the joinable lobby. Caller
+    /// MUST be inside <c>Execute</c>/<c>ExecuteAsync</c>. <see cref="Settings"/> and
+    /// <see cref="CustomWordPool"/> are lobby config and intentionally preserved.
+    /// </summary>
+    internal void ResetForLobby()
+    {
+        _playerStates.Clear();
+        MatchParticipants = [];
+        CurrentRound = 0;
+        TargetWord = string.Empty;
+        RoundStartTime = null;
+        IsRoundActive = false;
+        IsGameOver = false;
+        PhaseExpiresAtUtc = null;
+        RoundHistory = RoundHistory.Clear();
+        LastCompletedAnswer = null;
+        RoundQueue = RoundQueue.Clear();
+    }
 }

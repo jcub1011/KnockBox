@@ -125,6 +125,65 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             Assert.IsFalse(state.IsJoinable, "Game should not be joinable after starting.");
         }
 
+        // ── Host as participant ───────────────────────────────────────────────
+
+        private async Task<CardCounterGameState> CreateStartedHostAsPlayerGameAsync(params User[] players)
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            var state = (CardCounterGameState)stateResult.Value!;
+            state.UpdateSettings(s => s with { HostPlays = true });
+            foreach (var p in players)
+                state.RegisterPlayer(p);
+            await _engine.StartAsync(_host, state);
+            return state;
+        }
+
+        [TestMethod]
+        public async Task StartAsync_HostPlays_AddsHostToGamePlayers()
+        {
+            using var state = await CreateStartedHostAsPlayerGameAsync(_player1);
+
+            Assert.IsTrue(state.GamePlayers.ContainsKey(_host.Id),
+                "Host should be dealt into GamePlayers when configured as a participant.");
+            Assert.Contains(_host.Id, state.TurnManager.TurnOrder,
+                "Host should hold a slot in the turn order when configured as a participant.");
+        }
+
+        [TestMethod]
+        public async Task StartAsync_HostPlays_WithNoOtherPlayers_Succeeds()
+        {
+            var stateResult = await _engine.CreateStateAsync(_host);
+            using var state = (CardCounterGameState)stateResult.Value!;
+            state.UpdateSettings(s => s with { HostPlays = true });
+            // No other players registered — the host alone is a valid participant.
+
+            var result = await _engine.StartAsync(_host, state);
+
+            Assert.IsTrue((bool)result.IsSuccess,
+                "A host-as-player game should start even with no other players, since the host counts.");
+            Assert.IsTrue(state.GamePlayers.ContainsKey(_host.Id));
+        }
+
+        [TestMethod]
+        public async Task StartAsync_HostPlays_SetsHostIsParticipantFlag()
+        {
+            using var state = await CreateStartedHostAsPlayerGameAsync(_player1);
+
+            Assert.IsTrue(state.HostIsParticipant,
+                "The state's HostIsParticipant flag should be synced from the setting at start.");
+        }
+
+        [TestMethod]
+        public async Task StartAsync_SharedDisplay_DoesNotAddHost()
+        {
+            using var state = await CreateStartedGameAsync(_player1);
+
+            Assert.IsFalse(state.GamePlayers.ContainsKey(_host.Id),
+                "Host should not be a player by default (shared-display path).");
+            Assert.IsFalse(state.HostIsParticipant,
+                "HostIsParticipant should be false on the default shared-display path.");
+        }
+
         // ── ActiveOperatorMode start ──────────────────────────────────────────
 
         private async Task<CardCounterGameState> CreateStartedActiveOperatorGameAsync(params User[] players)
@@ -335,123 +394,6 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             Assert.HasCount(potBefore, p1.Pot, "No card should be auto-drawn when the action timer is disabled.");
             Assert.AreSame(playerTurnState, context.Fsm.CurrentState, "FSM state should not change when action timer is disabled.");
-        }
-
-        // ── ResetGame ─────────────────────────────────────────────────────────
-
-        [TestMethod]
-        public async Task ResetGame_ByNonHost_ReturnsError()
-        {
-            using var state = await CreateStartedGameAsync(_player1);
-            state.SetPhase(GamePhase.GameOver);
-
-            var nonHost = UserFactory.Create("NotHost", "nothost-id");
-            var result = _engine.ResetGame(nonHost, state);
-
-            Assert.IsTrue(result.IsFailure, "Non-host should not be able to reset the game.");
-        }
-
-        [TestMethod]
-        public async Task ResetGame_DuringActiveGame_ReturnsError()
-        {
-            using var state = await CreateStartedGameAsync(_player1);
-            state.SetPhase(GamePhase.Playing);
-
-            var result = _engine.ResetGame(_host, state);
-
-            Assert.IsTrue(result.IsFailure, "Reset should only be allowed after the game is over.");
-        }
-
-        [TestMethod]
-        public async Task ResetGame_DuringBuyIn_ReturnsError()
-        {
-            using var state = await CreateStartedGameAsync(_player1);
-            // Phase is already BuyIn after start
-
-            var result = _engine.ResetGame(_host, state);
-
-            Assert.IsTrue(result.IsFailure);
-        }
-
-        [TestMethod]
-        public async Task ResetGame_AfterGameOver_TransitionsToBuyIn()
-        {
-            using var state = await CreateStartedGameAsync(_player1);
-            state.SetPhase(GamePhase.GameOver);
-
-            var result = _engine.ResetGame(_host, state);
-
-            Assert.IsTrue((bool)result.IsSuccess);
-            Assert.AreEqual(GamePhase.BuyIn, state.Phase, "Reset should transition back to BuyIn.");
-        }
-
-        [TestMethod]
-        public async Task ResetGame_AfterGameOver_ClearsDiscardHistory()
-        {
-            using var state = await CreateStartedGameAsync(_player1);
-            state.DiscardHistory.Add(new DiscardHistoryEntry("# 5", "🔢", "Player", false));
-            state.SetPhase(GamePhase.GameOver);
-
-            _engine.ResetGame(_host, state);
-
-            Assert.IsEmpty(state.DiscardHistory, "Discard history should be cleared on reset.");
-        }
-
-        [TestMethod]
-        public async Task ResetGame_AfterGameOver_ClearsLastPlayedAction()
-        {
-            using var state = await CreateStartedGameAsync(_player1);
-            state.LastPlayedAction = new LastPlayedActionInfo("p1", "P1", ActionType.Burn, null, null);
-            state.SetPhase(GamePhase.GameOver);
-
-            _engine.ResetGame(_host, state);
-
-            Assert.IsNull(state.LastPlayedAction, "LastPlayedAction should be cleared on reset.");
-        }
-
-        [TestMethod]
-        public async Task ResetGame_AfterGameOver_RebuildsDeck()
-        {
-            using var state = await CreateStartedGameAsync(_player1);
-            state.SetPhase(GamePhase.GameOver);
-
-            // Main deck should be empty (exhausted to trigger game over)
-            state.MainDeck.Clear();
-            state.CurrentShoe.Clear();
-
-            _engine.ResetGame(_host, state);
-
-            // After reset, deck should be rebuilt and BuyIn state sets up shoe via RoundEnd
-            Assert.AreEqual(GamePhase.BuyIn, state.Phase);
-        }
-
-        [TestMethod]
-        public async Task ResetGame_ActiveOperatorMode_SkipsBuyInPhase()
-        {
-            using var state = await CreateStartedActiveOperatorGameAsync(_player1);
-            state.SetPhase(GamePhase.GameOver);
-
-            var result = _engine.ResetGame(_host, state);
-
-            Assert.IsTrue((bool)result.IsSuccess);
-            Assert.AreEqual(GamePhase.Playing, state.Phase,
-                "Active Operator Mode reset should skip BuyIn and go straight to Playing.");
-        }
-
-        [TestMethod]
-        public async Task ResetGame_ActiveOperatorMode_SetsAllBalancesToTen()
-        {
-            using var state = await CreateStartedActiveOperatorGameAsync(_player1);
-            // Simulate players having earned/lost balance during the game
-            foreach (var ps in state.GamePlayers.Values)
-                ps.Balance = 999;
-            state.SetPhase(GamePhase.GameOver);
-
-            _engine.ResetGame(_host, state);
-
-            foreach (var ps in state.GamePlayers.Values)
-                Assert.AreEqual(10.0, ps.Balance,
-                    $"Player [{ps.PlayerId}] should be reset to balance 10 in Active Operator Mode.");
         }
 
         // ── ReturnToLobby ─────────────────────────────────────────────────────

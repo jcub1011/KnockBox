@@ -1,0 +1,182 @@
+.ac-settings {
+    margin-top: 1rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+    border-radius: 0.85rem;
+    background: rgba(255, 255, 255, 0.02);
+    text-align: left;
+}
+
+.ac-settings-title {
+    margin: 0 0 0.85rem;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.85rem 1rem;
+}
+
+.ac-settings-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    border: none;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+
+.ac-settings-field > span,
+.ac-settings-field > legend {
+    font-weight: 700;
+    color: var(--ac-ink, #eaf2ff);
+    padding: 0;
+}
+
+.ac-settings-field > span strong {
+    color: var(--ac-cyan, #00e5ff);
+    font-variant-numeric: tabular-nums;
+}
+
+.ac-settings-field-full {
+    grid-column: 1 / -1;
+}
+
+.ac-settings-field-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ac-settings-field input[type="number"] {
+    width: 100%;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    border-radius: 0.45rem;
+    background: var(--ac-bg-1, #0c1020);
+    color: var(--ac-ink, #eaf2ff);
+    font: inherit;
+    font-family: var(--font-mono, monospace);
+}
+
+.ac-settings-field input[type="number"]:focus {
+    outline: none;
+    border-color: var(--ac-cyan, #00e5ff);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ac-cyan) 30%, transparent);
+}
+
+.ac-settings-field input[type="range"] {
+    width: 100%;
+    padding: 0;
+    accent-color: var(--ac-cyan, #00e5ff);
+}
+
+.ac-settings-field-row input[type="checkbox"] {
+    width: 1.2rem;
+    height: 1.2rem;
+    accent-color: var(--ac-cyan, #00e5ff);
+}
+
+.ac-settings-radios {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 0.35rem;
+}
+
+.ac-settings-radio {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.45rem;
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+    background: rgba(255, 255, 255, 0.03);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.ac-settings-radio input { accent-color: var(--ac-cyan, #00e5ff); }
+
+.ac-settings-radio:has(input:checked) {
+    border-color: var(--ac-cyan, #00e5ff);
+    background: color-mix(in srgb, var(--ac-cyan) 14%, transparent);
+    color: var(--ac-cyan, #00e5ff);
+}
+
+.ac-settings-errors {
+    margin: 0.85rem 0 0;
+    padding: 0.5rem 0.75rem 0.5rem 1.6rem;
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--ac-danger) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ac-danger) 40%, transparent);
+    color: var(--ac-danger, #ff3b5c);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.ac-settings-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.85rem;
+}
+
+.ac-settings-reset {
+    padding: 0.4rem 0.9rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    font: inherit;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.ac-settings-reset:hover {
+    border-color: var(--ac-cyan, #00e5ff);
+    color: var(--ac-cyan, #00e5ff);
+    background: color-mix(in srgb, var(--ac-cyan) 12%, transparent);
+}
+
+/* ── Non-host read-only view ─────────────────────────────────────────── */
+.ac-settings-readout {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.6rem 1rem;
+    margin: 0;
+}
+
+.ac-settings-readout > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+}
+
+.ac-settings-readout dt {
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+}
+
+.ac-settings-readout dd {
+    margin: 0;
+    font-family: var(--font-mono, monospace);
+    font-weight: 800;
+    color: var(--ac-cyan, #00e5ff);
+}

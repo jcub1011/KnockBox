@@ -1,0 +1,47 @@
+/*
+ * Shared Alpha Chain card tokens + the button reset that wraps cards.
+ *
+ * Loaded globally (linked from the lobby page's <HeadContent>) so the category accent
+ * variables and the interactive-wrapper reset are available wherever cards render. The
+ * card visual itself now lives in GameCard.razor(.css); this file only owns the shared
+ * colour tokens and the .ac-cardbtn reset used by the Engine Bay / Reaction Hand /
+ * Optimization wrappers so a <button> around a GameCard adds no chrome of its own.
+ */
+
+:root {
+    --ac-additive: #14f195;
+    --ac-multiplicative: #ffb020;
+    --ac-tax: #ff3b5c;
+    /* Reaction accents, by role. */
+    --ac-teal: #41e0c8;   /* defensive */
+    --ac-rose: #ff5d73;   /* offensive */
+    --ac-violet: #b97bff; /* special   */
+    --ac-amber: #ffce5c;  /* negate/reflect */
+}
+
+/* Layout-only wrapper for an interactive card: strips native button chrome so the
+   GameCard inside is the only thing seen. State (drag/selected/dim) is passed to the
+   GameCard as parameters rather than styled here. */
+.ac-cardbtn {
+    display: inline-block;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+    cursor: pointer;
+}
+
+.ac-cardbtn:disabled {
+    cursor: default;
+}
+
+.ac-cardbtn[draggable="true"] {
+    cursor: grab;
+}
+
+.ac-cardbtn[draggable="true"]:active {
+    cursor: grabbing;
+}

@@ -52,10 +52,10 @@ namespace KnockBox.LinkedList.Pages
         /// <summary>True when the primary scoring metric is time (so guesses break ties).</summary>
         protected bool PrimaryIsTime => GameState.Settings.ScoringMode == ScoringMode.FastestTime;
 
-        /// <summary>Host-only: starts a brand-new match with the same players. Clears the
-        /// round words so a fresh curated pair is drawn, then re-runs the engine start
-        /// logic (which resets accumulators, the chain, scoring, and round counter).</summary>
-        protected async Task PlayAgain()
+        /// <summary>Host-only: returns the match to the lobby so players can join/leave
+        /// and settings can change before the next game. The engine clears all per-match
+        /// state and flips back to joinable, which re-renders every player at the lobby.</summary>
+        protected async Task ReturnToLobby()
         {
             if (_starting || UserService.CurrentUser is null) return;
             if (GameState.Host.Id != UserService.CurrentUser.Id) return;
@@ -63,16 +63,10 @@ namespace KnockBox.LinkedList.Pages
             _starting = true;
             try
             {
-                GameState.Execute(() =>
-                {
-                    GameState.StartWord = "";
-                    GameState.DestinationWord = "";
-                });
-
-                var result = await GameEngine.StartAsync(UserService.CurrentUser, GameState);
+                var result = GameEngine.ReturnToLobby(UserService.CurrentUser, GameState);
                 if (result.TryGetFailure(out var error))
                 {
-                    Logger.LogError("Failed to start a new Linked List match: {Error}", error.InternalMessage);
+                    Logger.LogError("Failed to return Linked List to the lobby: {Error}", error.InternalMessage);
                     await OnError.InvokeAsync(error.PublicMessage);
                 }
             }

@@ -27,6 +27,13 @@
          MSBuild property shortcut for this one, so we set it via the generic
          RuntimeHostConfigurationOption item. -->
     <RuntimeHostConfigurationOption Include="System.GC.HeapHardLimitPercent" Value="75" />
+    <!-- Trade a little CPU for a smaller committed footprint: ConserveMemory (0-9)
+         makes the GC compact more often and decommit free segments back to the OS
+         more aggressively, which suits a memory-constrained box already on
+         Workstation GC. 5 is a moderate starting point; tune against measured RSS
+         vs CPU (see the memory-measurement step in the polish plan) or set 0 to
+         disable. -->
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="5" />
   </ItemGroup>
 
   <!--

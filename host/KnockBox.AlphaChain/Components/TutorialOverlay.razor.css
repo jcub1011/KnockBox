@@ -1,0 +1,386 @@
+/* Tutorial overlay — a centered neon card with a staged, CSS-only scripted demo. Used both
+   full-screen (Tutorial phase) and inside the Intermission (Tax sub-phase). All reveal animations
+   keep their RESTING state visible so the global prefers-reduced-motion guard (which strips
+   ac-* animations) leaves the content fully readable. */
+
+/* Fixed, centered modal layer. Fixed positioning (identical in the normal and exiting states)
+   keeps the slide-out seamless — the exiting instance mounts in exactly the same spot the card
+   occupied, so it slides away rather than jumping. The dim/blur backdrop focuses attention and
+   lets the next phase be revealed cleanly as the overlay fades out. */
+.ac-tut {
+    position: fixed;
+    inset: 0;
+    z-index: 70; /* above ReactionOverlay (60) */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    background: rgba(6, 8, 15, 0.82);
+    backdrop-filter: blur(3px);
+    animation: ac-tut-backdrop-in 0.28s ease-out both;
+}
+
+/* ── Exit: slide the card away while the backdrop fades, revealing the next phase underneath ── */
+.ac-tut-exiting {
+    pointer-events: none; /* the revealed phase is immediately interactive + the word box focusable */
+    animation: ac-tut-backdrop-out 0.45s ease-in forwards;
+}
+
+.ac-tut-exiting .ac-tut-card {
+    /* Override the ac-pop entrance so the freshly-mounted exiting instance slides out, not in. */
+    animation: ac-tut-slide-out 0.45s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Freeze the staged demo content so it doesn't replay its entrance while the card slides away. */
+.ac-tut-exiting .ac-tut-reveal,
+.ac-tut-exiting .ac-tut-taxed {
+    animation: none;
+}
+
+@keyframes ac-tut-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes ac-tut-backdrop-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes ac-tut-slide-out {
+    from { transform: translateY(0); }
+    to { transform: translateY(-115%); }
+}
+
+.ac-tut-card {
+    width: min(680px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.6rem 1.6rem 1.2rem;
+    border-radius: 1rem;
+    background: var(--ac-panel, rgba(18, 24, 44, 0.72));
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    box-shadow: var(--ac-shadow-lift, 7px 7px 0 #000), var(--ac-glow-cyan, 0 0 18px rgba(0, 229, 255, 0.45));
+    backdrop-filter: blur(6px);
+    animation: ac-pop 0.4s ease-out both;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.ac-tut-head { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.ac-tut-eyebrow {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--ac-cyan, #00e5ff);
+}
+
+.ac-tut-title {
+    margin: 0;
+    font-family: var(--font-display, system-ui);
+    font-size: 1.7rem;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-tut-sub {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+/* ── Stage ──────────────────────────────────────────────────────────────── */
+.ac-tut-stage {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+    padding: 1.2rem 0.5rem;
+    border-radius: 0.75rem;
+    background: rgba(0, 0, 0, 0.28);
+    min-height: 9rem;
+    justify-content: center;
+}
+
+/* Staged reveal: resting state is VISIBLE; the keyframe plays in from hidden during the delay,
+   so reduced-motion users (animation stripped) still see everything. */
+.ac-tut-reveal {
+    animation: ac-tut-in 0.5s ease-out both;
+    animation-delay: calc(var(--ac-step, 0.55s) * var(--i, 0));
+}
+
+@keyframes ac-tut-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.96); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ── Shiritori chain ────────────────────────────────────────────────────── */
+.ac-tut-chain {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.ac-tut-chip {
+    display: inline-flex;
+    padding: 0.35rem 0.5rem;
+    border-radius: 0.4rem;
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 0 0 1px var(--ac-border, rgba(255, 255, 255, 0.08));
+}
+
+.ac-tut-ltr {
+    font-family: var(--font-display, system-ui);
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-tut-link {
+    color: var(--ac-cyan, #00e5ff);
+    text-shadow: var(--ac-glow-cyan, 0 0 18px rgba(0, 229, 255, 0.45));
+}
+
+.ac-tut-arrow {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+}
+
+/* ── Engine / Tax pipeline ──────────────────────────────────────────────── */
+.ac-tut-pipe {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+}
+
+.ac-tut-step {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    min-width: 4.2rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: 0.45rem;
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 0 0 1px var(--ac-border, rgba(255, 255, 255, 0.08));
+}
+
+.ac-tut-step-word {
+    font-family: var(--font-display, system-ui);
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-tut-step-name {
+    font-family: var(--font-display, system-ui);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-tut-step-run {
+    font-family: var(--font-mono, monospace);
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-tut-step-op {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+}
+
+.ac-tut-op-sign {
+    font-family: var(--font-mono, monospace);
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+}
+
+.ac-tut-seed .ac-tut-step-run { color: var(--ac-cyan, #00e5ff); }
+.ac-tut-add { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-additive, #14f195) 45%, transparent); }
+.ac-tut-add .ac-tut-step-run, .ac-tut-add .ac-tut-step-name { color: var(--ac-additive, #14f195); }
+.ac-tut-mul { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-multiplicative, #ffb020) 45%, transparent); }
+.ac-tut-mul .ac-tut-step-run, .ac-tut-mul .ac-tut-step-name { color: var(--ac-multiplicative, #ffb020); }
+
+.ac-tut-taxed {
+    background: color-mix(in srgb, var(--ac-tax, #ff3b5c) 22%, transparent);
+    animation: ac-flash 0.4s ease-out both;
+    animation-delay: calc(var(--ac-step, 0.55s) * var(--i, 0));
+}
+
+.ac-tut-taxed .ac-tut-step-run, .ac-tut-taxed .ac-tut-step-name { color: var(--ac-tax, #ff3b5c); }
+
+.ac-tut-formula {
+    margin: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.78rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    text-align: center;
+}
+
+/* ── Reaction chips (Engine) ────────────────────────────────────────────── */
+.ac-tut-rx-row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+
+.ac-tut-rx {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.55rem;
+    border-radius: 0.4rem;
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-violet, #b97bff) 40%, transparent);
+}
+
+.ac-tut-rx-name {
+    font-family: var(--font-display, system-ui);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ac-violet, #b97bff);
+}
+
+.ac-tut-rx-reason { font-size: 0.72rem; color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62)); }
+
+/* ── Banned badge + steal (Tax) ─────────────────────────────────────────── */
+.ac-tut-banned {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ac-tut-banned-label {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--ac-danger, #ff3b5c);
+}
+
+.ac-tut-banned-letter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 0.4rem;
+    font-family: var(--font-display, system-ui);
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: var(--ac-danger, #ff3b5c);
+    background: color-mix(in srgb, var(--ac-danger, #ff3b5c) 18%, transparent);
+    box-shadow: inset 0 0 0 1px var(--ac-danger, #ff3b5c), var(--ac-glow-danger, 0 0 18px rgba(255, 59, 92, 0.5));
+}
+
+.ac-tut-steal {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.4rem;
+    background: color-mix(in srgb, var(--ac-tax, #ff3b5c) 14%, transparent);
+}
+
+.ac-tut-steal-label {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ac-tax, #ff3b5c);
+}
+
+.ac-tut-steal-amt {
+    font-family: var(--font-mono, monospace);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--ac-additive, #14f195);
+}
+
+.ac-tut-steal-arrow { color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38)); }
+.ac-tut-steal-who { font-size: 0.78rem; font-weight: 700; color: var(--ac-ink, #eaf2ff); }
+
+.ac-tut-note {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    text-align: center;
+}
+
+.ac-tut-note strong, .ac-tut-formula strong { color: var(--ac-ink, #eaf2ff); }
+
+/* ── Footer: progress bar + Skip ────────────────────────────────────────── */
+.ac-tut-foot {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+}
+
+.ac-tut-progress {
+    flex: 1;
+    height: 0.35rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.ac-tut-progress-fill {
+    display: block;
+    height: 100%;
+    width: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--ac-cyan, #00e5ff), var(--ac-violet, #b97bff));
+    animation: ac-tut-fill var(--ac-tut-dwell, 12s) linear both;
+}
+
+@keyframes ac-tut-fill {
+    from { width: 0; }
+    to { width: 100%; }
+}
+
+.ac-tut-skip {
+    flex-shrink: 0;
+    padding: 0.5rem 1.1rem;
+    border: none;
+    border-radius: 0.5rem;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ac-bg-0, #06080f);
+    background: var(--ac-cyan, #00e5ff);
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+    cursor: pointer;
+}
+
+.ac-tut-skip:hover { filter: brightness(1.1); }
+.ac-tut-skip:active { transform: translate(2px, 2px); box-shadow: none; }
+
+.ac-tut-wait {
+    flex-shrink: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.72rem;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+}

@@ -134,4 +134,47 @@ public sealed class IEnumerableExtensionsTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new[] { "A" }.GetRandomWeightedItem(_ => -1, _rngMock.Object));
     }
+
+    // ── AsReadOnlyList ────────────────────────────────────────────────────────
+
+    [TestMethod]
+    public void AsReadOnlyList_AlreadyList_ReturnsSameInstance()
+    {
+        var list = new List<int> { 1, 2, 3 };
+
+        var result = list.AsReadOnlyList();
+
+        // Fast path: no defensive copy when the source is already an IReadOnlyList.
+        Assert.AreSame(list, result);
+    }
+
+    [TestMethod]
+    public void AsReadOnlyList_Array_ReturnsSameInstance()
+    {
+        var array = new[] { "a", "b" };
+
+        var result = array.AsReadOnlyList();
+
+        // Arrays implement IReadOnlyList<T>, so they are returned as-is.
+        Assert.AreSame(array, result);
+    }
+
+    [TestMethod]
+    public void AsReadOnlyList_DeferredSequence_MaterializesWithEqualContents()
+    {
+        IEnumerable<int> deferred = Enumerable.Range(1, 5).Where(i => i % 2 == 1);
+
+        var result = deferred.AsReadOnlyList();
+
+        Assert.AreNotSame(deferred, result);
+        CollectionAssert.AreEqual(new[] { 1, 3, 5 }, result.ToArray());
+    }
+
+    [TestMethod]
+    public void AsReadOnlyList_Null_Throws()
+    {
+        IEnumerable<int> source = null!;
+
+        Assert.Throws<ArgumentNullException>(() => source.AsReadOnlyList());
+    }
 }

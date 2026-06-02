@@ -39,19 +39,24 @@ Wire up the 4-round Era loop. After every `Config.EraInterval` rounds, the game 
 ### FSM behavior
 
 - `Services/Logic/Games/FSM/States/RoundState`:
-  - After advancing turn order, if `CurrentRound % Config.EraInterval == 0` (i.e., the era just completed), transition to `IntermissionState` **instead of** continuing to the next round (unless `CurrentEra == Config.EraCount`, in which case transition straight to `GameOverState`).
+  - At the turn-order wrap point, apply the **canonical Era/round rule** defined in M1 (`01-foundation.md`):
+    using `completedRound` (the pre-increment `CurrentRound`) and `LastScheduledRound = EraInterval × EraCount`,
+    transition to `GameOverState` if `completedRound == LastScheduledRound`; else transition to
+    `IntermissionState` if `completedRound % Config.EraInterval == 0`; otherwise increment `CurrentRound`
+    and continue. This replaces the M1 round-only end check with the same overall bound plus Intermission
+    insertion — do not introduce a second, differently-worded condition.
 - `Services/Logic/Games/FSM/States/IntermissionState`:
-  - `EnterAsync`:
-    - Set `Phase = Intermission`, `IntermissionPhase = Deal`, `SubPhaseEndTime = now + 3s` (deal animation buffer).
-    - Use injected `IRandomNumberService` to deal each non-eliminated player N modifiers + M actions. Weighted draws from `ModifierLibrary` and `ActionLibrary`. Config-driven counts: `Config.ModifiersDealtPerEra` (default 3), `Config.ActionsDealtPerEra` (default 2).
+  - `OnEnter`:
+    - Set `Phase = Intermission` (via `SetPhase`), `IntermissionPhase = Deal`, `SubPhaseEndTime = now + 3s` (deal animation buffer).
+    - Use injected `IRandomNumberService` to deal each non-eliminated player N modifiers + M actions. Weighted draws from `ModifierLibrary` and `ActionLibrary`. Counts come from the existing `AlphaChainSettings` fields `ModifiersDealtPerEra` (default 3) and `ActionsDealtPerEra` (default 2), defined in M1 — no new config is introduced here.
     - Append drawn modifiers to each player's `EngineBay` (append-to-right; player resequences in Optimization).
     - Append drawn actions to each player's `ActionHand`.
-  - `TickAsync` drives the sub-phase progression deterministically:
+  - `Tick` drives the sub-phase progression deterministically:
     - **Deal → Expansion** when `now >= SubPhaseEndTime`. Expansion: `player.ModifierSlots += 1` for all active players. Then move to **Optimization** with `SubPhaseEndTime = now + Config.IntermissionCardSelectSeconds`. Initialize `OptimizationSubmissions` with `Submitted = false` and current bay order.
     - **Optimization → SniperBan** when either `now >= SubPhaseEndTime` OR `OptimizationSubmissions.Values.All(s => s.Submitted)`. For non-submitters: keep their current order (capped to `ModifierSlots`; excess discarded oldest-first or chosen by deterministic rule — document the call). Apply all submissions to the live bays. Then resolve `SniperBanUserId` = lowest-score active player (ties: earliest in `TurnManager.TurnOrder`). `SubPhaseEndTime = now + Config.SniperBanSeconds`.
     - **SniperBan → Complete** when either the eligible player issues `SelectSniperBanCommand` or `now >= SubPhaseEndTime`. On timeout, pick a random letter from the legal pool. Validate the chosen letter is legal under `Config.BanMode`; reject if not, no consumption of the timer; if rejected at timeout, fall back to random.
-    - **Complete:** set `BannedLetter`, increment `CurrentEra`. If `CurrentEra > Config.EraCount`, transition to `GameOverState`. Otherwise back to `RoundState` with `RequiredStartLetter = null`, `PhaseEndTime` reset.
-  - `HandleCommandAsync`:
+    - **Complete:** set `BannedLetter`, increment `CurrentEra`, then go back to `RoundState` with `RequiredStartLetter = null` and `PhaseEndTime` reset. (Per the canonical rule, `RoundState` ends the game on the final scheduled round, so an Intermission never runs after the last era; the `CurrentEra > Config.EraCount` → `GameOverState` check here is a defensive backstop only.)
+  - `HandleCommand`:
     - `SubmitOptimizationCommand`: validate length ≤ `player.ModifierSlots`; all ids present in either current bay or just-dealt set; record submission. Do **not** mutate the live `EngineBay` yet (apply only when the sub-phase ends, so changes don't leak to opponents in case of UI snapshotting).
     - `SelectSniperBanCommand`: validate actor == `SniperBanUserId`, letter in the legal pool. Set `BannedLetter`, advance sub-phase to Complete.
 - `Services/Logic/Games/FSM/States/GameOverState`:
@@ -89,7 +94,7 @@ Wire up the 4-round Era loop. After every `Config.EraInterval` rounds, the game 
     - Tie-break: earliest turn-order index.
     - Timeout → random legal letter.
     - Illegal letter under `BanMode` rejected.
-  - **Era progression:** after `EraCount` intermissions, the next round triggers `GameOverState`.
+  - **Era progression:** exactly `EraCount − 1` Intermissions run (none after the final era); the game reaches `GameOverState` when the last scheduled round (`EraInterval × EraCount`) completes.
 - `Unit/Logic/Games/AlphaChain/States/GameOverStateTests.cs`:
   - Rankings ordered by score desc.
   - Survival winner is the last survivor.
@@ -106,8 +111,8 @@ Wire up the 4-round Era loop. After every `Config.EraInterval` rounds, the game 
 
 1. Add the new enums and records (`IntermissionSubPhase`, `OptimizationSubmission`, `GameResults`).
 2. Extend `AlphaChainGameState` with intermission fields.
-3. Implement `IntermissionState.EnterAsync` (Deal) and unit-test the deal counts.
-4. Implement the sub-phase progression in `TickAsync` (Expansion → Optimization → SniperBan → Complete).
+3. Implement `IntermissionState.OnEnter` (Deal) and unit-test the deal counts.
+4. Implement the sub-phase progression in `Tick` (Expansion → Optimization → SniperBan → Complete).
 5. Implement the two new commands and their validation.
 6. Update `RoundState` to transition into `IntermissionState` on era boundaries.
 7. Build the Intermission UI components and wire them into `AlphaChainGame.razor`.

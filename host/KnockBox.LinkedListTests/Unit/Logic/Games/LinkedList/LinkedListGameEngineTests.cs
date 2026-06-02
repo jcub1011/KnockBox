@@ -131,11 +131,40 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             Assert.IsTrue(state.IsJoinable);
         }
 
+        [TestMethod]
+        public async Task StartAsync_WithHostPlaying_SeatsHostAsParticipant()
+        {
+            var state = await CreateWithPlayersAsync(3);
+            state.UpdateSettings(s => s with { HostPlays = true });
+
+            var startResult = await _engine.StartAsync(_host, state);
+
+            Assert.IsTrue(startResult.IsSuccess);
+            // 3 registered players + the host.
+            Assert.AreEqual(4, state.GamePlayers.Count);
+            Assert.AreEqual(4, state.TurnManager.TurnOrder.Count);
+            CollectionAssert.Contains(state.ParticipantOrder, _host.Id);
+            Assert.IsTrue(state.GamePlayers.ContainsKey(_host.Id));
+        }
+
+        [TestMethod]
+        public async Task StartAsync_WithHostNotPlaying_OmitsHostFromParticipants()
+        {
+            var state = await CreateWithPlayersAsync(3);
+
+            var startResult = await _engine.StartAsync(_host, state);
+
+            Assert.IsTrue(startResult.IsSuccess);
+            Assert.AreEqual(3, state.GamePlayers.Count);
+            CollectionAssert.DoesNotContain(state.ParticipantOrder, _host.Id);
+            Assert.IsFalse(state.GamePlayers.ContainsKey(_host.Id));
+        }
+
         // ── Core gameplay loop (Milestone 2) ─────────────────────────────────
 
         /// <summary>
         /// Starts a 3-player game with fixed start/destination words so tests can
-        /// drive the loop deterministically. With HostPlaysGame off the turn order
+        /// drive the loop deterministically. With HostPlays off the turn order
         /// is [p0, p1, p2], the first submitter is p0, and the auto-assigned
         /// Auditor is p1 (first id that isn't the submitter).
         /// </summary>
@@ -937,6 +966,50 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             Assert.AreEqual(2, teams[1].Count); // b, d
             CollectionAssert.AreEqual(new[] { "a", "c", "e" }, teams[0]);
             CollectionAssert.AreEqual(new[] { "b", "d" }, teams[1]);
+        }
+
+        // ── ReturnToLobby ─────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task ReturnToLobby_NonHost_ReturnsError()
+        {
+            var state = await CreateWithPlayersAsync(3);
+            await _engine.StartAsync(_host, state);
+            state.SetPhase(LinkedListGamePhase.GameOver);
+            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+
+            var result = _engine.ReturnToLobby(nonHost, state);
+
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_BeforeGameOver_ReturnsError()
+        {
+            var state = await CreateWithPlayersAsync(3);
+            await _engine.StartAsync(_host, state);
+            // Phase is Playing, not GameOver — the replay path is rejected.
+
+            var result = _engine.ReturnToLobby(_host, state);
+
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_AfterGameOver_ReturnsToJoinableSetup()
+        {
+            var state = await CreateWithPlayersAsync(3);
+            await _engine.StartAsync(_host, state);
+            state.SetPhase(LinkedListGamePhase.GameOver);
+
+            var result = _engine.ReturnToLobby(_host, state);
+
+            Assert.IsTrue((bool)result.IsSuccess);
+            Assert.AreEqual(LinkedListGamePhase.Setup, state.Phase);
+            Assert.IsTrue(state.IsJoinable);
+            Assert.IsEmpty(state.GamePlayers);
+            Assert.IsEmpty(state.Groups);
+            Assert.AreEqual(0, state.RoundNumber);
         }
     }
 }

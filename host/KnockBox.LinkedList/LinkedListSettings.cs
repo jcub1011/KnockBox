@@ -27,7 +27,7 @@ public sealed record LinkedListSettings
     /// i.e. closing a loop. Off by default; loops are allowed and merely flagged.</summary>
     public bool NoImmediateRepeat { get; init; } = false;
 
-    public bool HostPlaysGame { get; init; } = false;
+    public bool HostPlays { get; init; } = false;
 
     /// <summary>Collective co-op target the host sets by hand (§8.1). Null = no par.</summary>
     public int? Par { get; init; } = null;

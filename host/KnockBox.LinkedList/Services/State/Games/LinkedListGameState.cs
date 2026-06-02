@@ -202,7 +202,7 @@ namespace KnockBox.LinkedList.Services.State.Games
 
         /// <summary>
         /// Atomically replaces <see cref="Settings"/> with <paramref name="mutate"/>'s
-        /// result and reflects the new <c>HostPlaysGame</c> value into
+        /// result and reflects the new <c>HostPlays</c> value into
         /// <see cref="AbstractGameState.HostIsParticipant"/> in the same critical
         /// section, so subscribers observe a single consistent transition.
         /// </summary>
@@ -210,7 +210,7 @@ namespace KnockBox.LinkedList.Services.State.Games
             Execute(() =>
             {
                 Settings = mutate(Settings);
-                SetHostIsParticipant(Settings.HostPlaysGame);
+                SetHostIsParticipant(Settings.HostPlays);
             });
     }
 

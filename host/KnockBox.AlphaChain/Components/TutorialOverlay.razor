@@ -1,0 +1,166 @@
+@using System.Globalization
+@using KnockBox.AlphaChain.Services.Logic.Games.Data
+@using KnockBox.AlphaChain.Services.Logic.Games.FSM.States
+
+@* A non-interactive scripted tutorial screen. The animation is purely CSS (identical on every
+   circuit), staggered off --ac-step like ScoreReplayStrip. The server FSM owns the dwell + the
+   auto-advance; this component only renders the demo and the host's Skip control. *@
+
+<div class="ac-tut ac-tut-@KindClass @(Exiting ? "ac-tut-exiting" : "")" style="--ac-step:0.55s; --ac-tut-dwell:@DwellCss">
+    <div class="ac-tut-card">
+        <header class="ac-tut-head">
+            <span class="ac-tut-eyebrow">How it works</span>
+            <h2 class="ac-tut-title">@Title</h2>
+            <p class="ac-tut-sub">@Subtitle</p>
+        </header>
+
+        <div class="ac-tut-stage">
+            @switch (Kind)
+            {
+                case TutorialKind.Shiritori:
+                    <div class="ac-tut-chain">
+                        @{ var chain = new[] { "CAT", "TIGER", "RAT", "TUSK", "KEY" }; }
+                        @for (int i = 0; i < chain.Length; i++)
+                        {
+                            var word = chain[i];
+                            <span class="ac-tut-chip ac-tut-reveal" style="--i:@i">
+                                @for (int c = 0; c < word.Length; c++)
+                                {
+                                    <span class="ac-tut-ltr @(c == word.Length - 1 ? "ac-tut-link" : "")">@word[c]</span>
+                                }
+                            </span>
+                            @if (i < chain.Length - 1)
+                            {
+                                <span class="ac-tut-arrow ac-tut-reveal" style="--i:@(i)">→</span>
+                            }
+                        }
+                    </div>
+                    <p class="ac-tut-note ac-tut-reveal" style="--i:6">
+                        Type a word and press <strong>GO</strong> before the shot clock runs out.
+                    </p>
+                    break;
+
+                case TutorialKind.Engine:
+                    <div class="ac-tut-pipe">
+                        <span class="ac-tut-step ac-tut-seed ac-tut-reveal" style="--i:0">
+                            <span class="ac-tut-step-word">STONE</span>
+                            <span class="ac-tut-step-run">5</span>
+                            <span class="ac-tut-step-op">length</span>
+                        </span>
+                        <span class="ac-tut-op-sign ac-tut-reveal" style="--i:1">+</span>
+                        <span class="ac-tut-step ac-tut-add ac-tut-reveal" style="--i:1">
+                            <span class="ac-tut-step-name">Anchor</span>
+                            <span class="ac-tut-step-run">8</span>
+                            <span class="ac-tut-step-op">+3 additive</span>
+                        </span>
+                        <span class="ac-tut-op-sign ac-tut-reveal" style="--i:2">×</span>
+                        <span class="ac-tut-step ac-tut-mul ac-tut-reveal" style="--i:2">
+                            <span class="ac-tut-step-name">Vowel Surge</span>
+                            <span class="ac-tut-step-run">16</span>
+                            <span class="ac-tut-step-op">×2 multiplier</span>
+                        </span>
+                    </div>
+                    <p class="ac-tut-formula ac-tut-reveal" style="--i:3">
+                        Score is a left-to-right walk of your bay (Length → +additives → ×multipliers). Place additives before multipliers to multiply a bigger base.
+                    </p>
+                    <div class="ac-tut-rx-row">
+                        <span class="ac-tut-rx ac-tut-reveal" style="--i:4">
+                            <span class="ac-tut-rx-name">The Titanium Mirror</span>
+                            <span class="ac-tut-rx-reason">auto-reflects an incoming attack</span>
+                        </span>
+                        <span class="ac-tut-rx ac-tut-reveal" style="--i:5">
+                            <span class="ac-tut-rx-name">Flak Cannon</span>
+                            <span class="ac-tut-rx-reason">auto-shaves the leaders' clocks</span>
+                        </span>
+                    </div>
+                    break;
+
+                case TutorialKind.Tax:
+                    <div class="ac-tut-banned ac-tut-reveal" style="--i:0">
+                        <span class="ac-tut-banned-label">Banned</span>
+                        <span class="ac-tut-banned-letter">E</span>
+                    </div>
+                    <div class="ac-tut-pipe">
+                        <span class="ac-tut-step ac-tut-seed ac-tut-reveal" style="--i:1">
+                            <span class="ac-tut-step-word">STON<span class="ac-tut-link">E</span></span>
+                            <span class="ac-tut-step-run">16</span>
+                            <span class="ac-tut-step-op">would score</span>
+                        </span>
+                        <span class="ac-tut-op-sign ac-tut-reveal" style="--i:2">→</span>
+                        <span class="ac-tut-step ac-tut-taxed ac-tut-reveal" style="--i:2">
+                            <span class="ac-tut-step-name">Tax</span>
+                            <span class="ac-tut-step-run">0</span>
+                            <span class="ac-tut-step-op">contains E</span>
+                        </span>
+                    </div>
+                    <div class="ac-tut-steal ac-tut-reveal" style="--i:3">
+                        <span class="ac-tut-steal-label">Tax Collector</span>
+                        <span class="ac-tut-steal-amt">+8</span>
+                        <span class="ac-tut-steal-arrow">→</span>
+                        <span class="ac-tut-steal-who">an opponent</span>
+                    </div>
+                    <p class="ac-tut-note ac-tut-reveal" style="--i:4">
+                        The chain keeps going — but a banned-letter word scores <strong>0</strong>.
+                    </p>
+                    break;
+            }
+        </div>
+
+        @if (!Exiting)
+        {
+            <footer class="ac-tut-foot">
+                <div class="ac-tut-progress"><span class="ac-tut-progress-fill"></span></div>
+                @if (IsHost)
+                {
+                    <button class="ac-tut-skip" @onclick="OnSkip">Skip ›</button>
+                }
+                else
+                {
+                    <span class="ac-tut-wait">Tutorial playing… the host can skip ahead</span>
+                }
+            </footer>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TutorialKind Kind { get; set; }
+
+    /// <summary>True for the room host, who gets the Skip control.</summary>
+    [Parameter] public bool IsHost { get; set; }
+
+    /// <summary>Invoked when the host clicks Skip.</summary>
+    [Parameter] public EventCallback OnSkip { get; set; }
+
+    /// <summary>When true, the overlay is animating out (sliding away to reveal the next phase).
+    /// The footer/controls are hidden and the card plays its slide-out instead of the entrance.</summary>
+    [Parameter] public bool Exiting { get; set; }
+
+    private string KindClass => Kind switch
+    {
+        TutorialKind.Shiritori => "shiritori",
+        TutorialKind.Engine => "engine",
+        TutorialKind.Tax => "tax",
+        _ => "shiritori"
+    };
+
+    private string Title => Kind switch
+    {
+        TutorialKind.Shiritori => "Build the chain",
+        TutorialKind.Engine => "Your scoring engine",
+        TutorialKind.Tax => "Banned letters & the tax",
+        _ => ""
+    };
+
+    private string Subtitle => Kind switch
+    {
+        TutorialKind.Shiritori => "Each word must start with the previous word's last letter.",
+        TutorialKind.Engine => "Modifier cards run left-to-right to build your score; reaction cards auto-fire on events.",
+        TutorialKind.Tax => "A word containing the banned letter still chains, but scores zero — and can feed opponents' Tax Collectors.",
+        _ => ""
+    };
+
+    // The progress bar fills over the same dwell the FSM uses to auto-advance (single source of truth).
+    private string DwellCss =>
+        TutorialState.DurationFor(Kind).TotalSeconds.ToString("0.#", CultureInfo.InvariantCulture) + "s";
+}

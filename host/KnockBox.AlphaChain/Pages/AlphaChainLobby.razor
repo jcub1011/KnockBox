@@ -6,7 +6,9 @@
 <PageTitle>Alpha Chain</PageTitle>
 
 <HeadContent>
+    <link href="_content/KnockBox.AlphaChain/css/alpha-chain-theme.css" rel="stylesheet" />
     <link href="_content/KnockBox.AlphaChain/KnockBox.AlphaChain.styles.css" rel="stylesheet" />
+    <link href="_content/KnockBox.AlphaChain/css/cards.css" rel="stylesheet" />
 </HeadContent>
 
 <div class="content">
@@ -16,28 +18,84 @@
     }
     else if (GameState.IsJoinable)
     {
-        <div class="card">
-            <h4>Players</h4>
-            <div class="player-list">
-                @foreach (var entry in GameState.Players)
-                {
-                    <button class="btn" title="Click to kick player."
-                            @onclick="() => GameState.KickPlayer(UserService.CurrentUser!, entry.User)">
-                        @entry.DisplayName @(entry.User.Id == GameState.Host.Id ? "(Host)" : "")
-                    </button>
+        <div class="ac-lobby">
+            <header class="ac-lobby-head">
+                <span class="ac-lobby-brand">ALPHA CHAIN</span>
+                <span class="ac-lobby-tagline">Build the value chain · beat the shot clock</span>
+            </header>
+
+            <div class="ac-lobby-card">
+                <h4 class="ac-lobby-heading">
+                    Players
+                    <span class="ac-lobby-count">@GameState.Players.Length</span>
+                </h4>
+                <div class="ac-lobby-players">
+                    @foreach (var entry in GameState.Players)
+                    {
+                        var isHostPlayer = entry.User.Id == GameState.Host.Id;
+                        <button class="ac-player-chip @(isHostPlayer ? "ac-player-host" : "")" title="Click to kick player."
+                                @onclick="() => GameState.KickPlayer(UserService.CurrentUser!, entry.User)">
+                            <span class="ac-player-name">@entry.DisplayName</span>
+                            @if (isHostPlayer)
+                            {
+                                <span class="ac-player-badge">Host</span>
+                            }
+                        </button>
+                    }
+                </div>
+
+                @{
+                    var isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
+                    var settingsValid = GameState.Settings.Validate().IsValid;
                 }
+
+                @if (isHost)
+                {
+                    @* Two start buttons (mirrors Operator): shared display vs. host as player.
+                       Both are also gated on a valid config — Settings.Validate() is the single
+                       source of truth shared with StartAsyncCore. *@
+                    <div class="ac-lobby-actions">
+                        <button class="ac-start-btn ac-start-primary"
+                                disabled="@(GameState.Players.Length < GameEngine.MinPlayerCount || !settingsValid)"
+                                @onclick="() => StartGame(false)">
+                            Start Game
+                        </button>
+                        <button class="ac-start-btn ac-start-secondary"
+                                disabled="@(GameState.Players.Length + 1 < GameEngine.MinPlayerCount || !settingsValid)"
+                                @onclick="() => StartGame(true)">
+                            Start As Player
+                        </button>
+                    </div>
+                    @if (GameState.Players.Length + 1 < GameEngine.MinPlayerCount)
+                    {
+                        <p class="ac-lobby-note">Need at least @GameEngine.MinPlayerCount players (or @(GameEngine.MinPlayerCount - 1) plus the host).</p>
+                    }
+                    else if (GameState.Players.Length < GameEngine.MinPlayerCount)
+                    {
+                        <p class="ac-lobby-note">Need @GameEngine.MinPlayerCount players to start, or start as a player to join in.</p>
+                    }
+                    else if (!settingsValid)
+                    {
+                        <p class="ac-lobby-note ac-lobby-note-warn">Fix the highlighted settings below before starting.</p>
+                    }
+                }
+                else
+                {
+                    <p class="ac-lobby-note">Waiting for host to start…</p>
+                }
+
+                @* Host edits the config here; non-host players see it read-only. The lobby
+                   re-renders on every state change (LobbyPageBase subscription), so a host edit
+                   immediately reflects in every joiner's read-only view. *@
+                <AlphaChainSettingsPanel GameState="GameState" IsHost="isHost" />
             </div>
-            @if (UserService.CurrentUser?.Id == GameState.Host.Id)
-            {
-                <button class="btn btn-primary start-btn mt-3" @onclick="StartGame">Start Session</button>
-            }
         </div>
     }
     else
     {
-        <div class="card">
-            <h4>Game in progress</h4>
-            <p>Alpha Chain placeholder lobby — game logic coming soon.</p>
-        </div>
+        @* In-game view. The host-as-shared-display vs. host-as-player split is identical
+           in M1 (both see the status + debug controls); a dedicated spectator view lands
+           with the real gameplay UI in later milestones. *@
+        <AlphaChainGame GameState="GameState" />
     }
 </div>

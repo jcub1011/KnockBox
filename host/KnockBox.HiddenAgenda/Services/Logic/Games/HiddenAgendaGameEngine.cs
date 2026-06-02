@@ -22,7 +22,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         IRandomNumberService randomNumberService,
         ILogger<HiddenAgendaGameEngine> logger,
         ILogger<HiddenAgendaGameState> stateLogger) 
-        : AbstractGameEngine(minPlayerCount: 3, maxPlayerCount: 6)
+        : AbstractGameEngine<HiddenAgendaGameState>(minPlayerCount: 3, maxPlayerCount: 6)
     {
         public override Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
@@ -36,11 +36,8 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
             return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
         }
 
-        protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
+        protected override Task<Result> StartAsyncCore(HiddenAgendaGameState gameState, CancellationToken ct = default)
         {
-            if (state is not HiddenAgendaGameState gameState)
-                return Task.FromResult(Result.FromError("Error starting game.", $"Game state of type [{(state?.GetType().Name ?? "null")}] couldn't be cast to type [{nameof(HiddenAgendaGameState)}]."));
-
             var context = new HiddenAgendaGameContext(gameState, randomNumberService, logger);
             var fsm = new FiniteStateMachine<HiddenAgendaGameContext, HiddenAgendaCommand>(logger);
             context.Fsm = fsm;

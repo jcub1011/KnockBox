@@ -11,7 +11,7 @@ namespace KnockBox.DiceSimulator.Services.Logic.Games
     public class DiceSimulatorGameEngine(
         IRandomNumberService randomNumberService,
         ILogger<DiceSimulatorGameEngine> logger,
-        ILogger<DiceSimulatorGameState> stateLogger) : AbstractGameEngine
+        ILogger<DiceSimulatorGameState> stateLogger) : AbstractGameEngine<DiceSimulatorGameState>
     {
         public override async Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
@@ -24,11 +24,8 @@ namespace KnockBox.DiceSimulator.Services.Logic.Games
             return gameState;
         }
 
-        protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
+        protected override Task<Result> StartAsyncCore(DiceSimulatorGameState state, CancellationToken ct = default)
         {
-            if (state is not DiceSimulatorGameState gameState)
-                return Task.FromResult(Result.FromError("Error starting game.", $"Game state of type [{(state?.GetType().Name ?? "null")}] couldn't be cast to type [{nameof(DiceSimulatorGameState)}]."));
-
             var executeResult = state.Execute(() =>
             {
                 state.SetJoinable(false);
