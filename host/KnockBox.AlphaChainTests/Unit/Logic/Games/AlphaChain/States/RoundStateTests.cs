@@ -242,45 +242,21 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
         // ── Stated-rule decisions (resolved, not open questions) ────────────────
 
-        private static void GiveAction(AlphaChainGameState state, string playerId, string cardId) =>
-            state.Execute(() => state.GamePlayers[playerId].ActionHand.Add(
-                global::KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.ActionLibrary.FindById(cardId)!));
-
-        [TestMethod]
-        public async Task Pivot_DoesNotSuppressZeroPointTax()
-        {
-            // Pivot only clears RequiredStartLetter; it does NOT touch the Zero-Point Tax. A
-            // word containing the banned letter still scores 0 even when a Pivot is queued.
-            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'a');
-            using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
-
-            // Force a non-matching chain requirement so the Pivot has to do its job, and arm it.
-            state.Execute(() => state.RequiredStartLetter = 'q');
-            GiveAction(state, current, "pivot");
-            await engine.PlayActionAsync(current, "pivot", null, state);
-
-            var outcome = await SubmitAsync(engine, state, current, "cat");
-
-            // Chain cleared by Pivot (so "cat" got through), but the banned 'a' still taxes it.
-            Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(outcome);
-            Assert.AreEqual(0, state.GamePlayers[current].Score);
-            // Pivot is consumed by the submission it was queued for.
-            Assert.IsNull(state.GamePlayers[current].PendingAction);
-        }
+        private static void GiveReaction(AlphaChainGameState state, string playerId, string cardId) =>
+            state.Execute(() => state.GamePlayers[playerId].ReactionHand.Add(
+                global::KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.ReactionLibrary.FindById(cardId)!));
 
         [TestMethod]
         public async Task Amnesty_WithBannedLastLetter_ScoresFullAndClearsChain()
         {
-            // Amnesty suppresses the tax (full points) AND a banned-letter-as-last-letter still
-            // clears RequiredStartLetter for the next player — the chain-clearing effect is
+            // A held Amnesty auto-suppresses the tax (full points) AND a banned-letter-as-last-letter
+            // still clears RequiredStartLetter for the next player — the chain-clearing effect is
             // independent of scoring.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 't');
             using var _ = state;
             var current = state.TurnManager.CurrentPlayer!;
 
-            GiveAction(state, current, "amnesty");
-            await engine.PlayActionAsync(current, "amnesty", null, state);
+            GiveReaction(state, current, "amnesty");
 
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
@@ -290,7 +266,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // Banned 't' as the last letter clears the chain regardless of the Amnesty.
             Assert.IsNull(state.RequiredStartLetter);
             // Amnesty fired (banned letter present) → consumed.
-            Assert.IsNull(state.GamePlayers[current].PendingAction);
+            Assert.AreEqual(0, state.GamePlayers[current].ReactionHand.Count);
         }
 
         [TestMethod]
@@ -311,35 +287,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.AreEqual(0, state.GamePlayers[current].Score);
             // 'a' is not the last letter → the chain continues on 't'.
             Assert.AreEqual('t', state.RequiredStartLetter);
-        }
-
-        [TestMethod]
-        public async Task TimeThief_OnPlayerWhoJustSubmitted_QueuesDebuff()
-        {
-            // After a player submits, the clock has already reset for the NEXT player. Time
-            // Thief aimed at the player who just submitted (no longer the active player) is
-            // therefore queued against their next turn rather than applied immediately.
-            var (engine, state) = await StartGameAsync(
-                new StubWordListService("cat", "tea"), playerCount: 3, banned: 'z');
-            using var _ = state;
-
-            var first = state.TurnManager.CurrentPlayer!;
-            var second = state.TurnManager.TurnOrder[1];
-            var third = state.TurnManager.TurnOrder[2];
-
-            // First player submits "cat" → turn advances to the second player; clock reset.
-            await SubmitAsync(engine, state, first, "cat");
-            Assert.AreEqual(second, state.TurnManager.CurrentPlayer);
-
-            // Third player aims Time Thief at the first player, who just submitted and is no
-            // longer on the clock → the debit is queued, not applied now.
-            GiveAction(state, third, "time-thief");
-            var before = state.PhaseEndTime;
-            var play = await engine.PlayActionAsync(third, "time-thief", first, state);
-
-            Assert.IsTrue(play.IsSuccess);
-            Assert.AreEqual(before, state.PhaseEndTime, "Active player's clock must be untouched.");
-            Assert.AreEqual(5, state.GamePlayers[first].QueuedTimePenaltySeconds);
         }
     }
 }

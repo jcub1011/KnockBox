@@ -4,15 +4,19 @@
  * Loaded globally (linked from the lobby page's <HeadContent>) so the category accent
  * variables and the interactive-wrapper reset are available wherever cards render. The
  * card visual itself now lives in GameCard.razor(.css); this file only owns the shared
- * colour tokens and the .ac-cardbtn reset used by the Engine Bay / Action Hand /
+ * colour tokens and the .ac-cardbtn reset used by the Engine Bay / Reaction Hand /
  * Optimization wrappers so a <button> around a GameCard adds no chrome of its own.
  */
 
 :root {
     --ac-additive: #14f195;
     --ac-multiplicative: #ffb020;
-    --ac-action: #b97bff;
     --ac-tax: #ff3b5c;
+    /* Reaction accents, by role. */
+    --ac-teal: #41e0c8;   /* defensive */
+    --ac-rose: #ff5d73;   /* offensive */
+    --ac-violet: #b97bff; /* special   */
+    --ac-amber: #ffce5c;  /* negate/reflect */
 }
 
 /* Layout-only wrapper for an interactive card: strips native button chrome so the

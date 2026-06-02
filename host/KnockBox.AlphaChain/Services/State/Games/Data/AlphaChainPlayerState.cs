@@ -52,8 +52,9 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         /// </summary>
         public List<ModifierCard> EngineBay { get; } = new();
 
-        /// <summary>The action cards currently in the player's hand.</summary>
-        public List<ActionCard> ActionHand { get; } = new();
+        /// <summary>The reaction cards currently in the player's hand. They sit passively and
+        /// auto-fire on game events (see <c>ReactionResolver</c>); they are never played by hand.</summary>
+        public List<ReactionCard> ReactionHand { get; } = new();
 
         /// <summary>
         /// Ids of the modifier cards dealt to this player in the current Intermission, so the
@@ -64,21 +65,23 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         public HashSet<string> NewlyDealtModifierIds { get; } = new(StringComparer.Ordinal);
 
         /// <summary>
-        /// The action cards dealt to this player in the current Intermission, shown as a reveal
+        /// The reaction cards dealt to this player in the current Intermission, shown as a reveal
         /// strip in the Optimization panel. Repopulated each deal, cleared when the Intermission
-        /// completes. A list (not a set) because action hands may hold duplicates.
+        /// completes. A list (not a set) because reaction hands may hold duplicates.
         /// </summary>
-        public List<ActionCard> NewlyDealtActions { get; } = new();
+        public List<ReactionCard> NewlyDealtReactions { get; } = new();
 
         /// <summary>
-        /// A Pivot/Amnesty queued for the player's next submission, or null when none is
-        /// pending. Consumed by the next accepted submission (see <c>RoundState</c>).
+        /// A personal banned letter imposed by an opponent's Jinx reaction (lower-case), or null
+        /// when none is active. Like the match's banned letter it triggers the Zero-Point Tax,
+        /// but it affects only this player and is consumed by their next accepted submission.
         /// </summary>
-        public ActionKind? PendingAction { get; set; } = null;
+        public char? PersonalBannedLetter { get; set; } = null;
 
         /// <summary>
-        /// Shot-clock seconds owed to this player from Time Thief plays made while they were
-        /// not the active player. Applied (and cleared) the next time they take a turn.
+        /// Shot-clock seconds owed to this player from attack reactions (Toll Booth, Frostbite)
+        /// that fired while they were not the active player. Applied (and cleared) the next time
+        /// they take a turn — see <c>RoundState.ApplyQueuedTimePenalty</c>.
         /// </summary>
         public int QueuedTimePenaltySeconds { get; set; } = 0;
     }

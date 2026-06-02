@@ -63,15 +63,15 @@
         }
     </ol>
 
-    @if (NewActions.Count > 0)
+    @if (NewReactions.Count > 0)
     {
         <div class="ac-im-opt-actions">
-            <span class="ac-im-opt-bin-label">New action cards</span>
+            <span class="ac-im-opt-bin-label">New reaction cards</span>
             <div class="ac-im-opt-actions-row">
-                @foreach (var card in NewActions)
+                @foreach (var card in NewReactions)
                 {
                     <GameCard Name="@card.Name" Description="@card.Description" Icon="@card.Icon"
-                              Category="CardCategory.Action" New="true" BadgeText="NEW" />
+                              Category="CardCategory.Reaction" ReactionClass="card.Class" New="true" BadgeText="NEW" />
                 }
             </div>
         </div>
@@ -112,8 +112,8 @@
     /// <summary>Ids of modifier cards freshly dealt this Intermission — flagged NEW + popped in.</summary>
     [Parameter] public IReadOnlyCollection<string> NewCardIds { get; set; } = [];
 
-    /// <summary>Action cards freshly dealt this Intermission, shown as a read-only reveal strip.</summary>
-    [Parameter] public IReadOnlyList<ActionCard> NewActions { get; set; } = [];
+    /// <summary>Reaction cards freshly dealt this Intermission, shown as a read-only reveal strip.</summary>
+    [Parameter] public IReadOnlyList<ReactionCard> NewReactions { get; set; } = [];
 
     /// <summary>How many players have locked in.</summary>
     [Parameter] public int SubmittedCount { get; set; }

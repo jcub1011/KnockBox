@@ -130,10 +130,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
         public Task<Result> AdvanceTurnAsync(string actorUserId, AlphaChainGameState state)
             => ProcessCommandAsync(state, new AdvanceTurnCommand(actorUserId));
 
-        /// <summary>Convenience wrapper for the UI: plays an action card from the actor's hand.</summary>
-        public Task<Result> PlayActionAsync(string actorUserId, string cardId, string? targetUserId, AlphaChainGameState state)
-            => ProcessCommandAsync(state, new PlayActionCommand(actorUserId, cardId, targetUserId));
-
         /// <summary>Convenience wrapper for the UI: commits an Engine Bay ordering during Intermission Optimization.</summary>
         public Task<Result> SubmitOptimizationAsync(string actorUserId, IReadOnlyList<string> modifierBayIds, AlphaChainGameState state)
             => ProcessCommandAsync(state, new SubmitOptimizationCommand(actorUserId, modifierBayIds));

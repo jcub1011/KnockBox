@@ -72,10 +72,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             foreach (var player in state.GamePlayers.Values)
             {
                 Assert.AreEqual(state.Settings.ModifiersDealtPerEra, player.EngineBay.Count, "modifier deal count");
-                Assert.AreEqual(state.Settings.ActionsDealtPerEra, player.ActionHand.Count, "action deal count");
+                Assert.AreEqual(state.Settings.ReactionsDealtPerEra, player.ReactionHand.Count, "reaction deal count");
                 // Dealt cards are tracked so the Optimization panel can flag them NEW.
                 Assert.AreEqual(state.Settings.ModifiersDealtPerEra, player.NewlyDealtModifierIds.Count, "new modifier ids");
-                Assert.AreEqual(state.Settings.ActionsDealtPerEra, player.NewlyDealtActions.Count, "new actions");
+                Assert.AreEqual(state.Settings.ReactionsDealtPerEra, player.NewlyDealtReactions.Count, "new reactions");
             }
         }
 
@@ -90,7 +90,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             EnterIntermission(state);
 
             Assert.AreEqual(0, state.GamePlayers[eliminatedId].EngineBay.Count);
-            Assert.AreEqual(0, state.GamePlayers[eliminatedId].ActionHand.Count);
+            Assert.AreEqual(0, state.GamePlayers[eliminatedId].ReactionHand.Count);
         }
 
         [TestMethod]

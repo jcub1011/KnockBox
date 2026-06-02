@@ -136,3 +136,48 @@
     font-variant-numeric: tabular-nums;
     color: var(--ac-additive, #14f195);
 }
+
+/* ── Reactions that auto-fired on this word ────────────────────────────── */
+.ac-replay-rx {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.35rem;
+    background: rgba(255, 255, 255, 0.05);
+    /* Reveals after the score/steal rows; reuse the shared pop keyframe at the per-step duration. */
+    animation: ac-pop var(--ac-step) ease-out both;
+}
+
+.ac-replay-rx-icon {
+    display: inline-flex;
+    width: 1rem;
+    height: 1rem;
+}
+
+.ac-replay-rx-icon .gc-icon-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.ac-replay-rx-name {
+    font-family: var(--font-display, system-ui);
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.ac-replay-rx-reason {
+    font-size: 0.7rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-replay-rx-defend { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-teal, #41e0c8) 45%, transparent); }
+.ac-replay-rx-defend .ac-replay-rx-name { color: var(--ac-teal, #41e0c8); }
+.ac-replay-rx-attack { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-rose, #ff5d73) 45%, transparent); }
+.ac-replay-rx-attack .ac-replay-rx-name { color: var(--ac-rose, #ff5d73); }
+.ac-replay-rx-special { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-violet, #b97bff) 45%, transparent); }
+.ac-replay-rx-special .ac-replay-rx-name { color: var(--ac-violet, #b97bff); }
+.ac-replay-rx-negate { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-amber, #ffce5c) 55%, transparent); }
+.ac-replay-rx-negate .ac-replay-rx-name { color: var(--ac-amber, #ffce5c); }

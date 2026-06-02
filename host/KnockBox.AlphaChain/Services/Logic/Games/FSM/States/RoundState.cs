@@ -14,11 +14,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
     /// The core turn loop. Players submit words via <see cref="SubmitWordCommand"/>;
     /// the chain (succession) rule, uniqueness, dictionary validation, the Zero-Point
     /// Tax, and the full scoring pipeline (<c>Score = (L + ΣA) × ΠM</c>) are enforced here.
-    /// M3 adds card play: modifiers reshape scoring (via <see cref="AlphaChainGameContext.ScoreCalculator"/>),
-    /// and action cards queue per-submission effects (Pivot/Amnesty) or steal shot-clock time
-    /// (Time Thief). The shot clock is a real timer: <see cref="Tick"/> zeroes a player's turn
-    /// (or eliminates them in Survival mode) when it runs out. When the turn order wraps the
-    /// canonical era/round rule decides whether the game ends.
+    /// Modifiers reshape scoring (via <see cref="AlphaChainGameContext.ScoreCalculator"/>), and
+    /// <b>reaction cards auto-fire on game events</b> (via <see cref="ReactionResolver"/>): Amnesty
+    /// at submit, the offensive/board reactions on the resulting standings swing, Free Throw at
+    /// turn start, and Overtime when the shot clock expires. The shot clock is a real timer:
+    /// <see cref="Tick"/> zeroes a player's turn (or eliminates them in Survival mode) when it runs
+    /// out. When the turn order wraps the canonical era/round rule decides whether the game ends.
     /// </summary>
     public sealed class RoundState : ITimedGameState<AlphaChainGameContext, AlphaChainCommand>
     {
@@ -29,10 +30,16 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.ResetTurnTimer(DateTimeOffset.UtcNow);
 
             // Drop the previous era's last score replay so it doesn't animate on this era's bays
-            // after the Intermission deal, and clear any leftover transition hold.
+            // after the Intermission deal, and clear any leftover transition hold. A Censor never
+            // bleeds across an era boundary.
             state.LatestScoreReplay = null;
             state.PendingTransitionAt = null;
             state.PendingTransitionIsGameOver = false;
+            ClearCensor(state);
+
+            // The opening player of the era never goes through AdvanceToNextActivePlayer, so fire
+            // their turn-start reactions (Free Throw) here too.
+            ApplyTurnStartReactions(context, state);
 
             context.Logger.LogDebug(
                 "Alpha Chain FSM → RoundState (era {era}, round {round}, active {player})",
@@ -65,7 +72,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             {
                 SubmitWordCommand cmd => HandleSubmitWord(context, cmd),
                 AdvanceTurnCommand cmd => HandleAdvanceTurn(context, cmd),
-                PlayActionCommand cmd => HandlePlayAction(context, cmd),
                 _ => (ValueResult<FsmState?>)null!
             };
         }
@@ -103,17 +109,11 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 return null;
             }
 
-            // Snapshot the actor's queued action (Pivot/Amnesty) for this submission. It is
-            // consumed only when the submission is accepted, so a rejected word never wastes it.
             state.GamePlayers.TryGetValue(cmd.ActorUserId, out var player);
-            var pending = player?.PendingAction;
-            bool pivotActive = pending == ActionKind.Pivot;
-            bool amnestyActive = pending == ActionKind.Amnesty;
 
             // 4. Chain (succession) rule — first letter must match the required start letter.
-            //    A queued Pivot clears the requirement for this submission only.
-            char? effectiveRequired = pivotActive ? null : state.RequiredStartLetter;
-            if (effectiveRequired is { } required && word[0] != required)
+            //    A Free Throw reaction (if held) already cleared it at turn start when rare.
+            if (state.RequiredStartLetter is { } required && word[0] != required)
             {
                 context.LastSubmitResult = new SubmitWordResult.RejectedChainBroken(required);
                 return null;
@@ -133,28 +133,35 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 return null;
             }
 
-            // 7. Zero-Point Tax: the banned letter anywhere in the word zeroes the score,
-            //    unless a queued Amnesty suppresses it for this submission.
-            bool containsBanned = state.BannedLetter is { } banned && word.Contains(banned);
-            bool taxed = containsBanned && !amnestyActive;
+            // Standings before this word is credited — the reaction resolver diffs pre vs post.
+            var preRanks = ReactionResolver.RankByScore(state);
+            var reactions = new List<ReactionEvent>();
 
-            // 8. Full scoring pipeline: (L + ΣA) × ΠM, evaluated left → right over the bay.
-            //    Capture the per-step trace too (for the score-replay animation); its
-            //    FinalBeforeTax equals the plain Calculate result.
+            // 7. Zero-Point Tax: any active banned letter anywhere in the word zeroes the score —
+            //    the match's era letter, an active board-wide Censor (unless the submitter is a
+            //    Riposte-exempt holder), or a personal Jinx letter on the submitter.
+            char? censorBan = (state.CensorBannedLetter is { } cb && !state.CensorExemptUserIds.Contains(cmd.ActorUserId))
+                ? cb : null;
+            bool containsBanned = ContainsAny(word, state.BannedLetter, censorBan, player?.PersonalBannedLetter);
+
+            // 8. Full scoring pipeline: (L + ΣA) × ΠM, left → right over the bay. The WordContext is
+            //    seeded with only the canonical era letter so modifier triggers (Tax Collector) and
+            //    the replay's "banned" anchor stay tied to it, not to transient Censor/Jinx bans.
             var ctx = WordContext.Build(word, state.BannedLetter);
             var bay = (IReadOnlyList<ModifierCard>?)player?.EngineBay ?? [];
-            var breakdown = context.ScoreCalculator.CalculateSteps(ctx, bay, taxed);
+            var probe = context.ScoreCalculator.CalculateSteps(ctx, bay, taxed: false);
+
+            // 8b. Amnesty auto-fires (only when beneficial) to suppress the tax on a banned-letter
+            //     word that would have scored. Resolved before the tax is finalized.
+            bool amnestyFired = ReactionResolver.TryAmnesty(player, containsBanned, probe.FinalBeforeTax, reactions);
+            bool taxed = containsBanned && !amnestyFired;
+            var breakdown = taxed ? context.ScoreCalculator.CalculateSteps(ctx, bay, taxed: true) : probe;
             int baseScore = breakdown.FinalBeforeTax;
             int score = breakdown.FinalScore;
 
-            // 9. Consume the queued action now that the submission is committed. Pivot is
-            //    always spent by the submission it was queued for; Amnesty is spent only when
-            //    it actually fired (a banned letter was present), so a clean word keeps it.
+            // 9. The personal Jinx letter (if any) is consumed by this accepted submission.
             if (player is not null)
-            {
-                if (pivotActive || (amnestyActive && containsBanned))
-                    player.PendingAction = null;
-            }
+                player.PersonalBannedLetter = null;
 
             // 10. Record the play and update the chain. A banned letter *as the last letter*
             //     clears the required start letter (free choice for the next player).
@@ -173,6 +180,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             //      their own taxed word.
             var (bounty, taxCollectors) = PayTaxCollectorBounty(state, cmd.ActorUserId, taxed, baseScore);
 
+            // 11c. Resolve the standings-driven reactions now that the score and the Tax Collector
+            //      bounty have both landed (so the pre/post diff reflects the full swing).
+            ReactionResolver.ResolveAfterScore(context, cmd.ActorUserId, score, preRanks, reactions);
+
             // Log the accepted play for the UI feed.
             state.PlayLog.Add(new AlphaChainWordPlay(
                 DateTimeOffset.UtcNow,
@@ -185,11 +196,17 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             // Publish the scoring trace so every client plays the replay strip. The sequence bump
             // makes the strip remount and animate exactly once for this word. On a taxed word the
-            // bounty + collector names ride along so the strip can show who stole the points.
+            // bounty + collector names ride along, and any reactions that fired this submission
+            // ride along too (rendered as extra rows + the prominent overlay).
             state.ScoreReplaySequence++;
             state.LatestScoreReplay = new ScoreReplay(
                 state.ScoreReplaySequence, cmd.ActorUserId, player?.DisplayName ?? cmd.ActorUserId,
-                breakdown, bounty, taxCollectors);
+                breakdown, bounty, taxCollectors, reactions);
+            if (reactions.Count > 0)
+            {
+                state.LatestReactionNotices = reactions;
+                state.ReactionNoticeSequence++;
+            }
 
             // 12. Result is set before advancing so it reflects this submission.
             context.LastSubmitResult = taxed
@@ -240,101 +257,39 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             return (bounty, collectors);
         }
 
-        // ── Action cards ─────────────────────────────────────────────────────
+        // ── Reaction helpers ─────────────────────────────────────────────────
 
-        /// <summary>
-        /// Plays an action card from the actor's hand. Pivot/Amnesty queue a one-shot effect
-        /// for the actor's next submission (valid only on their own turn, before they submit);
-        /// Time Thief steals 5 s from a target opponent's shot clock — applied immediately when
-        /// the target is the active player, otherwise queued for the target's next turn.
-        /// </summary>
-        private static ValueResult<FsmState?> HandlePlayAction(AlphaChainGameContext context, PlayActionCommand cmd)
+        /// <summary>True when <paramref name="word"/> contains any of the supplied banned letters
+        /// (nulls ignored). Backs the broadened Zero-Point Tax (era + Censor + personal Jinx).</summary>
+        private static bool ContainsAny(string word, params char?[] bans)
         {
-            var state = context.State;
-
-            // The round is ending and we're holding for the score animation — no more plays.
-            if (state.PendingTransitionAt is not null)
-                return new ResultError("The round is ending.",
-                    $"PlayActionCommand from [{cmd.ActorUserId}] during the end-of-round hold.");
-
-            // Possession: the actor must actually hold the named card.
-            if (!state.GamePlayers.TryGetValue(cmd.ActorUserId, out var actor))
-                return new ResultError("You are not in this game.",
-                    $"PlayActionCommand from unknown player [{cmd.ActorUserId}].");
-
-            var card = actor.ActionHand.FirstOrDefault(c => c.Id == cmd.CardId);
-            if (card is null)
-                return new ResultError("You don't hold that card.",
-                    $"Player [{cmd.ActorUserId}] tried to play missing action card [{cmd.CardId}].");
-
-            switch (card.Kind)
-            {
-                case ActionKind.Pivot:
-                case ActionKind.Amnesty:
-                    // Timing: queueable only on your own turn (a turn you have not yet ended by
-                    // submitting — submitting advances the turn, so "your turn" implies that).
-                    if (cmd.ActorUserId != state.TurnManager.CurrentPlayer)
-                        return new ResultError("You can only queue that on your turn.",
-                            $"Player [{cmd.ActorUserId}] tried to queue {card.Kind} out of turn.");
-
-                    actor.PendingAction = card.Kind;
-                    break;
-
-                case ActionKind.TimeThief:
-                    var thiefResult = ApplyTimeThief(context, cmd, actor);
-                    if (thiefResult.TryGetFailure(out var thiefError))
-                        return thiefError;
-                    break;
-            }
-
-            // Spend the card (remove a single instance — hands may hold duplicates).
-            actor.ActionHand.Remove(card);
-
-            context.Logger.LogDebug(
-                "Alpha Chain action [{card}] played by [{actor}] (target [{target}]).",
-                card.Id, cmd.ActorUserId, cmd.TargetUserId ?? "—");
-
-            return (ValueResult<FsmState?>)null!;
+            foreach (var ban in bans)
+                if (ban is { } c && word.Contains(c))
+                    return true;
+            return false;
         }
 
         /// <summary>
-        /// Applies a Time Thief play. The target must be a different, present player. When the
-        /// target is the active player and their clock is still running, 5 s is shaved off
-        /// <c>PhaseEndTime</c> directly; otherwise the debit is queued and applied the next
-        /// time the target takes a turn. The FSM (running inside the execute lock) is the
-        /// single writer of <c>PhaseEndTime</c>, so this is safe against concurrent ticks.
+        /// Fires the turn-start reactions for the now-active player (Free Throw), publishing a
+        /// reaction notice if anything fired. Called from <see cref="OnEnter"/> and after each
+        /// turn advance.
         /// </summary>
-        private static Result ApplyTimeThief(AlphaChainGameContext context, PlayActionCommand cmd, AlphaChainPlayerState actor)
+        private static void ApplyTurnStartReactions(AlphaChainGameContext context, AlphaChainGameState state)
         {
-            var state = context.State;
-
-            if (cmd.TargetUserId is null)
-                return Result.FromError("Time Thief needs a target.", "PlayActionCommand.TargetUserId was null.");
-
-            if (cmd.TargetUserId == cmd.ActorUserId)
-                return Result.FromError("You can't target yourself.",
-                    $"Player [{cmd.ActorUserId}] aimed Time Thief at themselves.");
-
-            if (!state.GamePlayers.TryGetValue(cmd.TargetUserId, out var target)
-                || target.IsEliminated || target.HasLeft)
-                return Result.FromError("That opponent isn't available.",
-                    $"Time Thief target [{cmd.TargetUserId}] is unknown or out of play.");
-
-            const int stealSeconds = 5;
-            var now = DateTimeOffset.UtcNow;
-
-            if (cmd.TargetUserId == state.TurnManager.CurrentPlayer && state.PhaseEndTime > now)
+            var notices = new List<ReactionEvent>();
+            ReactionResolver.TryFreeThrow(state, notices);
+            if (notices.Count > 0)
             {
-                // The target is on the clock right now — steal the time immediately.
-                state.PhaseEndTime = state.PhaseEndTime.AddSeconds(-stealSeconds);
+                state.LatestReactionNotices = notices;
+                state.ReactionNoticeSequence++;
             }
-            else
-            {
-                // The target isn't currently on the clock — debit their next turn instead.
-                target.QueuedTimePenaltySeconds += stealSeconds;
-            }
+        }
 
-            return Result.Success;
+        /// <summary>Clears any active board-wide Censor ban and its exemption set.</summary>
+        private static void ClearCensor(AlphaChainGameState state)
+        {
+            state.CensorBannedLetter = null;
+            state.CensorExemptUserIds.Clear();
         }
 
         // ── Debug turn advance (kept from M1) ────────────────────────────────
@@ -374,6 +329,16 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             // Timer still running — nothing to do.
             if (now < state.PhaseEndTime)
                 return null;
+
+            // Overtime: a held reaction rescues the current player from the timeout by extending
+            // the clock once (prevents a 0-score turn, or elimination in Survival).
+            var overtimeNotices = new List<ReactionEvent>();
+            if (ReactionResolver.TryOvertime(state, now, overtimeNotices))
+            {
+                state.LatestReactionNotices = overtimeNotices;
+                state.ReactionNoticeSequence++;
+                return null;
+            }
 
             var current = state.TurnManager.CurrentPlayer;
             state.GamePlayers.TryGetValue(current ?? string.Empty, out var player);
@@ -426,6 +391,11 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             if (wrapped)
             {
+                // A board-wide Censor lasts one full rotation: clear it once the round it was
+                // imposed in has been left behind (every player got exactly one turn under it).
+                if (state.CensorBannedLetter is not null && state.CurrentRound > state.CensorImposedAtRound)
+                    ClearCensor(state);
+
                 // The turn order wrapped — a round completed. Evaluate the canonical
                 // end condition against the round that just finished.
                 int completedRound = state.CurrentRound;
@@ -459,6 +429,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             state.ResetTurnTimer(now);
             ApplyQueuedTimePenalty(state);
+            ApplyTurnStartReactions(context, state);
             return null;
         }
 
@@ -476,8 +447,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         }
 
         /// <summary>
-        /// If the now-active player has Time Thief time queued against them, shave it off the
-        /// freshly-armed shot clock and clear the debit. Caller already holds the execute lock.
+        /// If the now-active player has attack-reaction time (Toll Booth / Frostbite) queued
+        /// against them, shave it off the freshly-armed shot clock and clear the debit. Caller
+        /// already holds the execute lock.
         /// </summary>
         private static void ApplyQueuedTimePenalty(AlphaChainGameState state)
         {

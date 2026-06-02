@@ -83,8 +83,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         /// <summary>Modifier cards dealt to each player at an intermission. Consumed in M4.</summary>
         public int ModifiersDealtPerEra { get; init; } = 3;
 
-        /// <summary>Action cards dealt to each player at an intermission. Consumed in M4.</summary>
-        public int ActionsDealtPerEra { get; init; } = 2;
+        /// <summary>Reaction cards dealt to each player at an intermission. They sit in hand and
+        /// auto-fire on game events.</summary>
+        public int ReactionsDealtPerEra { get; init; } = 2;
 
         /// <summary>
         /// Total runtime (seconds) of the score-replay animation that plays through the Engine
@@ -131,8 +132,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
             if (ModifiersDealtPerEra < MinCardsDealtPerEra || ModifiersDealtPerEra > MaxCardsDealtPerEra)
                 violations.Add($"Modifiers dealt per era must be between {MinCardsDealtPerEra} and {MaxCardsDealtPerEra}.");
 
-            if (ActionsDealtPerEra < MinCardsDealtPerEra || ActionsDealtPerEra > MaxCardsDealtPerEra)
-                violations.Add($"Actions dealt per era must be between {MinCardsDealtPerEra} and {MaxCardsDealtPerEra}.");
+            if (ReactionsDealtPerEra < MinCardsDealtPerEra || ReactionsDealtPerEra > MaxCardsDealtPerEra)
+                violations.Add($"Reactions dealt per era must be between {MinCardsDealtPerEra} and {MaxCardsDealtPerEra}.");
 
             if (EngineAnimationSeconds < MinEngineAnimationSeconds || EngineAnimationSeconds > MaxEngineAnimationSeconds)
                 violations.Add($"Engine animation must be between {MinEngineAnimationSeconds:0.#} and {MaxEngineAnimationSeconds:0.#} seconds.");

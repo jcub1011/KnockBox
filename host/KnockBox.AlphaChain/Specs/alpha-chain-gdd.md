@@ -32,11 +32,26 @@ Modifiers are persistent cards that stay in a player's "Engine Bay." They are pr
     *   *Example:* **Vowel Surge** (2× if vowels > consonants).
     *   *Example:* **The Architect** (1.5× for 8+ letter words).
 
-### 3.2 Action Cards (Tactical)
-Single-use cards that provide immediate utility or disruption.
-*   **The Pivot:** Ignore the required starting letter; play any word.
-*   **Amnesty:** Use the Banned Letter this turn for full points.
-*   **Time Thief:** Subtract 5 seconds from the next player's current shot clock.
+### 3.2 Reaction Cards (Tactical)
+Single-use cards that sit passively in a player's hand and **auto-fire on game events** — only
+when they would actually help (never wasted), with no manual play and no targeting. They replace
+the original hand-played "action cards", whose mid-turn sifting was dead weight under the shot
+clock. At most one matching reaction per holder fires per event (oldest first).
+
+**Defensive** (fire on something that happens to you):
+*   **Amnesty:** When you play a banned-letter word, the Zero-Point Tax is suppressed and the word scores in full.
+*   **Free Throw:** When your turn opens on a rare required letter (Q/X/Z/J/K/V), the requirement is cleared. *(Reworked from the original "Pivot".)*
+*   **Overtime:** When your shot clock runs out, gain a few seconds and keep your turn — once (saves you from a 0-score timeout, or elimination in Survival).
+*   **Windfall:** When you fall to last place, immediately draw 2 more reaction cards.
+
+**Offensive** (fire on an opponent's action; routed through Riposte):
+*   **Toll Booth:** When an opponent *ahead of you* posts a big word, shave ~5 s off their next shot clock.
+*   **Frostbite:** When an opponent overtakes you specifically, shave time off their next shot clock.
+*   **Jinx:** When an opponent takes the overall lead, curse their next word with a personal banned letter.
+
+**Special:**
+*   **Censor:** When you fall to last place, ban an extra letter for everyone for one round (Riposte holders are spared).
+*   **Riposte:** When an attack reaction targets you, negate it and reflect it back at the caster; against board-wide effects (Censor), its holder is simply exempt.
 
 ---
 
@@ -85,8 +100,14 @@ The shipped implementation makes the following confirmed, intentional departures
 design above. They are recorded here so the GDD stays the single source of truth for *what the
 game actually does*.
 
-*   **Time Thief targets any opponent** (and can shorten a clock that is already ticking), not
-    strictly "the next player" as written in §3.2. *(Confirmed intentional.)*
+*   **Tactical cards are auto-firing reactions, not hand-played actions.** The original §3.2
+    action cards (Pivot, Amnesty, Time Thief) were proactive — you had to find and play the right
+    card mid-turn, which was friction under the shot clock. They are replaced by the reaction system
+    described in §3.2: cards sit in hand and auto-fire on game events, only when beneficial. Amnesty
+    is preserved (now auto-firing), Pivot became **Free Throw** (rare-letter rescue at turn start),
+    Time Thief is removed, and six new cards were added (Overtime, Windfall, Toll Booth, Frostbite,
+    Jinx, Censor, Riposte). A "reaction strike" overlay tells a targeted player what hit them and why.
+    *(Confirmed intentional.)*
 *   **Era 1 is cardless.** Players start with an empty Engine Bay and empty hand; the first Deal
     happens at the first Intermission (after `EraInterval` rounds), not at game start.
 *   **Starting `ModifierSlots = 3`.** The GDD only specifies that Expansion grants +1 slot per

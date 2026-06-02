@@ -42,7 +42,7 @@
                         <IntermissionOptimizationPanel Cards="me.EngineBay"
                                                        Slots="me.ModifierSlots"
                                                        NewCardIds="me.NewlyDealtModifierIds"
-                                                       NewActions="me.NewlyDealtActions"
+                                                       NewReactions="me.NewlyDealtReactions"
                                                        SubmittedCount="OptimizationSubmittedCount"
                                                        TotalCount="OptimizationTotalCount"
                                                        HasSubmitted="HasSubmittedOptimization"
@@ -93,7 +93,19 @@
                     </div>
                     <div class="ac-cmd-cell ac-cmd-banned">
                         <span class="ac-cmd-label">Banned</span>
-                        <span class="ac-cmd-letter">@BannedLetterDisplay</span>
+                        <span class="ac-cmd-letters">
+                            <span class="ac-cmd-letter">@BannedLetterDisplay</span>
+                            @if (CensorBannedLetterDisplay is { } censor)
+                            {
+                                <span class="ac-cmd-letter ac-cmd-censor @(AmCensorExempt ? "ac-cmd-censor-exempt" : "")"
+                                      title="@(AmCensorExempt ? "Censor: extra banned letter this round (you are immune via Riposte)" : "Censor: extra banned letter for everyone this round")">@censor</span>
+                            }
+                            @if (PersonalBannedLetterDisplay is { } jinx)
+                            {
+                                <span class="ac-cmd-letter ac-cmd-jinx"
+                                      title="Jinx: a personal banned letter on your next word">@jinx</span>
+                            }
+                        </span>
                     </div>
                 </div>
 
@@ -127,10 +139,6 @@
                 </div>
 
                 <div class="ac-entry-status">
-                    @if (PendingActionBadge is { } badge)
-                    {
-                        <span class="ac-pending-badge">@badge</span>
-                    }
                     @if (FeedbackMessage is { } feedback)
                     {
                         <span class="ac-feedback ac-feedback-bad">@feedback</span>
@@ -144,6 +152,11 @@
                     <ScoreReplayStrip @key="GameState.ScoreReplaySequence" Replay="replay"
                                       ReplayTotalSeconds="GameState.Settings.EngineAnimationSeconds" />
                 }
+
+                @* ── Reaction strike overlay: announces auto-fired reactions, emphasising hits
+                      against the local player. Keyed on the notice sequence so it replays once. *@
+                <ReactionOverlay @key="GameState.ReactionNoticeSequence"
+                                 Notices="GameState.LatestReactionNotices" CurrentUserId="CurrentUserId" />
 
                 @* ── Chain trail ── *@
                 @if (ChainTrail.Count > 0)
@@ -161,7 +174,7 @@
                     </div>
                 }
 
-                @* ── Cards: own Engine Bay + Action Hand, host debug deal ── *@
+                @* ── Cards: own Engine Bay + Reaction Hand ── *@
                 @if (MyPlayer is { } myCards)
                 {
                     <div class="ac-cards">
@@ -170,8 +183,7 @@
                            always Locked here, so no OnReorder handler is wired. *@
                         <EngineBay Cards="myCards.EngineBay" Slots="myCards.ModifierSlots"
                                    Locked="true" Title="Your Engine Bay" />
-                        <ActionHand Cards="myCards.ActionHand" Opponents="ActionTargets" Disabled="false"
-                                    QueuedKind="myCards.PendingAction" OnPlay="PlayActionAsync" />
+                        <ReactionHand Cards="myCards.ReactionHand" />
                     </div>
                 }
 

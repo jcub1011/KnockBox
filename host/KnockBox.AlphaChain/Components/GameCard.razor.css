@@ -26,13 +26,26 @@
     --gc-accent: var(--ac-multiplicative, #ffb020);
 }
 
-.gc-action {
-    --gc-accent: var(--ac-action, #b97bff);
+/* Reactions default to the special/violet accent; the role sub-tint overrides it. */
+.gc-reaction {
+    --gc-accent: var(--ac-violet, #b97bff);
+}
+
+.gc-reaction-defensive {
+    --gc-accent: var(--ac-teal, #41e0c8);
+}
+
+.gc-reaction-offensive {
+    --gc-accent: var(--ac-rose, #ff5d73);
+}
+
+.gc-reaction-special {
+    --gc-accent: var(--ac-violet, #b97bff);
 }
 
 .gc-additive,
 .gc-multiplicative,
-.gc-action {
+.gc-reaction {
     border-color: color-mix(in srgb, var(--gc-accent) 60%, transparent);
     background: color-mix(in srgb, var(--gc-accent) 12%, transparent);
 }

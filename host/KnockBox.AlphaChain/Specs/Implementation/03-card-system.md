@@ -1,5 +1,15 @@
 # Milestone 3 — Card System
 
+> **Superseded (action cards → reaction cards).** The hand-played **action card** system described
+> below (Pivot, Amnesty, Time Thief; `ActionCard`/`ActionKind`/`ActionLibrary`, `PlayActionCommand`,
+> `PendingAction`, the `ActionHand` UI) has been replaced by an **auto-firing reaction system**.
+> Reactions sit in a player's hand and fire automatically on game events, only when beneficial — no
+> manual play, no targeting. The modifier/scoring half of this milestone is unchanged. See
+> **`alpha-chain-gdd.md` §3.2** for the catalogue and `Services/Logic/Games/FSM/ReactionResolver.cs`
+> for the dispatch. Type renames: `ActionCard`→`ReactionCard`, `ActionLibrary`→`ReactionLibrary`,
+> `ActionHand`→`ReactionHand`, `ActionsDealtPerEra`→`ReactionsDealtPerEra`; `PlayActionCommand` and
+> `PendingAction` are removed. The text below is retained for historical context.
+
 ## Goal
 
 Introduce Modifier cards (the Engine Bay) and Action cards plus the full scoring pipeline `Score = (L + ΣA) × ΠM` with conditional triggers. Cards do not yet enter play through Intermission (that lands in M4). Instead, M3 ships a host-only debug "Grant Cards" command so the pipeline and UI can be exercised in isolation.

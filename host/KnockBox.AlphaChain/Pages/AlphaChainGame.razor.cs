@@ -89,6 +89,22 @@ namespace KnockBox.AlphaChain.Pages
         protected string BannedLetterDisplay =>
             GameState.BannedLetter is { } c ? char.ToUpperInvariant(c).ToString() : "—";
 
+        /// <summary>The extra board-wide Censor letter as an upper-case string, or null when no
+        /// Censor is active. Shown beside the banned letter so affected players can see it.</summary>
+        protected string? CensorBannedLetterDisplay =>
+            GameState.CensorBannedLetter is { } c ? char.ToUpperInvariant(c).ToString() : null;
+
+        /// <summary>Whether the local player is exempt from the active Censor (holds a Riposte).
+        /// Exempt players still see the letter, marked as not applying to them.</summary>
+        protected bool AmCensorExempt =>
+            CurrentUserId is { } id && GameState.CensorExemptUserIds.Contains(id);
+
+        /// <summary>The personal Jinx letter on the local player as an upper-case string, or null
+        /// when none. Shown beside the banned letter so the cursed player can see it (it is
+        /// personal — only the affected player sees their own Jinx).</summary>
+        protected string? PersonalBannedLetterDisplay =>
+            MyPlayer?.PersonalBannedLetter is { } c ? char.ToUpperInvariant(c).ToString() : null;
+
         /// <summary>Total duration of the per-turn shot clock (for the countdown ring).</summary>
         protected TimeSpan ShotClockDuration => TimeSpan.FromSeconds(GameState.Settings.ShotClockSeconds);
 
@@ -225,29 +241,6 @@ namespace KnockBox.AlphaChain.Pages
                 .Where(p => p.UserId != CurrentUserId && !p.HasLeft)
                 .OrderBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
-
-        /// <summary>Targetable opponents for the Time Thief picker (active opponents only).</summary>
-        protected IReadOnlyList<ActionHand.ActionTarget> ActionTargets =>
-            Opponents.Where(p => !p.IsEliminated)
-                .Select(p => new ActionHand.ActionTarget(p.UserId, p.DisplayName))
-                .ToList();
-
-        /// <summary>Badge text for a queued Pivot/Amnesty, or null when none is pending.</summary>
-        protected string? PendingActionBadge => MyPlayer?.PendingAction switch
-        {
-            ActionKind.Pivot => "Pivot pending",
-            ActionKind.Amnesty => "Amnesty pending",
-            _ => null
-        };
-
-        /// <summary>Plays an action card for the local player.</summary>
-        protected async Task PlayActionAsync(ActionHand.ActionPlayRequest request)
-        {
-            if (CurrentUserId is not { } id) return;
-            var result = await GameEngine.PlayActionAsync(id, request.CardId, request.TargetUserId, GameState);
-            if (result.TryGetFailure(out var error))
-                Logger.LogWarning("Play action failed: {Error}", error.PublicMessage);
-        }
 
         protected override void OnInitialized()
         {

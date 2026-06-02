@@ -1,0 +1,54 @@
+@using KnockBox.AlphaChain.Services.State.Games.Data
+@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
+
+@* Prominent, transient overlay announcing the reactions that just auto-fired — so a targeted
+   player understands what hit them, which card did it, and why. The parent @keys this on the
+   reaction-notice sequence so the pop+fade animation replays exactly once per fire. *@
+
+@if (Notices.Count > 0)
+{
+    <div class="ac-rx-overlay" aria-live="polite">
+        @foreach (var n in Notices)
+        {
+            var youHit = n.TargetUserId == CurrentUserId && n.Class == ReactionClass.Offensive && !n.Negated;
+            var tone = n.Negated
+                ? "ac-rx-negate"
+                : n.Class switch
+                {
+                    ReactionClass.Offensive => "ac-rx-attack",
+                    ReactionClass.Special => "ac-rx-special",
+                    _ => "ac-rx-defend"
+                };
+            <div class="ac-rx-card @tone @(youHit ? "ac-rx-you" : "")">
+                <span class="ac-rx-icon"><CardIcon Icon="@n.Icon" /></span>
+                <div class="ac-rx-body">
+                    <span class="ac-rx-name">@n.CardName@(n.Negated ? " — reflected!" : "")</span>
+                    <span class="ac-rx-head">@Headline(n)</span>
+                    <span class="ac-rx-reason">@n.Reason</span>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>The reactions to announce. Parent passes <c>GameState.LatestReactionNotices</c>.</summary>
+    [Parameter] public IReadOnlyList<ReactionEvent> Notices { get; set; } = [];
+
+    /// <summary>The local player's id, so the overlay can emphasize hits against them.</summary>
+    [Parameter] public string? CurrentUserId { get; set; }
+
+    private string Headline(ReactionEvent n)
+    {
+        bool holderIsYou = n.HolderUserId == CurrentUserId;
+        bool targetIsYou = n.TargetUserId == CurrentUserId;
+
+        if (n.TargetUserId is null)
+            return holderIsYou ? "Your reaction fired" : $"{n.HolderName}'s reaction fired";
+        if (targetIsYou)
+            return n.Negated ? $"You reflected {n.HolderName}'s attack" : $"Hit by {n.HolderName}";
+        if (holderIsYou)
+            return $"You hit {n.TargetName}";
+        return $"{n.HolderName} → {n.TargetName}";
+    }
+}

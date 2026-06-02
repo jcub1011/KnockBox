@@ -119,7 +119,7 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// <summary>
         /// The letter the next word must start with (lower-case), or null when the next
         /// player has a free choice — at game start, after a banned-letter-as-last-letter
-        /// play, and after a Pivot (Pivot lands in M3).
+        /// play, and when a Free Throw reaction clears it at turn start.
         /// </summary>
         public char? RequiredStartLetter { get; set; }
 
@@ -129,6 +129,37 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// clears <see cref="RequiredStartLetter"/> for the next player.
         /// </summary>
         public char? BannedLetter { get; set; }
+
+        // ── Censor reaction (board-wide transient ban) ────────────────────────
+
+        /// <summary>
+        /// An extra, transient board-wide banned letter (lower-case) imposed by a Censor reaction,
+        /// or null when none is active. It triggers the Zero-Point Tax like <see cref="BannedLetter"/>
+        /// but lasts only one full turn rotation and never clears <see cref="RequiredStartLetter"/>.
+        /// Kept separate so <c>IntermissionState</c> remains the sole writer of <see cref="BannedLetter"/>.
+        /// </summary>
+        public char? CensorBannedLetter { get; set; }
+
+        /// <summary>User ids of the Riposte holders captured when the active Censor was imposed;
+        /// they are exempt from <see cref="CensorBannedLetter"/> for its duration.</summary>
+        public HashSet<string> CensorExemptUserIds { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>The round number in which the active <see cref="CensorBannedLetter"/> was imposed;
+        /// it clears on the first turn-order wrap after this round. Meaningful only while a Censor is active.</summary>
+        public int CensorImposedAtRound { get; set; }
+
+        // ── Reaction notice channel (off-submission reactions) ────────────────
+
+        /// <summary>
+        /// The reactions that fired outside a word submission (Free Throw at turn start, Overtime
+        /// at clock expiry), published so clients animate them. Submission-time reactions instead
+        /// ride on the word's <see cref="LatestScoreReplay"/>. Replaced wholesale on each fire.
+        /// </summary>
+        public IReadOnlyList<ReactionEvent> LatestReactionNotices { get; set; } = [];
+
+        /// <summary>Monotonic counter bumped whenever <see cref="LatestReactionNotices"/> changes,
+        /// so the reaction overlay <c>@key</c>s off it and animates exactly once.</summary>
+        public int ReactionNoticeSequence { get; set; }
 
         /// <summary>
         /// Re-arms the shot clock from <paramref name="now"/>. Called on entering

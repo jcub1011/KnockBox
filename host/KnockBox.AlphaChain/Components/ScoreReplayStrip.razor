@@ -49,6 +49,21 @@
             }
         </div>
     }
+
+    @* Reactions that auto-fired on this word, revealed after the score (and steal) rows. *@
+    @if (Replay.Reactions is { Count: > 0 } fired)
+    {
+        @for (int i = 0; i < fired.Count; i++)
+        {
+            var rx = fired[i];
+            <div class="ac-replay-rx @(rx.Negated ? "ac-replay-rx-negate" : rx.Class == ReactionClass.Offensive ? "ac-replay-rx-attack" : rx.Class == ReactionClass.Special ? "ac-replay-rx-special" : "ac-replay-rx-defend")"
+                 style="animation-delay: calc(var(--ac-step) * @(ReactionRowBase + i))">
+                <span class="ac-replay-rx-icon"><CardIcon Icon="@rx.Icon" /></span>
+                <span class="ac-replay-rx-name">@rx.CardName</span>
+                <span class="ac-replay-rx-reason">@rx.Reason</span>
+            </div>
+        }
+    }
 </div>
 
 @code {
@@ -61,6 +76,10 @@
 
     /// <summary>Hard cap on a single step's reveal time.</summary>
     private const double MaxStepSeconds = 0.5;
+
+    /// <summary>Animation-delay row index of the first reaction row: after the seed, every modifier
+    /// step, the final score, and the steal line (when present).</summary>
+    private int ReactionRowBase => Replay.Breakdown.Steps.Count + 2 + (Replay.HasSteal ? 1 : 0);
 
     /// <summary>Per-step reveal/stagger time as a CSS literal: total / rows, clamped to the cap.
     /// Rows = seed + one per card + the final score + the steal line (when present).</summary>

@@ -77,6 +77,38 @@
     position: relative;
 }
 
+/* Banned + Censor letters sit side by side. */
+.ac-cmd-letters {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+}
+
+/* The extra Censor letter: smaller, violet (the Censor card's accent) so it reads as a
+   separate, temporary ban next to the era's banned letter. */
+.ac-cmd-banned .ac-cmd-censor {
+    font-size: clamp(1.4rem, 4.5vw, 2.1rem);
+    color: var(--ac-violet, #b97bff);
+    text-shadow: 0 0 12px color-mix(in srgb, var(--ac-violet, #b97bff) 55%, transparent);
+    align-self: center;
+}
+
+/* A Riposte-immune player still sees the letter, struck through to show it doesn't apply. */
+.ac-cmd-banned .ac-cmd-censor-exempt {
+    opacity: 0.4;
+    text-decoration: line-through;
+    text-shadow: none;
+}
+
+/* The personal Jinx letter: smaller, rose (the offensive-reaction accent), only the cursed
+   player sees their own. */
+.ac-cmd-banned .ac-cmd-jinx {
+    font-size: clamp(1.4rem, 4.5vw, 2.1rem);
+    color: var(--ac-rose, #ff5d73);
+    text-shadow: 0 0 12px color-mix(in srgb, var(--ac-rose, #ff5d73) 55%, transparent);
+    align-self: center;
+}
+
 /* ── Shot-clock ring ──────────────────────────────────────────────────── */
 .ac-cmd-clock {
     display: flex;
@@ -281,18 +313,6 @@
     align-items: center;
     gap: 0.5rem;
     min-height: 1.5rem;
-}
-
-.ac-pending-badge {
-    padding: 0.2rem 0.7rem;
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    border-radius: 0.5rem;
-    background: color-mix(in srgb, var(--ac-violet) 22%, transparent);
-    color: var(--ac-violet);
-    border: 1px solid color-mix(in srgb, var(--ac-violet) 45%, transparent);
 }
 
 .ac-feedback {

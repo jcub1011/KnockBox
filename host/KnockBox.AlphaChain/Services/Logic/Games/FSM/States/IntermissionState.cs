@@ -181,13 +181,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         {
             var state = context.State;
             int modCount = state.Settings.ModifiersDealtPerEra;
-            int actCount = state.Settings.ActionsDealtPerEra;
+            int reactCount = state.Settings.ReactionsDealtPerEra;
 
             foreach (var player in ActivePlayers(state))
             {
                 // Fresh reveal lists for this Intermission's deal.
                 player.NewlyDealtModifierIds.Clear();
-                player.NewlyDealtActions.Clear();
+                player.NewlyDealtReactions.Clear();
 
                 // Distinct modifiers the player doesn't already hold (bay ids must stay unique).
                 var heldIds = player.EngineBay.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
@@ -200,12 +200,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                     pool.RemoveAt(idx);
                 }
 
-                // Actions may repeat in hand.
-                for (int i = 0; i < actCount && ActionLibrary.All.Length > 0; i++)
+                // Reactions may repeat in hand.
+                for (int i = 0; i < reactCount && ReactionLibrary.All.Length > 0; i++)
                 {
-                    int idx = context.Rng.GetRandomInt(ActionLibrary.All.Length);
-                    player.ActionHand.Add(ActionLibrary.All[idx]);
-                    player.NewlyDealtActions.Add(ActionLibrary.All[idx]);
+                    int idx = context.Rng.GetRandomInt(ReactionLibrary.All.Length);
+                    player.ReactionHand.Add(ReactionLibrary.All[idx]);
+                    player.NewlyDealtReactions.Add(ReactionLibrary.All[idx]);
                 }
             }
         }
@@ -315,12 +315,15 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.SniperBanUserId = null;
             state.OptimizationSubmissions.Clear();
 
-            // Drop the deal-reveal markers so they don't bleed into the next era's round UI.
+            // Drop the deal-reveal markers so they don't bleed into the next era's round UI, and
+            // drop any board-wide Censor — it never carries across an era boundary.
             foreach (var player in state.GamePlayers.Values)
             {
                 player.NewlyDealtModifierIds.Clear();
-                player.NewlyDealtActions.Clear();
+                player.NewlyDealtReactions.Clear();
             }
+            state.CensorBannedLetter = null;
+            state.CensorExemptUserIds.Clear();
 
             if (state.CurrentEra > state.Settings.EraCount)
                 return new GameOverState();

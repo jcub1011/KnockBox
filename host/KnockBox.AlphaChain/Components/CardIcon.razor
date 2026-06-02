@@ -1,4 +1,4 @@
-@* A distinct inline SVG glyph per card, keyed by ModifierCard.Icon / ActionCard.Icon.
+@* A distinct inline SVG glyph per card, keyed by ModifierCard.Icon / ReactionCard.Icon.
    Stroke uses currentColor so the parent (GameCard) can tint it to the card's category
    accent. Inline SVG (not static files) keeps icons working without per-plugin static-asset
    path wiring and lets them inherit color cleanly. *@
@@ -57,23 +57,66 @@
             <line x1="6" y1="18" x2="18" y2="6" />
             break;
 
-        case "pivot":
-            @* Refresh / redirect arrow. *@
-            <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" />
-            <polyline points="18,2.5 18,7 13.5,7" />
-            break;
-
         case "amnesty":
             @* Shield with a check — protection. *@
             <path d="M12 3l7 3v4.6c0 4.8-3.4 7.7-7 8.9-3.6-1.2-7-4.1-7-8.9V6z" />
             <polyline points="8.8,12 11.2,14.4 15.4,9.6" />
             break;
 
-        case "time-thief":
-            @* Clock losing time — a minus by the dial. *@
+        case "free-throw":
+            @* Open arc breaking free of the chain — clear the required letter. *@
+            <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" />
+            <polyline points="18,2.5 18,7 13.5,7" />
+            break;
+
+        case "overtime":
+            @* Clock gaining time — a plus by the dial. *@
             <circle cx="11" cy="13" r="7" />
             <polyline points="11,9 11,13 14,15" />
-            <line x1="17" y1="4.5" x2="22" y2="4.5" />
+            <line x1="19.5" y1="2.5" x2="19.5" y2="6.5" />
+            <line x1="17.5" y1="4.5" x2="21.5" y2="4.5" />
+            break;
+
+        case "windfall":
+            @* Falling cards / gift — drawing extra. *@
+            <rect x="4" y="9" width="9" height="12" rx="1" transform="rotate(-12 8.5 15)" />
+            <rect x="11" y="7" width="9" height="12" rx="1" transform="rotate(10 15.5 13)" />
+            break;
+
+        case "toll-booth":
+            @* Barrier gate — a toll. *@
+            <line x1="4" y1="20" x2="4" y2="9" />
+            <line x1="4" y1="10" x2="20" y2="6" />
+            <line x1="4" y1="20" x2="20" y2="20" />
+            <circle cx="4" cy="7.5" r="1.6" />
+            break;
+
+        case "frostbite":
+            @* Snowflake — chilling the clock. *@
+            <line x1="12" y1="3" x2="12" y2="21" />
+            <line x1="4" y1="7.5" x2="20" y2="16.5" />
+            <line x1="20" y1="7.5" x2="4" y2="16.5" />
+            <polyline points="9.5,4.5 12,6.5 14.5,4.5" />
+            <polyline points="9.5,19.5 12,17.5 14.5,19.5" />
+            break;
+
+        case "jinx":
+            @* Forbidden letter — circle with a slash. *@
+            <circle cx="12" cy="12" r="8.5" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+            break;
+
+        case "censor":
+            @* Redaction bars — banning letters. *@
+            <rect x="3.5" y="6.5" width="11" height="3.4" rx="1" />
+            <rect x="3.5" y="13.6" width="17" height="3.4" rx="1" />
+            break;
+
+        case "riposte":
+            @* Crossed parry — deflect and reflect. *@
+            <line x1="4" y1="20" x2="19" y2="5" />
+            <polyline points="19,9.5 19,5 14.5,5" />
+            <line x1="4" y1="9" x2="9" y2="14" />
             break;
 
         default:
@@ -83,6 +126,6 @@
 </svg>
 
 @code {
-    /// <summary>The card's icon key (see <c>ModifierCard.Icon</c> / <c>ActionCard.Icon</c>).</summary>
+    /// <summary>The card's icon key (see <c>ModifierCard.Icon</c> / <c>ReactionCard.Icon</c>).</summary>
     [Parameter] public string? Icon { get; set; }
 }
