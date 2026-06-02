@@ -287,13 +287,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
 
             // Tracer Round: 0 points (×1.0). At the end of your turn, the letter your word ends on is
             // forced onto the next player as a one-turn personal banned letter.
-            new ModifierCard(
-                "tracer-round", "Tracer Round",
-                "Grants 0 points. At the end of your turn, the letter your word ends on becomes a personal banned letter for the next player's turn.",
-                ModifierKind.Multiplicative,
-                Always,
-                static _ => 1.0)
-            { Icon = "tracer-round", HijacksEndLetter = true },
+            // Completely broken whith shintori rules.
+            //new ModifierCard(
+            //    "tracer-round", "Tracer Round",
+            //    "Grants 0 points. At the end of your turn, the letter your word ends on becomes a personal banned letter for the next player's turn.",
+            //    ModifierKind.Multiplicative,
+            //    Always,
+            //    static _ => 1.0)
+            //{ Icon = "tracer-round", HijacksEndLetter = true },
 
             // ── Shield (§2.4): The Titanium Mirror. Starts as a passive ×1.0 placeholder; auto-blocks
             //    and reflects incoming automated attacks, decaying −0.1× per block into a burden. ──
