@@ -14,17 +14,17 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
             new ActionCard(
                 "pivot", "The Pivot",
                 "Clears the required start letter for your next submission.",
-                ActionKind.Pivot),
+                ActionKind.Pivot) { Icon = "pivot" },
 
             new ActionCard(
                 "amnesty", "Amnesty",
                 "Suppresses the Zero-Point Tax for your next submission.",
-                ActionKind.Amnesty),
+                ActionKind.Amnesty) { Icon = "amnesty" },
 
             new ActionCard(
                 "time-thief", "Time Thief",
                 "Steals 5 seconds from an opponent's shot clock.",
-                ActionKind.TimeThief),
+                ActionKind.TimeThief) { Icon = "time-thief" },
         ];
 
         /// <summary>Fast id → card lookup for resolving network ids against the catalogue.</summary>

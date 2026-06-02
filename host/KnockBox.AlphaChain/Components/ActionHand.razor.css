@@ -38,51 +38,6 @@
     position: relative;
 }
 
-/* ── Action card chip (scoped to this component's markup) ────────────── */
-.ac-card {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 2.75rem;
-    padding: 0.4rem 0.8rem;
-    border: 1px solid color-mix(in srgb, var(--ac-action) 70%, transparent);
-    border-radius: 0.5rem;
-    background: color-mix(in srgb, var(--ac-action) 14%, transparent);
-    color: var(--ac-ink, #eaf2ff);
-    cursor: pointer;
-    font: inherit;
-}
-
-.ac-card:disabled {
-    cursor: default;
-    opacity: 0.5;
-}
-
-.ac-card-selected {
-    outline: 2px solid var(--ac-action, #b97bff);
-    outline-offset: 1px;
-    box-shadow: 0 0 16px color-mix(in srgb, var(--ac-action) 45%, transparent);
-}
-
-.ac-card-name {
-    font-size: 0.78rem;
-    font-weight: 700;
-}
-
-/* "Queued for your next word" badge on a pending Pivot/Amnesty card. */
-.ac-card-queued-badge {
-    margin-left: 0.4rem;
-    padding: 0.05rem 0.4rem;
-    font-size: 0.58rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    border-radius: 0.4rem;
-    background: var(--ac-violet, #b97bff);
-    color: #16082b;
-    box-shadow: 0 0 12px color-mix(in srgb, var(--ac-violet) 55%, transparent);
-}
-
 /* ── Time Thief target-picker modal ──────────────────────────────────── */
 .ac-modal-backdrop {
     position: fixed;

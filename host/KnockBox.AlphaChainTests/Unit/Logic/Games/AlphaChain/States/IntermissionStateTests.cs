@@ -11,8 +11,9 @@ using Moq;
 namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 {
     /// <summary>
-    /// Exercises the era-boundary Intermission: the Deal / Expansion / Optimization / Sniper Ban
-    /// sub-phase progression, the two player commands, and era advancement back into the round loop.
+    /// Exercises the era-boundary Intermission: cards are dealt and bays expanded instantly on
+    /// entry (no Deal/Expansion dwell), then the Optimization → Sniper Ban progression, the two
+    /// player commands, and era advancement back into the round loop.
     /// </summary>
     [TestClass]
     public class IntermissionStateTests
@@ -52,30 +53,34 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             return (engine, state);
         }
 
-        /// <summary>Transitions the live FSM into a fresh Intermission (runs OnEnter → Deal).</summary>
+        /// <summary>Transitions the live FSM into a fresh Intermission (OnEnter deals, expands,
+        /// and opens Optimization directly — no Deal/Expansion dwell sub-phases).</summary>
         private static void EnterIntermission(AlphaChainGameState state)
             => state.Execute(() => state.Context!.Fsm.TransitionTo(state.Context, new IntermissionState()));
 
-        // ── Deal ──────────────────────────────────────────────────────────────
+        // ── Deal + Expansion (applied instantly on entry) ──────────────────────
 
         [TestMethod]
-        public async Task Deal_DealsConfiguredCounts_ToEveryActivePlayer()
+        public async Task OnEnter_DealsConfiguredCounts_ToEveryActivePlayer_AndOpensOptimization()
         {
             var (_, state) = await StartGameAsync(playerCount: 4);
             using var _ = state;
 
             EnterIntermission(state);
 
-            Assert.AreEqual(IntermissionSubPhase.Deal, state.IntermissionPhase);
+            Assert.AreEqual(IntermissionSubPhase.Optimization, state.IntermissionPhase);
             foreach (var player in state.GamePlayers.Values)
             {
                 Assert.AreEqual(state.Settings.ModifiersDealtPerEra, player.EngineBay.Count, "modifier deal count");
                 Assert.AreEqual(state.Settings.ActionsDealtPerEra, player.ActionHand.Count, "action deal count");
+                // Dealt cards are tracked so the Optimization panel can flag them NEW.
+                Assert.AreEqual(state.Settings.ModifiersDealtPerEra, player.NewlyDealtModifierIds.Count, "new modifier ids");
+                Assert.AreEqual(state.Settings.ActionsDealtPerEra, player.NewlyDealtActions.Count, "new actions");
             }
         }
 
         [TestMethod]
-        public async Task Deal_SkipsEliminatedPlayers()
+        public async Task OnEnter_SkipsEliminatedPlayers()
         {
             var (_, state) = await StartGameAsync(playerCount: 4);
             using var _ = state;
@@ -88,36 +93,28 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.AreEqual(0, state.GamePlayers[eliminatedId].ActionHand.Count);
         }
 
-        // ── Expansion ───────────────────────────────────────────────────────────
-
         [TestMethod]
-        public async Task Expansion_AddsOneSlotToEachActivePlayer()
+        public async Task OnEnter_AddsOneSlotToEachActivePlayer()
         {
-            var (engine, state) = await StartGameAsync(playerCount: 4);
+            var (_, state) = await StartGameAsync(playerCount: 4);
             using var _ = state;
-            EnterIntermission(state);
             int before = state.GamePlayers.Values.First().ModifierSlots;
 
-            // Deal dwell elapses → Expansion.
-            engine.Tick(state.Context!, DateTimeOffset.UtcNow.AddSeconds(5));
+            EnterIntermission(state);
 
-            Assert.AreEqual(IntermissionSubPhase.Expansion, state.IntermissionPhase);
+            Assert.AreEqual(IntermissionSubPhase.Optimization, state.IntermissionPhase);
             foreach (var player in state.GamePlayers.Values)
                 Assert.AreEqual(before + 1, player.ModifierSlots);
         }
 
         // ── Optimization ──────────────────────────────────────────────────────
 
-        /// <summary>Fast-forwards Deal → Expansion → Optimization and returns the clock used.</summary>
+        /// <summary>OnEnter opens Optimization directly (deal + expand are instant); asserts that
+        /// and returns a base clock the caller can advance to time the sub-phase out.</summary>
         private static DateTimeOffset AdvanceToOptimization(AlphaChainGameEngine engine, AlphaChainGameState state)
         {
-            var clock = DateTimeOffset.UtcNow;
-            clock = clock.AddSeconds(5);
-            engine.Tick(state.Context!, clock); // Deal → Expansion
-            clock = clock.AddSeconds(5);
-            engine.Tick(state.Context!, clock); // Expansion → Optimization
             Assert.AreEqual(IntermissionSubPhase.Optimization, state.IntermissionPhase);
-            return clock;
+            return DateTimeOffset.UtcNow;
         }
 
         [TestMethod]

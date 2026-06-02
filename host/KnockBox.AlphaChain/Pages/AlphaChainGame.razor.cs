@@ -58,6 +58,17 @@ namespace KnockBox.AlphaChain.Pages
         protected bool IsMyTurn =>
             CurrentUserId is not null && GameState.TurnManager.CurrentPlayer == CurrentUserId;
 
+        /// <summary>True while the round-ending word's score animation is playing and the FSM is
+        /// holding before the Intermission/GameOver transition — all word entry is frozen.</summary>
+        protected bool AwaitingTransition => GameState.PendingTransitionAt is not null;
+
+        /// <summary>Status text shown in the entry while the end-of-round hold plays out.</summary>
+        protected string TransitionHoldMessage =>
+            GameState.PendingTransitionIsGameOver ? "final word — tallying…" : "era complete — tallying…";
+
+        /// <summary>Whether the local player may submit right now (their turn and not mid-hold).</summary>
+        protected bool CanSubmit => IsMyTurn && !AwaitingTransition;
+
         /// <summary>Display name of the active player, or a placeholder when unset.</summary>
         protected string CurrentPlayerName
         {
@@ -108,6 +119,16 @@ namespace KnockBox.AlphaChain.Pages
                 ? GameState.PlayLog
                 : GameState.PlayLog.Skip(GameState.PlayLog.Count - 7).ToList();
 
+        /// <summary>The inline score replay to play on <paramref name="userId"/>'s Engine Bay, or
+        /// null when the latest play wasn't theirs (or had no modifier cards to walk through).
+        /// Only the submitting player's bay animates; every client sees it on that bay.</summary>
+        protected ScoreReplay? ReplayFor(string? userId) =>
+            userId is not null
+            && GameState.LatestScoreReplay is { Breakdown.Steps.Count: > 0 } replay
+            && replay.UserId == userId
+                ? replay
+                : null;
+
         /// <summary>The newest accepted play, used to flash a score-pop on the leaderboard.</summary>
         protected AlphaChainWordPlay? LatestPlay =>
             GameState.PlayLog.Count > 0 ? GameState.PlayLog[^1] : null;
@@ -137,30 +158,15 @@ namespace KnockBox.AlphaChain.Pages
 
         // ── Intermission (M4) ───────────────────────────────────────────────
 
-        /// <summary>Whole seconds left on the current Intermission sub-phase timer (never negative).</summary>
-        protected int SubPhaseSecondsRemaining
+        /// <summary>The configured duration of the current Intermission sub-phase, or
+        /// <see cref="TimeSpan.Zero"/> when the sub-phase has no countdown. Feeds the shared
+        /// client-side <c>CountdownClock</c> so the timer ticks smoothly off the circuit.</summary>
+        protected TimeSpan SubPhaseDuration => GameState.IntermissionPhase switch
         {
-            get
-            {
-                var remaining = GameState.SubPhaseEndTime - DateTimeOffset.UtcNow;
-                return remaining > TimeSpan.Zero ? (int)Math.Ceiling(remaining.TotalSeconds) : 0;
-            }
-        }
-
-        /// <summary>The configured duration (seconds) of the current sub-phase, or 0 when unknown
-        /// (Deal/Expansion are brief fixed dwells with no meaningful progress bar).</summary>
-        protected int SubPhaseDurationSeconds => GameState.IntermissionPhase switch
-        {
-            IntermissionSubPhase.Optimization => GameState.Settings.IntermissionCardSelectSeconds,
-            IntermissionSubPhase.SniperBan => GameState.Settings.SniperBanSeconds,
-            _ => 0
+            IntermissionSubPhase.Optimization => TimeSpan.FromSeconds(GameState.Settings.IntermissionCardSelectSeconds),
+            IntermissionSubPhase.SniperBan => TimeSpan.FromSeconds(GameState.Settings.SniperBanSeconds),
+            _ => TimeSpan.Zero
         };
-
-        /// <summary>0–1 fraction of the sub-phase timer remaining, or 1 when duration is unknown.</summary>
-        protected double SubPhaseFraction =>
-            SubPhaseDurationSeconds > 0
-                ? Math.Clamp((double)SubPhaseSecondsRemaining / SubPhaseDurationSeconds, 0, 1)
-                : 1;
 
         /// <summary>How many players have locked in their Optimization ordering.</summary>
         protected int OptimizationSubmittedCount =>
@@ -285,14 +291,16 @@ namespace KnockBox.AlphaChain.Pages
                 }
 
                 // Re-arm the auto-submit deadline + focus only when the turn (or my deadline)
-                // changes — not on every tick re-render.
-                var sig = IsMyTurn
-                    ? $"me|{GameState.PhaseEndTime.UtcTicks}"
-                    : $"other|{GameState.TurnManager.CurrentPlayer}";
+                // changes — not on every tick re-render. The intermission hold disarms entry.
+                var sig = AwaitingTransition
+                    ? "hold"
+                    : IsMyTurn
+                        ? $"me|{GameState.PhaseEndTime.UtcTicks}"
+                        : $"other|{GameState.TurnManager.CurrentPlayer}";
                 if (sig != _lastArmSig)
                 {
                     _lastArmSig = sig;
-                    if (IsMyTurn)
+                    if (CanSubmit)
                     {
                         var remainingMs = Math.Max(0, (GameState.PhaseEndTime - DateTimeOffset.UtcNow).TotalMilliseconds);
                         await _inputModule.InvokeVoidAsync("armDeadline", _inputId, remainingMs, AutoSubmitLeadMs);

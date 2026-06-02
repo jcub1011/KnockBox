@@ -26,5 +26,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
         string Description,
         ModifierKind Kind,
         Func<WordContext, bool> Trigger,
-        Func<WordContext, double> Value);
+        Func<WordContext, double> Value)
+    {
+        /// <summary>
+        /// Stable icon key resolved by <c>CardIcon</c> to an inline SVG glyph, so players
+        /// associate a distinct symbol with each card's function. Set via object initializer
+        /// in <see cref="ModifierLibrary"/>; defaults to empty for ad-hoc/test cards.
+        /// </summary>
+        public string Icon { get; init; } = string.Empty;
+    }
 }

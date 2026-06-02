@@ -1,0 +1,87 @@
+@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
+
+@* The single, uniform card renderer used everywhere a modifier or action card appears
+   (Engine Bay, Action Hand, Optimization panel, score overlay). Every card has the same
+   fixed width so they line up in lists, and shows its icon + name + inline description so
+   players never have to hover to learn what a card does. Interactive behaviour (drag,
+   click, discard) lives in the wrapping consumer; this component owns the visuals only. *@
+
+<div class="@RootClass">
+    <div class="gc-head">
+        <span class="gc-icon"><CardIcon Icon="@Icon" /></span>
+        @if (OperatorSymbol is { } op)
+        {
+            <span class="gc-op">@op</span>
+        }
+        @if (!string.IsNullOrEmpty(BadgeText))
+        {
+            <span class="gc-badge">@BadgeText</span>
+        }
+    </div>
+    <span class="gc-name">@Name</span>
+    @if (!Compact && !string.IsNullOrEmpty(Description))
+    {
+        <p class="gc-desc">@Description</p>
+    }
+</div>
+
+@code {
+    /// <summary>Card display name.</summary>
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+
+    /// <summary>Inline rules text shown on the card (no hover needed).</summary>
+    [Parameter] public string? Description { get; set; }
+
+    /// <summary>Icon key resolved by <see cref="CardIcon"/>.</summary>
+    [Parameter] public string? Icon { get; set; }
+
+    /// <summary>Top-level category, drives the accent tint + operator.</summary>
+    [Parameter] public CardCategory Category { get; set; } = CardCategory.Modifier;
+
+    /// <summary>Modifier kind (additive/multiplicative); null for action cards.</summary>
+    [Parameter] public ModifierKind? Kind { get; set; }
+
+    /// <summary>Overrides the operator/value glyph (e.g. "×1.5" in the score overlay).</summary>
+    [Parameter] public string? ValueText { get; set; }
+
+    /// <summary>Optional small corner badge ("NEW", "Queued", a slot number, …).</summary>
+    [Parameter] public string? BadgeText { get; set; }
+
+    /// <summary>Selected outline (e.g. a chosen action target).</summary>
+    [Parameter] public bool Selected { get; set; }
+
+    /// <summary>Drag-in-progress styling.</summary>
+    [Parameter] public bool Dragging { get; set; }
+
+    /// <summary>Dimmed/disabled look (a card that can't be played right now).</summary>
+    [Parameter] public bool Dim { get; set; }
+
+    /// <summary>Plays the entrance pop + glow (a freshly-dealt card).</summary>
+    [Parameter] public bool New { get; set; }
+
+    /// <summary>Compact variant (hides the description, narrower) for opponent summaries.</summary>
+    [Parameter] public bool Compact { get; set; }
+
+    /// <summary>Full root class string (base + category + state modifiers).</summary>
+    private string RootClass => $"gc-card gc-{CategoryClass}{StateClasses}";
+
+    /// <summary>action / additive / multiplicative — selects the accent variable.</summary>
+    private string CategoryClass => Category == CardCategory.Action
+        ? "action"
+        : Kind == ModifierKind.Multiplicative ? "multiplicative" : "additive";
+
+    /// <summary>The operator glyph: explicit override, else + / × for modifiers, else none.</summary>
+    private string? OperatorSymbol => ValueText ?? Kind switch
+    {
+        ModifierKind.Additive => "+",
+        ModifierKind.Multiplicative => "×",
+        _ => null
+    };
+
+    private string StateClasses =>
+        (Selected ? " gc-selected" : "")
+        + (Dragging ? " gc-dragging" : "")
+        + (Dim ? " gc-dim" : "")
+        + (New ? " gc-new" : "")
+        + (Compact ? " gc-compact" : "");
+}

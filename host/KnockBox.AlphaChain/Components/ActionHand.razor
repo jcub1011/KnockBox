@@ -22,18 +22,15 @@
                 var current = card;
                 bool queued = QueuedKind == current.Kind && current.Kind != ActionKind.TimeThief;
                 <li class="ac-hand-card-wrap">
-                    <CardTooltip Name="@current.Name" Description="@current.Description" Category="CardCategory.Action">
-                        <button type="button"
-                                class="ac-card ac-card-action @(_pickerCard == current ? "ac-card-selected" : "")"
-                                disabled="@Disabled"
-                                @onclick="() => OnCardClicked(current)">
-                            <span class="ac-card-name">@current.Name</span>
-                            @if (queued)
-                            {
-                                <span class="ac-card-queued-badge" title="Queued for your next word">Queued</span>
-                            }
-                        </button>
-                    </CardTooltip>
+                    <button type="button"
+                            class="ac-cardbtn"
+                            disabled="@Disabled"
+                            @onclick="() => OnCardClicked(current)">
+                        <GameCard Name="@current.Name" Description="@current.Description" Icon="@current.Icon"
+                                  Category="CardCategory.Action"
+                                  Selected="@(_pickerCard == current)" Dim="@Disabled"
+                                  BadgeText="@(queued ? "Queued" : null)" />
+                    </button>
                 </li>
             }
         </ul>

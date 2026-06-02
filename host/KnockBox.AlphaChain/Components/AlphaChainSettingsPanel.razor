@@ -1,3 +1,4 @@
+@using System.Globalization
 @using KnockBox.AlphaChain.Services.Logic.Games.Data
 @using KnockBox.AlphaChain.Services.State.Games
 @using KnockBox.Core.Services.Storage.ClientStorage
@@ -104,6 +105,16 @@
                        @oninput="OnActionsChanged" />
             </label>
 
+            <label class="ac-settings-field ac-settings-field-full" title="@EngineAnimTip">
+                <span>Engine Animation <strong>@s.EngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture) s</strong></span>
+                <input type="range"
+                       min="@AlphaChainSettings.MinEngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture)"
+                       max="@AlphaChainSettings.MaxEngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture)"
+                       step="0.5"
+                       value="@s.EngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture)"
+                       @oninput="OnEngineAnimationChanged" />
+            </label>
+
             <label class="ac-settings-field ac-settings-field-row" title="@SurvivalTip">
                 <span>Survival Mode</span>
                 <input type="checkbox"
@@ -134,6 +145,7 @@
             <div title="@SniperBanTip"><dt>Sniper Ban Timer</dt><dd>@s.SniperBanSeconds s</dd></div>
             <div title="@ModifiersTip"><dt>Modifiers / Era</dt><dd>@s.ModifiersDealtPerEra</dd></div>
             <div title="@ActionsTip"><dt>Actions / Era</dt><dd>@s.ActionsDealtPerEra</dd></div>
+            <div title="@EngineAnimTip"><dt>Engine Animation</dt><dd>@s.EngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture) s</dd></div>
             <div title="@SurvivalTip"><dt>Survival Mode</dt><dd>@(s.SurvivalMode ? "On" : "Off")</dd></div>
         </dl>
     }
@@ -156,6 +168,7 @@
     private const string ModifiersTip = "Modifier cards dealt to each player every Intermission. Modifiers are persistent engine cards processed left-to-right (additives first, multipliers last).";
     private const string ActionsTip = "Single-use Action cards dealt to each player every Intermission (e.g. Pivot, Amnesty, Time Thief).";
     private const string SurvivalTip = "When on, a player who misses the shot clock is eliminated for good instead of being penalized and staying in.";
+    private const string EngineAnimTip = "Total length of the score-replay animation that runs each accepted word through the Engine Bay so everyone sees how the score is built. Constant regardless of how many cards you hold — bigger engines just animate faster.";
 
     private readonly CancellationTokenSource _cts = new();
     private Task? _saveTask;
@@ -195,6 +208,14 @@
     private void OnSniperBanChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { SniperBanSeconds = v });
     private void OnModifiersChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { ModifiersDealtPerEra = v });
     private void OnActionsChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { ActionsDealtPerEra = v });
+
+    // EngineAnimationSeconds is a double (range slider, 0.5 s steps); parsed invariant so the
+    // browser's dot-decimal value is read correctly regardless of host locale.
+    private void OnEngineAnimationChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+            UpdateSetting(s => s with { EngineAnimationSeconds = value });
+    }
 
     // Raw value is stored as-typed (no clamping) so Validate() can flag out-of-range input
     // and gate the start buttons; an unparseable value is ignored.

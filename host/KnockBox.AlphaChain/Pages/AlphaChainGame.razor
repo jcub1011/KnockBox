@@ -19,30 +19,30 @@
         <div class="ac-intermission">
             <div class="ac-im-header">
                 <span class="ac-im-era">Era @GameState.CurrentEra <span class="ac-im-arrow">→</span> @(GameState.CurrentEra + 1)</span>
-                <div class="ac-im-timer">
-                    <span class="ac-im-clock @(SubPhaseSecondsRemaining <= 3 ? "ac-clock-urgent" : "")">@SubPhaseSecondsRemaining<span class="ac-im-clock-unit">s</span></span>
-                    @if (SubPhaseDurationSeconds > 0)
-                    {
-                        <span class="ac-im-bar"><span class="ac-im-bar-fill" style="width:@((SubPhaseFraction * 100).ToString("0.#", CultureInfo.InvariantCulture))%"></span></span>
-                    }
-                </div>
+                @if (SubPhaseDuration > TimeSpan.Zero)
+                {
+                    <CountdownClock EndTimeUtc="GameState.SubPhaseEndTime" Duration="SubPhaseDuration" Context="im">
+                        @{
+                            int imSecs = (int)Math.Ceiling(Math.Max(0, im.RemainingSeconds));
+                            float imFrac = Math.Clamp(im.Fraction, 0f, 1f);
+                        }
+                        <div class="ac-im-timer">
+                            <span class="ac-im-clock @(im.RemainingSeconds <= 3 ? "ac-clock-urgent" : "")">@imSecs<span class="ac-im-clock-unit">s</span></span>
+                            <span class="ac-im-bar"><span class="ac-im-bar-fill" style="width:@((imFrac * 100).ToString("0.#", CultureInfo.InvariantCulture))%"></span></span>
+                        </div>
+                    </CountdownClock>
+                }
             </div>
 
             @switch (GameState.IntermissionPhase)
             {
-                case IntermissionSubPhase.Deal:
-                case IntermissionSubPhase.Expansion:
-                    <IntermissionDealAnimation SubPhase="GameState.IntermissionPhase"
-                                               Modifiers="MyPlayer?.EngineBay ?? []"
-                                               Actions="MyPlayer?.ActionHand ?? []"
-                                               Slots="MyPlayer?.ModifierSlots ?? 0" />
-                    break;
-
                 case IntermissionSubPhase.Optimization:
                     @if (MyPlayer is { } me)
                     {
                         <IntermissionOptimizationPanel Cards="me.EngineBay"
                                                        Slots="me.ModifierSlots"
+                                                       NewCardIds="me.NewlyDealtModifierIds"
+                                                       NewActions="me.NewlyDealtActions"
                                                        SubmittedCount="OptimizationSubmittedCount"
                                                        TotalCount="OptimizationTotalCount"
                                                        HasSubmitted="HasSubmittedOptimization"
@@ -113,16 +113,16 @@
                 </div>
 
                 @* ── Word entry: client-owned input (no @bind — see alpha-chain-input.js) ── *@
-                <div class="ac-entry @(IsMyTurn ? "ac-entry-live" : "ac-entry-wait")">
+                <div class="ac-entry @(CanSubmit ? "ac-entry-live" : "ac-entry-wait")">
                     <span class="ac-entry-prefix @(GameState.RequiredStartLetter is null ? "ac-entry-prefix-free" : "")"
                           title="@(GameState.RequiredStartLetter is null ? "Free choice — any letter" : "Your word must start with this letter")">
                         @(GameState.RequiredStartLetter is { } req ? char.ToUpperInvariant(req).ToString() : "∗")
                     </span>
                     <input @ref="_wordInputRef" class="ac-word-input" type="text"
-                           placeholder="@(IsMyTurn ? "type a word…" : $"{CurrentPlayerName} is playing…")"
-                           disabled="@(!IsMyTurn)"
+                           placeholder="@(AwaitingTransition ? TransitionHoldMessage : CanSubmit ? "type a word…" : $"{CurrentPlayerName} is playing…")"
+                           disabled="@(!CanSubmit)"
                            autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
-                    <button type="button" class="ac-submit-btn" disabled="@(!IsMyTurn || IsSubmitting)"
+                    <button type="button" class="ac-submit-btn" disabled="@(!CanSubmit || IsSubmitting)"
                             @onclick="SubmitFromButtonAsync">GO</button>
                 </div>
 
@@ -161,7 +161,9 @@
                            frozen and only resequenced at Intermission (Optimization). The bay is
                            always Locked here, so no OnReorder handler is wired. *@
                         <EngineBay Cards="myCards.EngineBay" Slots="myCards.ModifierSlots"
-                                   Locked="true" Title="Your Engine Bay" />
+                                   Locked="true" Title="Your Engine Bay"
+                                   Replay="ReplayFor(CurrentUserId)"
+                                   ReplayTotalSeconds="GameState.Settings.EngineAnimationSeconds" />
                         <ActionHand Cards="myCards.ActionHand" Opponents="ActionTargets" Disabled="false"
                                     QueuedKind="myCards.PendingAction" OnPlay="PlayActionAsync" />
                     </div>
@@ -173,7 +175,9 @@
                     <div class="ac-opponent-bays">
                         @foreach (var opp in Opponents)
                         {
-                            <EngineBay Cards="opp.EngineBay" Slots="opp.ModifierSlots" ReadOnly="true" Title="@opp.DisplayName" />
+                            <EngineBay Cards="opp.EngineBay" Slots="opp.ModifierSlots" ReadOnly="true" Title="@opp.DisplayName"
+                                       Replay="ReplayFor(opp.UserId)"
+                                       ReplayTotalSeconds="GameState.Settings.EngineAnimationSeconds" />
                         }
                     </div>
                 }

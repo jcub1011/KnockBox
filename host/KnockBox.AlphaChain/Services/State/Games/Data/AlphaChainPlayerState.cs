@@ -56,6 +56,21 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         public List<ActionCard> ActionHand { get; } = new();
 
         /// <summary>
+        /// Ids of the modifier cards dealt to this player in the current Intermission, so the
+        /// Optimization panel can flag them NEW and pop them in (the deal reveal now lives in
+        /// Optimization instead of a dedicated sub-phase). Repopulated each deal, cleared when
+        /// the Intermission completes.
+        /// </summary>
+        public HashSet<string> NewlyDealtModifierIds { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The action cards dealt to this player in the current Intermission, shown as a reveal
+        /// strip in the Optimization panel. Repopulated each deal, cleared when the Intermission
+        /// completes. A list (not a set) because action hands may hold duplicates.
+        /// </summary>
+        public List<ActionCard> NewlyDealtActions { get; } = new();
+
+        /// <summary>
         /// A Pivot/Amnesty queued for the player's next submission, or null when none is
         /// pending. Consumed by the next accepted submission (see <c>RoundState</c>).
         /// </summary>

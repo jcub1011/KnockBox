@@ -39,9 +39,49 @@ namespace KnockBox.AlphaChain.Services.Logic.Scoring
                     current *= card.Value(word);
             }
 
-            // Round half-up (away from zero) at the very end, then clamp.
-            int rounded = (int)Math.Round(current, MidpointRounding.AwayFromZero);
-            return Math.Clamp(rounded, 0, MaxWordScore);
+            return RoundClamp(current);
         }
+
+        public ScoreBreakdown CalculateSteps(WordContext word, IReadOnlyList<ModifierCard> orderedBay, bool taxed)
+        {
+            double current = word.Length;
+            var steps = new List<ScoreStep>(orderedBay.Count);
+
+            foreach (var card in orderedBay)
+            {
+                bool triggered = card.Trigger(word);
+                string valueText = "—";
+
+                if (triggered)
+                {
+                    double value = card.Value(word);
+                    if (card.Kind == ModifierKind.Additive)
+                    {
+                        current += value;
+                        valueText = "+" + FormatValue(value);
+                    }
+                    else
+                    {
+                        current *= value;
+                        valueText = "×" + FormatValue(value);
+                    }
+                }
+
+                steps.Add(new ScoreStep(
+                    card.Id, card.Name, card.Icon, card.Kind, triggered, valueText, RoundClamp(current)));
+            }
+
+            int finalBeforeTax = RoundClamp(current);
+            return new ScoreBreakdown(
+                word.Word, word.Length, steps, finalBeforeTax, taxed, taxed ? 0 : finalBeforeTax);
+        }
+
+        /// <summary>Round half-up (away from zero) then clamp to the legal score range.</summary>
+        private static int RoundClamp(double value) =>
+            Math.Clamp((int)Math.Round(value, MidpointRounding.AwayFromZero), 0, MaxWordScore);
+
+        /// <summary>Formats a card value for display, dropping a trailing ".0" (e.g. 2 → "2", 1.5 → "1.5").</summary>
+        private static string FormatValue(double value) =>
+            value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
     }
 }

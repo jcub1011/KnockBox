@@ -70,6 +70,14 @@ namespace KnockBox.AlphaChain.Tests.Integration
                     continue;
                 }
 
+                // A round-ending word leaves the FSM holding in RoundState so its score animation
+                // can finish; tick past the hold to fire the transition (as the host tick does).
+                if (state.PendingTransitionAt is { } holdUntil)
+                {
+                    engine.Tick(state.Context!, holdUntil.AddSeconds(1));
+                    continue;
+                }
+
                 // RoundState: the active player answers immediately (no timeout).
                 var actor = state.TurnManager.CurrentPlayer!;
                 var word = NextWord(state.RequiredStartLetter, state.BannedLetter, ref counter);
@@ -122,10 +130,10 @@ namespace KnockBox.AlphaChain.Tests.Integration
                 $"Expected at least {eraCount} eras but reached {state.CurrentEra}.");
         }
 
-        // Steps a live Intermission through every timed sub-phase (Deal → Expansion →
-        // Optimization → SniperBan) by ticking well past each sub-phase's timer, until the FSM
-        // hands back to RoundState (or GameOver). No optimization/ban commands are issued, so
-        // the deal/expansion defaults and the SniperBan timeout-draw fallback are exercised.
+        // Steps a live Intermission through its timed sub-phases (Optimization → SniperBan; cards
+        // are dealt and bays expanded instantly on entry) by ticking well past each sub-phase's
+        // timer, until the FSM hands back to RoundState (or GameOver). No optimization/ban commands
+        // are issued, so the deal defaults and the SniperBan timeout-draw fallback are exercised.
         private static void StepIntermissionToCompletion(AlphaChainGameEngine engine, AlphaChainGameState state)
         {
             var t0 = DateTimeOffset.UtcNow;

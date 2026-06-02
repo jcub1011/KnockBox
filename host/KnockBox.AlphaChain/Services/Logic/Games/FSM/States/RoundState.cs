@@ -28,6 +28,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.SetPhase(AlphaChainGamePhase.Round);
             state.ResetTurnTimer(DateTimeOffset.UtcNow);
 
+            // Drop the previous era's last score replay so it doesn't animate on this era's bays
+            // after the Intermission deal, and clear any leftover transition hold.
+            state.LatestScoreReplay = null;
+            state.PendingTransitionAt = null;
+            state.PendingTransitionIsGameOver = false;
+
             context.Logger.LogDebug(
                 "Alpha Chain FSM → RoundState (era {era}, round {round}, active {player})",
                 state.CurrentEra, state.CurrentRound, state.TurnManager.CurrentPlayer);
@@ -39,7 +45,17 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
         public ValueResult<TimeSpan> GetRemainingTime(AlphaChainGameContext context, DateTimeOffset now)
         {
-            var remaining = context.State.PhaseEndTime - now;
+            var state = context.State;
+
+            // While holding for the score animation, schedule the next tick for the hold deadline
+            // (not the now-stale shot clock) so the transition fires right when it elapses.
+            if (state.PendingTransitionAt is { } holdUntil)
+            {
+                var hold = holdUntil - now;
+                return hold > TimeSpan.Zero ? hold : TimeSpan.Zero;
+            }
+
+            var remaining = state.PhaseEndTime - now;
             return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
         }
 
@@ -60,6 +76,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         {
             var state = context.State;
             var turnManager = state.TurnManager;
+
+            // 0. The round-ending word has been played; we're holding for its score animation.
+            //    Refuse further submissions until the transition (Intermission/GameOver) fires.
+            if (state.PendingTransitionAt is not null)
+            {
+                context.LastSubmitResult = new SubmitWordResult.RejectedNotYourTurn();
+                return null;
+            }
 
             // 1. Only the active player may submit.
             if (cmd.ActorUserId != turnManager.CurrentPlayer)
@@ -115,10 +139,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             bool taxed = containsBanned && !amnestyActive;
 
             // 8. Full scoring pipeline: (L + ΣA) × ΠM, evaluated left → right over the bay.
+            //    Capture the per-step trace too (for the score-replay animation); its
+            //    FinalBeforeTax equals the plain Calculate result.
             var ctx = WordContext.Build(word, state.BannedLetter);
-            int baseScore = context.ScoreCalculator.Calculate(
-                ctx, (IReadOnlyList<ModifierCard>?)player?.EngineBay ?? []);
-            int score = taxed ? 0 : baseScore;
+            var bay = (IReadOnlyList<ModifierCard>?)player?.EngineBay ?? [];
+            var breakdown = context.ScoreCalculator.CalculateSteps(ctx, bay, taxed);
+            int baseScore = breakdown.FinalBeforeTax;
+            int score = breakdown.FinalScore;
 
             // 9. Consume the queued action now that the submission is committed. Pivot is
             //    always spent by the submission it was queued for; Amnesty is spent only when
@@ -156,13 +183,20 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 taxed,
                 bounty));
 
+            // Publish the scoring trace so every client plays the center-stage replay. The
+            // sequence bump makes the overlay remount and animate exactly once for this word.
+            state.ScoreReplaySequence++;
+            state.LatestScoreReplay = new ScoreReplay(
+                state.ScoreReplaySequence, cmd.ActorUserId, player?.DisplayName ?? cmd.ActorUserId, breakdown);
+
             // 12. Result is set before advancing so it reflects this submission.
             context.LastSubmitResult = taxed
                 ? new SubmitWordResult.AcceptedZeroPointTax()
                 : new SubmitWordResult.Accepted(score);
 
-            // 13. Advance the turn (round increment / game-over check) and re-arm the clock.
-            return AdvanceTurnAndEvaluate(context, DateTimeOffset.UtcNow);
+            // 13. Advance the turn (round increment / game-over check) and re-arm the clock. An
+            //     era-ending word holds in RoundState until its score animation finishes.
+            return AdvanceTurnAndEvaluate(context, DateTimeOffset.UtcNow, holdForReplay: true);
         }
 
         /// <summary>
@@ -210,6 +244,11 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         private static ValueResult<FsmState?> HandlePlayAction(AlphaChainGameContext context, PlayActionCommand cmd)
         {
             var state = context.State;
+
+            // The round is ending and we're holding for the score animation — no more plays.
+            if (state.PendingTransitionAt is not null)
+                return new ResultError("The round is ending.",
+                    $"PlayActionCommand from [{cmd.ActorUserId}] during the end-of-round hold.");
 
             // Possession: the actor must actually hold the named card.
             if (!state.GamePlayers.TryGetValue(cmd.ActorUserId, out var actor))
@@ -310,6 +349,21 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         {
             var state = context.State;
 
+            // Holding after the round-ending word so the inline score animation can finish. Once
+            // the hold elapses, fire the pending transition (Intermission or GameOver). The shot
+            // clock is ignored while holding.
+            if (state.PendingTransitionAt is { } holdUntil)
+            {
+                if (now >= holdUntil)
+                {
+                    bool gameOver = state.PendingTransitionIsGameOver;
+                    state.PendingTransitionAt = null;
+                    state.PendingTransitionIsGameOver = false;
+                    return gameOver ? new GameOverState() : new IntermissionState();
+                }
+                return null;
+            }
+
             // Timer still running — nothing to do.
             if (now < state.PhaseEndTime)
                 return null;
@@ -350,7 +404,15 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         /// any Time Thief time queued against the new active player.
         /// Returns <see cref="GameOverState"/> when the final scheduled round completes, else null.
         /// </summary>
-        private static ValueResult<FsmState?> AdvanceTurnAndEvaluate(AlphaChainGameContext context, DateTimeOffset now)
+        /// <param name="holdForReplay">
+        /// True when this advance follows an accepted word submission. On a round boundary that ends
+        /// the era or the match, the transition (Intermission or GameOver) is then deferred — the
+        /// FSM holds in <see cref="RoundState"/> — so the inline score animation for the round-ending
+        /// word can finish first. False for timeouts and debug advances, which transition immediately
+        /// (no word to animate).
+        /// </param>
+        private static ValueResult<FsmState?> AdvanceTurnAndEvaluate(
+            AlphaChainGameContext context, DateTimeOffset now, bool holdForReplay = false)
         {
             var state = context.State;
             bool wrapped = AdvanceToNextActivePlayer(state);
@@ -364,14 +426,25 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
                 // Canonical era/round rule (defined in M1, evaluated at the wrap point):
                 //   1. Game over on the final scheduled round — no Intermission ever follows it.
-                if (completedRound == lastScheduledRound)
-                    return new GameOverState();
+                //   2. Otherwise an era boundary → Intermission. IntermissionState advances
+                //      CurrentEra and bumps CurrentRound on its way back, so we do NOT do it here.
+                bool gameOver = completedRound == lastScheduledRound;
+                bool eraBoundary = !gameOver && completedRound % state.Settings.EraInterval == 0;
 
-                //   2. Era boundary → Intermission. IntermissionState advances CurrentEra and
-                //      bumps CurrentRound on its way back to RoundState, so we do NOT increment
-                //      CurrentRound here.
-                if (completedRound % state.Settings.EraInterval == 0)
-                    return new IntermissionState();
+                if (gameOver || eraBoundary)
+                {
+                    // If the round-ending word produced a score animation, hold in RoundState until
+                    // it finishes (blocking further play) instead of cutting straight to the next
+                    // screen. Tick fires the pending transition once the hold elapses.
+                    if (holdForReplay && state.LatestScoreReplay is { Breakdown.Steps.Count: > 0 } replay)
+                    {
+                        state.PendingTransitionAt = now + ComputeReplayHold(replay, state.Settings);
+                        state.PendingTransitionIsGameOver = gameOver;
+                        return null;
+                    }
+
+                    return gameOver ? new GameOverState() : new IntermissionState();
+                }
 
                 //   3. Otherwise continue the current era with the next round.
                 state.CurrentRound++;
@@ -380,6 +453,19 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.ResetTurnTimer(now);
             ApplyQueuedTimePenalty(state);
             return null;
+        }
+
+        /// <summary>
+        /// How long to hold in <see cref="RoundState"/> after the round-ending word so its inline
+        /// score animation can play out. Mirrors the UI's per-step timing (total ÷ rows, capped at
+        /// 0.5 s/step — see <c>EngineBay</c>) over the reveal rows (seed + one per card + final),
+        /// plus a short read before the cut to the next screen.
+        /// </summary>
+        private static TimeSpan ComputeReplayHold(ScoreReplay replay, AlphaChainSettings settings)
+        {
+            int rows = replay.Breakdown.Steps.Count + 2;
+            double stepSeconds = Math.Min(settings.EngineAnimationSeconds / Math.Max(1, rows), 0.5);
+            return TimeSpan.FromSeconds(rows * stepSeconds + 0.8);
         }
 
         /// <summary>

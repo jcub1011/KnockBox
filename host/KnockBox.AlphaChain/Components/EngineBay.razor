@@ -1,16 +1,49 @@
+@using KnockBox.AlphaChain.Services.State.Games.Data
 @using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
 
 @* A player's Engine Bay: an ordered row of modifier slots, left → right is the scoring
    pipeline order. Reorder is HTML5 drag-and-drop with a keyboard fallback (focus a card,
    then ←/→ to move it) — the keyboard path is the primary, always-available code path; DnD
    is the progressive enhancement (M5). Reorder is suppressed when ReadOnly (opponent
-   summary) or Locked (during a live round, where scoring order is frozen). *@
+   summary) or Locked (during a live round, where scoring order is frozen).
+
+   When a Replay is supplied (the owner just scored a word) an inline strip animates the word
+   running through this engine — seed → each card's contribution → final score — so everyone
+   sees how the bay built the score, without an overlay covering the word input. *@
 
 <div class="ac-bay @(ReadOnly ? "ac-bay-readonly" : "") @(Interactive ? "" : "ac-bay-locked")">
     <div class="ac-bay-header">
         <span class="ac-bay-title">@Title</span>
         <span class="ac-bay-flow" title="Additives stack first (left); multipliers explode last (right).">L + ΣA → ×ΠM</span>
     </div>
+
+    @if (Replay is { Breakdown.Steps.Count: > 0 } rep)
+    {
+        <div class="ac-bay-replay" @key="rep.Sequence" style="--ac-step:@StepDurationCss; --ac-rows:@(rep.Breakdown.Steps.Count + 2)">
+            <span class="ac-bay-replay-word">@rep.Breakdown.Word.ToUpperInvariant()</span>
+            <span class="ac-bay-replay-seq ac-bay-replay-seed" style="animation-delay: calc(var(--ac-step) * 0)">
+                <span class="ac-bay-replay-op">len</span>
+                <span class="ac-bay-replay-run">@rep.Breakdown.Seed</span>
+            </span>
+            @for (int i = 0; i < rep.Breakdown.Steps.Count; i++)
+            {
+                var step = rep.Breakdown.Steps[i];
+                var kindClass = step.Triggered
+                    ? (step.Kind == ModifierKind.Additive ? "ac-bay-replay-add" : "ac-bay-replay-mul")
+                    : "ac-bay-replay-skip";
+                <span class="ac-bay-replay-seq @kindClass" style="animation-delay: calc(var(--ac-step) * @(i + 1))">
+                    <span class="ac-bay-replay-icon"><CardIcon Icon="@step.Icon" /></span>
+                    <span class="ac-bay-replay-op">@(step.Triggered ? step.ValueText : "—")</span>
+                    <span class="ac-bay-replay-run">@step.RunningScore</span>
+                </span>
+            }
+            <span class="ac-bay-replay-seq ac-bay-replay-final @(rep.Breakdown.Taxed ? "ac-bay-replay-taxed" : "")"
+                  style="animation-delay: calc(var(--ac-step) * @(rep.Breakdown.Steps.Count + 1))">
+                <span class="ac-bay-replay-op">@(rep.Breakdown.Taxed ? "tax" : "score")</span>
+                <span class="ac-bay-replay-run">@(rep.Breakdown.Taxed ? "0" : $"+{rep.Breakdown.FinalScore}")</span>
+            </span>
+        </div>
+    }
 
     <ol class="ac-bay-slots">
         @for (int i = 0; i < Slots; i++)
@@ -23,23 +56,22 @@
                 @ondrop="() => OnDrop(index)">
                 @if (card is not null)
                 {
-                    <CardTooltip Name="@card.Name" Description="@card.Description" Category="CardCategory.Modifier">
-                        <button type="button"
-                                class="ac-card ac-card-modifier ac-card-@(card.Kind == ModifierKind.Additive ? "additive" : "multiplicative") @(_dragIndex == index ? "ac-card-dragging" : "")"
-                                disabled="@(!Interactive)"
-                                draggable="@(Interactive ? "true" : "false")"
-                                aria-grabbed="@(_dragIndex == index ? "true" : "false")"
-                                @ondragstart="() => _dragIndex = index"
-                                @ondragend="() => _dragIndex = null"
-                                @onkeydown="e => OnKeyDown(e, index)">
-                            <span class="ac-card-name">@card.Name</span>
-                            <span class="ac-card-op">@(card.Kind == ModifierKind.Additive ? "+" : "×")</span>
-                        </button>
-                    </CardTooltip>
+                    <button type="button"
+                            class="ac-cardbtn"
+                            disabled="@(!Interactive)"
+                            draggable="@(Interactive ? "true" : "false")"
+                            aria-grabbed="@(_dragIndex == index ? "true" : "false")"
+                            @ondragstart="() => _dragIndex = index"
+                            @ondragend="() => _dragIndex = null"
+                            @onkeydown="e => OnKeyDown(e, index)">
+                        <GameCard Name="@card.Name" Description="@card.Description" Icon="@card.Icon"
+                                  Category="CardCategory.Modifier" Kind="card.Kind"
+                                  Compact="@ReadOnly" Dragging="@(_dragIndex == index)" />
+                    </button>
                 }
                 else
                 {
-                    <div class="ac-card ac-card-empty">empty</div>
+                    <div class="ac-bay-empty">empty</div>
                 }
             </li>
         }
@@ -68,7 +100,30 @@
     /// <summary>Raised with the new ordering of card ids when the player moves a card.</summary>
     [Parameter] public EventCallback<IReadOnlyList<string>> OnReorder { get; set; }
 
+    /// <summary>When set, the owner just scored this word — animate it through the bay inline.
+    /// Only the submitting player's bay should receive a (non-null) value.</summary>
+    [Parameter] public ScoreReplay? Replay { get; set; }
+
+    /// <summary>Total runtime (seconds) of the inline replay; per-step time scales to keep it
+    /// roughly constant, capped so tiny engines don't drag.</summary>
+    [Parameter] public double ReplayTotalSeconds { get; set; } = 2.5;
+
+    /// <summary>Hard cap on a single step's reveal time (matches the old overlay behaviour).</summary>
+    private const double MaxStepSeconds = 0.5;
+
     private int? _dragIndex;
+
+    /// <summary>Per-step reveal/stagger time as a CSS literal: total / rows, clamped to the cap.
+    /// Rows = seed + one per card + the final score.</summary>
+    private string StepDurationCss
+    {
+        get
+        {
+            int rows = (Replay?.Breakdown.Steps.Count ?? 0) + 2;
+            double step = Math.Min(ReplayTotalSeconds / Math.Max(1, rows), MaxStepSeconds);
+            return step.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "s";
+        }
+    }
 
     /// <summary>True when the owner may resequence (not a read-only summary and not round-locked).</summary>
     private bool Interactive => !ReadOnly && !Locked;

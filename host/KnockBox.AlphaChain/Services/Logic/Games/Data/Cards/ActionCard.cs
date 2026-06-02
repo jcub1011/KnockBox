@@ -27,5 +27,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
         string Id,
         string Name,
         string Description,
-        ActionKind Kind);
+        ActionKind Kind)
+    {
+        /// <summary>
+        /// Stable icon key resolved by <c>CardIcon</c> to an inline SVG glyph, so players
+        /// associate a distinct symbol with each card's function. Set via object initializer
+        /// in <see cref="ActionLibrary"/>; defaults to empty for ad-hoc/test cards.
+        /// </summary>
+        public string Icon { get; init; } = string.Empty;
+    }
 }

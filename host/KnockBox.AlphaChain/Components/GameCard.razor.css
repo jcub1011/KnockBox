@@ -1,0 +1,139 @@
+/* Uniform card visual. One fixed width so cards align in any list; icon + name + inline
+   description so meaning is readable at a glance. Category accent vars come from cards.css. */
+
+.gc-card {
+    position: relative;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    width: 9.75rem;
+    min-height: 5.5rem;
+    padding: 0.55rem 0.6rem;
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    border-radius: 0.6rem;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ac-ink, #eaf2ff);
+    text-align: left;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.gc-additive {
+    --gc-accent: var(--ac-additive, #14f195);
+}
+
+.gc-multiplicative {
+    --gc-accent: var(--ac-multiplicative, #ffb020);
+}
+
+.gc-action {
+    --gc-accent: var(--ac-action, #b97bff);
+}
+
+.gc-additive,
+.gc-multiplicative,
+.gc-action {
+    border-color: color-mix(in srgb, var(--gc-accent) 60%, transparent);
+    background: color-mix(in srgb, var(--gc-accent) 12%, transparent);
+}
+
+.gc-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.gc-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    width: 1.65rem;
+    height: 1.65rem;
+    color: var(--gc-accent);
+}
+
+.gc-icon-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.gc-op {
+    font-family: var(--font-mono, monospace);
+    font-size: 1.15rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--gc-accent);
+}
+
+.gc-badge {
+    margin-left: auto;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.55rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-radius: 0.35rem;
+    background: var(--gc-accent);
+    color: #07101e;
+    white-space: nowrap;
+}
+
+.gc-name {
+    font-family: var(--font-display, system-ui);
+    font-size: 0.82rem;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.gc-desc {
+    margin: 0;
+    font-size: 0.68rem;
+    line-height: 1.25;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.7));
+}
+
+/* ── States ──────────────────────────────────────────────────────────── */
+
+.gc-card:hover:not(.gc-dim) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.gc-selected {
+    outline: 2px solid var(--gc-accent);
+    outline-offset: 1px;
+    box-shadow: 0 0 14px color-mix(in srgb, var(--gc-accent) 45%, transparent);
+}
+
+.gc-dragging {
+    opacity: 0.5;
+    outline: 2px dashed var(--ac-cyan, #00e5ff);
+    outline-offset: 1px;
+}
+
+.gc-dim {
+    opacity: 0.5;
+}
+
+.gc-new {
+    animation: ac-pop 0.4s ease-out both;
+    box-shadow: 0 0 16px color-mix(in srgb, var(--gc-accent) 50%, transparent);
+}
+
+.gc-compact {
+    width: 7.5rem;
+    min-height: 0;
+    padding: 0.4rem 0.45rem;
+    gap: 0.2rem;
+}
+
+.gc-compact .gc-name {
+    font-size: 0.74rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gc-card,
+    .gc-new {
+        animation: none;
+        transition: none;
+    }
+}

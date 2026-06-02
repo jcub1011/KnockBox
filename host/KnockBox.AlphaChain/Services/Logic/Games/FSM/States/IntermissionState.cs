@@ -10,11 +10,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
     using FsmState = IGameState<AlphaChainGameContext, AlphaChainCommand>;
 
     /// <summary>
-    /// The era-boundary Intermission. Walks deterministically through four sub-phases —
-    /// <b>Deal → Expansion → Optimization → Sniper Ban</b> — then hands back to
-    /// <see cref="RoundState"/> for the next era. <see cref="Tick"/> drives the timed
-    /// progression; <see cref="HandleCommand"/> accepts the two player inputs
-    /// (<see cref="SubmitOptimizationCommand"/>, <see cref="SelectSniperBanCommand"/>).
+    /// The era-boundary Intermission. Cards are dealt and the Engine Bay is expanded instantly
+    /// in <see cref="OnEnter"/>, then it walks deterministically through
+    /// <b>Optimization → Sniper Ban</b> — then hands back to <see cref="RoundState"/> for the
+    /// next era. <see cref="Tick"/> drives the timed progression; <see cref="HandleCommand"/>
+    /// accepts the two player inputs (<see cref="SubmitOptimizationCommand"/>,
+    /// <see cref="SelectSniperBanCommand"/>).
     /// </summary>
     /// <remarks>
     /// <para>This state is the <b>only</b> writer of <see cref="AlphaChainGameState.BannedLetter"/>
@@ -25,9 +26,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
     ///   <item><b>Distinct modifiers:</b> dealt modifiers are always distinct from the cards a
     ///   player already holds. The Engine Bay keys reorders by card id, so duplicate ids would
     ///   break Optimization; this caps a player's lifetime modifiers at the library size.</item>
-    ///   <item><b>Expansion is a brief visible sub-phase:</b> the +1 slot is applied when leaving
-    ///   Deal, then dwells for <see cref="ExpansionAnimationSeconds"/> so the UI can animate it
-    ///   before Optimization opens.</item>
+    ///   <item><b>No dedicated Deal/Expansion dwell:</b> dealing and the +1 slot happen instantly
+    ///   on entry; the freshly-dealt cards are revealed per-player <i>inside</i> Optimization
+    ///   (flagged NEW), so players act immediately instead of watching two passive animations.</item>
     ///   <item><b>Non-submitter discard:</b> a player who never commits keeps their current bay
     ///   order; if it overflows the (now larger) slot count the <b>oldest</b> cards are discarded
     ///   first (drop from the left), keeping the freshly-dealt cards on the right.</item>
@@ -38,25 +39,22 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
     /// </remarks>
     public sealed class IntermissionState : ITimedGameState<AlphaChainGameContext, AlphaChainCommand>
     {
-        /// <summary>Seconds the "dealing cards" animation dwells before Expansion.</summary>
-        private const int DealAnimationSeconds = 3;
-
-        /// <summary>Seconds the "+1 slot" animation dwells before Optimization opens.</summary>
-        private const int ExpansionAnimationSeconds = 2;
-
         public ValueResult<FsmState?> OnEnter(AlphaChainGameContext context)
         {
             var state = context.State;
             var now = DateTimeOffset.UtcNow;
 
             state.SetPhase(AlphaChainGamePhase.Intermission);
-            state.IntermissionPhase = IntermissionSubPhase.Deal;
-            state.SubPhaseEndTime = now.AddSeconds(DealAnimationSeconds);
 
+            // Deal new cards and grow every active player's bay by one slot up-front, then open
+            // Optimization directly — no separate Deal/Expansion dwells. The just-dealt cards are
+            // revealed (flagged NEW) in the Optimization panel.
             DealCards(context);
+            ExpandBays(context);
+            EnterOptimization(context, now);
 
             context.Logger.LogDebug(
-                "Alpha Chain FSM → IntermissionState (era {era} → {next}, dealing cards)",
+                "Alpha Chain FSM → IntermissionState (era {era} → {next}, dealt + expanded, Optimization open)",
                 state.CurrentEra, state.CurrentEra + 1);
 
             return null;
@@ -78,16 +76,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             switch (state.IntermissionPhase)
             {
-                case IntermissionSubPhase.Deal:
-                    if (now >= state.SubPhaseEndTime)
-                        EnterExpansion(context, now);
-                    return null;
-
-                case IntermissionSubPhase.Expansion:
-                    if (now >= state.SubPhaseEndTime)
-                        EnterOptimization(context, now);
-                    return null;
-
                 case IntermissionSubPhase.Optimization:
                     if (now >= state.SubPhaseEndTime || AllSubmitted(state))
                         EnterSniperBan(context, now);
@@ -187,7 +175,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
         // ── Sub-phase entry helpers ──────────────────────────────────────────
 
-        /// <summary>Deal: weighted (currently uniform) draws appended to each active player's hand.</summary>
+        /// <summary>Deal: weighted (currently uniform) draws appended to each active player's hand.
+        /// Records the dealt cards on the player so the Optimization panel can flag them NEW.</summary>
         private static void DealCards(AlphaChainGameContext context)
         {
             var state = context.State;
@@ -196,6 +185,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             foreach (var player in ActivePlayers(state))
             {
+                // Fresh reveal lists for this Intermission's deal.
+                player.NewlyDealtModifierIds.Clear();
+                player.NewlyDealtActions.Clear();
+
                 // Distinct modifiers the player doesn't already hold (bay ids must stay unique).
                 var heldIds = player.EngineBay.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
                 var pool = ModifierLibrary.All.Where(c => !heldIds.Contains(c.Id)).ToList();
@@ -203,6 +196,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 {
                     int idx = context.Rng.GetRandomInt(pool.Count);
                     player.EngineBay.Add(pool[idx]); // append-to-right; resequenced in Optimization.
+                    player.NewlyDealtModifierIds.Add(pool[idx].Id);
                     pool.RemoveAt(idx);
                 }
 
@@ -211,22 +205,18 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 {
                     int idx = context.Rng.GetRandomInt(ActionLibrary.All.Length);
                     player.ActionHand.Add(ActionLibrary.All[idx]);
+                    player.NewlyDealtActions.Add(ActionLibrary.All[idx]);
                 }
             }
         }
 
-        /// <summary>Expansion: +1 modifier slot for every active player, then a brief dwell.</summary>
-        private static void EnterExpansion(AlphaChainGameContext context, DateTimeOffset now)
+        /// <summary>Expansion: +1 modifier slot for every active player (applied instantly on entry).</summary>
+        private static void ExpandBays(AlphaChainGameContext context)
         {
-            var state = context.State;
-
-            foreach (var player in ActivePlayers(state))
+            foreach (var player in ActivePlayers(context.State))
                 player.ModifierSlots += 1;
 
-            state.IntermissionPhase = IntermissionSubPhase.Expansion;
-            state.SubPhaseEndTime = now.AddSeconds(ExpansionAnimationSeconds);
-
-            context.Logger.LogDebug("Alpha Chain Intermission → Expansion (+1 slot for all active players).");
+            context.Logger.LogDebug("Alpha Chain Intermission expanded bays (+1 slot for all active players).");
         }
 
         /// <summary>Optimization: seed each active player's pending order and open the countdown.</summary>
@@ -324,6 +314,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.RequiredStartLetter = null;
             state.SniperBanUserId = null;
             state.OptimizationSubmissions.Clear();
+
+            // Drop the deal-reveal markers so they don't bleed into the next era's round UI.
+            foreach (var player in state.GamePlayers.Values)
+            {
+                player.NewlyDealtModifierIds.Clear();
+                player.NewlyDealtActions.Clear();
+            }
 
             if (state.CurrentEra > state.Settings.EraCount)
                 return new GameOverState();

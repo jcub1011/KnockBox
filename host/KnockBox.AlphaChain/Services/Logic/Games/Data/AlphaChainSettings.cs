@@ -50,6 +50,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         /// <summary>Upper bound on cards dealt per era (sanity cap for the number input).</summary>
         public const int MaxCardsDealtPerEra = 10;
 
+        /// <summary>Minimum total runtime of the score-replay animation, in seconds.</summary>
+        public const double MinEngineAnimationSeconds = 1.0;
+
+        /// <summary>Maximum total runtime of the score-replay animation, in seconds.</summary>
+        public const double MaxEngineAnimationSeconds = 6.0;
+
         // ── Settings ───────────────────────────────────────────────────────────
 
         /// <summary>Which letter class the per-round ban draws from.</summary>
@@ -79,6 +85,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
 
         /// <summary>Action cards dealt to each player at an intermission. Consumed in M4.</summary>
         public int ActionsDealtPerEra { get; init; } = 2;
+
+        /// <summary>
+        /// Total runtime (seconds) of the score-replay animation that plays through the Engine
+        /// Bay on every accepted word. Constant regardless of bay size — per-step time shrinks
+        /// as cards are added — so a long engine never drags the game out.
+        /// </summary>
+        public double EngineAnimationSeconds { get; init; } = 2.5;
 
         /// <summary>
         /// Start-time-only choice set by the lobby's two start buttons (host as shared
@@ -120,6 +133,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
 
             if (ActionsDealtPerEra < MinCardsDealtPerEra || ActionsDealtPerEra > MaxCardsDealtPerEra)
                 violations.Add($"Actions dealt per era must be between {MinCardsDealtPerEra} and {MaxCardsDealtPerEra}.");
+
+            if (EngineAnimationSeconds < MinEngineAnimationSeconds || EngineAnimationSeconds > MaxEngineAnimationSeconds)
+                violations.Add($"Engine animation must be between {MinEngineAnimationSeconds:0.#} and {MaxEngineAnimationSeconds:0.#} seconds.");
 
             if (!Enum.IsDefined(BanMode))
                 violations.Add("Ban mode is not a recognized value.");

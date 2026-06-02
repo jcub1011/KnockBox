@@ -214,5 +214,69 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Scoring
                 }
             }
         }
+
+        // ── CalculateSteps (per-step trace for the score-replay animation) ──────
+
+        [TestMethod]
+        public void Steps_FinalBeforeTax_EqualsCalculate()
+        {
+            var ctx = Ctx("cat"); // length 3
+            var bay = new[] { Additive(2), Additive(5), Mult(2) }; // (3+2+5)×2 = 20
+            var breakdown = _calc.CalculateSteps(ctx, bay, taxed: false);
+
+            Assert.AreEqual(_calc.Calculate(ctx, bay), breakdown.FinalBeforeTax);
+            Assert.AreEqual(20, breakdown.FinalBeforeTax);
+            Assert.AreEqual(20, breakdown.FinalScore);
+            Assert.IsFalse(breakdown.Taxed);
+        }
+
+        [TestMethod]
+        public void Steps_CaptureRunningTotalsPerCard()
+        {
+            var ctx = Ctx("cat"); // seed 3
+            var bay = new[] { Additive(2), Additive(5), Mult(2) };
+            var breakdown = _calc.CalculateSteps(ctx, bay, taxed: false);
+
+            Assert.AreEqual(3, breakdown.Seed);
+            Assert.AreEqual(3, breakdown.Steps.Count);
+            Assert.AreEqual(5, breakdown.Steps[0].RunningScore);  // 3 + 2
+            Assert.AreEqual(10, breakdown.Steps[1].RunningScore); // 5 + 5
+            Assert.AreEqual(20, breakdown.Steps[2].RunningScore); // 10 × 2
+            Assert.AreEqual("+2", breakdown.Steps[0].ValueText);
+            Assert.AreEqual("×2", breakdown.Steps[2].ValueText);
+        }
+
+        [TestMethod]
+        public void Steps_SkippedCard_MarkedNotTriggered_AndLeavesRunningUnchanged()
+        {
+            var ctx = Ctx("cat"); // seed 3, "crypt"-style skip via Architect (needs ≥8)
+            var bay = new[] { Card("architect") }; // length 3 < 8 → skipped
+            var breakdown = _calc.CalculateSteps(ctx, bay, taxed: false);
+
+            Assert.IsFalse(breakdown.Steps[0].Triggered);
+            Assert.AreEqual(3, breakdown.Steps[0].RunningScore);
+            Assert.AreEqual(3, breakdown.FinalBeforeTax);
+        }
+
+        [TestMethod]
+        public void Steps_Taxed_ZeroesFinalScoreButKeepsBreakdown()
+        {
+            var ctx = Ctx("cat"); // seed 3
+            var bay = new[] { Additive(10) }; // would be 13
+            var breakdown = _calc.CalculateSteps(ctx, bay, taxed: true);
+
+            Assert.IsTrue(breakdown.Taxed);
+            Assert.AreEqual(13, breakdown.FinalBeforeTax);
+            Assert.AreEqual(0, breakdown.FinalScore);
+            Assert.AreEqual(1, breakdown.Steps.Count, "the pipeline trace is still captured when taxed");
+        }
+
+        [TestMethod]
+        public void Steps_MultiplicativeValueText_FormatsWithoutTrailingZeros()
+        {
+            var ctx = Ctx("cat");
+            var breakdown = _calc.CalculateSteps(ctx, [Mult(1.5)], taxed: false);
+            Assert.AreEqual("×1.5", breakdown.Steps[0].ValueText);
+        }
     }
 }

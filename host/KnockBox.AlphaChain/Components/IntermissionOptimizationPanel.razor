@@ -2,14 +2,23 @@
 
 @* Optimization sub-phase: the local player privately resequences their Engine Bay and,
    when it overflows the (newly expanded) slot count, discards the excess. Reorder is HTML5
-   drag-and-drop with a keyboard fallback (focus a card, then ←/→ to move it). Opponents'
-   bays are hidden — only a submitted/total tally is shown (fog-of-war). *@
+   drag-and-drop with a keyboard fallback (focus a card, then ←/→ to move it). Freshly-dealt
+   cards are flagged NEW and pop in (the per-player deal reveal now lives here, not in a
+   dedicated sub-phase). Opponents' bays are hidden — only a submitted/total tally is shown
+   (fog-of-war). *@
 
 <div class="ac-im-opt">
     <div class="ac-im-opt-head">
         <h3 class="ac-im-opt-title">Optimize your Engine Bay</h3>
         <span class="ac-im-opt-count">@SubmittedCount / @TotalCount ready</span>
     </div>
+
+    <div class="ac-im-opt-banner">
+        <span class="ac-im-opt-slotbadge">+1 SLOT</span>
+        <span>Engine Bay expanded to <strong>@Slots</strong> slots. New cards are marked <span class="ac-im-opt-newtag">NEW</span>.</span>
+    </div>
+
+    <p class="ac-im-opt-hint">Drag cards to reorder — or focus a card and use ← / →. Additives stack first (left); multipliers explode last (right).</p>
 
     @if (HasSubmitted)
     {
@@ -27,24 +36,25 @@
             int index = i;
             var card = Kept[index];
             bool overCapacity = index >= Slots;
+            bool isNew = NewCardIds.Contains(card.Id);
 
             <li class="ac-im-opt-slot @(overCapacity ? "ac-im-opt-overflow" : "")"
                 @ondragover:preventDefault="!HasSubmitted"
                 @ondrop="() => OnDrop(index)">
-                <CardTooltip Name="@card.Name" Description="@card.Description" Category="CardCategory.Modifier">
-                    <button type="button"
-                            class="ac-card ac-card-modifier ac-card-@(card.Kind == ModifierKind.Additive ? "additive" : "multiplicative") @(_dragIndex == index ? "ac-card-dragging" : "")"
-                            disabled="@HasSubmitted"
-                            draggable="@(HasSubmitted ? "false" : "true")"
-                            aria-grabbed="@(_dragIndex == index ? "true" : "false")"
-                            @ondragstart="() => _dragIndex = index"
-                            @ondragend="() => _dragIndex = null"
-                            @onkeydown="e => OnKeyDown(e, index)">
-                        <span class="ac-card-pos">@(index + 1)</span>
-                        <span class="ac-card-name">@card.Name</span>
-                        <span class="ac-card-op">@(card.Kind == ModifierKind.Additive ? "+" : "×")</span>
-                    </button>
-                </CardTooltip>
+                <span class="ac-im-opt-pos">@(index + 1)</span>
+                <button type="button"
+                        class="ac-cardbtn"
+                        disabled="@HasSubmitted"
+                        draggable="@(HasSubmitted ? "false" : "true")"
+                        aria-grabbed="@(_dragIndex == index ? "true" : "false")"
+                        @ondragstart="() => _dragIndex = index"
+                        @ondragend="() => _dragIndex = null"
+                        @onkeydown="e => OnKeyDown(e, index)">
+                    <GameCard Name="@card.Name" Description="@card.Description" Icon="@card.Icon"
+                              Category="CardCategory.Modifier" Kind="card.Kind"
+                              Dragging="@(_dragIndex == index)" New="@isNew"
+                              BadgeText="@(isNew ? "NEW" : null)" />
+                </button>
                 <button type="button" class="ac-im-opt-discard"
                         disabled="@HasSubmitted"
                         title="Discard this card"
@@ -53,18 +63,33 @@
         }
     </ol>
 
+    @if (NewActions.Count > 0)
+    {
+        <div class="ac-im-opt-actions">
+            <span class="ac-im-opt-bin-label">New action cards</span>
+            <div class="ac-im-opt-actions-row">
+                @foreach (var card in NewActions)
+                {
+                    <GameCard Name="@card.Name" Description="@card.Description" Icon="@card.Icon"
+                              Category="CardCategory.Action" New="true" BadgeText="NEW" />
+                }
+            </div>
+        </div>
+    }
+
     @if (Discarded.Count > 0)
     {
         <div class="ac-im-opt-bin">
             <span class="ac-im-opt-bin-label">Discarded</span>
             @foreach (var card in Discarded)
             {
-                <button type="button" class="ac-card ac-card-discarded"
+                <button type="button" class="ac-cardbtn"
                         disabled="@HasSubmitted"
                         title="Put back"
                         @onclick="() => Restore(card.Id)">
-                    <span class="ac-card-name">@card.Name</span>
-                    <span class="ac-im-opt-restore">↩</span>
+                    <GameCard Name="@card.Name" Description="@card.Description" Icon="@card.Icon"
+                              Category="CardCategory.Modifier" Kind="card.Kind"
+                              Compact="true" Dim="true" />
                 </button>
             }
         </div>
@@ -83,6 +108,12 @@
 
     /// <summary>The local player's (post-expansion) slot capacity.</summary>
     [Parameter] public int Slots { get; set; }
+
+    /// <summary>Ids of modifier cards freshly dealt this Intermission — flagged NEW + popped in.</summary>
+    [Parameter] public IReadOnlyCollection<string> NewCardIds { get; set; } = [];
+
+    /// <summary>Action cards freshly dealt this Intermission, shown as a read-only reveal strip.</summary>
+    [Parameter] public IReadOnlyList<ActionCard> NewActions { get; set; } = [];
 
     /// <summary>How many players have locked in.</summary>
     [Parameter] public int SubmittedCount { get; set; }

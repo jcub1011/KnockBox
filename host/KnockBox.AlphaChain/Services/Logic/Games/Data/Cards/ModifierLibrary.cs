@@ -32,49 +32,49 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
                 "Adds a flat +12 to your word, always.",
                 ModifierKind.Additive,
                 Always,
-                static _ => 12),
+                static _ => 12) { Icon = "anchor" },
 
             new ModifierCard(
                 "consonant-crunch", "Consonant Crunch",
                 "Adds +2 for every consonant in your word.",
                 ModifierKind.Additive,
                 Always,
-                static ctx => 2 * ctx.Consonants),
+                static ctx => 2 * ctx.Consonants) { Icon = "consonant" },
 
             new ModifierCard(
                 "vowel-surge", "Vowel Surge",
                 "×2 when your word has more vowels than consonants.",
                 ModifierKind.Multiplicative,
                 static ctx => ctx.Vowels > ctx.Consonants,
-                static _ => 2),
+                static _ => 2) { Icon = "wave" },
 
             new ModifierCard(
                 "architect", "The Architect",
                 "×1.5 when your word is 8 letters or longer.",
                 ModifierKind.Multiplicative,
                 static ctx => ctx.Length >= 8,
-                static _ => 1.5),
+                static _ => 1.5) { Icon = "architect" },
 
             new ModifierCard(
                 "brick-layer", "Brick Layer",
                 "Adds +1 per letter when your word is 6 letters or longer.",
                 ModifierKind.Additive,
                 static ctx => ctx.Length >= 6,
-                static ctx => ctx.Length),
+                static ctx => ctx.Length) { Icon = "brick" },
 
             new ModifierCard(
                 "sprinter", "Sprinter",
                 "×1.25 when your word is 4 letters or shorter.",
                 ModifierKind.Multiplicative,
                 static ctx => ctx.Length <= 4,
-                static _ => 1.25),
+                static _ => 1.25) { Icon = "sprinter" },
 
             new ModifierCard(
                 "letter-hoarder", "Letter Hoarder",
                 "Adds +1 for every distinct letter in your word.",
                 ModifierKind.Additive,
                 Always,
-                static ctx => ctx.Word.Distinct().Count()),
+                static ctx => ctx.Word.Distinct().Count()) { Icon = "hoarder" },
 
             // Tax Collector does NOT fold into its owner's own scoring pipeline (Trigger is
             // Never). Instead it is a passive bounty: when an *opponent* plays a banned-letter
@@ -85,7 +85,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
                 "When an opponent plays a banned-letter word, collect half the points it would have scored.",
                 ModifierKind.Multiplicative,
                 Never,
-                static _ => TaxCollectorRate),
+                static _ => TaxCollectorRate) { Icon = "tax" },
         ];
 
         /// <summary>Fast id → card lookup for resolving network ids against the catalogue.</summary>

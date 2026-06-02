@@ -89,6 +89,30 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// <summary>Chronological log of accepted plays, backing the UI's submitted-words feed.</summary>
         public List<AlphaChainWordPlay> PlayLog { get; } = new();
 
+        /// <summary>
+        /// The most recent accepted word's scoring trace, for the center-stage score-replay
+        /// animation every client plays. Null before the first play. Set inside the execute
+        /// lock in <c>RoundState</c>; the change notification (fired after unlock) drives the
+        /// replay on every circuit.
+        /// </summary>
+        public ScoreReplay? LatestScoreReplay { get; set; }
+
+        /// <summary>Monotonic counter bumped on each accepted play so the overlay replays once per word.</summary>
+        public int ScoreReplaySequence { get; set; }
+
+        /// <summary>
+        /// When set, the round-ending word has been accepted and the FSM is holding in
+        /// <c>RoundState</c> until this time so the inline score animation can finish before the
+        /// end-of-era/match transition fires. Submissions and action plays are refused while it is
+        /// set; the round shot clock is paused. Cleared when the transition fires (or a new round
+        /// begins). <see cref="PendingTransitionIsGameOver"/> says which transition is pending.
+        /// </summary>
+        public DateTimeOffset? PendingTransitionAt { get; set; }
+
+        /// <summary>True when the pending hold ends in <c>GameOver</c> (the final scheduled round);
+        /// false when it opens the Intermission. Only meaningful while <see cref="PendingTransitionAt"/> is set.</summary>
+        public bool PendingTransitionIsGameOver { get; set; }
+
         /// <summary>The most recently accepted word (normalized), or null before the first play.</summary>
         public string? LastWord { get; set; }
 
