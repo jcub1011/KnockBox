@@ -133,9 +133,17 @@
                     }
                     @if (FeedbackMessage is { } feedback)
                     {
-                        <span class="ac-feedback @(LastResultIsRejection ? "ac-feedback-bad" : "ac-feedback-good")">@feedback</span>
+                        <span class="ac-feedback ac-feedback-bad">@feedback</span>
                     }
                 </div>
+
+                @* ── Score replay: one fixed spot, same for every player; names the submitter
+                      and lingers as a readout until the next word lands. *@
+                @if (LatestReplay is { } replay)
+                {
+                    <ScoreReplayStrip @key="GameState.ScoreReplaySequence" Replay="replay"
+                                      ReplayTotalSeconds="GameState.Settings.EngineAnimationSeconds" />
+                }
 
                 @* ── Chain trail ── *@
                 @if (ChainTrail.Count > 0)
@@ -161,9 +169,7 @@
                            frozen and only resequenced at Intermission (Optimization). The bay is
                            always Locked here, so no OnReorder handler is wired. *@
                         <EngineBay Cards="myCards.EngineBay" Slots="myCards.ModifierSlots"
-                                   Locked="true" Title="Your Engine Bay"
-                                   Replay="ReplayFor(CurrentUserId)"
-                                   ReplayTotalSeconds="GameState.Settings.EngineAnimationSeconds" />
+                                   Locked="true" Title="Your Engine Bay" />
                         <ActionHand Cards="myCards.ActionHand" Opponents="ActionTargets" Disabled="false"
                                     QueuedKind="myCards.PendingAction" OnPlay="PlayActionAsync" />
                     </div>
@@ -175,9 +181,7 @@
                     <div class="ac-opponent-bays">
                         @foreach (var opp in Opponents)
                         {
-                            <EngineBay Cards="opp.EngineBay" Slots="opp.ModifierSlots" ReadOnly="true" Title="@opp.DisplayName"
-                                       Replay="ReplayFor(opp.UserId)"
-                                       ReplayTotalSeconds="GameState.Settings.EngineAnimationSeconds" />
+                            <EngineBay Cards="opp.EngineBay" Slots="opp.ModifierSlots" ReadOnly="true" Title="@opp.DisplayName" />
                         }
                     </div>
                 }

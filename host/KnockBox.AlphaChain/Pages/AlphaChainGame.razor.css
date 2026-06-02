@@ -301,7 +301,6 @@
     font-size: 0.95rem;
 }
 
-.ac-feedback-good { color: var(--ac-mint); text-shadow: 0 0 10px rgba(20, 241, 149, 0.4); }
 .ac-feedback-bad { color: var(--ac-danger); }
 
 /* ── Chain trail ──────────────────────────────────────────────────────── */

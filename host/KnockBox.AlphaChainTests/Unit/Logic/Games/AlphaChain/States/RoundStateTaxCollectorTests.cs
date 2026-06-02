@@ -79,6 +79,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             // The play feed records the bounty that was paid.
             Assert.AreEqual(8, state.PlayLog[^1].TaxBounty);
+
+            // The score replay surfaces who stole the points (and how much) so the strip can list them.
+            var replay = state.LatestScoreReplay!;
+            Assert.AreEqual(8, replay.TaxBounty);
+            CollectionAssert.AreEqual(
+                new[] { state.GamePlayers[owner].DisplayName },
+                replay.TaxCollectors!.ToArray());
+            Assert.IsTrue(replay.HasSteal);
         }
 
         [TestMethod]
@@ -99,6 +107,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             Assert.AreEqual(0, state.GamePlayers[submitter].Score);
             Assert.AreEqual(0, state.PlayLog[^1].TaxBounty);
+
+            // No one collected, so the replay reports no steal.
+            Assert.IsFalse(state.LatestScoreReplay!.HasSteal);
+            Assert.AreEqual(0, state.LatestScoreReplay!.TaxBounty);
         }
 
         [TestMethod]
@@ -138,6 +150,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             Assert.AreEqual(8, state.GamePlayers[owner1].Score);
             Assert.AreEqual(8, state.GamePlayers[owner2].Score);
+
+            // Both owners are listed (sorted) on the replay so the strip shows every thief.
+            var replay = state.LatestScoreReplay!;
+            Assert.AreEqual(8, replay.TaxBounty);
+            CollectionAssert.AreEquivalent(
+                new[] { state.GamePlayers[owner1].DisplayName, state.GamePlayers[owner2].DisplayName },
+                replay.TaxCollectors!.ToArray());
         }
     }
 }

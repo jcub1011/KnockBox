@@ -119,15 +119,12 @@ namespace KnockBox.AlphaChain.Pages
                 ? GameState.PlayLog
                 : GameState.PlayLog.Skip(GameState.PlayLog.Count - 7).ToList();
 
-        /// <summary>The inline score replay to play on <paramref name="userId"/>'s Engine Bay, or
-        /// null when the latest play wasn't theirs (or had no modifier cards to walk through).
-        /// Only the submitting player's bay animates; every client sees it on that bay.</summary>
-        protected ScoreReplay? ReplayFor(string? userId) =>
-            userId is not null
-            && GameState.LatestScoreReplay is { Breakdown.Steps.Count: > 0 } replay
-            && replay.UserId == userId
-                ? replay
-                : null;
+        /// <summary>The latest accepted word's score replay, shown once in a fixed spot below the
+        /// submit box for every player (the strip's subtitle names the submitter). Null when there
+        /// is no play yet, or the last play had nothing to animate (no modifier cards walked and no
+        /// Tax Collector steal to report).</summary>
+        protected ScoreReplay? LatestReplay =>
+            GameState.LatestScoreReplay is { HasAnimation: true } replay ? replay : null;
 
         /// <summary>The newest accepted play, used to flash a score-pop on the leaderboard.</summary>
         protected AlphaChainWordPlay? LatestPlay =>
@@ -402,11 +399,11 @@ namespace KnockBox.AlphaChain.Pages
             }
         }
 
-        /// <summary>Human-readable inline feedback for <see cref="LastResult"/>.</summary>
+        /// <summary>Human-readable inline feedback for a rejected submission. Accepted plays
+        /// (scored or taxed) produce no message here — the score-replay strip already shows the
+        /// result — so the entry status row only surfaces errors.</summary>
         protected string? FeedbackMessage => LastResult switch
         {
-            SubmitWordResult.Accepted a => $"+{a.Score}",
-            SubmitWordResult.AcceptedZeroPointTax => "Zero-Point Tax — banned letter used (0 points)",
             SubmitWordResult.RejectedNotYourTurn => "It's not your turn.",
             SubmitWordResult.RejectedChainBroken c => $"Word must start with '{char.ToUpperInvariant(c.Required)}'.",
             SubmitWordResult.RejectedNotInDictionary => "Not a word in the dictionary.",
@@ -414,10 +411,6 @@ namespace KnockBox.AlphaChain.Pages
             SubmitWordResult.RejectedEmpty => "Enter a word.",
             _ => null
         };
-
-        /// <summary>Whether the last result was a rejection (for feedback styling).</summary>
-        protected bool LastResultIsRejection =>
-            LastResult is not (null or SubmitWordResult.Accepted or SubmitWordResult.AcceptedZeroPointTax);
 
         public override void Dispose()
         {

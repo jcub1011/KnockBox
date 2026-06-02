@@ -171,7 +171,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             //      submitter, but every *other* active player holding a Tax Collector collects
             //      half of what the word would have scored. The submitter never collects from
             //      their own taxed word.
-            int bounty = PayTaxCollectorBounty(state, cmd.ActorUserId, taxed, baseScore);
+            var (bounty, taxCollectors) = PayTaxCollectorBounty(state, cmd.ActorUserId, taxed, baseScore);
 
             // Log the accepted play for the UI feed.
             state.PlayLog.Add(new AlphaChainWordPlay(
@@ -183,11 +183,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 taxed,
                 bounty));
 
-            // Publish the scoring trace so every client plays the center-stage replay. The
-            // sequence bump makes the overlay remount and animate exactly once for this word.
+            // Publish the scoring trace so every client plays the replay strip. The sequence bump
+            // makes the strip remount and animate exactly once for this word. On a taxed word the
+            // bounty + collector names ride along so the strip can show who stole the points.
             state.ScoreReplaySequence++;
             state.LatestScoreReplay = new ScoreReplay(
-                state.ScoreReplaySequence, cmd.ActorUserId, player?.DisplayName ?? cmd.ActorUserId, breakdown);
+                state.ScoreReplaySequence, cmd.ActorUserId, player?.DisplayName ?? cmd.ActorUserId,
+                breakdown, bounty, taxCollectors);
 
             // 12. Result is set before advancing so it reflects this submission.
             context.LastSubmitResult = taxed
@@ -204,21 +206,22 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         /// every active player other than the submitter who holds a Tax Collector in their Engine
         /// Bay collects <see cref="ModifierLibrary.TaxCollectorRate"/> × <paramref name="wouldBeScore"/>
         /// (rounded half-up, clamped to <see cref="ScoreCalculator.MaxWordScore"/>). Returns the
-        /// per-owner bounty (0 when nothing was paid). Runs inside the execute lock.
+        /// per-owner bounty (0 when nothing was paid) and the display names of every owner who
+        /// collected (sorted, for the replay strip's "stolen by …" line). Runs inside the execute lock.
         /// </summary>
-        private static int PayTaxCollectorBounty(
+        private static (int Bounty, IReadOnlyList<string> Collectors) PayTaxCollectorBounty(
             AlphaChainGameState state, string submitterUserId, bool taxed, int wouldBeScore)
         {
             if (!taxed || wouldBeScore <= 0)
-                return 0;
+                return (0, []);
 
             int bounty = Math.Clamp(
                 (int)Math.Round(wouldBeScore * ModifierLibrary.TaxCollectorRate, MidpointRounding.AwayFromZero),
                 0, ScoreCalculator.MaxWordScore);
             if (bounty == 0)
-                return 0;
+                return (0, []);
 
-            bool anyPaid = false;
+            var collectors = new List<string>();
             foreach (var other in state.GamePlayers.Values)
             {
                 if (other.UserId == submitterUserId || other.IsEliminated || other.HasLeft)
@@ -226,11 +229,15 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 if (other.EngineBay.Any(c => c.Id == ModifierLibrary.TaxCollectorId))
                 {
                     other.Score += bounty;
-                    anyPaid = true;
+                    collectors.Add(other.DisplayName);
                 }
             }
 
-            return anyPaid ? bounty : 0;
+            if (collectors.Count == 0)
+                return (0, []);
+
+            collectors.Sort(StringComparer.OrdinalIgnoreCase);
+            return (bounty, collectors);
         }
 
         // ── Action cards ─────────────────────────────────────────────────────
@@ -436,7 +443,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                     // If the round-ending word produced a score animation, hold in RoundState until
                     // it finishes (blocking further play) instead of cutting straight to the next
                     // screen. Tick fires the pending transition once the hold elapses.
-                    if (holdForReplay && state.LatestScoreReplay is { Breakdown.Steps.Count: > 0 } replay)
+                    if (holdForReplay && state.LatestScoreReplay is { HasAnimation: true } replay)
                     {
                         state.PendingTransitionAt = now + ComputeReplayHold(replay, state.Settings);
                         state.PendingTransitionIsGameOver = gameOver;
@@ -458,12 +465,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         /// <summary>
         /// How long to hold in <see cref="RoundState"/> after the round-ending word so its inline
         /// score animation can play out. Mirrors the UI's per-step timing (total ÷ rows, capped at
-        /// 0.5 s/step — see <c>EngineBay</c>) over the reveal rows (seed + one per card + final),
-        /// plus a short read before the cut to the next screen.
+        /// 0.5 s/step — see <c>ScoreReplayStrip</c>) over the reveal rows (seed + one per card + final,
+        /// plus the steal line when present), plus a short read before the cut to the next screen.
         /// </summary>
         private static TimeSpan ComputeReplayHold(ScoreReplay replay, AlphaChainSettings settings)
         {
-            int rows = replay.Breakdown.Steps.Count + 2;
+            int rows = replay.AnimationRows;
             double stepSeconds = Math.Min(settings.EngineAnimationSeconds / Math.Max(1, rows), 0.5);
             return TimeSpan.FromSeconds(rows * stepSeconds + 0.8);
         }
