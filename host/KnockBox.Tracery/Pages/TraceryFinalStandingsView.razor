@@ -1,8 +1,6 @@
-@using KnockBox.Core.Services.Navigation
-@using KnockBox.Core.Services.State.Games.Shared
 @using KnockBox.Core.Services.State.Users
-@inject IGameSessionService GameSessionService
 @inject IUserService UserService
+@inject KnockBox.Tracery.Services.Logic.Games.TraceryGameEngine GameEngine
 
 @{
     // Render from the frozen start-of-match snapshot, not the live Players roster, so
@@ -45,13 +43,26 @@
         }
     </div>
 
-    <button class="tr-btn tr-btn-primary tr-over-exit" @onclick="ReturnHome">
-        Return Home
-    </button>
+    <div class="tr-over-actions">
+        @if (UserService.CurrentUser?.Id == State.Host.Id)
+        {
+            <button class="tr-btn tr-btn-primary tr-over-exit" @onclick="ReturnToLobby">
+                Return to Lobby
+            </button>
+        }
+        else
+        {
+            <span class="tr-over-wait">Waiting for host…</span>
+        }
+    </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public TraceryGameState State { get; set; } = default!;
 
-    private void ReturnHome() => GameSessionService.LeaveCurrentSession(navigateHome: true);
+    private void ReturnToLobby()
+    {
+        if (UserService.CurrentUser is null) return;
+        GameEngine.ReturnToLobby(UserService.CurrentUser, State);
+    }
 }

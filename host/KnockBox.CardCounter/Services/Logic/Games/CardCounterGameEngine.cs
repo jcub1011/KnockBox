@@ -239,56 +239,6 @@ namespace KnockBox.CardCounter.Services.Logic.Games
             });
         }
 
-        /// <summary>
-        /// Resets the game so another round can be played with the same players.
-        /// Only the host can trigger a reset.
-        /// </summary>
-        public Result ResetGame(User host, CardCounterGameState state)
-        {
-            if (state.Host.Id != host.Id)
-                return Result.FromError("Only the host can reset the game.");
-
-            if (state.Phase != GamePhase.GameOver)
-                return Result.FromError("Can only reset after the game is over.");
-
-            return state.Execute(() =>
-            {
-                // Create a fresh context and re-run initialization
-                var context = new CardCounterGameContext(state, randomNumberService, logger);
-                context.Fsm = new FiniteStateMachine<CardCounterGameContext, CardCounterCommand>(logger);
-                state.Context = context;
-                state.DiscardHistory.Clear();
-                state.MainDeck.Clear();
-                state.CurrentShoe.Clear();
-                state.DiscardPile.Clear();
-                state.LastPlayedAction = null;
-                state.LastDrawnCard = null;
-                state.LastOperatorResult = null;
-                state.PendingReaction = null;
-                state.FeelingLuckyTargetId = null;
-                state.IsNotMyMoneySelecting = false;
-                state.PendingNotMyMoneyOperator = null;
-                state.ForceDrawStack.Clear();
-                state.SetHostIsParticipant(state.Settings.HostPlays);
-                InitializeGame(context);
-
-                // Respect Active Operator Mode on reset: same logic as StartAsync.
-                if (state.Settings.ActiveOperatorMode)
-                {
-                    foreach (var ps in context.State.GamePlayers.Values)
-                    {
-                        ps.Balance = 10;
-                        ps.HasSetBuyIn = true;
-                    }
-                    TransitionTo(context, new RoundEndState());
-                }
-                else
-                {
-                    TransitionTo(context, new BuyInState());
-                }
-            });
-        }
-
         // ── Player-leave handling ─────────────────────────────────────────────
 
         /// <summary>

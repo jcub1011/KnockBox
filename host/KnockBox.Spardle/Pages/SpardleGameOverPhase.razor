@@ -1,10 +1,8 @@
-@using KnockBox.Core.Services.Navigation
 @using KnockBox.Core.Services.State.Games.Shared
 @using KnockBox.Core.Services.State.Users
 @using KnockBox.Spardle.Models
-@inject IGameSessionService GameSessionService
 @inject IUserService UserService
-@inject INavigationService NavigationService
+@inject SpardleEngine GameEngine
 
 @{
     // Render from the frozen start-of-match snapshot, not the live Players roster,
@@ -86,16 +84,26 @@
         }
     </div>
 
-    <button class="spd-btn spd-btn-primary spd-btn-lg spd-over-exit" @onclick="ReturnHome">
-        RETURN HOME
-    </button>
+    <div class="spd-over-actions">
+        @if (UserService.CurrentUser?.Id == State.Host.Id)
+        {
+            <button class="spd-btn spd-btn-primary spd-btn-lg spd-over-exit" @onclick="ReturnToLobby">
+                RETURN TO LOBBY
+            </button>
+        }
+        else
+        {
+            <span class="spd-over-wait">Waiting for host…</span>
+        }
+    </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
 
-    private void ReturnHome()
+    private void ReturnToLobby()
     {
-        GameSessionService.LeaveCurrentSession(navigateHome: true);
+        if (UserService.CurrentUser is null) return;
+        GameEngine.ReturnToLobby(UserService.CurrentUser, State);
     }
 }

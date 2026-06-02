@@ -13,6 +13,18 @@
     @if (GameState.Phase == AlphaChainGamePhase.GameOver)
     {
         <GameOverPanel Results="GameState.Results" />
+        @if (IsHost)
+        {
+            <div class="ac-results-actions">
+                <button class="ac-start-btn ac-start-primary" @onclick="ReturnToLobbyAsync">
+                    Return to Lobby
+                </button>
+            </div>
+        }
+        else
+        {
+            <p class="ac-results-wait">Waiting for host…</p>
+        }
     }
     else if (GameState.Phase == AlphaChainGamePhase.Intermission)
     {

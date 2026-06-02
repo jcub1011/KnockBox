@@ -207,6 +207,9 @@ namespace KnockBox.Codeword.Services.Logic.Games
             if (state.Host.Id != host.Id)
                 return Result.FromError("Only the host can return the game to the lobby.");
 
+            if (state.Phase != CodewordGamePhase.GameOver)
+                return Result.FromError("Can only return to the lobby after the game is over.");
+
             return state.Execute(() =>
             {
                 state.Context = null;
@@ -226,53 +229,6 @@ namespace KnockBox.Codeword.Services.Logic.Games
                 state.EndGameVoteStatus = new EndGameVoteStatus([], 0);
                 state.GameScores.Clear();
                 state.SetJoinable(true);
-            });
-        }
-
-        /// <summary>
-        /// Resets the game so another round can be played with the same players.
-        /// Only the host can trigger a reset.
-        /// </summary>
-        public Result ResetGame(User host, CodewordGameState state)
-        {
-            if (state.Host.Id != host.Id)
-                return Result.FromError("Only the host can reset the game.");
-
-            return state.Execute(() =>
-            {
-                // Create a fresh context and FSM.
-                var context = new CodewordGameContext(state, randomNumberService, logger);
-                var fsm = new FiniteStateMachine<CodewordGameContext, CodewordCommand>(logger);
-                context.Fsm = fsm;
-                state.Context = context;
-
-                // Clear per-game state.
-                state.GamePlayers.Clear();
-                state.TurnManager.TurnOrder.Clear();
-                state.TurnManager.SetCurrentPlayerIndex(0);
-                state.CurrentEliminationCycle = 0;
-                state.CurrentWordPair = null;
-                state.CurrentRoundClues.Clear();
-                state.CurrentRoundVotes.Clear();
-                state.UsedClues.Clear();
-                state.LastElimination = null;
-                state.LastInformantGuess = null;
-                state.AwaitingInformantGuess = false;
-                state.WinResult = null;
-                state.EndGameVoteStatus = new EndGameVoteStatus([], 0);
-
-                // Re-snapshot participants (host included if HostPlays is on).
-                foreach (var entry in state.Participants)
-                {
-                    state.GamePlayers[entry.User.Id] = new CodewordPlayerState
-                    {
-                        PlayerId = entry.User.Id,
-                        DisplayName = entry.DisplayName
-                    };
-                    state.TurnManager.TurnOrder.Add(entry.User.Id);
-                }
-
-                fsm.TransitionTo(context, new SetupState());
             });
         }
 

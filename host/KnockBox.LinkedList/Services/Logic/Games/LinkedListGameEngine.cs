@@ -140,6 +140,46 @@ namespace KnockBox.LinkedList.Services.Logic.Games
             return Task.FromResult(Result.Success);
         }
 
+        /// <summary>
+        /// Returns the game to the lobby so players can join/leave and settings can be
+        /// changed. Host-only, and only after the match is over. Flipping the state back
+        /// to joinable re-renders every player's page at the lobby — no navigation needed.
+        /// </summary>
+        public Result ReturnToLobby(User host, LinkedListGameState state)
+        {
+            if (state is null) return Result.FromError("No game state.");
+            if (state.Host.Id != host.Id)
+                return Result.FromError("Only the host can return the game to the lobby.");
+            if (state.Phase != LinkedListGamePhase.GameOver)
+                return Result.FromError("Can only return to the lobby after the game is over.");
+
+            return state.Execute(() =>
+            {
+                // Cancel any lingering per-group turn timers before discarding the groups.
+                foreach (var g in state.Groups)
+                {
+                    g.TurnTimeoutHandle?.Cancel();
+                    g.TurnTimeoutHandle = null;
+                }
+
+                state.Groups.Clear();
+                state.GamePlayers.Clear();
+                state.ParticipantOrder.Clear();
+                state.GroupAssignments.Clear();
+                state.AuditQueue.Clear();
+                state.StartWord = "";
+                state.DestinationWord = "";
+                state.AuditorPlayerId = "";
+                state.AuditorRotationIndex = 0;
+                state.RoundNumber = 0;
+                state.LastRoundResult = null;
+                state.LastStandings = [];
+                state.Superlatives = [];
+                state.SetPhase(LinkedListGamePhase.Setup);
+                state.SetJoinable(true);
+            });
+        }
+
         // ── Group construction (§8.2) ────────────────────────────────────────
 
         /// <summary>The single all-players chain for Collective play.</summary>

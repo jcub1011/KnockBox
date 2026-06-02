@@ -58,6 +58,50 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
             return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
         }
 
+        /// <summary>
+        /// Returns the game to the lobby so players can join/leave and settings can be
+        /// changed. Host-only, and only after the game is over. Flipping the state back to
+        /// joinable re-renders every player's page at the lobby — no navigation needed.
+        /// </summary>
+        public Result ReturnToLobby(User host, AlphaChainGameState state)
+        {
+            if (state.Host.Id != host.Id)
+                return Result.FromError("Only the host can return the game to the lobby.");
+            if (state.Phase != AlphaChainGamePhase.GameOver)
+                return Result.FromError("Can only return to the lobby after the game is over.");
+
+            return state.Execute(() =>
+            {
+                // SetupState re-snapshots GamePlayers from the roster on the next start, so
+                // clearing the per-match state here is sufficient. Settings are preserved.
+                state.Context = null;
+                state.GamePlayers.Clear();
+                state.TurnManager.TurnOrder.Clear();
+                state.OptimizationSubmissions.Clear();
+                state.PlayedWords.Clear();
+                state.PlayLog.Clear();
+                state.CensorExemptUserIds.Clear();
+                state.CurrentRound = 0;
+                state.CurrentEra = 0;
+                state.IntermissionPhase = default;
+                state.SniperBanUserId = null;
+                state.LatestScoreReplay = null;
+                state.ScoreReplaySequence = 0;
+                state.PendingTransitionAt = null;
+                state.PendingTransitionIsGameOver = false;
+                state.LastWord = null;
+                state.RequiredStartLetter = null;
+                state.BannedLetter = null;
+                state.CensorBannedLetter = null;
+                state.CensorImposedAtRound = 0;
+                state.LatestReactionNotices = [];
+                state.ReactionNoticeSequence = 0;
+                state.Results = null;
+                state.SetPhase(AlphaChainGamePhase.Setup);
+                state.SetJoinable(true);
+            });
+        }
+
         protected override Task<Result> StartAsyncCore(AlphaChainGameState gameState, CancellationToken ct = default)
         {
             // Validate() is the single source of truth for a legal config (the lobby gates its

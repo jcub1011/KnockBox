@@ -967,5 +967,49 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             CollectionAssert.AreEqual(new[] { "a", "c", "e" }, teams[0]);
             CollectionAssert.AreEqual(new[] { "b", "d" }, teams[1]);
         }
+
+        // ── ReturnToLobby ─────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task ReturnToLobby_NonHost_ReturnsError()
+        {
+            var state = await CreateWithPlayersAsync(3);
+            await _engine.StartAsync(_host, state);
+            state.SetPhase(LinkedListGamePhase.GameOver);
+            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+
+            var result = _engine.ReturnToLobby(nonHost, state);
+
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_BeforeGameOver_ReturnsError()
+        {
+            var state = await CreateWithPlayersAsync(3);
+            await _engine.StartAsync(_host, state);
+            // Phase is Playing, not GameOver — the replay path is rejected.
+
+            var result = _engine.ReturnToLobby(_host, state);
+
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_AfterGameOver_ReturnsToJoinableSetup()
+        {
+            var state = await CreateWithPlayersAsync(3);
+            await _engine.StartAsync(_host, state);
+            state.SetPhase(LinkedListGamePhase.GameOver);
+
+            var result = _engine.ReturnToLobby(_host, state);
+
+            Assert.IsTrue((bool)result.IsSuccess);
+            Assert.AreEqual(LinkedListGamePhase.Setup, state.Phase);
+            Assert.IsTrue(state.IsJoinable);
+            Assert.IsEmpty(state.GamePlayers);
+            Assert.IsEmpty(state.Groups);
+            Assert.AreEqual(0, state.RoundNumber);
+        }
     }
 }

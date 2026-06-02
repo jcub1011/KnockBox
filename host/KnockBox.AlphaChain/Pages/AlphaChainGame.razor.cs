@@ -405,6 +405,18 @@ namespace KnockBox.AlphaChain.Pages
             _ => null
         };
 
+        /// <summary>Host-only: returns the match to the lobby so players can join/leave and
+        /// settings can change before the next game. The engine clears all per-match state and
+        /// flips back to joinable, which re-renders every player's page at the lobby.</summary>
+        protected Task ReturnToLobbyAsync()
+        {
+            if (UserService.CurrentUser is not { } user) return Task.CompletedTask;
+            var result = GameEngine.ReturnToLobby(user, GameState);
+            if (result.TryGetFailure(out var error))
+                Logger.LogError("Failed to return Alpha Chain to the lobby: {Error}", error);
+            return Task.CompletedTask;
+        }
+
         public override void Dispose()
         {
             _tickSubscription?.Dispose();

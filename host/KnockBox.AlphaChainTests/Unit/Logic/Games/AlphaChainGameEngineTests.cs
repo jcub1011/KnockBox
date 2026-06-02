@@ -213,5 +213,46 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
 
             _engine.HandlePlayerLeft(MakePlayer(0), state);
         }
+
+        // ── ReturnToLobby ─────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task ReturnToLobby_NonHost_ReturnsError()
+        {
+            using var state = await CreateStartedGameAsync(2);
+            state.SetPhase(AlphaChainGamePhase.GameOver);
+            var nonHost = MakePlayer(99);
+
+            var result = _engine.ReturnToLobby(nonHost, state);
+
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_BeforeGameOver_ReturnsError()
+        {
+            using var state = await CreateStartedGameAsync(2);
+            // A started game is in Round, not GameOver — the replay path is rejected.
+
+            var result = _engine.ReturnToLobby(_host, state);
+
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task ReturnToLobby_AfterGameOver_ReturnsToJoinableSetup()
+        {
+            using var state = await CreateStartedGameAsync(2);
+            state.SetPhase(AlphaChainGamePhase.GameOver);
+
+            var result = _engine.ReturnToLobby(_host, state);
+
+            Assert.IsTrue((bool)result.IsSuccess);
+            Assert.AreEqual(AlphaChainGamePhase.Setup, state.Phase);
+            Assert.IsTrue(state.IsJoinable);
+            Assert.IsEmpty(state.GamePlayers);
+            Assert.IsEmpty(state.TurnManager.TurnOrder);
+            Assert.IsNull(state.Results);
+        }
     }
 }

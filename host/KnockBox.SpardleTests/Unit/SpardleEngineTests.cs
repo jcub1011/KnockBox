@@ -1232,4 +1232,48 @@ public class SpardleEngineTests
         Assert.HasCount(total, state.RoundQueue);
         Assert.AreEqual(total, state.RoundQueue.Distinct().Count());
     }
+
+    // ───────────────────────────────────────────────────────────────────────
+    // ReturnToLobby
+    // ───────────────────────────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task ReturnToLobby_NonHost_ReturnsError()
+    {
+        var (state, _) = await CreateStateAsync();
+        state.Phase = GamePhase.GameOver;
+        var nonHost = UserFactory.Create("NotHost", "nothost-id");
+
+        var result = _engine.ReturnToLobby(nonHost, state);
+
+        Assert.IsTrue(result.IsFailure);
+    }
+
+    [TestMethod]
+    public async Task ReturnToLobby_BeforeGameOver_ReturnsError()
+    {
+        var (state, host) = await CreateStateAsync();
+        // A fresh state is in the Lobby phase, not GameOver — the replay path is rejected.
+
+        var result = _engine.ReturnToLobby(host, state);
+
+        Assert.IsTrue(result.IsFailure);
+    }
+
+    [TestMethod]
+    public async Task ReturnToLobby_AfterGameOver_ReturnsToJoinableLobby()
+    {
+        var (state, host) = await CreateStateAsync();
+        state.CustomWordPool = ImmutableList.Create("apple", "brave");
+        await _engine.StartAsync(host, state);
+        state.Phase = GamePhase.GameOver;
+
+        var result = _engine.ReturnToLobby(host, state);
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.AreEqual(GamePhase.Lobby, state.Phase);
+        Assert.IsTrue(state.IsJoinable);
+        Assert.IsEmpty(state.PlayerStates);
+        Assert.AreEqual(0, state.CurrentRound);
+    }
 }

@@ -334,6 +334,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         public async Task ReturnToLobby_Host_ClearsContextAndSetsJoinable()
         {
             using var state = await CreateStartedGameAsync(4);
+            state.SetPhase(CodewordGamePhase.GameOver);
 
             var result = _engine.ReturnToLobby(_host, state);
 
@@ -346,6 +347,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         public async Task ReturnToLobby_Host_ClearsGameState()
         {
             using var state = await CreateStartedGameAsync(4);
+            state.SetPhase(CodewordGamePhase.GameOver);
 
             _engine.ReturnToLobby(_host, state);
 
@@ -354,29 +356,15 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             Assert.AreEqual(0, state.TurnManager.CurrentPlayerIndex);
         }
 
-        // ── ResetGame ─────────────────────────────────────────────────────────
-
         [TestMethod]
-        public async Task ResetGame_NonHost_ReturnsError()
+        public async Task ReturnToLobby_BeforeGameOver_ReturnsError()
         {
             using var state = await CreateStartedGameAsync(4);
-            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+            // A freshly started game is not in GameOver, so the replay path is rejected.
 
-            var result = _engine.ResetGame(nonHost, state);
+            var result = _engine.ReturnToLobby(_host, state);
 
             Assert.IsTrue(result.IsFailure);
-        }
-
-        [TestMethod]
-        public async Task ResetGame_Host_ResetsAndTransitionsToSetup()
-        {
-            using var state = await CreateStartedGameAsync(4);
-
-            var result = _engine.ResetGame(_host, state);
-
-            Assert.IsTrue((bool)result.IsSuccess);
-            Assert.IsNotNull(state.Context);
-            Assert.AreEqual(CodewordGamePhase.Setup, state.Phase);
         }
 
         // ── Tick ──────────────────────────────────────────────────────────────
