@@ -84,5 +84,36 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         /// they take a turn — see <c>RoundState.ApplyQueuedTimePenalty</c>.
         /// </summary>
         public int QueuedTimePenaltySeconds { get; set; } = 0;
+
+        // ── Card-capability state (feedback cards) ──────────────────────────────
+
+        /// <summary>
+        /// Personal banned letters (lower-case) rolled at era start by this player's
+        /// <c>RollsPersonalBanAtEraStart</c> modifier cards (Roulette Wheel, Smuggler's Toll),
+        /// keyed by the card id that rolled them. Like the match's banned letter they trigger the
+        /// Zero-Point Tax for this player; re-rolled each era. Separate from
+        /// <see cref="PersonalBannedLetter"/> (the transient Jinx/Bait &amp; Switch ban).
+        /// </summary>
+        public Dictionary<string, char> CardBannedLetters { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// True once Hyper-Drive has latched this era: the owner's shot clock is overridden short
+        /// and every multiplicative card is scaled up for the rest of the era. Reset at each era
+        /// boundary.
+        /// </summary>
+        public bool HyperDriveActive { get; set; } = false;
+
+        /// <summary>
+        /// Seconds this player is "silenced" (word input locked) at the start of their next turn,
+        /// queued by a Feedback Loop when a holder's Riposte negated this player's attack. Read and
+        /// cleared by the client at turn start.
+        /// </summary>
+        public int QueuedSilenceSeconds { get; set; } = 0;
+
+        /// <summary>
+        /// True once this player's Windfall has fired in the current era, so a player oscillating on
+        /// the last-place boundary can't loop-draw their deck. Reset at each era boundary.
+        /// </summary>
+        public bool WindfallFiredThisEra { get; set; } = false;
     }
 }

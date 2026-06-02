@@ -1,0 +1,159 @@
+using KnockBox.AlphaChain.Services.Logic.Games;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
+using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.State.Games;
+using KnockBox.AlphaChain.Tests.Unit.Support;
+using KnockBox.Core.Services.State.Users;
+using Microsoft.Extensions.Logging;
+using Moq;
+
+namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
+{
+    /// <summary>
+    /// Exercises the glass-cannon clock cards (Vault, Redline, Panic Button) via
+    /// <see cref="AlphaChainGameState.ComputeArmedShotClockSeconds"/>, and the Hyper-Drive
+    /// era-scoped latch via the real submit path with a deterministic submission timestamp.
+    /// </summary>
+    [TestClass]
+    public class ClockAndHyperDriveTests
+    {
+        private Mock<ILogger<AlphaChainGameEngine>> _engineLoggerMock = default!;
+        private Mock<ILogger<AlphaChainGameState>> _stateLoggerMock = default!;
+        private User _host = default!;
+
+        [TestInitialize]
+        public void Setup()
+        {
+            _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
+            _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
+            _host = UserFactory.Create("Host", "host1");
+        }
+
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+
+        private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartGameAsync(
+            StubWordListService words, int playerCount = 2, char? banned = null)
+        {
+            var engine = new AlphaChainGameEngine(
+                words, new FixedRandomNumberService(), new ScoreCalculator(),
+                _engineLoggerMock.Object, _stateLoggerMock.Object);
+
+            var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
+            for (int i = 0; i < playerCount; i++)
+                state.RegisterPlayer(MakePlayer(i));
+
+            state.UpdateSettings(s => s with { EnableTutorials = false });
+            await engine.StartAsync(_host, state);
+
+            if (banned is { } b)
+                state.Execute(() => state.BannedLetter = b);
+
+            return (engine, state);
+        }
+
+        private static void GiveModifier(AlphaChainGameState state, string playerId, string cardId) =>
+            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(ModifierLibrary.FindById(cardId)!));
+
+        // ── Clock effects (ComputeArmedShotClockSeconds) ────────────────────
+
+        [TestMethod]
+        public async Task Vault_ShavesThreeSecondsOffArmedClock()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
+            using var _ = state;
+            var id = state.TurnManager.CurrentPlayer!;
+            GiveModifier(state, id, "the-vault");
+
+            // Default shot clock 12 − 3 = 9.
+            Assert.AreEqual(9, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+        }
+
+        [TestMethod]
+        public async Task Redline_ShortensClockByTenPercent()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
+            using var _ = state;
+            var id = state.TurnManager.CurrentPlayer!;
+            GiveModifier(state, id, "redline");
+
+            // 12 × 0.9 = 10.8 → 11 (half-up).
+            Assert.AreEqual(11, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+        }
+
+        [TestMethod]
+        public async Task PanicButton_HalvesClock()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
+            using var _ = state;
+            var id = state.TurnManager.CurrentPlayer!;
+            GiveModifier(state, id, "panic-button");
+
+            // 12 × 0.5 = 6.
+            Assert.AreEqual(6, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+        }
+
+        [TestMethod]
+        public async Task ClockEffects_Stack_FractionThenSeconds()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
+            using var _ = state;
+            var id = state.TurnManager.CurrentPlayer!;
+            GiveModifier(state, id, "redline");    // −10%
+            GiveModifier(state, id, "the-vault");  // −3s
+
+            // 12 × 0.9 − 3 = 7.8 → 8 (half-up).
+            Assert.AreEqual(8, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+        }
+
+        [TestMethod]
+        public async Task ClockEffects_FlooredAtMinimum()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
+            using var _ = state;
+            var id = state.TurnManager.CurrentPlayer!;
+            GiveModifier(state, id, "panic-button"); // −50%
+            GiveModifier(state, id, "redline");      // −10%
+            GiveModifier(state, id, "the-vault");    // −3s
+
+            // 12 × 0.4 − 3 = 1.8 → 2 → floored to MinShotClockSeconds (3).
+            Assert.AreEqual(AlphaChainGameState.MinShotClockSeconds,
+                state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+        }
+
+        // ── Hyper-Drive latch (submit path) ─────────────────────────────────
+
+        [TestMethod]
+        public async Task HyperDrive_LatchesWhenSubmittingFast()
+        {
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
+            using var _ = state;
+            var id = state.TurnManager.CurrentPlayer!;
+            GiveModifier(state, id, "hyper-drive");
+
+            // Arm the clock to a known window, then submit 2s in (elapsed 2 < 3 threshold).
+            var armAt = DateTimeOffset.UtcNow;
+            state.Execute(() => state.PhaseEndTime = armAt.AddSeconds(12));
+            await engine.SubmitWordAsync(id, "cat", state, armAt.AddSeconds(2));
+
+            Assert.IsTrue(state.GamePlayers[id].HyperDriveActive, "Fast submit should latch Hyper-Drive.");
+            // Once latched, the owner's clock is overridden to the rule's 5s.
+            Assert.AreEqual(5, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+        }
+
+        [TestMethod]
+        public async Task HyperDrive_DoesNotLatchWhenSubmittingSlow()
+        {
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
+            using var _ = state;
+            var id = state.TurnManager.CurrentPlayer!;
+            GiveModifier(state, id, "hyper-drive");
+
+            // Submit 10s in (elapsed 10 ≥ 3 threshold) → no latch.
+            var armAt = DateTimeOffset.UtcNow;
+            state.Execute(() => state.PhaseEndTime = armAt.AddSeconds(12));
+            await engine.SubmitWordAsync(id, "cat", state, armAt.AddSeconds(10));
+
+            Assert.IsFalse(state.GamePlayers[id].HyperDriveActive, "Slow submit must not latch Hyper-Drive.");
+        }
+    }
+}

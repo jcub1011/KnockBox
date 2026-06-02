@@ -274,6 +274,17 @@
     cursor: not-allowed;
 }
 
+/* Feedback Loop: the field is locked (readOnly) for a few seconds at turn start. */
+.ac-word-input-silenced {
+    cursor: not-allowed;
+    color: var(--ac-danger);
+}
+
+.ac-word-input-silenced::placeholder {
+    color: var(--ac-danger);
+    opacity: 0.85;
+}
+
 .ac-submit-btn {
     flex: 0 0 auto;
     padding: 0 1.4rem;
@@ -366,6 +377,17 @@
     color: var(--ac-danger);
     text-decoration: line-through;
     opacity: 0.7;
+}
+
+/* Tunnel Vision: the holder's view masks the most recent word's first & last letters. */
+.ac-trail-hidden {
+    color: var(--ac-ink-faint);
+    background: repeating-linear-gradient(
+        45deg,
+        color-mix(in srgb, var(--ac-ink-faint) 18%, transparent),
+        color-mix(in srgb, var(--ac-ink-faint) 18%, transparent) 3px,
+        transparent 3px,
+        transparent 6px);
 }
 
 /* ── Cards ────────────────────────────────────────────────────────────── */

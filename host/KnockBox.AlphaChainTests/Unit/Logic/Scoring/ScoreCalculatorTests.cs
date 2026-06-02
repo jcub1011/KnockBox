@@ -18,6 +18,12 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Scoring
         private static WordContext Ctx(string word, char? banned = null) =>
             WordContext.Build(word, banned);
 
+        // Build a context with turn context for the time-aware (Sprinter, Panic Button) and meta
+        // (Hyper-Drive multiplier scale) cards.
+        private static WordContext Ctx(
+            string word, double remainingSeconds, int shotClock = 12, double multiplierScale = 1.0, char? banned = null) =>
+            WordContext.Build(word, banned, remainingSeconds, shotClock, multiplierScale);
+
         // A trivial additive card of fixed value.
         private static ModifierCard Additive(double value) =>
             new("add", "Add", "", ModifierKind.Additive, _ => true, _ => value);
@@ -146,8 +152,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Scoring
         [TestMethod]
         public void Architect_MultipliesWhenEightOrLonger()
         {
-            // "elephants" length 9 ≥ 8 → ×1.5 → 9 × 1.5 = 13.5 → 14 (half-up).
-            Assert.AreEqual(14, _calc.Calculate(Ctx("elephants"), [Card("architect")]));
+            // "elephants" length 9 ≥ 8 → ×2 (buffed from ×1.5) → 9 × 2 = 18.
+            Assert.AreEqual(18, _calc.Calculate(Ctx("elephants"), [Card("architect")]));
         }
 
         [TestMethod]
@@ -172,17 +178,32 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Scoring
         }
 
         [TestMethod]
-        public void Sprinter_MultipliesWhenFourOrShorter()
+        public void Sprinter_ScalesWithSecondsRemaining()
         {
-            // "cat" length 3 ≤ 4 → ×1.25 → 3 × 1.25 = 3.75 → 4 (half-up).
-            Assert.AreEqual(4, _calc.Calculate(Ctx("cat"), [Card("sprinter")]));
+            // "cat" length 3 ≤ 4, 10s left → ×(1 + 0.1×10) = ×2 → 3 × 2 = 6.
+            Assert.AreEqual(6, _calc.Calculate(Ctx("cat", remainingSeconds: 10), [Card("sprinter")]));
+        }
+
+        [TestMethod]
+        public void Sprinter_NoBonusWithNoTimeLeft()
+        {
+            // 0s left → ×1.0 → just the length.
+            Assert.AreEqual(3, _calc.Calculate(Ctx("cat", remainingSeconds: 0), [Card("sprinter")]));
         }
 
         [TestMethod]
         public void Sprinter_SkippedWhenLongerThanFour()
         {
-            // "bridge" length 6 > 4 → trigger false → score == length.
-            Assert.AreEqual(6, _calc.Calculate(Ctx("bridge"), [Card("sprinter")]));
+            // "bridge" length 6 > 4 → trigger false even with time to spare → score == length.
+            Assert.AreEqual(6, _calc.Calculate(Ctx("bridge", remainingSeconds: 10), [Card("sprinter")]));
+        }
+
+        [TestMethod]
+        public void PanicButton_DoublesInFinalTwoSeconds()
+        {
+            // "cat" with >2s left → ×1.35 → 3 × 1.35 = 4.05 → 4; with ≤2s left → ×2.7 → 8.1 → 8.
+            Assert.AreEqual(4, _calc.Calculate(Ctx("cat", remainingSeconds: 9), [Card("panic-button")]));
+            Assert.AreEqual(8, _calc.Calculate(Ctx("cat", remainingSeconds: 2), [Card("panic-button")]));
         }
 
         [TestMethod]
@@ -197,6 +218,89 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Scoring
         {
             // "letter" length 6, distinct = l,e,t,r (4) → +4 → 6 + 4 = 10.
             Assert.AreEqual(10, _calc.Calculate(Ctx("letter"), [Card("letter-hoarder")]));
+        }
+
+        // ── Group A: new big-word / linguistic niche cards ──────────────────
+
+        [TestMethod]
+        public void Sesquipedalian_TriplesWhenTenOrLonger()
+        {
+            // "exceedingly" length 11 ≥ 10 → ×3 → 11 × 3 = 33.
+            Assert.AreEqual(33, _calc.Calculate(Ctx("exceedingly"), [Card("sesquipedalian")]));
+        }
+
+        [TestMethod]
+        public void Sesquipedalian_SkippedWhenShorterThanTen()
+        {
+            // "elephants" length 9 < 10 → trigger false → score == length.
+            Assert.AreEqual(9, _calc.Calculate(Ctx("elephants"), [Card("sesquipedalian")]));
+        }
+
+        [TestMethod]
+        public void GutturalRoar_FiresWhenOnlyVowelsAreAorE()
+        {
+            // "shred" → vowel 'e' only (no i/o/u) → ×1.5 → 5 × 1.5 = 7.5 → 8 (half-up).
+            Assert.AreEqual(8, _calc.Calculate(Ctx("shred"), [Card("guttural-roar")]));
+        }
+
+        [TestMethod]
+        public void GutturalRoar_FiresWithNoVowelsAtAll()
+        {
+            // "crwth" (a real word) → no i/o/u (no vowels at all) → ×1.5 → 5 × 1.5 = 7.5 → 8.
+            Assert.AreEqual(8, _calc.Calculate(Ctx("crwth"), [Card("guttural-roar")]));
+        }
+
+        [TestMethod]
+        public void GutturalRoar_SkippedWhenWordContainsIOorU()
+        {
+            // "bridge" contains 'i' → trigger false → score == length.
+            Assert.AreEqual(6, _calc.Calculate(Ctx("bridge"), [Card("guttural-roar")]));
+        }
+
+        [TestMethod]
+        public void HighRoller_AddsTwentyOnRareStartLetter()
+        {
+            // "quartz" starts with 'q' → +20 → 6 + 20 = 26.
+            Assert.AreEqual(26, _calc.Calculate(Ctx("quartz"), [Card("high-roller")]));
+        }
+
+        [TestMethod]
+        public void HighRoller_SkippedOnCommonStartLetter()
+        {
+            // "cat" starts with 'c' → trigger false → score == length.
+            Assert.AreEqual(3, _calc.Calculate(Ctx("cat"), [Card("high-roller")]));
+        }
+
+        [TestMethod]
+        public void PerfectLink_MultipliesWhenEndingInVowel()
+        {
+            // "aerie" ends in 'e' → ×1.5 → 5 × 1.5 = 7.5 → 8 (half-up).
+            Assert.AreEqual(8, _calc.Calculate(Ctx("aerie"), [Card("perfect-link")]));
+        }
+
+        [TestMethod]
+        public void PerfectLink_SkippedWhenEndingInConsonant()
+        {
+            // "cat" ends in 't' → trigger false → score == length.
+            Assert.AreEqual(3, _calc.Calculate(Ctx("cat"), [Card("perfect-link")]));
+        }
+
+        // ── Hyper-Drive multiplier scale (meta effect) ──────────────────────
+
+        [TestMethod]
+        public void MultiplierScale_DoublesEveryMultiplicativeFactor()
+        {
+            // scale 2 turns a ×3 card into an effective ×6; additives are unaffected.
+            var ctx = Ctx("cats", remainingSeconds: 0, multiplierScale: 2.0); // length 4
+            Assert.AreEqual(4 * 6, _calc.Calculate(ctx, [Mult(3)]));
+        }
+
+        [TestMethod]
+        public void MultiplierScale_LeavesAdditivesUntouched()
+        {
+            var ctx = Ctx("cat", remainingSeconds: 0, multiplierScale: 2.0); // length 3
+            // Additive +10 is unscaled; only multiplicative factors scale.
+            Assert.AreEqual(13, _calc.Calculate(ctx, [Additive(10)]));
         }
 
         [TestMethod]

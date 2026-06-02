@@ -31,17 +31,22 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
         public const string JinxId = "jinx";
         public const string CensorId = "censor";
         public const string RiposteId = "riposte";
+        public const string FeedbackLoopId = "feedback-loop";
 
         // ── Tunable constants (kept here as the single source of truth) ──
 
         /// <summary>Required start letters rare enough to fire Free Throw at turn start.</summary>
         public static readonly ImmutableArray<char> RareStartLetters = ['q', 'x', 'z', 'j', 'k', 'v'];
 
-        /// <summary>Minimum final (post-modifier) word score that counts as a "big word" for Toll Booth.</summary>
-        public const int BigWordThreshold = 25;
+        /// <summary>Minimum word length for an ahead-opponent's word to trigger Toll Booth's point-steal.</summary>
+        public const int TollBoothMinLength = 7;
 
-        /// <summary>Seconds Toll Booth shaves off the targeted opponent's next shot clock.</summary>
-        public const int TollBoothPenaltySeconds = 5;
+        /// <summary>Fraction of the points an ahead opponent just earned that Toll Booth steals.</summary>
+        public const double TollBoothStealFraction = 0.20;
+
+        /// <summary>Seconds a Feedback Loop silences (locks the word input of) the attacker whose
+        /// reaction was negated by the holder's Riposte, at the start of the attacker's next turn.</summary>
+        public const int FeedbackLoopSilenceSeconds = 3;
 
         /// <summary>Seconds Frostbite shaves off the targeted opponent's next shot clock.</summary>
         public const int FrostbitePenaltySeconds = 5;
@@ -104,7 +109,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
 
             new ReactionCard(
                 TollBoothId, "Toll Booth",
-                "Auto: when an opponent ahead of you posts a big word, shave 5s off their next shot clock.",
+                "Auto: when an opponent ahead of you posts a 7+ letter word, steal 20% of the points they just earned.",
                 ReactionTrigger.TollBooth)
             { Icon = "toll-booth", Class = ReactionClass.Offensive, IsAttack = true },
 
@@ -131,6 +136,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
                 "Auto: negate the next attack reaction aimed at you and reflect it back at its caster; also shields you from board-wide bans.",
                 ReactionTrigger.Riposte)
             { Icon = "riposte", Class = ReactionClass.Special },
+
+            new ReactionCard(
+                FeedbackLoopId, "Feedback Loop",
+                "Auto: when your Riposte negates an attacker, silence them — their word input is locked for the first 3 seconds of their next turn.",
+                ReactionTrigger.FeedbackLoop)
+            { Icon = "feedback-loop", Class = ReactionClass.Special },
         ];
 
         /// <summary>Fast id → card lookup for resolving network ids against the catalogue.</summary>

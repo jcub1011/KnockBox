@@ -1,4 +1,5 @@
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 using KnockBox.Core.Primitives.Returns;
@@ -160,6 +161,13 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// it clears on the first turn-order wrap after this round. Meaningful only while a Censor is active.</summary>
         public int CensorImposedAtRound { get; set; }
 
+        /// <summary>
+        /// A personal banned letter (lower-case) that a Bait &amp; Switch play forces onto the very
+        /// next active player; applied to that player's <see cref="AlphaChainPlayerState.PersonalBannedLetter"/>
+        /// once the turn advances to them, then cleared. Null when no forced ban is pending.
+        /// </summary>
+        public char? PendingForcedPersonalBan { get; set; }
+
         // ── Reaction notice channel (off-submission reactions) ────────────────
 
         /// <summary>
@@ -173,13 +181,58 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// so the reaction overlay <c>@key</c>s off it and animates exactly once.</summary>
         public int ReactionNoticeSequence { get; set; }
 
+        /// <summary>The shortest a shot clock can be armed to, so the glass-cannon clock cards
+        /// (Vault, Redline, Panic Button, Hyper-Drive) can shorten but never zero/invert it.</summary>
+        public const int MinShotClockSeconds = 3;
+
         /// <summary>
-        /// Re-arms the shot clock from <paramref name="now"/>. Called on entering
-        /// <c>RoundState</c> and after every turn (submission or timeout). Caller must
+        /// Re-arms the shot clock from <paramref name="now"/> for the active player, applying that
+        /// player's modifier clock effects (see <see cref="ComputeArmedShotClockSeconds"/>). Called
+        /// on entering <c>RoundState</c> and after every turn (submission or timeout). Caller must
         /// already hold the execute lock.
         /// </summary>
         public void ResetTurnTimer(DateTimeOffset now)
-            => PhaseEndTime = now.AddSeconds(Settings.ShotClockSeconds);
+        {
+            int seconds = Settings.ShotClockSeconds;
+            if (TurnManager.CurrentPlayer is { } id && GamePlayers.TryGetValue(id, out var player))
+                seconds = ComputeArmedShotClockSeconds(player);
+            PhaseEndTime = now.AddSeconds(seconds);
+        }
+
+        /// <summary>
+        /// The shot-clock length to arm for <paramref name="player"/>: the configured base (or the
+        /// Hyper-Drive override when latched), then every <see cref="ClockEffect"/> in their Engine
+        /// Bay folded in (fractions first, then flat seconds), floored at
+        /// <see cref="MinShotClockSeconds"/>. Pure function of the player's bay + match settings.
+        /// </summary>
+        public int ComputeArmedShotClockSeconds(AlphaChainPlayerState player)
+        {
+            double seconds = Settings.ShotClockSeconds;
+
+            // A latched Hyper-Drive overrides the base clock for the rest of the era.
+            if (player.HyperDriveActive)
+                foreach (var card in player.EngineBay)
+                    if (card.Hyperdrive is { } hd)
+                    {
+                        seconds = hd.ClockOverrideSeconds;
+                        break;
+                    }
+
+            // Permanent per-owner clock effects: apply all fractions, then all flat seconds.
+            double fraction = 0;
+            int flat = 0;
+            foreach (var card in player.EngineBay)
+                if (card.Clock is { } ce)
+                {
+                    fraction += ce.DeltaFraction;
+                    flat += ce.DeltaSeconds;
+                }
+
+            seconds = seconds * (1 + fraction) + flat;
+
+            int armed = (int)Math.Round(seconds, MidpointRounding.AwayFromZero);
+            return Math.Max(MinShotClockSeconds, armed);
+        }
 
         /// <summary>Monotonic counter feeding <see cref="AlphaChainPlayerState.EliminationOrder"/>.</summary>
         private int _eliminationCounter;

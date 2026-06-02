@@ -182,13 +182,19 @@
                 @* ── Chain trail ── *@
                 @if (ChainTrail.Count > 0)
                 {
+                    int lastTrailIndex = ChainTrail.Count - 1;
                     <div class="ac-trail" aria-label="Recent chain">
-                        @foreach (var play in ChainTrail)
+                        @for (int t = 0; t < ChainTrail.Count; t++)
                         {
+                            var play = ChainTrail[t];
+                            // Tunnel Vision masks the first & last letter of the most recent word for
+                            // its holder only — you must remember it (or read the required-start letter).
+                            bool maskWord = LocalPlayerHasTunnelVision && t == lastTrailIndex;
                             <span class="ac-trail-word @(play.ZeroPointTax ? "ac-trail-taxed" : "")">
                                 @for (int i = 0; i < play.Word.Length; i++)
                                 {
-                                    <span class="ac-trail-letter @(i == play.Word.Length - 1 ? "ac-trail-link" : "")">@char.ToUpperInvariant(play.Word[i])</span>
+                                    bool hideLetter = maskWord && (i == 0 || i == play.Word.Length - 1);
+                                    <span class="ac-trail-letter @(i == play.Word.Length - 1 ? "ac-trail-link" : "") @(hideLetter ? "ac-trail-hidden" : "")">@(hideLetter ? '·' : char.ToUpperInvariant(play.Word[i]))</span>
                                 }
                             </span>
                         }

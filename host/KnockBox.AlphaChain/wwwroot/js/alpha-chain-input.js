@@ -24,6 +24,11 @@ export function register(id, el, dotNetRef) {
     inputs.set(id, state);
 
     state.keyHandler = (ev) => {
+        // Feedback Loop silence: swallow every keystroke (incl. Enter) while locked.
+        if (state.silenced) {
+            ev.preventDefault();
+            return;
+        }
         if (ev.key === 'Enter') {
             ev.preventDefault();
             notify(state, 'OnWordSubmitted', el.value);
@@ -56,6 +61,32 @@ export function armDeadline(id, remainingMs, leadMs) {
     }, delay);
 }
 
+// Feedback Loop: lock the input for `ms` at the start of a turn — typing and Enter are swallowed,
+// the field reads "silenced…", then it unlocks and focuses. The shot clock keeps running (the
+// penalty). The `disabled` attribute is Blazor-owned, so we use readOnly + a flag instead.
+export function silence(id, ms) {
+    const state = inputs.get(id);
+    if (!state || !state.el) return;
+    clearSilence(state);
+
+    const el = state.el;
+    state.silenced = true;
+    state.silencedPlaceholder = el.getAttribute('placeholder') || '';
+    el.value = '';
+    el.readOnly = true;
+    el.classList.add('ac-word-input-silenced');
+    el.setAttribute('placeholder', 'silenced…');
+
+    state.silenceId = setTimeout(() => {
+        state.silenceId = null;
+        state.silenced = false;
+        el.readOnly = false;
+        el.classList.remove('ac-word-input-silenced');
+        el.setAttribute('placeholder', state.silencedPlaceholder || '');
+        try { el.focus(); } catch (err) { /* element detached; ignore */ }
+    }, ms);
+}
+
 export function focus(id) {
     const state = inputs.get(id);
     if (state && state.el) {
@@ -81,6 +112,7 @@ export function unregister(id) {
     const state = inputs.get(id);
     if (!state) return;
     clearDeadline(state);
+    clearSilence(state);
     if (state.el) {
         if (state.keyHandler) state.el.removeEventListener('keydown', state.keyHandler);
         if (state.blurHandler) state.el.removeEventListener('blur', state.blurHandler);
@@ -93,6 +125,14 @@ function clearDeadline(state) {
         clearTimeout(state.timeoutId);
         state.timeoutId = null;
     }
+}
+
+function clearSilence(state) {
+    if (state.silenceId != null) {
+        clearTimeout(state.silenceId);
+        state.silenceId = null;
+    }
+    state.silenced = false;
 }
 
 function notify(state, method, arg) {

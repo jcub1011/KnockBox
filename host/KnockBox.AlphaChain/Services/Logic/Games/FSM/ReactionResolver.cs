@@ -77,7 +77,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
         /// is the standings captured before this word was credited; current state is the post-state.
         /// </summary>
         public static void ResolveAfterScore(AlphaChainGameContext context, string submitterUserId,
-            int finalScore, IReadOnlyDictionary<string, int> preRanks, List<ReactionEvent> notices)
+            int finalScore, int wordLength, IReadOnlyDictionary<string, int> preRanks, List<ReactionEvent> notices)
         {
             var state = context.State;
             if (!state.GamePlayers.TryGetValue(submitterUserId, out var submitter))
@@ -116,14 +116,16 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
                     ApplyTimeAttack(fb, h, submitter, ReactionLibrary.FrostbitePenaltySeconds, ref riposteAvailable, notices);
             }
 
-            // 1c. Toll Booth — a behind opponent fires when the (ahead) submitter posts a big word.
-            if (finalScore >= ReactionLibrary.BigWordThreshold)
+            // 1c. Toll Booth — a behind opponent fires when the (ahead) submitter posts a long word,
+            //     stealing a cut of the points just earned. Unlike the time attacks this transfers
+            //     current score (like the Tax Collector bounty); postRanks stay fixed, so no cascade.
+            if (wordLength >= ReactionLibrary.TollBoothMinLength)
                 foreach (var h in holders.Where(h => h.UserId != submitterUserId))
                 {
                     int hPost = postRanks.GetValueOrDefault(h.UserId, int.MaxValue);
                     if (submitterPost < hPost &&
                         h.ReactionHand.FirstOrDefault(c => c.Trigger == ReactionTrigger.TollBooth) is { } tb)
-                        ApplyTimeAttack(tb, h, submitter, ReactionLibrary.TollBoothPenaltySeconds, ref riposteAvailable, notices);
+                        ApplyPointSteal(tb, h, submitter, finalScore, ref riposteAvailable, notices);
                 }
 
             // 2. Self/board reactions for any holder who just fell to last place.
@@ -135,7 +137,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
                     if (hPost != activeCount || hPre == activeCount)
                         continue;
 
-                    if (h.ReactionHand.FirstOrDefault(c => c.Trigger == ReactionTrigger.Windfall) is { } wf)
+                    // Windfall fires at most once per era so a player riding the 3rd/4th boundary
+                    // can't loop-draw their whole deck.
+                    if (!h.WindfallFiredThisEra &&
+                        h.ReactionHand.FirstOrDefault(c => c.Trigger == ReactionTrigger.Windfall) is { } wf)
                         ApplyWindfall(context, wf, h, notices);
 
                     if (state.CensorBannedLetter is null &&
@@ -207,6 +212,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
                 caster.PersonalBannedLetter ??= PickBan(state);
                 caster.ReactionHand.Remove(card);
                 notices.Add(Reflect(rip, victim, caster, $"Reflected {card.Name} back at {caster.DisplayName}"));
+                TryFeedbackLoop(victim, caster, notices);
                 return;
             }
 
@@ -229,6 +235,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
                 caster.QueuedTimePenaltySeconds += seconds;
                 caster.ReactionHand.Remove(card);
                 notices.Add(Reflect(rip, victim, caster, $"Reflected {card.Name} — −{seconds}s {caster.DisplayName}'s next clock"));
+                TryFeedbackLoop(victim, caster, notices);
                 return;
             }
 
@@ -237,10 +244,58 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
             notices.Add(Attack(card, caster, victim, $"−{seconds}s next shot clock"));
         }
 
+        /// <summary>
+        /// Toll Booth's point-steal: the (behind) caster takes <see cref="ReactionLibrary.TollBoothStealFraction"/>
+        /// of the points the (ahead) submitter just earned. Routed through the victim's Riposte —
+        /// when reflected, the caster loses the points to the victim instead. Transfers current
+        /// score; the caller's <c>postRanks</c> snapshot is intentionally not recomputed (no cascade).
+        /// </summary>
+        private static void ApplyPointSteal(ReactionCard card, AlphaChainPlayerState caster,
+            AlphaChainPlayerState victim, int finalScore, ref bool riposteAvailable, List<ReactionEvent> notices)
+        {
+            int amount = (int)Math.Round(finalScore * ReactionLibrary.TollBoothStealFraction, MidpointRounding.AwayFromZero);
+            if (amount <= 0)
+                return; // nothing worth stealing (e.g. a taxed long word) — keep the card.
+
+            if (riposteAvailable && TakeRiposte(victim) is { } rip)
+            {
+                riposteAvailable = false;
+                caster.Score = Math.Max(0, caster.Score - amount);
+                victim.Score += amount;
+                caster.ReactionHand.Remove(card);
+                notices.Add(Reflect(rip, victim, caster, $"Reflected {card.Name} — took {amount} back from {caster.DisplayName}"));
+                TryFeedbackLoop(victim, caster, notices);
+                return;
+            }
+
+            victim.Score = Math.Max(0, victim.Score - amount);
+            caster.Score += amount;
+            caster.ReactionHand.Remove(card);
+            notices.Add(Attack(card, caster, victim, $"stole {amount} points"));
+        }
+
+        /// <summary>
+        /// Fires a Feedback Loop the <paramref name="riposter"/> holds (consuming it) when their
+        /// Riposte negated <paramref name="attacker"/>: queues a turn-start silence on the attacker.
+        /// </summary>
+        private static void TryFeedbackLoop(AlphaChainPlayerState riposter, AlphaChainPlayerState attacker,
+            List<ReactionEvent> notices)
+        {
+            var fb = riposter.ReactionHand.FirstOrDefault(c => c.Trigger == ReactionTrigger.FeedbackLoop);
+            if (fb is null)
+                return;
+
+            riposter.ReactionHand.Remove(fb);
+            attacker.QueuedSilenceSeconds = Math.Max(attacker.QueuedSilenceSeconds, ReactionLibrary.FeedbackLoopSilenceSeconds);
+            notices.Add(Attack(fb, riposter, attacker,
+                $"silenced {attacker.DisplayName} for {ReactionLibrary.FeedbackLoopSilenceSeconds}s"));
+        }
+
         private static void ApplyWindfall(AlphaChainGameContext context, ReactionCard card,
             AlphaChainPlayerState holder, List<ReactionEvent> notices)
         {
             holder.ReactionHand.Remove(card);
+            holder.WindfallFiredThisEra = true;
 
             int drawn = 0;
             for (int i = 0; i < ReactionLibrary.WindfallDrawCount && ReactionLibrary.All.Length > 0; i++)

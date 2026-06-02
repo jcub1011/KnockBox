@@ -160,12 +160,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         /// <summary>Sets pre-scores, captures the standings, then sets the submitter's post-score
         /// and runs the resolver — modelling "this word was just credited".</summary>
         private void ResolveSwing(AlphaChainGameState state, string submitterId, int finalScore,
-            (string id, int pre, int post)[] scores, List<ReactionEvent> notices)
+            (string id, int pre, int post)[] scores, List<ReactionEvent> notices, int wordLength = 8)
         {
             foreach (var (id, pre, _) in scores) SetScore(state, id, pre);
             var preRanks = ReactionResolver.RankByScore(state);
             foreach (var (id, _, post) in scores) SetScore(state, id, post);
-            state.Execute(() => ReactionResolver.ResolveAfterScore(state.Context!, submitterId, finalScore, preRanks, notices));
+            state.Execute(() => ReactionResolver.ResolveAfterScore(
+                state.Context!, submitterId, finalScore, wordLength, preRanks, notices));
         }
 
         [TestMethod]
@@ -200,33 +201,36 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         }
 
         [TestMethod]
-        public async Task TollBooth_QueuesPenalty_WhenAheadSubmitterPostsBigWord()
+        public async Task TollBooth_StealsPoints_WhenAheadSubmitterPostsLongWord()
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
             using var _ = state;
             string p0 = "p0-id", p1 = "p1-id";
             GiveReaction(state, p1, ReactionLibrary.TollBoothId);
 
-            // p0 already ahead, posts a big word (>= threshold); p1 is behind and tolls them.
-            ResolveSwing(state, p0, finalScore: ReactionLibrary.BigWordThreshold + 5,
-                [(p0, 30, 60), (p1, 10, 10)], new List<ReactionEvent>());
+            // p0 is ahead and posts a 7+ letter word scoring 60; behind p1 tolls 20% = 12 points.
+            ResolveSwing(state, p0, finalScore: 60,
+                [(p0, 30, 60), (p1, 10, 10)], new List<ReactionEvent>(), wordLength: 8);
 
-            Assert.AreEqual(ReactionLibrary.TollBoothPenaltySeconds, state.GamePlayers[p0].QueuedTimePenaltySeconds);
-            Assert.AreEqual(0, CountOf(state, p1, ReactionTrigger.TollBooth));
+            Assert.AreEqual(48, state.GamePlayers[p0].Score, "Submitter loses 20% of the 60 just earned.");
+            Assert.AreEqual(22, state.GamePlayers[p1].Score, "Toll Booth owner gains the 12 stolen.");
+            Assert.AreEqual(0, CountOf(state, p1, ReactionTrigger.TollBooth), "TollBooth consumed.");
         }
 
         [TestMethod]
-        public async Task TollBooth_DoesNotFire_BelowBigWordThreshold()
+        public async Task TollBooth_DoesNotFire_OnShortWord()
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
             using var _ = state;
             string p0 = "p0-id", p1 = "p1-id";
             GiveReaction(state, p1, ReactionLibrary.TollBoothId);
 
-            ResolveSwing(state, p0, finalScore: ReactionLibrary.BigWordThreshold - 1,
-                [(p0, 30, 40), (p1, 10, 10)], new List<ReactionEvent>());
+            // A 6-letter word is below the 7-letter threshold → no steal.
+            ResolveSwing(state, p0, finalScore: 60,
+                [(p0, 30, 90), (p1, 10, 10)], new List<ReactionEvent>(), wordLength: 6);
 
-            Assert.AreEqual(0, state.GamePlayers[p0].QueuedTimePenaltySeconds);
+            Assert.AreEqual(90, state.GamePlayers[p0].Score, "No steal on a short word.");
+            Assert.AreEqual(10, state.GamePlayers[p1].Score);
             Assert.AreEqual(1, CountOf(state, p1, ReactionTrigger.TollBooth), "TollBooth kept.");
         }
 
@@ -260,6 +264,41 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             Assert.IsNotNull(state.CensorBannedLetter, "Censor should impose a board-wide ban.");
             Assert.AreEqual(0, CountOf(state, p1, ReactionTrigger.Censor));
+        }
+
+        [TestMethod]
+        public async Task Windfall_FiresAtMostOncePerEra()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 3, banned: 'z');
+            using var _ = state;
+            string p0 = "p0-id", p1 = "p1-id", p2 = "p2-id";
+            GiveReaction(state, p1, ReactionLibrary.WindfallId);
+
+            // First drop to last → Windfall fires and sets the per-era guard.
+            ResolveSwing(state, p0, finalScore: 20, [(p0, 0, 30), (p1, 6, 6), (p2, 8, 8)], new List<ReactionEvent>());
+            Assert.IsTrue(state.GamePlayers[p1].WindfallFiredThisEra);
+
+            // Give another Windfall and make p1 fall to last AGAIN this era → the guard blocks it.
+            GiveReaction(state, p1, ReactionLibrary.WindfallId);
+            ResolveSwing(state, p0, finalScore: 20, [(p0, 0, 30), (p1, 10, 10), (p2, 12, 12)], new List<ReactionEvent>());
+            Assert.AreEqual(1, CountOf(state, p1, ReactionTrigger.Windfall), "Second Windfall must not fire this era.");
+        }
+
+        [TestMethod]
+        public async Task FeedbackLoop_SilencesAttacker_WhenRiposteNegatesThem()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
+            using var _ = state;
+            string p0 = "p0-id", p1 = "p1-id";
+            GiveReaction(state, p0, ReactionLibrary.RiposteId);       // submitter holds Riposte …
+            GiveReaction(state, p0, ReactionLibrary.FeedbackLoopId);  // … and Feedback Loop
+            GiveReaction(state, p1, ReactionLibrary.JinxId);          // opponent attacks with Jinx
+
+            // p0 takes the lead → p1's Jinx fires; p0's Riposte negates it and Feedback Loop silences p1.
+            ResolveSwing(state, p0, finalScore: 20, [(p0, 0, 20), (p1, 10, 10)], new List<ReactionEvent>());
+
+            Assert.AreEqual(ReactionLibrary.FeedbackLoopSilenceSeconds, state.GamePlayers[p1].QueuedSilenceSeconds);
+            Assert.AreEqual(0, CountOf(state, p0, ReactionTrigger.FeedbackLoop), "Feedback Loop consumed.");
         }
 
         // ── Riposte ─────────────────────────────────────────────────────────

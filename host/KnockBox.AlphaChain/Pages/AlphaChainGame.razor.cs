@@ -255,6 +255,11 @@ namespace KnockBox.AlphaChain.Pages
         protected AlphaChainPlayerState? MyPlayer =>
             CurrentUserId is { } id && GameState.GamePlayers.TryGetValue(id, out var ps) ? ps : null;
 
+        /// <summary>Whether the local player holds Tunnel Vision — their view masks the first and last
+        /// letter of the most recent chain word (owner-only; the chain rule is still server-enforced).</summary>
+        protected bool LocalPlayerHasTunnelVision =>
+            MyPlayer?.EngineBay.Any(c => c.MasksPreviousWord) == true;
+
         /// <summary>Whether the local user is the room host (gates the debug "Grant Cards" button).</summary>
         protected bool IsHost => CurrentUserId is not null && CurrentUserId == GameState.Host.Id;
 
@@ -384,9 +389,21 @@ namespace KnockBox.AlphaChain.Pages
                     _lastArmSig = sig;
                     if (CanSubmit)
                     {
+                        // Feedback Loop: consume any queued silence and lock the input client-side for
+                        // its first seconds (the chain/clock still run — that's the penalty).
+                        int silenceMs = 0;
+                        if (MyPlayer is { QueuedSilenceSeconds: > 0 } me)
+                        {
+                            silenceMs = me.QueuedSilenceSeconds * 1000;
+                            GameState.Execute(() => me.QueuedSilenceSeconds = 0);
+                        }
+
                         var remainingMs = Math.Max(0, (GameState.PhaseEndTime - DateTimeOffset.UtcNow).TotalMilliseconds);
                         await _inputModule.InvokeVoidAsync("armDeadline", _inputId, remainingMs, AutoSubmitLeadMs);
-                        await _inputModule.InvokeVoidAsync("focus", _inputId);
+                        if (silenceMs > 0)
+                            await _inputModule.InvokeVoidAsync("silence", _inputId, silenceMs);
+                        else
+                            await _inputModule.InvokeVoidAsync("focus", _inputId);
                     }
                     else
                     {

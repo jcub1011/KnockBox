@@ -139,15 +139,22 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             // 7. Zero-Point Tax: any active banned letter anywhere in the word zeroes the score —
             //    the match's era letter, an active board-wide Censor (unless the submitter is a
-            //    Riposte-exempt holder), or a personal Jinx letter on the submitter.
+            //    Riposte-exempt holder), a personal Jinx/Bait & Switch letter, or any personal
+            //    card-ban the submitter rolled this era (Roulette Wheel, Smuggler's Toll).
             char? censorBan = (state.CensorBannedLetter is { } cb && !state.CensorExemptUserIds.Contains(cmd.ActorUserId))
                 ? cb : null;
-            bool containsBanned = ContainsAny(word, state.BannedLetter, censorBan, player?.PersonalBannedLetter);
+            bool containsBanned =
+                ContainsAny(word, state.BannedLetter, censorBan, player?.PersonalBannedLetter)
+                || ContainsAnyOf(word, player?.CardBannedLetters.Values);
 
             // 8. Full scoring pipeline: (L + ΣA) × ΠM, left → right over the bay. The WordContext is
             //    seeded with only the canonical era letter so modifier triggers (Tax Collector) and
             //    the replay's "banned" anchor stay tied to it, not to transient Censor/Jinx bans.
-            var ctx = WordContext.Build(word, state.BannedLetter);
+            //    Turn context (remaining clock, multiplier scale) feeds the time-aware/meta cards.
+            double remainingSeconds = Math.Max(0, (state.PhaseEndTime - cmd.Now).TotalSeconds);
+            double multiplierScale = ActiveMultiplierScale(player);
+            var ctx = WordContext.Build(
+                word, state.BannedLetter, remainingSeconds, state.Settings.ShotClockSeconds, multiplierScale);
             var bay = (IReadOnlyList<ModifierCard>?)player?.EngineBay ?? [];
             var probe = context.ScoreCalculator.CalculateSteps(ctx, bay, taxed: false);
 
@@ -159,7 +166,26 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             int baseScore = breakdown.FinalBeforeTax;
             int score = breakdown.FinalScore;
 
-            // 9. The personal Jinx letter (if any) is consumed by this accepted submission.
+            // 8c. IRS: a held card salvages the owner's own taxed word into a flat score and (when
+            //     so configured) denies the Tax Collector / Enforcer bounty. The replay strip shows
+            //     the salvaged figure rather than a bare 0.
+            bool suppressBounty = false;
+            if (taxed && player?.EngineBay.FirstOrDefault(c => c.OwnTax is not null)?.OwnTax is { } ownTax)
+            {
+                score = ownTax.FlatPoints;
+                suppressBounty = ownTax.SuppressesBounty;
+                if (score > 0)
+                    breakdown = breakdown with { FinalScore = score };
+            }
+
+            // 8d. Bait & Switch: a held card forces the offending banned letter onto the next player
+            //     as a personal ban (applied when the turn advances to them).
+            if (taxed && player is not null && player.EngineBay.Any(c => c.ForcesNextPlayerBan)
+                && FirstBannedLetterUsed(word, state.BannedLetter, censorBan,
+                       player.PersonalBannedLetter, player.CardBannedLetters.Values) is { } offending)
+                state.PendingForcedPersonalBan = offending;
+
+            // 9. The personal Jinx/Bait & Switch letter (if any) is consumed by this accepted submission.
             if (player is not null)
                 player.PersonalBannedLetter = null;
 
@@ -174,15 +200,22 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             if (player is not null)
                 player.Score += score;
 
-            // 11b. Tax Collector bounty: a taxed (banned-letter) word pays nothing to the
-            //      submitter, but every *other* active player holding a Tax Collector collects
-            //      half of what the word would have scored. The submitter never collects from
-            //      their own taxed word.
-            var (bounty, taxCollectors) = PayTaxCollectorBounty(state, cmd.ActorUserId, taxed, baseScore);
+            // 11a. Hyper-Drive: a fast accepted submission latches the era-scoped overdrive (a 5s
+            //      shot clock + doubled multipliers) for the rest of the era. Affects later turns,
+            //      not this one (this word already scored under the pre-latch scale).
+            TryLatchHyperDrive(state, player, remainingSeconds);
 
-            // 11c. Resolve the standings-driven reactions now that the score and the Tax Collector
-            //      bounty have both landed (so the pre/post diff reflects the full swing).
-            ReactionResolver.ResolveAfterScore(context, cmd.ActorUserId, score, preRanks, reactions);
+            // 11b. Siphon payouts: a taxed word feeds every other Tax Collector / Enforcer (a cut of
+            //      the would-be score), and a normally-scored word that used an opponent's Smuggler's
+            //      Toll letter mints that opponent a cut of what the submitter earned. The submitter
+            //      never collects from their own word; IRS can suppress the taxed bounty.
+            var (bounty, taxCollectors) =
+                PaySiphons(state, cmd.ActorUserId, word, taxed, baseScore, score, suppressBounty);
+
+            // 11c. Resolve the standings-driven reactions now that the score and the siphon payouts
+            //      have both landed (so the pre/post diff reflects the full swing). Word length feeds
+            //      the Toll Booth point-steal trigger (7+ letters).
+            ReactionResolver.ResolveAfterScore(context, cmd.ActorUserId, score, word.Length, preRanks, reactions);
 
             // Log the accepted play for the UI feed.
             state.PlayLog.Add(new AlphaChainWordPlay(
@@ -208,8 +241,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 state.ReactionNoticeSequence++;
             }
 
-            // 12. Result is set before advancing so it reflects this submission.
-            context.LastSubmitResult = taxed
+            // 12. Result is set before advancing so it reflects this submission. A taxed word that
+            //     an IRS salvaged into points reads as a normal accept (the player did score).
+            context.LastSubmitResult = (taxed && score == 0)
                 ? new SubmitWordResult.AcceptedZeroPointTax()
                 : new SubmitWordResult.Accepted(score);
 
@@ -219,34 +253,58 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         }
 
         /// <summary>
-        /// Pays the Tax Collector bounty for a submission. When <paramref name="taxed"/> is true,
-        /// every active player other than the submitter who holds a Tax Collector in their Engine
-        /// Bay collects <see cref="ModifierLibrary.TaxCollectorRate"/> × <paramref name="wouldBeScore"/>
-        /// (rounded half-up, clamped to <see cref="ScoreCalculator.MaxWordScore"/>). Returns the
-        /// per-owner bounty (0 when nothing was paid) and the display names of every owner who
-        /// collected (sorted, for the replay strip's "stolen by …" line). Runs inside the execute lock.
+        /// Pays every modifier siphon triggered by a submission and returns the era-tax bounty for
+        /// the replay strip's "stolen by …" line. Two independent siphon families resolve here:
+        /// <list type="bullet">
+        /// <item><b>Era-tax</b> (Tax Collector / Enforcer): on a taxed word, each <i>other</i> active
+        /// holder collects their single highest matching rate × <paramref name="wouldBeScore"/>
+        /// (rates don't stack). Suppressed by an IRS on the submitter (<paramref name="suppressBounty"/>).</item>
+        /// <item><b>Card-ban</b> (Smuggler's Toll): on a normally-scored word that used a holder's
+        /// era-rolled personal card-ban, that holder is minted their rate × <paramref name="earnedScore"/>;
+        /// the submitter keeps their points.</item>
+        /// </list>
+        /// The two are mutually exclusive per word (a taxed word earns 0). Runs inside the execute lock.
         /// </summary>
-        private static (int Bounty, IReadOnlyList<string> Collectors) PayTaxCollectorBounty(
-            AlphaChainGameState state, string submitterUserId, bool taxed, int wouldBeScore)
+        private static (int Bounty, IReadOnlyList<string> Collectors) PaySiphons(
+            AlphaChainGameState state, string submitterUserId, string word,
+            bool taxed, int wouldBeScore, int earnedScore, bool suppressBounty)
         {
-            if (!taxed || wouldBeScore <= 0)
-                return (0, []);
-
-            int bounty = Math.Clamp(
-                (int)Math.Round(wouldBeScore * ModifierLibrary.TaxCollectorRate, MidpointRounding.AwayFromZero),
-                0, ScoreCalculator.MaxWordScore);
-            if (bounty == 0)
-                return (0, []);
-
             var collectors = new List<string>();
-            foreach (var other in state.GamePlayers.Values)
+            int reportBounty = 0;
+
+            if (taxed && !suppressBounty && wouldBeScore > 0)
             {
-                if (other.UserId == submitterUserId || other.IsEliminated || other.HasLeft)
-                    continue;
-                if (other.EngineBay.Any(c => c.Id == ModifierLibrary.TaxCollectorId))
+                foreach (var other in state.GamePlayers.Values)
                 {
-                    other.Score += bounty;
+                    if (other.UserId == submitterUserId || other.IsEliminated || other.HasLeft)
+                        continue;
+                    double rate = MaxSiphonRate(other, SiphonTrigger.OpponentEraTaxed);
+                    if (rate <= 0)
+                        continue;
+                    int amount = ClampScore(wouldBeScore * rate);
+                    if (amount <= 0)
+                        continue;
+                    other.Score += amount;
                     collectors.Add(other.DisplayName);
+                    reportBounty = Math.Max(reportBounty, amount);
+                }
+            }
+
+            if (!taxed && earnedScore > 0)
+            {
+                foreach (var other in state.GamePlayers.Values)
+                {
+                    if (other.UserId == submitterUserId || other.IsEliminated || other.HasLeft)
+                        continue;
+                    foreach (var card in other.EngineBay)
+                        if (card.Siphon is { Trigger: SiphonTrigger.OpponentUsedMyCardBan } s
+                            && other.CardBannedLetters.TryGetValue(card.Id, out var banned)
+                            && word.Contains(banned))
+                        {
+                            int amount = ClampScore(earnedScore * s.Rate);
+                            if (amount > 0)
+                                other.Score += amount;
+                        }
                 }
             }
 
@@ -254,7 +312,41 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 return (0, []);
 
             collectors.Sort(StringComparer.OrdinalIgnoreCase);
-            return (bounty, collectors);
+            return (reportBounty, collectors);
+        }
+
+        /// <summary>The single highest siphon rate among <paramref name="player"/>'s bay cards that
+        /// match <paramref name="trigger"/>, or 0 when none — so Tax Collector + Enforcer pays 75%,
+        /// not 125%.</summary>
+        private static double MaxSiphonRate(AlphaChainPlayerState player, SiphonTrigger trigger)
+        {
+            double max = 0;
+            foreach (var card in player.EngineBay)
+                if (card.Siphon is { } s && s.Trigger == trigger && s.Rate > max)
+                    max = s.Rate;
+            return max;
+        }
+
+        /// <summary>Rounds half-up and clamps a siphon payout into the legal score range.</summary>
+        private static int ClampScore(double value) =>
+            Math.Clamp((int)Math.Round(value, MidpointRounding.AwayFromZero), 0, ScoreCalculator.MaxWordScore);
+
+        /// <summary>
+        /// The banned letter <paramref name="word"/> actually used, preferring the era letter, then a
+        /// board-wide Censor, then the personal Jinx/Bait &amp; Switch letter, then any era-rolled
+        /// card-ban. Null when the word used none. Backs Bait &amp; Switch's "that exact letter".
+        /// </summary>
+        private static char? FirstBannedLetterUsed(
+            string word, char? eraBan, char? censorBan, char? personalBan, IEnumerable<char>? cardBans)
+        {
+            if (eraBan is { } e && word.Contains(e)) return e;
+            if (censorBan is { } c && word.Contains(c)) return c;
+            if (personalBan is { } p && word.Contains(p)) return p;
+            if (cardBans is not null)
+                foreach (char b in cardBans)
+                    if (word.Contains(b))
+                        return b;
+            return null;
         }
 
         // ── Reaction helpers ─────────────────────────────────────────────────
@@ -267,6 +359,50 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 if (ban is { } c && word.Contains(c))
                     return true;
             return false;
+        }
+
+        /// <summary>True when <paramref name="word"/> contains any of <paramref name="letters"/>
+        /// (null collection ignored). Backs the era-rolled personal card-bans in the Zero-Point Tax.</summary>
+        private static bool ContainsAnyOf(string word, IEnumerable<char>? letters)
+        {
+            if (letters is null) return false;
+            foreach (char c in letters)
+                if (word.Contains(c))
+                    return true;
+            return false;
+        }
+
+        /// <summary>
+        /// The multiplier scale to seed this submission's <see cref="WordContext"/> with: the
+        /// Hyper-Drive factor when the submitter has latched it this era, else 1.0 (no scaling).
+        /// </summary>
+        private static double ActiveMultiplierScale(AlphaChainPlayerState? player)
+        {
+            if (player is { HyperDriveActive: true })
+                foreach (var card in player.EngineBay)
+                    if (card.Hyperdrive is { } hd)
+                        return hd.MultiplierScale;
+            return 1.0;
+        }
+
+        /// <summary>
+        /// Latches Hyper-Drive for the rest of the era when the submitter holds the card, has not
+        /// already latched, and beat its threshold (elapsed = armed clock − seconds remaining at
+        /// submit). The latch is read by <c>ComputeArmedShotClockSeconds</c> (clock override) and
+        /// <see cref="ActiveMultiplierScale"/> (doubled multipliers) on subsequent turns.
+        /// </summary>
+        private static void TryLatchHyperDrive(AlphaChainGameState state, AlphaChainPlayerState? player, double remainingSeconds)
+        {
+            if (player is null || player.HyperDriveActive)
+                return;
+
+            var card = player.EngineBay.FirstOrDefault(c => c.Hyperdrive is not null);
+            if (card?.Hyperdrive is not { } hd)
+                return;
+
+            double elapsed = state.ComputeArmedShotClockSeconds(player) - remainingSeconds;
+            if (elapsed < hd.ThresholdSeconds)
+                player.HyperDriveActive = true;
         }
 
         /// <summary>
@@ -429,8 +565,24 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             state.ResetTurnTimer(now);
             ApplyQueuedTimePenalty(state);
+            ApplyPendingForcedBan(state);
             ApplyTurnStartReactions(context, state);
             return null;
+        }
+
+        /// <summary>
+        /// Applies a pending Bait &amp; Switch ban to the now-active player (set when the previous
+        /// player's word was taxed while holding the card), then clears it. Overwrites any existing
+        /// personal ban; consumed by the victim's next accepted submission like a Jinx.
+        /// </summary>
+        private static void ApplyPendingForcedBan(AlphaChainGameState state)
+        {
+            if (state.PendingForcedPersonalBan is not { } letter)
+                return;
+
+            if (state.TurnManager.CurrentPlayer is { } id && state.GamePlayers.TryGetValue(id, out var player))
+                player.PersonalBannedLetter = letter;
+            state.PendingForcedPersonalBan = null;
         }
 
         /// <summary>

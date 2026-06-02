@@ -375,19 +375,57 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.OptimizationSubmissions.Clear();
 
             // Drop the deal-reveal markers so they don't bleed into the next era's round UI, and
-            // drop any board-wide Censor — it never carries across an era boundary.
+            // drop any board-wide Censor — it never carries across an era boundary. Reset the
+            // era-scoped card state too (Hyper-Drive latch, Windfall guard) so each era starts clean.
             foreach (var player in state.GamePlayers.Values)
             {
                 player.NewlyDealtModifierIds.Clear();
                 player.NewlyDealtReactions.Clear();
+                player.HyperDriveActive = false;
+                player.WindfallFiredThisEra = false;
             }
             state.CensorBannedLetter = null;
             state.CensorExemptUserIds.Clear();
+            state.PendingForcedPersonalBan = null;
 
             if (state.CurrentEra > state.Settings.EraCount)
                 return new GameOverState();
 
+            // Roll fresh personal banned letters for the new era now that the bay is final and the
+            // Sniper Ban has set the era letter (so the personal ban can dodge it).
+            RollPersonalBans(context);
             return new RoundState();
+        }
+
+        /// <summary>
+        /// Rolls a fresh personal banned letter for every active player's
+        /// <c>RollsPersonalBanAtEraStart</c> modifier cards (Roulette Wheel, Smuggler's Toll), keyed
+        /// by card id. Drawn from the match's legal ban pool, avoiding the era banned letter so the
+        /// personal ban is a distinct hazard. Stale rolls are cleared first (a re-roll each era).
+        /// </summary>
+        private static void RollPersonalBans(AlphaChainGameContext context)
+        {
+            var state = context.State;
+            foreach (var player in ActivePlayers(state))
+            {
+                player.CardBannedLetters.Clear();
+                foreach (var card in player.EngineBay)
+                    if (card.RollsPersonalBanAtEraStart)
+                        player.CardBannedLetters[card.Id] = DrawPersonalBan(context, state.BannedLetter);
+            }
+        }
+
+        /// <summary>Draws a legal personal banned letter, nudging off the era ban if it collides.</summary>
+        private static char DrawPersonalBan(AlphaChainGameContext context, char? eraBan)
+        {
+            string pool = BanLetterPool.For(context.State.Settings.BanMode);
+            char letter = BanLetterPool.Draw(context.State.Settings.BanMode, context.Rng);
+            if (eraBan is { } e && letter == e && pool.Length > 1)
+            {
+                int idx = pool.IndexOf(letter);
+                letter = pool[(idx + 1) % pool.Length];
+            }
+            return letter;
         }
 
         // ── Shared helpers ───────────────────────────────────────────────────

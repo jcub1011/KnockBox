@@ -92,6 +92,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
             state.BannedLetter = null;
             state.CensorBannedLetter = null;
             state.CensorImposedAtRound = 0;
+            state.PendingForcedPersonalBan = null;
             state.LatestReactionNotices = [];
             state.ReactionNoticeSequence = 0;
             state.Results = null;
@@ -189,18 +190,19 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
         /// it on the context; this reads it back out after the dispatch completes.
         /// </summary>
         public async Task<ValueResult<SubmitWordResult>> SubmitWordAsync(
-            string actorUserId, string wordRaw, AlphaChainGameState state)
+            string actorUserId, string wordRaw, AlphaChainGameState state, DateTimeOffset? now = null)
         {
             if (state.Context is null)
                 return ValueResult<SubmitWordResult>.FromError("The game has not been started yet.");
 
             var context = state.Context;
             SubmitWordResult? result = null;
+            var submittedAt = now ?? DateTimeOffset.UtcNow;
 
             var executeResult = await state.ExecuteAsync(() =>
             {
                 context.LastSubmitResult = null;
-                var fsmResult = context.Fsm.HandleCommand(context, new SubmitWordCommand(actorUserId, wordRaw));
+                var fsmResult = context.Fsm.HandleCommand(context, new SubmitWordCommand(actorUserId, wordRaw, submittedAt));
                 if (fsmResult.TryGetFailure(out var err))
                     logger.LogError("Alpha Chain submit-word FSM error: {msg}", err.PublicMessage);
                 result = context.LastSubmitResult;

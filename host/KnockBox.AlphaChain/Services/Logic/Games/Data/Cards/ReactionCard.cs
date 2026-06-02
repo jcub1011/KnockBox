@@ -22,7 +22,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
         Windfall,
 
         // ── Offensive: fire on an opponent's action (routed through Riposte) ──
-        /// <summary>An opponent who is ahead of the holder posts a big word → shave their next clock.</summary>
+        /// <summary>An opponent who is ahead of the holder posts a long (7+ letter) word → steal a
+        /// cut of the points they just earned.</summary>
         TollBooth,
         /// <summary>An opponent overtakes the holder specifically → shave their next clock.</summary>
         Frostbite,
@@ -33,7 +34,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
         /// <summary>The holder drops to last place → impose a board-wide banned letter for one round.</summary>
         Censor,
         /// <summary>The holder is targeted by an attack reaction → negate it and reflect it at the caster.</summary>
-        Riposte
+        Riposte,
+        /// <summary>An attacker's reaction is negated by the holder's Riposte → silence the attacker
+        /// (lock their word input) for the first seconds of their next turn.</summary>
+        FeedbackLoop
     }
 
     /// <summary>Broad role of a reaction, used for UI tinting and the Riposte/attack routing.</summary>

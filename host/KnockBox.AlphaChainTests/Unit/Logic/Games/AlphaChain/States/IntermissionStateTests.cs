@@ -1,5 +1,6 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM.States;
 using KnockBox.AlphaChain.Services.Logic.Scoring;
 using KnockBox.AlphaChain.Services.State.Games;
@@ -279,6 +280,46 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.AreEqual('q', state.BannedLetter);
             Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
             Assert.AreEqual(eraBefore + 1, state.CurrentEra);
+        }
+
+        [TestMethod]
+        public async Task EraStart_RollsPersonalBan_ForRouletteHolder_DodgingTheEraBan()
+        {
+            var (engine, state) = await StartGameAsync(playerCount: 2);
+            using var _ = state;
+            EnterIntermission(state);
+            AdvanceToSniperBan(engine, state);
+
+            // Give the picker a Roulette Wheel before the era completes, so it's in the final bay.
+            var picker = state.SniperBanUserId!;
+            state.Execute(() => state.GamePlayers[picker].EngineBay.Add(ModifierLibrary.FindById("roulette-wheel")!));
+
+            await engine.SelectSniperBanAsync(picker, 'q', state); // era advances → RollPersonalBans
+
+            var bans = state.GamePlayers[picker].CardBannedLetters;
+            Assert.IsTrue(bans.ContainsKey("roulette-wheel"), "Roulette Wheel rolls a personal ban at era start.");
+            Assert.AreNotEqual('q', bans["roulette-wheel"], "The rolled personal ban dodges the era banned letter.");
+        }
+
+        [TestMethod]
+        public async Task EraBoundary_ResetsEraScopedCardState()
+        {
+            var (engine, state) = await StartGameAsync(playerCount: 2);
+            using var _ = state;
+            EnterIntermission(state);
+            AdvanceToSniperBan(engine, state);
+
+            var picker = state.SniperBanUserId!;
+            state.Execute(() =>
+            {
+                state.GamePlayers[picker].HyperDriveActive = true;
+                state.GamePlayers[picker].WindfallFiredThisEra = true;
+            });
+
+            await engine.SelectSniperBanAsync(picker, 'q', state);
+
+            Assert.IsFalse(state.GamePlayers[picker].HyperDriveActive, "Hyper-Drive latch clears across an era.");
+            Assert.IsFalse(state.GamePlayers[picker].WindfallFiredThisEra, "Windfall guard resets each era.");
         }
 
         [TestMethod]

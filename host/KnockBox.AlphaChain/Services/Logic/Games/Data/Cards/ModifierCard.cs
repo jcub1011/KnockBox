@@ -34,5 +34,38 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
         /// in <see cref="ModifierLibrary"/>; defaults to empty for ad-hoc/test cards.
         /// </summary>
         public string Icon { get; init; } = string.Empty;
+
+        // ── Optional capability descriptors (see CardCapabilities.cs) ────────────
+        // All null/false by default: a plain scoring card declares none, and the engine's
+        // lifecycle hooks no-op for it. Cards opt in to richer behavior by setting one or more.
+
+        /// <summary>Permanent per-owner shot-clock change applied while this card is in the active
+        /// player's bay (Vault, Redline, Panic Button). Null = no clock effect.</summary>
+        public ClockEffect? Clock { get; init; }
+
+        /// <summary>Reactive payout from opponents' submissions (Tax Collector, Enforcer,
+        /// Smuggler's Toll). Null = none. A siphon card's <see cref="Trigger"/> is typically
+        /// <c>Never</c> so it never folds into its owner's own pipeline.</summary>
+        public SiphonRule? Siphon { get; init; }
+
+        /// <summary>When true, the owner rolls a fresh random personal banned letter at each era
+        /// start (Roulette Wheel, Smuggler's Toll). That letter triggers the Zero-Point Tax for the
+        /// owner like the era ban.</summary>
+        public bool RollsPersonalBanAtEraStart { get; init; }
+
+        /// <summary>Overrides the owner's own Zero-Point Tax outcome (IRS). Null = standard tax (0).</summary>
+        public OwnTaxRule? OwnTax { get; init; }
+
+        /// <summary>When true, a taxed word forces the next player's personal banned letter to the
+        /// banned letter just used (Bait &amp; Switch).</summary>
+        public bool ForcesNextPlayerBan { get; init; }
+
+        /// <summary>Latches an era-scoped clock/multiplier boost when the owner submits fast
+        /// (Hyper-Drive). Null = none.</summary>
+        public HyperdriveRule? Hyperdrive { get; init; }
+
+        /// <summary>When true, this card masks the previous word's first &amp; last letters in its
+        /// owner's UI only (Tunnel Vision). Presentational; the chain rule is still server-enforced.</summary>
+        public bool MasksPreviousWord { get; init; }
     }
 }

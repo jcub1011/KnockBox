@@ -36,7 +36,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Scoring
                 if (card.Kind == ModifierKind.Additive)
                     current += card.Value(word);
                 else
-                    current *= card.Value(word);
+                    current *= MultiplicativeFactor(card, word);
             }
 
             return RoundClamp(current);
@@ -54,16 +54,17 @@ namespace KnockBox.AlphaChain.Services.Logic.Scoring
 
                 if (triggered)
                 {
-                    double value = card.Value(word);
                     if (card.Kind == ModifierKind.Additive)
                     {
+                        double value = card.Value(word);
                         current += value;
                         valueText = "+" + FormatValue(value);
                     }
                     else
                     {
-                        current *= value;
-                        valueText = "×" + FormatValue(value);
+                        double factor = MultiplicativeFactor(card, word);
+                        current *= factor;
+                        valueText = "×" + FormatValue(factor);
                     }
                 }
 
@@ -75,6 +76,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Scoring
             return new ScoreBreakdown(
                 word.Word, word.Length, steps, finalBeforeTax, taxed, taxed ? 0 : finalBeforeTax);
         }
+
+        /// <summary>
+        /// The effective multiplicative factor for a triggered card: its raw <see cref="ModifierCard.Value"/>
+        /// scaled by <see cref="WordContext.MultiplierScale"/> (1.0 normally). Hyper-Drive raises the
+        /// scale for an era so "all multipliers are doubled" without editing any individual card.
+        /// </summary>
+        private static double MultiplicativeFactor(ModifierCard card, WordContext word)
+            => card.Value(word) * word.MultiplierScale;
 
         /// <summary>Round half-up (away from zero) then clamp to the legal score range.</summary>
         private static int RoundClamp(double value) =>

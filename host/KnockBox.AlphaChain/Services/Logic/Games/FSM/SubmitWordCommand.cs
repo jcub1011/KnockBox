@@ -8,5 +8,11 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
     /// </summary>
     /// <param name="ActorUserId">The id of the player issuing the submission.</param>
     /// <param name="WordRaw">The raw, un-normalized word as typed by the player.</param>
-    public record SubmitWordCommand(string ActorUserId, string WordRaw) : AlphaChainCommand(ActorUserId);
+    /// <param name="Now">
+    /// The submission timestamp, captured at the engine boundary. Threaded in (rather than read
+    /// from the wall clock inside the FSM) so time-aware scoring — remaining shot-clock seconds for
+    /// Sprinter/Panic Button and the Hyper-Drive elapsed check — is deterministic under test.
+    /// </param>
+    public record SubmitWordCommand(string ActorUserId, string WordRaw, DateTimeOffset Now)
+        : AlphaChainCommand(ActorUserId);
 }
