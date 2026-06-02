@@ -1,0 +1,99 @@
+/*
+ * Alpha Chain — Neon-Noir Esports theme.
+ *
+ * Shared design tokens + keyframes for every Alpha Chain surface (lobby, in-game HUD,
+ * intermission, game-over, header, cards). Linked globally from the lobby page's
+ * <HeadContent> alongside cards.css, so the tokens are available to every scoped
+ * stylesheet (which read them via var(--ac-*)).
+ *
+ * Reuses the host fonts already loaded in app.css — no extra @font-face / @import.
+ * Palette: deep navy/black scoreboard, cyan-vs-magenta accents, strong glows.
+ */
+
+:root {
+    /* ── Surfaces ─────────────────────────────────────────────────────── */
+    --ac-bg-0: #06080f;
+    --ac-bg-1: #0c1020;
+    --ac-bg-2: #141a30;
+    --ac-panel: rgba(18, 24, 44, 0.72);
+    --ac-panel-solid: #121830;
+    --ac-border: rgba(255, 255, 255, 0.08);
+    --ac-border-strong: rgba(255, 255, 255, 0.18);
+    --ac-ink: #eaf2ff;
+    --ac-ink-soft: rgba(234, 242, 255, 0.62);
+    --ac-ink-faint: rgba(234, 242, 255, 0.38);
+
+    /* ── Accents ──────────────────────────────────────────────────────── */
+    --ac-cyan: #00e5ff;
+    --ac-magenta: #ff2e8b;
+    --ac-violet: #b97bff;
+    --ac-amber: #ffb020;
+    --ac-go: var(--ac-cyan);
+    --ac-danger: #ff3b5c;
+    --ac-mint: #14f195;
+
+    /* ── Card semantics (also mirrored in cards.css) ──────────────────── */
+    --ac-additive: #14f195;
+    --ac-multiplicative: #ffb020;
+    --ac-action: #b97bff;
+    --ac-tax: #ff3b5c;
+
+    /* ── Player accent rotation (assigned by turn-order index) ────────── */
+    --ac-p1: #00e5ff;
+    --ac-p2: #ff2e8b;
+    --ac-p3: #b97bff;
+    --ac-p4: #ffd23a;
+    --ac-p5: #14f195;
+    --ac-p6: #ff8a3d;
+
+    /* ── Glows + hard 3D shadow (house style) ─────────────────────────── */
+    --ac-glow-cyan: 0 0 18px rgba(0, 229, 255, 0.45);
+    --ac-glow-mag: 0 0 18px rgba(255, 46, 139, 0.45);
+    --ac-glow-danger: 0 0 18px rgba(255, 59, 92, 0.5);
+    --ac-shadow: 5px 5px 0 #000;
+    --ac-shadow-sm: 3px 3px 0 #000;
+    --ac-shadow-lift: 7px 7px 0 #000;
+
+    /* ── Tooltip / dialog dark glass (consumes previously-unused props) ── */
+    --ac-tooltip-bg: rgba(10, 14, 28, 0.96);
+    --ac-tooltip-fg: var(--ac-ink);
+    --ac-picker-bg: rgba(10, 14, 28, 0.96);
+}
+
+/* ── Shared keyframes ─────────────────────────────────────────────────── */
+@keyframes ac-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+@keyframes ac-pop {
+    0% { transform: scale(0.6) translateY(8px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@keyframes ac-float-up {
+    0% { transform: translateY(0); opacity: 0; }
+    20% { opacity: 1; }
+    100% { transform: translateY(-1.6rem); opacity: 0; }
+}
+
+@keyframes ac-ring-pulse {
+    0%, 100% { filter: drop-shadow(0 0 4px currentColor); }
+    50% { filter: drop-shadow(0 0 12px currentColor); }
+}
+
+@keyframes ac-flash {
+    0% { background: rgba(255, 255, 255, 0.18); }
+    100% { background: transparent; }
+}
+
+@keyframes ac-rise {
+    0% { transform: translateY(10px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *[class*="ac-"] {
+        animation: none !important;
+    }
+}

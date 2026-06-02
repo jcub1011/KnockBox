@@ -88,6 +88,34 @@ public class OperatorGameEngine(
     }
 
     /// <summary>
+    /// Returns the game to the lobby (host-only, terminal-phase-only) via the base
+    /// <see cref="AbstractGameEngine{TState}.ReturnToLobby"/>. Flipping the state back to
+    /// joinable re-renders every player's page at the lobby — no navigation needed.
+    /// </summary>
+    protected override bool IsTerminalPhase(OperatorGameState state) => state.Phase == OperatorGamePhase.GameOver;
+
+    /// <inheritdoc />
+    protected override void ResetForLobby(OperatorGameState state)
+    {
+        // Fresh context mirrors CreateStateAsync; StartAsyncCore replaces it again on
+        // the next start. Keeps the lobby's pre-start invariant (non-null Context).
+        state.Context = new OperatorGameContext(state, randomNumberService);
+        state.GamePlayers.Clear();
+        state.Deck = [];
+        state.DiscardPile = [];
+        state.ActionLog = [];
+        state.LastBlockedActionMessage = null;
+        state.BlockedAttackerId = null;
+        state.TurnManager.SetTurnOrder([]);
+        state.PendingGameActionCommand = null;
+        state.ReactionTargetPlayerIds = [];
+        state.PlayerReactions = [];
+        state.TurnCount = 0;
+        state.WinnerPlayerId = null;
+        state.Phase = OperatorGamePhase.Setup;
+    }
+
+    /// <summary>
     /// Processes a game command by delegating to the current FSM state.
     /// </summary>
     public Task<Result> ExecuteCommandAsync(OperatorGameState state, OperatorCommand command)

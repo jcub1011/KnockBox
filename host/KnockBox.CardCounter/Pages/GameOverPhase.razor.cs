@@ -27,14 +27,6 @@ namespace KnockBox.CardCounter.Pages
         /// </summary>
         protected bool IsSharedDisplay() => IsHost() && !GameState.HostIsParticipant;
 
-        protected void ResetGame()
-        {
-            if (UserService.CurrentUser == null) return;
-            var result = GameEngine.ResetGame(UserService.CurrentUser, GameState);
-            if (result.TryGetFailure(out var error))
-                Logger.LogError("Failed to reset game: {Error}", error);
-        }
-
         protected void ReturnToLobby()
         {
             if (UserService.CurrentUser == null) return;

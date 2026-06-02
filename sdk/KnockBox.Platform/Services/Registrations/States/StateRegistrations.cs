@@ -9,7 +9,9 @@ using KnockBox.Services.State.Games.Shared;
 using KnockBox.Services.State.Shared;
 using KnockBox.Platform.Services.State.Shared;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.Core.Services.State.PlayLog;
 using KnockBox.Services.State.Users;
+using KnockBox.Services.State.PlayLog;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -36,6 +38,10 @@ namespace KnockBox.Services.Registrations.States
             services.AddSingleton<ISessionServiceProvider, SessionServiceProvider>();
             services.AddScoped<ISessionTokenProvider, SessionTokenProvider>();
             services.AddScoped<IUserService, UserService>();
+
+            // Per-circuit browser-persisted history of games the user has played.
+            // Scoped because it depends on the scoped ILocalStorageService.
+            services.AddScoped<IPlayLogService, PlayLogService>();
 
             // GameSessionState is the long-lived session holder cached per user id by
             // ISessionServiceProvider. It must be Transient so the provider creates a fresh

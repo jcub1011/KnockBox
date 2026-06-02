@@ -109,6 +109,20 @@ namespace KnockBox.Tracery.Services.Logic.Games
             });
         }
 
+        /// <summary>
+        /// Hooks for the base <see cref="AbstractGameEngine{TState}.ReturnToLobby"/> (host-only,
+        /// terminal-phase-only). Resetting to <see cref="GamePhase.Lobby"/> and re-enabling joins
+        /// re-renders every player's page at the lobby — no navigation needed.
+        /// </summary>
+        protected override bool IsTerminalPhase(TraceryGameState state) => state.Phase == GamePhase.FinalStandings;
+
+        /// <inheritdoc />
+        protected override void ResetForLobby(TraceryGameState state)
+        {
+            state.ResetForLobby();
+            state.Phase = GamePhase.Lobby;
+        }
+
         protected override Task<Result> StartAsyncCore(TraceryGameState s, CancellationToken ct = default)
         {
             var execResult = s.Execute(() =>

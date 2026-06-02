@@ -142,18 +142,16 @@
         @if (isHost)
         {
             <button class="dtd-btn dtd-btn-lg dtd-btn-primary"
-                    @onclick="PlayAgainAsync"
+                    @onclick="ReturnToLobbyAsync"
                     disabled="@_submitting"
-                    aria-label="Play Again">
-                Play Again
+                    aria-label="Return to Lobby">
+                Return to Lobby
             </button>
         }
-        <button class="dtd-btn dtd-btn-lg dtd-btn-secondary"
-                @onclick="ReturnToMenuAsync"
-                disabled="@_submitting"
-                aria-label="Return to Menu">
-            Return to Menu
-        </button>
+        else
+        {
+            <p class="dtd-final-results-waiting">Waiting for host…</p>
+        }
     </div>
 
     @if (_errorMessage is not null)

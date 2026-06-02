@@ -158,5 +158,27 @@ namespace KnockBox.Tracery.Services.State.Games
         /// </summary>
         public bool TryGetPlayerState(string userId, out TraceryPlayerState state)
             => _playerStates.TryGetValue(userId, out state!);
+
+        /// <summary>
+        /// Clears all per-match data so the room can return to the joinable lobby. Caller
+        /// MUST be inside <c>Execute</c>/<c>ExecuteAsync</c>. <see cref="Settings"/> is lobby
+        /// config and intentionally preserved.
+        /// </summary>
+        internal void ResetForLobby()
+        {
+            _playerStates.Clear();
+            Participants = [];
+            CurrentRound = 0;
+            PhaseExpiresAtUtc = null;
+            RoundResults = [];
+            CurrentReveal = null;
+            CurrentGrid = null;
+            FindableWords = ImmutableDictionary<string, TracedWord>.Empty;
+            BoardFindableWords = ImmutableDictionary<string, TracedWord>.Empty;
+            RoundStartTime = null;
+            SearchList = [];
+            SearchCompletionsThisRound = 0;
+            IsRoundActive = false;
+        }
     }
 }

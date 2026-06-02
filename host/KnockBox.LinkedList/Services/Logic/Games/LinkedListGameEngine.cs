@@ -140,6 +140,39 @@ namespace KnockBox.LinkedList.Services.Logic.Games
             return Task.FromResult(Result.Success);
         }
 
+        /// <summary>
+        /// Returns the game to the lobby (host-only, terminal-phase-only) via the base
+        /// <see cref="AbstractGameEngine{TState}.ReturnToLobby"/>. Flipping the state back
+        /// to joinable re-renders every player's page at the lobby — no navigation needed.
+        /// </summary>
+        protected override bool IsTerminalPhase(LinkedListGameState state) => state.Phase == LinkedListGamePhase.GameOver;
+
+        /// <inheritdoc />
+        protected override void ResetForLobby(LinkedListGameState state)
+        {
+            // Cancel any lingering per-group turn timers before discarding the groups.
+            foreach (var g in state.Groups)
+            {
+                g.TurnTimeoutHandle?.Cancel();
+                g.TurnTimeoutHandle = null;
+            }
+
+            state.Groups.Clear();
+            state.GamePlayers.Clear();
+            state.ParticipantOrder.Clear();
+            state.GroupAssignments.Clear();
+            state.AuditQueue.Clear();
+            state.StartWord = "";
+            state.DestinationWord = "";
+            state.AuditorPlayerId = "";
+            state.AuditorRotationIndex = 0;
+            state.RoundNumber = 0;
+            state.LastRoundResult = null;
+            state.LastStandings = [];
+            state.Superlatives = [];
+            state.SetPhase(LinkedListGamePhase.Setup);
+        }
+
         // ── Group construction (§8.2) ────────────────────────────────────────
 
         /// <summary>The single all-players chain for Collective play.</summary>

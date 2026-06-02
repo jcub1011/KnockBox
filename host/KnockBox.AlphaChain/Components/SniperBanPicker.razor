@@ -1,0 +1,44 @@
+@* Sniper Ban sub-phase. The last-place player picks the next era's banned letter from the
+   legal pool (only legal letters are offered — the engine re-validates defensively).
+   Everyone else sees a waiting message. *@
+
+<div class="ac-im-sniper">
+    @if (IsPicker)
+    {
+        <h3 class="ac-im-sniper-title">You're in last place — pick the banned letter</h3>
+        <p class="ac-im-sniper-sub">Any word using it next era pays the Zero-Point Tax.</p>
+        <div class="ac-im-sniper-letters">
+            @foreach (var letter in LegalLetters)
+            {
+                char l = letter;
+                <button type="button"
+                        class="ac-im-sniper-letter @(BannedLetter is { } b && char.ToLowerInvariant(b) == char.ToLowerInvariant(l) ? "ac-im-sniper-chosen" : "")"
+                        @onclick="() => OnSelect.InvokeAsync(l)">
+                    @char.ToUpperInvariant(l)
+                </button>
+            }
+        </div>
+    }
+    else
+    {
+        <h3 class="ac-im-sniper-title">Sniper Ban</h3>
+        <p class="ac-im-sniper-sub">Waiting for <strong>@PickerName</strong> to pick the next banned letter…</p>
+    }
+</div>
+
+@code {
+    /// <summary>Whether the local player is the resolved last-place picker.</summary>
+    [Parameter] public bool IsPicker { get; set; }
+
+    /// <summary>The legal letters to offer (already filtered by BanMode).</summary>
+    [Parameter] public IReadOnlyList<char> LegalLetters { get; set; } = [];
+
+    /// <summary>Display name of the picker, shown to non-pickers.</summary>
+    [Parameter] public string PickerName { get; set; } = "the last-place player";
+
+    /// <summary>The currently-set banned letter (highlights the chosen button after a pick).</summary>
+    [Parameter] public char? BannedLetter { get; set; }
+
+    /// <summary>Raised with the chosen letter.</summary>
+    [Parameter] public EventCallback<char> OnSelect { get; set; }
+}

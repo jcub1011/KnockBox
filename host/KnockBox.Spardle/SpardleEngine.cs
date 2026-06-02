@@ -75,6 +75,20 @@ public class SpardleEngine(
         return Task.FromResult(Result.FromCancellation());
     }
 
+    /// <summary>
+    /// Hooks for the base <see cref="AbstractGameEngine{TState}.ReturnToLobby"/> (host-only,
+    /// terminal-phase-only). Resetting to <see cref="GamePhase.Lobby"/> and re-enabling joins
+    /// re-renders every player's page at the lobby — no navigation needed.
+    /// </summary>
+    protected override bool IsTerminalPhase(SpardleState state) => state.Phase == GamePhase.GameOver;
+
+    /// <inheritdoc />
+    protected override void ResetForLobby(SpardleState state)
+    {
+        state.ResetForLobby();
+        state.Phase = GamePhase.Lobby;
+    }
+
     private void GenerateRoundQueue(SpardleState state)
     {
         var queue = new List<string>();

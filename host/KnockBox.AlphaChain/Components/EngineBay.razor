@@ -1,0 +1,127 @@
+@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
+
+@* A player's Engine Bay: an ordered row of modifier slots, left → right is the scoring
+   pipeline order. Reorder is HTML5 drag-and-drop with a keyboard fallback (focus a card,
+   then ←/→ to move it) — the keyboard path is the primary, always-available code path; DnD
+   is the progressive enhancement (M5). Reorder is suppressed when ReadOnly (opponent
+   summary) or Locked (during a live round, where scoring order is frozen).
+
+   The score replay (the word running through the engine after a play) is no longer drawn here
+   — it renders once, in a fixed spot below the word-submit box (see ScoreReplayStrip). *@
+
+<div class="ac-bay @(ReadOnly ? "ac-bay-readonly" : "") @(Interactive ? "" : "ac-bay-locked")">
+    <div class="ac-bay-header">
+        <span class="ac-bay-title">@Title</span>
+        <span class="ac-bay-flow" title="Cards apply left-to-right in bay order. Place additives before multipliers to multiply a bigger base.">L + ΣA → ×ΠM</span>
+    </div>
+
+    <ol class="ac-bay-slots">
+        @for (int i = 0; i < Slots; i++)
+        {
+            int index = i;
+            var card = index < Cards.Count ? Cards[index] : null;
+
+            <li class="ac-bay-slot"
+                @ondragover:preventDefault="Interactive"
+                @ondrop="() => OnDrop(index)">
+                @if (card is not null)
+                {
+                    <button type="button"
+                            class="ac-cardbtn"
+                            disabled="@(!Interactive)"
+                            draggable="@(Interactive ? "true" : "false")"
+                            aria-grabbed="@(_dragIndex == index ? "true" : "false")"
+                            @ondragstart="() => _dragIndex = index"
+                            @ondragend="() => _dragIndex = null"
+                            @onkeydown="e => OnKeyDown(e, index)">
+                        <GameCard Name="@card.Name" Description="@card.Description" Icon="@card.Icon"
+                                  Category="CardCategory.Modifier" Kind="card.Kind"
+                                  ValueText="@ShieldValueText(card)"
+                                  Compact="@ReadOnly" Dragging="@(_dragIndex == index)" />
+                    </button>
+                }
+                else
+                {
+                    <div class="ac-bay-empty">empty</div>
+                }
+            </li>
+        }
+    </ol>
+</div>
+
+@code {
+    /// <summary>The ordered modifier cards in the bay (left → right = pipeline order).</summary>
+    [Parameter] public IReadOnlyList<ModifierCard> Cards { get; set; } = [];
+
+    /// <summary>How many slots to render (capacity). Empty slots render as placeholders.</summary>
+    [Parameter] public int Slots { get; set; } = 3;
+
+    /// <summary>When true, the bay is display-only (opponent summary).</summary>
+    [Parameter] public bool ReadOnly { get; set; }
+
+    /// <summary>
+    /// When true, reorder is suppressed even for the owner — used during a live round, where
+    /// the scoring pipeline order is frozen (the bay is only resequenced at Intermission).
+    /// </summary>
+    [Parameter] public bool Locked { get; set; }
+
+    /// <summary>Heading shown above the slots.</summary>
+    [Parameter] public string Title { get; set; } = "Engine Bay";
+
+    /// <summary>
+    /// The owner's live Titanium Mirror multiplier. When supplied, the shield card in this bay
+    /// shows its current factor (e.g. "×0.7") in place of the bare "×", so the player can see how
+    /// far the mirror has decayed. Null leaves the shield card showing the default operator.
+    /// </summary>
+    [Parameter] public double? ShieldMultiplier { get; set; }
+
+    /// <summary>The live "×N.N" glyph for the shield card, or null for every other card.</summary>
+    private string? ShieldValueText(ModifierCard card) =>
+        card.Shield is not null && ShieldMultiplier is { } sm ? $"×{sm:0.0}" : null;
+
+    /// <summary>Raised with the new ordering of card ids when the player moves a card.</summary>
+    [Parameter] public EventCallback<IReadOnlyList<string>> OnReorder { get; set; }
+
+    private int? _dragIndex;
+
+    /// <summary>True when the owner may resequence (not a read-only summary and not round-locked).</summary>
+    private bool Interactive => !ReadOnly && !Locked;
+
+    private async Task OnDrop(int targetIndex)
+    {
+        if (!Interactive || _dragIndex is not { } from) return;
+        _dragIndex = null;
+        await MoveAsync(from, targetIndex);
+    }
+
+    /// <summary>Keyboard fallback: ←/→ move the focused card one slot in that direction.</summary>
+    private async Task OnKeyDown(KeyboardEventArgs e, int index)
+    {
+        if (!Interactive) return;
+        int target = e.Key switch
+        {
+            "ArrowLeft" => index - 1,
+            "ArrowRight" => index + 1,
+            _ => index
+        };
+        if (target != index)
+            await MoveAsync(index, target);
+    }
+
+    // Moves the card at `from` to `to` (clamped to the filled range) and raises OnReorder
+    // with the new id order. Reordering only ever touches filled slots.
+    private async Task MoveAsync(int from, int to)
+    {
+        int count = Cards.Count;
+        if (from < 0 || from >= count) return;
+        to = Math.Clamp(to, 0, count - 1);
+        if (from == to) return;
+
+        var ids = Cards.Select(c => c.Id).ToList();
+        var moved = ids[from];
+        ids.RemoveAt(from);
+        ids.Insert(to, moved);
+
+        await OnReorder.InvokeAsync(ids);
+    }
+}

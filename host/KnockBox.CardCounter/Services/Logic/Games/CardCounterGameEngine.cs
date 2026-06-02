@@ -203,90 +203,33 @@ namespace KnockBox.CardCounter.Services.Logic.Games
         }
 
         /// <summary>
-        /// Returns the game to the lobby so players can join/leave and settings can be changed.
-        /// Only the host can trigger this, and only after the game has ended.
+        /// Hooks for the base <see cref="AbstractGameEngine{TState}.ReturnToLobby"/> (host-only,
+        /// terminal-phase-only) so players can join/leave and settings can change before the next game.
         /// </summary>
-        public Result ReturnToLobby(User host, CardCounterGameState state)
+        protected override bool IsTerminalPhase(CardCounterGameState state) => state.Phase == GamePhase.GameOver;
+
+        /// <inheritdoc />
+        protected override void ResetForLobby(CardCounterGameState state)
         {
-            if (state.Host.Id != host.Id)
-                return Result.FromError("Only the host can return the game to the lobby.");
-
-            if (state.Phase != GamePhase.GameOver)
-                return Result.FromError("Can only return to the lobby after the game is over.");
-
-            return state.Execute(() =>
-            {
-                state.Context = null;
-                state.GamePlayers.Clear();
-                state.TurnManager.SetTurnOrder([]);
-                state.ShoeIndex = 0;
-                state.DiscardHistory.Clear();
-                state.MainDeck.Clear();
-                state.CurrentShoe.Clear();
-                state.DiscardPile.Clear();
-                state.LastPlayedAction = null;
-                state.LastDrawnCard = null;
-                state.LastOperatorResult = null;
-                state.LastOperatorChange = null;
-                state.PendingReaction = null;
-                state.FeelingLuckyTargetId = null;
-                state.IsNotMyMoneySelecting = false;
-                state.PendingNotMyMoneyOperator = null;
-                state.ForceDrawStack.Clear();
-                state.IsNewShoe = false;
-                state.HedgeYourBetPlayerId = null;
-                state.SetJoinable(true);
-            });
-        }
-
-        /// <summary>
-        /// Resets the game so another round can be played with the same players.
-        /// Only the host can trigger a reset.
-        /// </summary>
-        public Result ResetGame(User host, CardCounterGameState state)
-        {
-            if (state.Host.Id != host.Id)
-                return Result.FromError("Only the host can reset the game.");
-
-            if (state.Phase != GamePhase.GameOver)
-                return Result.FromError("Can only reset after the game is over.");
-
-            return state.Execute(() =>
-            {
-                // Create a fresh context and re-run initialization
-                var context = new CardCounterGameContext(state, randomNumberService, logger);
-                context.Fsm = new FiniteStateMachine<CardCounterGameContext, CardCounterCommand>(logger);
-                state.Context = context;
-                state.DiscardHistory.Clear();
-                state.MainDeck.Clear();
-                state.CurrentShoe.Clear();
-                state.DiscardPile.Clear();
-                state.LastPlayedAction = null;
-                state.LastDrawnCard = null;
-                state.LastOperatorResult = null;
-                state.PendingReaction = null;
-                state.FeelingLuckyTargetId = null;
-                state.IsNotMyMoneySelecting = false;
-                state.PendingNotMyMoneyOperator = null;
-                state.ForceDrawStack.Clear();
-                state.SetHostIsParticipant(state.Settings.HostPlays);
-                InitializeGame(context);
-
-                // Respect Active Operator Mode on reset: same logic as StartAsync.
-                if (state.Settings.ActiveOperatorMode)
-                {
-                    foreach (var ps in context.State.GamePlayers.Values)
-                    {
-                        ps.Balance = 10;
-                        ps.HasSetBuyIn = true;
-                    }
-                    TransitionTo(context, new RoundEndState());
-                }
-                else
-                {
-                    TransitionTo(context, new BuyInState());
-                }
-            });
+            state.Context = null;
+            state.GamePlayers.Clear();
+            state.TurnManager.SetTurnOrder([]);
+            state.ShoeIndex = 0;
+            state.DiscardHistory.Clear();
+            state.MainDeck.Clear();
+            state.CurrentShoe.Clear();
+            state.DiscardPile.Clear();
+            state.LastPlayedAction = null;
+            state.LastDrawnCard = null;
+            state.LastOperatorResult = null;
+            state.LastOperatorChange = null;
+            state.PendingReaction = null;
+            state.FeelingLuckyTargetId = null;
+            state.IsNotMyMoneySelecting = false;
+            state.PendingNotMyMoneyOperator = null;
+            state.ForceDrawStack.Clear();
+            state.IsNewShoe = false;
+            state.HedgeYourBetPlayerId = null;
         }
 
         // ── Player-leave handling ─────────────────────────────────────────────

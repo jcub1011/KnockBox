@@ -1,5 +1,14 @@
 # Milestone 3 — Card System
 
+> **Superseded (unified Modifier tier — no action or reaction cards).** This milestone first shipped
+> hand-played *action* cards, then an auto-firing *reaction* hand. Both tiers are now **abolished**:
+> every card is a persistent Engine Bay **Modifier**. `ReactionCard`/`ReactionLibrary`/`ReactionHand`/
+> `ReactionResolver` and `ReactionsDealtPerEra` are removed; the offensive reactions are re-homed as
+> automated modifiers (Flak Cannon, Scattershot, Bounty Hunter, Tracer Round, The Toll Booth) and a
+> shield (The Titanium Mirror), all resolved in `Services/Logic/Games/FSM/EngineEffectResolver.cs`.
+> The modifier/scoring half of this milestone is unchanged. See **`alpha-chain-gdd.md` §3** for the
+> current catalogue. The text below is retained for historical context.
+
 ## Goal
 
 Introduce Modifier cards (the Engine Bay) and Action cards plus the full scoring pipeline `Score = (L + ΣA) × ΠM` with conditional triggers. Cards do not yet enter play through Intermission (that lands in M4). Instead, M3 ships a host-only debug "Grant Cards" command so the pipeline and UI can be exercised in isolation.
@@ -78,7 +87,7 @@ Introduce Modifier cards (the Engine Bay) and Action cards plus the full scoring
 
 ### FSM updates
 
-- `Services/Logic/Games/FSM/States/RoundState.HandleCommandAsync`:
+- `Services/Logic/Games/FSM/States/RoundState.HandleCommand`:
   - For `SubmitWordCommand`:
     - Build `WordContext`.
     - If `PendingAction == Pivot`, set `RequiredStartLetter = null` (only for this submission), consume Pivot.
@@ -142,7 +151,7 @@ Introduce Modifier cards (the Engine Bay) and Action cards plus the full scoring
 2. Author `ModifierLibrary` and `ActionLibrary` static lists.
 3. Implement and test `ScoreCalculator` in isolation.
 4. Extend `AlphaChainPlayerState` with hand/bay fields.
-5. Add the three commands and wire them through `RoundState.HandleCommandAsync`.
+5. Add the three commands and wire them through `RoundState.HandleCommand`.
 6. Update `RoundState` submission flow to use `ScoreCalculator` and honor pending actions.
 7. Build `EngineBay`, `ActionHand`, `CardTooltip` components.
 8. Add the debug `Grant Cards` button.

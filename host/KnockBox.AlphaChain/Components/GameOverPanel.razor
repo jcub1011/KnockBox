@@ -1,0 +1,57 @@
+@using KnockBox.AlphaChain.Services.State.Games.Data
+
+@* Final results: winner, full leaderboard, and match totals. *@
+
+<div class="ac-results">
+    <h2 class="ac-results-title">Game Over</h2>
+
+    @if (Results is { } results)
+    {
+        @if (Winner is { } winner)
+        {
+            <p class="ac-results-winner">🏆 <strong>@winner.DisplayName</strong> wins with @winner.Score points!</p>
+        }
+
+        <ol class="ac-standings">
+            @{ int rank = 1; }
+            @foreach (var row in results.Rankings)
+            {
+                <li class="ac-standings-row @(row.Eliminated ? "ac-eliminated" : "")">
+                    <span class="ac-standings-rank">#@rank</span>
+                    <span class="ac-standings-name">
+                        @row.DisplayName
+                        @if (row.Eliminated)
+                        {
+                            <span class="ac-tag">out</span>
+                        }
+                    </span>
+                    <span class="ac-standings-words">@row.WordsPlayed word@(row.WordsPlayed == 1 ? "" : "s")</span>
+                    <span class="ac-standings-score">@row.Score</span>
+                </li>
+                rank++;
+            }
+        </ol>
+
+        <div class="ac-results-totals">
+            <span>@results.TotalWordsPlayed words played</span>
+            <span>@FormatDuration(results.Duration)</span>
+        </div>
+    }
+    else
+    {
+        <p>No results available.</p>
+    }
+</div>
+
+@code {
+    /// <summary>The populated final standings.</summary>
+    [Parameter] public GameResults? Results { get; set; }
+
+    private PlayerResult? Winner =>
+        Results?.Rankings.FirstOrDefault(r => r.UserId == Results.WinnerUserId)
+        ?? Results?.Rankings.FirstOrDefault();
+
+    private static string FormatDuration(TimeSpan d) =>
+        d.TotalHours >= 1 ? $"{(int)d.TotalHours}h {d.Minutes}m {d.Seconds}s"
+                          : $"{d.Minutes}m {d.Seconds}s";
+}

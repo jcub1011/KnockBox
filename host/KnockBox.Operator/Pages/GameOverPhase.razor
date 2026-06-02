@@ -48,7 +48,7 @@
         }
 
         <div class="op-game-over-actions">
-            <button class="op-btn op-btn-primary op-btn-lg" @onclick="GoHome">
+            <button class="op-btn op-btn-primary op-btn-lg" @onclick="ReturnToLobby">
                 RETURN TO LOBBY
             </button>
         </div>
@@ -78,9 +78,7 @@ else
         </div>
 
         <div class="op-game-over-actions">
-            <button class="op-btn op-btn-primary op-btn-lg" @onclick="GoHome">
-                RETURN TO LOBBY
-            </button>
+            <span class="op-waiting-text">Waiting for host…</span>
         </div>
     </div>
 }

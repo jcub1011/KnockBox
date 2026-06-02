@@ -1,0 +1,311 @@
+@using System.Globalization
+@using KnockBox.AlphaChain.Services.Logic.Games.Data
+@using KnockBox.AlphaChain.Services.State.Games
+@using KnockBox.Core.Services.Storage.ClientStorage
+@inject ILocalStorageService LocalStorage
+@inject ILogger<AlphaChainSettingsPanel> Logger
+@implements IAsyncDisposable
+
+@{
+    var s = GameState.Settings;
+    var validation = s.Validate();
+}
+
+<section class="ac-settings @(IsHost ? "ac-settings-host" : "ac-settings-readonly")">
+    <h3 class="ac-settings-title">Match Rules</h3>
+
+    @if (IsHost)
+    {
+        <div class="ac-settings-grid">
+            <fieldset class="ac-settings-field ac-settings-field-full" title="@BanModeTip">
+                <legend>Ban Mode</legend>
+                <div class="ac-settings-radios">
+                    <label class="ac-settings-radio">
+                        <input type="radio" name="ac-ban-mode"
+                               checked="@(s.BanMode == BanLetterMode.Vowels)"
+                               @onchange="() => SetBanMode(BanLetterMode.Vowels)" />
+                        <span>Vowels Only</span>
+                    </label>
+                    <label class="ac-settings-radio">
+                        <input type="radio" name="ac-ban-mode"
+                               checked="@(s.BanMode == BanLetterMode.Consonants)"
+                               @onchange="() => SetBanMode(BanLetterMode.Consonants)" />
+                        <span>Consonants Only</span>
+                    </label>
+                    <label class="ac-settings-radio">
+                        <input type="radio" name="ac-ban-mode"
+                               checked="@(s.BanMode == BanLetterMode.All)"
+                               @onchange="() => SetBanMode(BanLetterMode.All)" />
+                        <span>All Bannable</span>
+                    </label>
+                </div>
+            </fieldset>
+
+            <label class="ac-settings-field ac-settings-field-full" title="@ShotClockTip">
+                <span>Shot Clock <strong>@s.ShotClockSeconds s</strong></span>
+                <input type="range"
+                       min="@AlphaChainSettings.MinShotClockSeconds"
+                       max="@AlphaChainSettings.MaxShotClockSeconds"
+                       step="1"
+                       value="@s.ShotClockSeconds"
+                       @oninput="OnShotClockChanged" />
+            </label>
+
+            <label class="ac-settings-field" title="@EraIntervalTip">
+                <span>Era Interval (rounds)</span>
+                <input type="number"
+                       min="@AlphaChainSettings.MinEraInterval"
+                       max="@AlphaChainSettings.MaxEraInterval"
+                       value="@s.EraInterval"
+                       @oninput="OnEraIntervalChanged" />
+            </label>
+
+            <label class="ac-settings-field" title="@EraCountTip">
+                <span>Era Count</span>
+                <input type="number"
+                       min="@AlphaChainSettings.MinEraCount"
+                       max="@AlphaChainSettings.MaxEraCount"
+                       value="@s.EraCount"
+                       @oninput="OnEraCountChanged" />
+            </label>
+
+            <label class="ac-settings-field" title="@IntermissionTip">
+                <span>Intermission Timer (s)</span>
+                <input type="number"
+                       min="@AlphaChainSettings.MinIntermissionSeconds"
+                       max="@AlphaChainSettings.MaxIntermissionSeconds"
+                       value="@s.IntermissionCardSelectSeconds"
+                       @oninput="OnIntermissionChanged" />
+            </label>
+
+            <label class="ac-settings-field" title="@SniperBanTip">
+                <span>Sniper Ban Timer (s)</span>
+                <input type="number"
+                       min="@AlphaChainSettings.MinSniperBanSeconds"
+                       max="@AlphaChainSettings.MaxSniperBanSeconds"
+                       value="@s.SniperBanSeconds"
+                       @oninput="OnSniperBanChanged" />
+            </label>
+
+            <label class="ac-settings-field" title="@ModifiersTip">
+                <span>Modifiers / Era</span>
+                <input type="number"
+                       min="@AlphaChainSettings.MinCardsDealtPerEra"
+                       max="@AlphaChainSettings.MaxCardsDealtPerEra"
+                       value="@s.ModifiersDealtPerEra"
+                       @oninput="OnModifiersChanged" />
+            </label>
+
+            <label class="ac-settings-field ac-settings-field-full" title="@EngineAnimTip">
+                <span>Engine Animation <strong>@s.EngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture) s</strong></span>
+                <input type="range"
+                       min="@AlphaChainSettings.MinEngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture)"
+                       max="@AlphaChainSettings.MaxEngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture)"
+                       step="0.5"
+                       value="@s.EngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture)"
+                       @oninput="OnEngineAnimationChanged" />
+            </label>
+
+            <label class="ac-settings-field ac-settings-field-row" title="@SurvivalTip">
+                <span>Survival Mode</span>
+                <input type="checkbox"
+                       checked="@s.SurvivalMode"
+                       @onchange="OnSurvivalChanged" />
+            </label>
+
+            <label class="ac-settings-field ac-settings-field-row" title="@TutorialsTip">
+                <span>Enable Tutorials</span>
+                <input type="checkbox"
+                       checked="@s.EnableTutorials"
+                       @onchange="OnTutorialsChanged" />
+            </label>
+        </div>
+
+        @if (!validation.IsValid)
+        {
+            <ul class="ac-settings-errors">
+                @foreach (var violation in validation.Violations)
+                {
+                    <li>@violation</li>
+                }
+            </ul>
+        }
+
+        <div class="ac-settings-actions">
+            <button type="button" class="ac-settings-reset" title="@ResetTip" @onclick="ResetToDefaults">
+                Reset Defaults
+            </button>
+        </div>
+    }
+    else
+    {
+        @* Non-host read-only view so joiners can see what they're signing up for. *@
+        <dl class="ac-settings-readout">
+            <div title="@BanModeTip"><dt>Ban Mode</dt><dd>@BanModeLabel(s.BanMode)</dd></div>
+            <div title="@ShotClockTip"><dt>Shot Clock</dt><dd>@s.ShotClockSeconds s</dd></div>
+            <div title="@EraIntervalTip"><dt>Era Interval</dt><dd>@s.EraInterval rounds</dd></div>
+            <div title="@EraCountTip"><dt>Era Count</dt><dd>@s.EraCount</dd></div>
+            <div title="@IntermissionTip"><dt>Intermission Timer</dt><dd>@s.IntermissionCardSelectSeconds s</dd></div>
+            <div title="@SniperBanTip"><dt>Sniper Ban Timer</dt><dd>@s.SniperBanSeconds s</dd></div>
+            <div title="@ModifiersTip"><dt>Modifiers / Era</dt><dd>@s.ModifiersDealtPerEra</dd></div>
+            <div title="@EngineAnimTip"><dt>Engine Animation</dt><dd>@s.EngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture) s</dd></div>
+            <div title="@SurvivalTip"><dt>Survival Mode</dt><dd>@(s.SurvivalMode ? "On" : "Off")</dd></div>
+            <div title="@TutorialsTip"><dt>Enable Tutorials</dt><dd>@(s.EnableTutorials ? "On" : "Off")</dd></div>
+        </dl>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public AlphaChainGameState GameState { get; set; } = default!;
+
+    /// <summary>True for the host (editable controls + persistence); false renders read-only.</summary>
+    [Parameter] public bool IsHost { get; set; }
+
+    // Per-setting help text (GDD §2.1, §2.2, §3, §4, §6). Shared by the editable host controls
+    // and the read-only joiner view so both surface identical explanations as native tooltips.
+    private const string BanModeTip = "Which letters can become the per-round Banned Letter. A word containing the Banned Letter still keeps the chain alive but scores 0 for that turn.";
+    private const string ShotClockTip = "Seconds each player has to submit a valid word on their turn. GDD baseline is 10–15 s; go lower for frantic matches or higher for relaxed ones.";
+    private const string EraIntervalTip = "Rounds per Era. At the end of each Era the game pauses for an Intermission: deal cards, gain a Modifier slot, reorder your engine, and last place picks the next Banned Letter.";
+    private const string EraCountTip = "How many Eras are played before the match ends. Highest cumulative score at the end of the final Era wins.";
+    private const string IntermissionTip = "Seconds players have during an Intermission to draft and rearrange their Engine Bay modifier cards.";
+    private const string SniperBanTip = "Seconds the last-place player has to pick the next Banned Letter. If they don't choose in time, a legal letter is banned at random.";
+    private const string ModifiersTip = "Modifier cards dealt to each player every Intermission. Modifiers are persistent engine cards applied left-to-right in bay order (place additives before multipliers to multiply a bigger base) — the only card tier in the game.";
+    private const string SurvivalTip = "When on, a player who misses the shot clock is eliminated for good instead of being penalized and staying in.";
+    private const string TutorialsTip = "When on, three short non-interactive tutorials play at their cue points (word chain at the start, the scoring engine when the first era ends, and the tax before the first banned letter is chosen). You can skip each one as host.";
+    private const string EngineAnimTip = "Total length of the score-replay animation that runs each accepted word through the Engine Bay so everyone sees how the score is built. Constant regardless of how many cards you hold — bigger engines just animate faster.";
+    private const string ResetTip = "Reset every match rule back to its default value.";
+
+    private readonly CancellationTokenSource _cts = new();
+    private Task? _saveTask;
+
+    // Blocks the initial localStorage load from clobbering an edit the host made while the
+    // load was still in flight.
+    private bool _userHasEdited;
+
+    private static string BanModeLabel(BanLetterMode mode) => mode switch
+    {
+        BanLetterMode.Vowels => "Vowels Only",
+        BanLetterMode.Consonants => "Consonants Only",
+        _ => "All Bannable"
+    };
+
+    // Pushes the edit through the state (which enforces Execute + change notification so
+    // non-host viewers re-render) and then persists. Order matters: mark edited first so a
+    // late-arriving load can't overwrite this change.
+    private void UpdateSetting(Func<AlphaChainSettings, AlphaChainSettings> mutate)
+    {
+        _userHasEdited = true;
+        if (GameState.UpdateSettings(mutate).TryGetFailure(out var error))
+        {
+            Logger.LogError("Failed to update Alpha Chain settings: {Error}", error.PublicMessage);
+            return;
+        }
+        PersistSettings();
+    }
+
+    // Resets every match rule to its default by swapping in a fresh settings record. HostPlays is a
+    // start-time choice (never persisted) and is left at its default false like the rest.
+    private void ResetToDefaults() => UpdateSetting(_ => new AlphaChainSettings());
+
+    private void SetBanMode(BanLetterMode mode) => UpdateSetting(s => s with { BanMode = mode });
+    private void OnSurvivalChanged(ChangeEventArgs e) => UpdateSetting(s => s with { SurvivalMode = e.Value is true });
+    private void OnTutorialsChanged(ChangeEventArgs e) => UpdateSetting(s => s with { EnableTutorials = e.Value is true });
+
+    private void OnShotClockChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { ShotClockSeconds = v });
+    private void OnEraIntervalChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { EraInterval = v });
+    private void OnEraCountChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { EraCount = v });
+    private void OnIntermissionChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { IntermissionCardSelectSeconds = v });
+    private void OnSniperBanChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { SniperBanSeconds = v });
+    private void OnModifiersChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { ModifiersDealtPerEra = v });
+
+    // EngineAnimationSeconds is a double (range slider, 0.5 s steps); parsed invariant so the
+    // browser's dot-decimal value is read correctly regardless of host locale.
+    private void OnEngineAnimationChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+            UpdateSetting(s => s with { EngineAnimationSeconds = value });
+    }
+
+    // Raw value is stored as-typed (no clamping) so Validate() can flag out-of-range input
+    // and gate the start buttons; an unparseable value is ignored.
+    private void ApplyInt(ChangeEventArgs e, Func<int, Func<AlphaChainSettings, AlphaChainSettings>> build)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var value))
+            UpdateSetting(build(value));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // localStorage needs JS interop, so the host's saved rules load here. Host-only:
+        // only the host edits/persists, so only their browser has anything to restore.
+        if (firstRender && IsHost)
+            await LoadSettingsAsync();
+    }
+
+    private async Task LoadSettingsAsync()
+    {
+        try
+        {
+            var saved = await LocalStorage.GetAsync<AlphaChainSettings>("alpha-chain", "settings", _cts.Token);
+            if (saved is not null && !_userHasEdited)
+            {
+                // HostPlays is a start-time choice, never a saved preference — clear any legacy
+                // persisted value so it can't auto-seat the host.
+                saved = saved with { HostPlays = false };
+                if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
+                {
+                    Logger.LogError("Failed to apply saved Alpha Chain settings: {Error}", error.PublicMessage);
+                    return;
+                }
+                StateHasChanged();
+            }
+        }
+        catch (OperationCanceledException) { /* component disposed */ }
+        catch (ObjectDisposedException) { /* circuit gone */ }
+        catch (JSDisconnectedException) { /* circuit gone */ }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading Alpha Chain settings.");
+        }
+    }
+
+    // Snapshot then chain off the prior save so rapid edits serialize and the final edit is
+    // the final write. HostPlays is excluded from the persisted snapshot.
+    private void PersistSettings()
+    {
+        var snapshot = GameState.Settings with { HostPlays = false };
+        _saveTask = SaveSettingsAsync(snapshot, _saveTask, _cts.Token);
+    }
+
+    private async Task SaveSettingsAsync(AlphaChainSettings settings, Task? prior, CancellationToken ct)
+    {
+        if (prior is not null)
+        {
+            try { await prior; } catch { /* prior failure already logged */ }
+        }
+        try
+        {
+            await LocalStorage.SetAsync("alpha-chain", "settings", settings, ct);
+        }
+        catch (OperationCanceledException) { /* component disposed */ }
+        catch (ObjectDisposedException) { /* circuit gone */ }
+        catch (JSDisconnectedException) { /* circuit gone */ }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving Alpha Chain settings.");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Flush the last pending save so a change made right before navigating away isn't
+        // lost. A dead circuit makes SetAsync throw JSDisconnectedException, which
+        // SaveSettingsAsync swallows, so this returns promptly rather than hanging.
+        if (_saveTask is not null)
+        {
+            try { await _saveTask; } catch { /* best-effort flush */ }
+        }
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}
