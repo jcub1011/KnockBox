@@ -66,6 +66,10 @@
                     }
                     break;
 
+                case IntermissionSubPhase.TaxTutorial:
+                    <TutorialOverlay @key="100" Kind="TutorialKind.Tax" IsHost="IsHost" OnSkip="SkipTutorialAsync" />
+                    break;
+
                 case IntermissionSubPhase.SniperBan:
                     <SniperBanPicker IsPicker="IsSniperBanPicker"
                                      LegalLetters="LegalBanLetters"
@@ -75,6 +79,11 @@
                     break;
             }
         </div>
+    }
+    else if (GameState.Phase == AlphaChainGamePhase.Tutorial)
+    {
+        <TutorialOverlay @key="GameState.CurrentTutorial" Kind="GameState.CurrentTutorial"
+                         IsHost="IsHost" OnSkip="SkipTutorialAsync" />
     }
     else
     {
@@ -272,5 +281,12 @@
                 </div>
             </aside>
         </div>
+    }
+
+    @* The just-ended tutorial slides away on top of the now-rendered next phase. It is a fixed,
+       pointer-events:none layer, so the revealed phase is immediately interactive. *@
+    @if (ExitingTutorial is { } exitingKind)
+    {
+        <TutorialOverlay Kind="exitingKind" IsHost="IsHost" Exiting="true" />
     }
 </div>

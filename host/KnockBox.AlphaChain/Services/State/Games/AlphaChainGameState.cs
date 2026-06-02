@@ -58,6 +58,17 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// <summary>The current Intermission sub-phase. Only meaningful while <see cref="Phase"/> is <c>Intermission</c>.</summary>
         public IntermissionSubPhase IntermissionPhase { get; set; }
 
+        // ── Tutorials ─────────────────────────────────────────────────────────
+
+        /// <summary>Which scripted tutorial is showing. Meaningful while <see cref="Phase"/> is
+        /// <c>Tutorial</c> (full-screen Shiritori/Engine) or while <see cref="IntermissionPhase"/>
+        /// is <c>TaxTutorial</c>.</summary>
+        public TutorialKind CurrentTutorial { get; set; }
+
+        /// <summary>Tutorials already played this match, so each shows at most once. Written inside
+        /// the execute lock when a tutorial is entered; cleared by <c>ResetForLobby</c>.</summary>
+        public HashSet<TutorialKind> ShownTutorials { get; } = new();
+
         /// <summary>
         /// When the current Intermission sub-phase's timer expires. Kept separate from
         /// <see cref="PhaseEndTime"/> so the round shot clock and the intermission countdowns
@@ -124,9 +135,10 @@ namespace KnockBox.AlphaChain.Services.State.Games
         public char? RequiredStartLetter { get; set; }
 
         /// <summary>
-        /// The match's banned letter (lower-case), chosen in <c>SetupState</c>. Using it
-        /// anywhere in a word triggers the Zero-Point Tax; using it as the last letter also
-        /// clears <see cref="RequiredStartLetter"/> for the next player.
+        /// The match's banned letter (lower-case), or null when none is in effect. Era 1 is
+        /// ban-free (null); from era 2 on it is set by the Sniper Ban at each Intermission, the
+        /// sole writer. Using it anywhere in a word triggers the Zero-Point Tax; using it as the
+        /// last letter also clears <see cref="RequiredStartLetter"/> for the next player.
         /// </summary>
         public char? BannedLetter { get; set; }
 

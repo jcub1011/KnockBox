@@ -80,6 +80,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
             state.CurrentRound = 0;
             state.CurrentEra = 0;
             state.IntermissionPhase = default;
+            state.CurrentTutorial = default;
+            state.ShownTutorials.Clear();
             state.SniperBanUserId = null;
             state.LatestScoreReplay = null;
             state.ScoreReplaySequence = 0;
@@ -175,6 +177,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
         /// <summary>Convenience wrapper for the UI: the last-place player picks the next era's banned letter.</summary>
         public Task<Result> SelectSniperBanAsync(string actorUserId, char letter, AlphaChainGameState state)
             => ProcessCommandAsync(state, new SelectSniperBanCommand(actorUserId, letter));
+
+        /// <summary>Convenience wrapper for the UI: the host skips the currently-showing tutorial.</summary>
+        public Task<Result> SkipTutorialAsync(string actorUserId, AlphaChainGameState state)
+            => ProcessCommandAsync(state, new SkipTutorialCommand(actorUserId));
 
         /// <summary>
         /// Submits a word for <paramref name="actorUserId"/> and returns the typed

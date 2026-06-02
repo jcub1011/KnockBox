@@ -3,6 +3,7 @@ using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
+using KnockBox.AlphaChain.Services.Logic.Games.FSM.States;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 using KnockBox.Core.Components.Shared;
@@ -25,6 +26,18 @@ namespace KnockBox.AlphaChain.Pages
 
         private IDisposable? _stateSubscription;
         private IDisposable? _tickSubscription;
+
+        // ── Tutorial slide-away transition ──────────────────────────────────
+        // When a tutorial ends, keep rendering it for a short window as a fixed overlay sliding
+        // away on top of the now-rendered next phase, then drop it. Kept in sync with the CSS
+        // animation duration in TutorialOverlay.razor.css.
+        private const int TutorialExitMs = 450;
+        private TutorialKind? _activeTutorial;
+        private TutorialKind? _exitingTutorial;
+        private CancellationTokenSource? _exitCts;
+
+        /// <summary>The tutorial currently sliding away (rendered on top of the next phase), or null.</summary>
+        protected TutorialKind? ExitingTutorial => _exitingTutorial;
 
         // ── Client-owned word input (see wwwroot/js/alpha-chain-input.js) ────
         // The <input> is NOT value-bound to Blazor: the constant tick/state re-renders
@@ -177,6 +190,7 @@ namespace KnockBox.AlphaChain.Pages
         protected TimeSpan SubPhaseDuration => GameState.IntermissionPhase switch
         {
             IntermissionSubPhase.Optimization => TimeSpan.FromSeconds(GameState.Settings.IntermissionCardSelectSeconds),
+            IntermissionSubPhase.TaxTutorial => TutorialState.DurationFor(TutorialKind.Tax),
             IntermissionSubPhase.SniperBan => TimeSpan.FromSeconds(GameState.Settings.SniperBanSeconds),
             _ => TimeSpan.Zero
         };
@@ -226,6 +240,15 @@ namespace KnockBox.AlphaChain.Pages
                 Logger.LogWarning("Select Sniper Ban failed: {Error}", error.PublicMessage);
         }
 
+        /// <summary>Host-only: skips the currently-showing tutorial and advances immediately.</summary>
+        protected async Task SkipTutorialAsync()
+        {
+            if (CurrentUserId is not { } id) return;
+            var result = await GameEngine.SkipTutorialAsync(id, GameState);
+            if (result.TryGetFailure(out var error))
+                Logger.LogWarning("Skip tutorial failed: {Error}", error.PublicMessage);
+        }
+
         // ── Cards (M3) ──────────────────────────────────────────────────────
 
         /// <summary>The local player's per-player state, or null before init / if spectating.</summary>
@@ -246,8 +269,7 @@ namespace KnockBox.AlphaChain.Pages
         {
             // The parent lobby (LobbyPageBase) also re-renders on state changes, but
             // subscribing here keeps this view self-contained and correct in isolation.
-            _stateSubscription = GameState.StateChangedEventManager.Subscribe(
-                async () => await InvokeAsync(StateHasChanged));
+            _stateSubscription = GameState.StateChangedEventManager.Subscribe(HandleStateChangedAsync);
 
             // Re-render once per second so the shot-clock countdown ticks down even when
             // no state change is raised. Every circuit registers this (it is render-only,
@@ -256,6 +278,76 @@ namespace KnockBox.AlphaChain.Pages
                 () => _ = InvokeAsync(StateHasChanged), tickInterval: TickService.TicksPerSecond);
             if (tickResult.TryGetSuccess(out var sub))
                 _tickSubscription = sub;
+        }
+
+        /// <summary>
+        /// State-change handler. Detects a tutorial ending <b>before</b> re-rendering so the
+        /// slide-away overlay is added in the same render that mounts the next phase (no flash),
+        /// then renders.
+        /// </summary>
+        private async ValueTask HandleStateChangedAsync()
+            => await InvokeAsync(() =>
+            {
+                DetectTutorialExit();
+                StateHasChanged();
+            });
+
+        /// <summary>The tutorial currently on screen (full-screen phase or the Intermission Tax
+        /// sub-phase), or null when no tutorial is showing.</summary>
+        private TutorialKind? CurrentActiveTutorial()
+        {
+            if (GameState.Phase == AlphaChainGamePhase.Tutorial)
+                return GameState.CurrentTutorial;
+            if (GameState.Phase == AlphaChainGamePhase.Intermission
+                && GameState.IntermissionPhase == IntermissionSubPhase.TaxTutorial)
+                return TutorialKind.Tax;
+            return null;
+        }
+
+        /// <summary>Tracks tutorial appearance/disappearance across state changes and kicks off the
+        /// slide-away when one ends.</summary>
+        private void DetectTutorialExit()
+        {
+            var current = CurrentActiveTutorial();
+            if (current is { } showing)
+            {
+                // A tutorial is on screen — record it and cancel any pending exit (defensive; the
+                // sequence never overlaps in practice).
+                _activeTutorial = showing;
+                _exitingTutorial = null;
+            }
+            else if (_activeTutorial is { } ended)
+            {
+                // A tutorial just left the screen — slide it away over the next phase.
+                _activeTutorial = null;
+                _exitingTutorial = ended;
+                StartExitTimer();
+            }
+        }
+
+        /// <summary>Removes the slide-away overlay once its animation has played.</summary>
+        private void StartExitTimer()
+        {
+            _exitCts?.Cancel();
+            _exitCts?.Dispose();
+            _exitCts = new CancellationTokenSource();
+            var token = _exitCts.Token;
+            _ = RunExitTimerAsync(token);
+        }
+
+        private async Task RunExitTimerAsync(CancellationToken token)
+        {
+            try
+            {
+                await Task.Delay(TutorialExitMs, token);
+            }
+            catch (TaskCanceledException)
+            {
+                return;
+            }
+
+            _exitingTutorial = null;
+            await InvokeAsync(StateHasChanged);
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -419,6 +511,8 @@ namespace KnockBox.AlphaChain.Pages
 
         public override void Dispose()
         {
+            _exitCts?.Cancel();
+            _exitCts?.Dispose();
             _tickSubscription?.Dispose();
             _stateSubscription?.Dispose();
             _ = DisposeInputModuleAsync();

@@ -78,6 +78,22 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             {
                 case IntermissionSubPhase.Optimization:
                     if (now >= state.SubPhaseEndTime || AllSubmitted(state))
+                    {
+                        // Show the Tax tutorial before the first Sniper Ban (once, era 1 only) so
+                        // players understand the tax before any letter is banned; otherwise go
+                        // straight to the ban. EnterSniperBan is what applies the optimization
+                        // orderings, so it must run exactly once — gating it here keeps that true.
+                        if (ShouldShowTaxTutorial(state))
+                            EnterTaxTutorial(context, now);
+                        else
+                            EnterSniperBan(context, now);
+                    }
+                    return null;
+
+                case IntermissionSubPhase.TaxTutorial:
+                    // Non-interactive dwell; auto-advance into the Sniper Ban when it elapses. This
+                    // is the single EnterSniperBan call on the tutorial path.
+                    if (now >= state.SubPhaseEndTime)
                         EnterSniperBan(context, now);
                     return null;
 
@@ -105,8 +121,30 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             {
                 SubmitOptimizationCommand cmd => HandleSubmitOptimization(context, cmd),
                 SelectSniperBanCommand cmd => HandleSelectSniperBan(context, cmd),
+                SkipTutorialCommand cmd => HandleSkipTutorial(context, cmd),
                 _ => (ValueResult<FsmState?>)null!
             };
+        }
+
+        /// <summary>
+        /// Host-only skip of the in-Intermission Tax tutorial: jumps straight into the Sniper Ban.
+        /// Ignored (no-op) outside the <see cref="IntermissionSubPhase.TaxTutorial"/> sub-phase so a
+        /// stray command never disturbs Optimization or the ban.
+        /// </summary>
+        private static ValueResult<FsmState?> HandleSkipTutorial(AlphaChainGameContext context, SkipTutorialCommand cmd)
+        {
+            var state = context.State;
+
+            if (state.IntermissionPhase != IntermissionSubPhase.TaxTutorial)
+                return (ValueResult<FsmState?>)null!;
+
+            if (cmd.ActorUserId != state.Host.Id)
+                return new ResultError("Only the host can skip the tutorial.",
+                    $"Non-host [{cmd.ActorUserId}] tried to skip the Tax tutorial.");
+
+            context.Logger.LogDebug("Alpha Chain Tax tutorial skipped by host.");
+            EnterSniperBan(context, DateTimeOffset.UtcNow);
+            return (ValueResult<FsmState?>)null!;
         }
 
         private static ValueResult<FsmState?> HandleSubmitOptimization(AlphaChainGameContext context, SubmitOptimizationCommand cmd)
@@ -237,6 +275,27 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             context.Logger.LogDebug("Alpha Chain Intermission → Optimization ({count} players).",
                 state.OptimizationSubmissions.Count);
+        }
+
+        /// <summary>True when the Tax tutorial should play before this Intermission's Sniper Ban:
+        /// tutorials enabled, the first era boundary (era 1), and not already shown.</summary>
+        private static bool ShouldShowTaxTutorial(AlphaChainGameState state)
+            => state.Settings.EnableTutorials && state.CurrentEra == 1
+               && !state.ShownTutorials.Contains(TutorialKind.Tax);
+
+        /// <summary>Tax tutorial: a non-interactive dwell shown between Optimization and Sniper Ban.
+        /// Touches no game state (no deal, no bay rewrite) — just flips the sub-phase and arms the
+        /// countdown — so the single <see cref="EnterSniperBan"/> call still applies orderings once.</summary>
+        private static void EnterTaxTutorial(AlphaChainGameContext context, DateTimeOffset now)
+        {
+            var state = context.State;
+
+            state.ShownTutorials.Add(TutorialKind.Tax);
+            state.CurrentTutorial = TutorialKind.Tax;
+            state.IntermissionPhase = IntermissionSubPhase.TaxTutorial;
+            state.SubPhaseEndTime = now + TutorialState.DurationFor(TutorialKind.Tax);
+
+            context.Logger.LogDebug("Alpha Chain Intermission → TaxTutorial (before first Sniper Ban).");
         }
 
         /// <summary>Sniper Ban: apply pending orders, resolve the last-place picker, open the countdown.</summary>

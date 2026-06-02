@@ -80,6 +80,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         /// <summary>When true, eliminated players are out for good rather than scoring negatives.</summary>
         public bool SurvivalMode { get; init; } = false;
 
+        /// <summary>
+        /// When true (the default), the three scripted onboarding tutorials play at their cue
+        /// points: Shiritori at game start, Engine when the first era ends, and Tax before the
+        /// first Sniper Ban. Read at start and at the first era boundary/Intermission; effectively
+        /// a start-time choice (the panel is lobby-only).
+        /// </summary>
+        public bool EnableTutorials { get; init; } = true;
+
         /// <summary>Modifier cards dealt to each player at an intermission. Consumed in M4.</summary>
         public int ModifiersDealtPerEra { get; init; } = 3;
 

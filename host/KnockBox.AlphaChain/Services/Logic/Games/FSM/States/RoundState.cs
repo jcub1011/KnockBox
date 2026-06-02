@@ -321,7 +321,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                     bool gameOver = state.PendingTransitionIsGameOver;
                     state.PendingTransitionAt = null;
                     state.PendingTransitionIsGameOver = false;
-                    return gameOver ? new GameOverState() : new IntermissionState();
+                    return NextAfterRoundWrap(state, gameOver);
                 }
                 return null;
             }
@@ -420,7 +420,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                         return null;
                     }
 
-                    return gameOver ? new GameOverState() : new IntermissionState();
+                    return NextAfterRoundWrap(state, gameOver);
                 }
 
                 //   3. Otherwise continue the current era with the next round.
@@ -431,6 +431,26 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             ApplyQueuedTimePenalty(state);
             ApplyTurnStartReactions(context, state);
             return null;
+        }
+
+        /// <summary>
+        /// Resolves the state to enter once the turn order wraps on an era boundary (or the final
+        /// round). Recomputed from live state at the moment the transition fires — including the
+        /// deferred score-replay-hold path — so it never relies on a stored target. When tutorials
+        /// are enabled, the Engine tutorial is inserted before the FIRST Intermission only (era 1);
+        /// <c>CurrentEra</c> only advances inside <c>CompleteIntermission</c>, so it is still 1 at
+        /// both fire points, and the shown-flag is a redundant backstop against re-entry.
+        /// </summary>
+        private static ValueResult<FsmState?> NextAfterRoundWrap(AlphaChainGameState state, bool gameOver)
+        {
+            if (gameOver)
+                return new GameOverState();
+
+            if (state.Settings.EnableTutorials && state.CurrentEra == 1
+                && !state.ShownTutorials.Contains(TutorialKind.Engine))
+                return new TutorialState(TutorialKind.Engine, new IntermissionState());
+
+            return new IntermissionState();
         }
 
         /// <summary>

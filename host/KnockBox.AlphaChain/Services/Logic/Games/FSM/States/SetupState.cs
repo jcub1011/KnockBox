@@ -7,9 +7,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 {
     /// <summary>
     /// Transient bootstrap state. Snapshots participants into <c>GamePlayers</c>,
-    /// initializes the era/round counters, and immediately hands off to
-    /// <see cref="RoundState"/> (the FSM chains the returned transition before any
-    /// command is processed, so this state is never observed by the UI).
+    /// initializes the era/round counters, and immediately hands off to the first
+    /// real screen (the Shiritori tutorial when tutorials are enabled, else
+    /// <see cref="RoundState"/>). The FSM chains the returned transition before any
+    /// command is processed, so this state is never observed by the UI.
     /// </summary>
     public sealed class SetupState : IGameState<AlphaChainGameContext, AlphaChainCommand>
     {
@@ -32,20 +33,23 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.CurrentRound = 1;
             state.StartedAt = DateTimeOffset.UtcNow;
 
-            // Pick the match's banned letter from the configured letter class. Stored
-            // lower-case so chain/contains checks against the normalized word are direct.
-            // After this initial draw, the Intermission state (M4) is the ONLY writer of
-            // BannedLetter — see the milestone invariant.
-            state.BannedLetter = BanLetterPool.Draw(state.Settings.BanMode, context.Rng);
+            // The first era is ban-free: banned letters are only introduced from era 2 onward,
+            // chosen by the last-place player's Sniper Ban at the first Intermission. This makes
+            // IntermissionState the SOLE writer of BannedLetter — see the state's invariant.
+            state.BannedLetter = null;
 
             // First player has a free choice — no required start letter yet.
             state.RequiredStartLetter = null;
 
             context.Logger.LogDebug(
-                "Alpha Chain FSM → SetupState ({count} participants, banned letter '{banned}')",
-                state.GamePlayers.Count, state.BannedLetter);
+                "Alpha Chain FSM → SetupState ({count} participants, era 1 is ban-free)",
+                state.GamePlayers.Count);
 
-            return new RoundState();
+            // When tutorials are enabled, the Shiritori tutorial plays before the first round;
+            // otherwise drop straight into the round loop.
+            return state.Settings.EnableTutorials
+                ? new TutorialState(TutorialKind.Shiritori, new RoundState())
+                : new RoundState();
         }
 
         public Result OnExit(AlphaChainGameContext context) => Result.Success;

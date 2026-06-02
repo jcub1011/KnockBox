@@ -45,8 +45,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
         private async Task<AlphaChainGameState> CreateStartedGameAsync(int playerCount = 2, bool hostPlays = false)
         {
             var state = await CreateStateWithPlayersAsync(playerCount);
-            if (hostPlays)
-                state.UpdateSettings(s => s with { HostPlays = true });
+            // Tutorials off so the game starts directly in RoundState (these tests assert the
+            // round/turn lifecycle, not the tutorial flow).
+            state.UpdateSettings(s => s with { EnableTutorials = false, HostPlays = hostPlays });
             await _engine.StartAsync(_host, state);
             return state;
         }
@@ -162,7 +163,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
         {
             // 1 era × 2 rounds = 2 scheduled rounds; 2 players → 2 advances per round.
             var state = await CreateStateWithPlayersAsync(2);
-            state.UpdateSettings(s => s with { EraInterval = 2, EraCount = 1 });
+            state.UpdateSettings(s => s with { EraInterval = 2, EraCount = 1, EnableTutorials = false });
             await _engine.StartAsync(_host, state);
             using var _ = state;
 

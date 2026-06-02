@@ -43,8 +43,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             for (int i = 0; i < playerCount; i++)
                 state.RegisterPlayer(MakePlayer(i));
 
-            if (survival)
-                state.UpdateSettings(s => s with { SurvivalMode = true });
+            // Tutorials off so the game starts directly in RoundState (these tests drive
+            // submissions immediately); SurvivalMode is applied in the same update.
+            state.UpdateSettings(s => s with { EnableTutorials = false, SurvivalMode = survival });
 
             await engine.StartAsync(_host, state);
 

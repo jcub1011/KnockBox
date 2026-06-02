@@ -53,11 +53,14 @@ namespace KnockBox.AlphaChain.Tests.Integration
             for (int i = 0; i < playerCount; i++)
                 state.RegisterPlayer(UserFactory.Create($"Player{i}", $"p{i}-id"));
 
-            state.UpdateSettings(s => s with { EraInterval = eraInterval, EraCount = eraCount });
+            // Tutorials off — this drives raw gameplay end-to-end; the tutorial phases are covered
+            // by dedicated unit tests.
+            state.UpdateSettings(s => s with { EraInterval = eraInterval, EraCount = eraCount, EnableTutorials = false });
             await engine.StartAsync(_host, state);
 
-            // The banned letter is drawn deterministically in Setup; generated words avoid it
-            // (and every previous word), so the chain never breaks and no Zero-Point Tax fires.
+            // Era 1 is ban-free; from era 2 the SniperBan timeout draws a banned letter. Generated
+            // words avoid the active banned letter (and every previous word), so the chain never
+            // breaks and no Zero-Point Tax fires.
             int counter = 0;
             int submissions = 0;
             const int safetyCap = 5000;

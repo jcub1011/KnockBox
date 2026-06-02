@@ -47,6 +47,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             for (int i = 0; i < playerCount; i++)
                 state.RegisterPlayer(MakePlayer(i));
 
+            // Tutorials off by default so the Optimization → SniperBan timings below are exact; the
+            // dedicated tutorial tests re-enable them via configure.
+            state.UpdateSettings(s => s with { EnableTutorials = false });
             configure?.Invoke(state);
 
             await engine.StartAsync(_host, state);
@@ -322,6 +325,116 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var result = await engine.SelectSniperBanAsync(notPicker, 'q', state);
 
             Assert.IsTrue(result.IsFailure);
+        }
+
+        // ── Tax tutorial (first Intermission, tutorials enabled) ────────────────
+
+        [TestMethod]
+        public async Task FirstIntermission_InsertsTaxTutorial_BeforeSniperBan()
+        {
+            var (engine, state) = await StartGameAsync(playerCount: 2,
+                configure: s => s.UpdateSettings(c => c with { EnableTutorials = true }));
+            using var _ = state;
+            EnterIntermission(state);
+            var clock = AdvanceToOptimization(engine, state);
+
+            var playerId = state.TurnManager.TurnOrder[0];
+            var dealt = state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList();
+
+            // Optimization times out → the Tax tutorial, NOT the Sniper Ban (era 1, tutorials on).
+            clock = clock.AddSeconds(60);
+            engine.Tick(state.Context!, clock);
+
+            Assert.AreEqual(IntermissionSubPhase.TaxTutorial, state.IntermissionPhase);
+            Assert.AreEqual(TutorialKind.Tax, state.CurrentTutorial);
+            Assert.IsTrue(state.ShownTutorials.Contains(TutorialKind.Tax));
+            Assert.IsNull(state.SniperBanUserId, "ban picker is resolved only when SniperBan opens");
+            // The tutorial touches no game state — bays are unchanged.
+            CollectionAssert.AreEqual(dealt, state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList());
+        }
+
+        [TestMethod]
+        public async Task TaxTutorial_AfterDuration_EntersSniperBan_AppliesOptimizationOnce()
+        {
+            var (engine, state) = await StartGameAsync(playerCount: 2,
+                configure: s => s.UpdateSettings(c => c with { EnableTutorials = true }));
+            using var _ = state;
+            EnterIntermission(state);
+            var clock = AdvanceToOptimization(engine, state);
+
+            var playerId = state.TurnManager.TurnOrder[0];
+            var dealt = state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList();
+            var reversed = dealt.AsEnumerable().Reverse().ToList();
+            await engine.SubmitOptimizationAsync(playerId, reversed, state);
+
+            // Optimization → TaxTutorial.
+            clock = clock.AddSeconds(60);
+            engine.Tick(state.Context!, clock);
+            Assert.AreEqual(IntermissionSubPhase.TaxTutorial, state.IntermissionPhase);
+            // The submission has NOT been applied yet (applied once, when SniperBan opens).
+            CollectionAssert.AreEqual(dealt, state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList());
+
+            // TaxTutorial dwell elapses → SniperBan, and the ordering is applied exactly once.
+            clock = clock.AddSeconds((int)TutorialState.DurationFor(TutorialKind.Tax).TotalSeconds + 1);
+            engine.Tick(state.Context!, clock);
+
+            Assert.AreEqual(IntermissionSubPhase.SniperBan, state.IntermissionPhase);
+            CollectionAssert.AreEqual(reversed, state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList());
+        }
+
+        [TestMethod]
+        public async Task TaxTutorial_HostSkip_EntersSniperBanImmediately()
+        {
+            var (engine, state) = await StartGameAsync(playerCount: 2,
+                configure: s => s.UpdateSettings(c => c with { EnableTutorials = true }));
+            using var _ = state;
+            EnterIntermission(state);
+            var clock = AdvanceToOptimization(engine, state);
+
+            clock = clock.AddSeconds(60);
+            engine.Tick(state.Context!, clock); // → TaxTutorial
+            Assert.AreEqual(IntermissionSubPhase.TaxTutorial, state.IntermissionPhase);
+
+            var result = await engine.SkipTutorialAsync(_host.Id, state);
+
+            Assert.IsTrue(result.IsSuccess);
+            Assert.AreEqual(IntermissionSubPhase.SniperBan, state.IntermissionPhase);
+        }
+
+        [TestMethod]
+        public async Task TaxTutorial_NonHostSkip_Rejected()
+        {
+            var (engine, state) = await StartGameAsync(playerCount: 2,
+                configure: s => s.UpdateSettings(c => c with { EnableTutorials = true }));
+            using var _ = state;
+            EnterIntermission(state);
+            var clock = AdvanceToOptimization(engine, state);
+
+            clock = clock.AddSeconds(60);
+            engine.Tick(state.Context!, clock); // → TaxTutorial
+
+            var result = await engine.SkipTutorialAsync(state.TurnManager.TurnOrder[0], state);
+
+            Assert.IsTrue(result.IsFailure);
+            Assert.AreEqual(IntermissionSubPhase.TaxTutorial, state.IntermissionPhase);
+        }
+
+        [TestMethod]
+        public async Task SecondIntermission_DoesNotInsertTaxTutorial()
+        {
+            var (engine, state) = await StartGameAsync(playerCount: 2,
+                configure: s => s.UpdateSettings(c => c with { EnableTutorials = true }));
+            using var _ = state;
+            // Simulate being past era 1 (the Tax tutorial is first-Intermission only).
+            state.Execute(() => state.CurrentEra = 2);
+            EnterIntermission(state);
+            var clock = AdvanceToOptimization(engine, state);
+
+            clock = clock.AddSeconds(60);
+            engine.Tick(state.Context!, clock); // Optimization → SniperBan directly
+
+            Assert.AreEqual(IntermissionSubPhase.SniperBan, state.IntermissionPhase);
+            Assert.IsFalse(state.ShownTutorials.Contains(TutorialKind.Tax));
         }
 
         // ── Era progression ─────────────────────────────────────────────────────

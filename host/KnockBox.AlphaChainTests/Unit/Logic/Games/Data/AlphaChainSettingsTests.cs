@@ -157,6 +157,21 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Data
             Assert.IsTrue(new AlphaChainSettings { HostPlays = false }.Validate().IsValid);
         }
 
+        // ── EnableTutorials: defaults on, never affects validity ─────────────
+
+        [TestMethod]
+        public void EnableTutorials_DefaultsOn()
+        {
+            Assert.IsTrue(new AlphaChainSettings().EnableTutorials);
+        }
+
+        [TestMethod]
+        public void EnableTutorials_DoesNotAffectValidity()
+        {
+            Assert.IsTrue(new AlphaChainSettings { EnableTutorials = true }.Validate().IsValid);
+            Assert.IsTrue(new AlphaChainSettings { EnableTutorials = false }.Validate().IsValid);
+        }
+
         // ── Multiple violations are all reported ─────────────────────────────
 
         [TestMethod]

@@ -5,8 +5,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Support
     /// <summary>
     /// Deterministic <see cref="IRandomNumberService"/> that always returns a fixed index
     /// (clamped into range). Tests that care about the exact banned letter override
-    /// <c>AlphaChainGameState.BannedLetter</c> directly; this just makes the SetupState draw
-    /// reproducible.
+    /// <c>AlphaChainGameState.BannedLetter</c> directly; this just makes the Intermission card
+    /// deals and the Sniper Ban timeout draw reproducible. (Era 1 is ban-free, so no draw
+    /// happens at setup.)
     /// </summary>
     internal sealed class FixedRandomNumberService(int value = 0) : IRandomNumberService
     {

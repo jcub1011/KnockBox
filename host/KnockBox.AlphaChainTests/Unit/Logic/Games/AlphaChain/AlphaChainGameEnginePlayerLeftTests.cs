@@ -41,8 +41,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
             for (int i = 0; i < playerCount; i++)
                 state.RegisterPlayer(MakePlayer(i));
 
-            if (survival)
-                state.UpdateSettings(s => s with { SurvivalMode = true });
+            // Tutorials off — these tests exercise the leave handler, not the tutorial flow.
+            state.UpdateSettings(s => s with { EnableTutorials = false, SurvivalMode = survival });
 
             await engine.StartAsync(_host, state);
             return (engine, state);
@@ -122,11 +122,12 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
                 state.RegisterPlayer(MakePlayer(i));
 
             // One round per era, several eras so the Intermission runs (not the final round).
-            state.UpdateSettings(s => s with { EraInterval = 1, EraCount = 3 });
+            // Tutorials off so round 1 → Intermission directly (no Engine/Tax tutorial detours).
+            state.UpdateSettings(s => s with { EraInterval = 1, EraCount = 3, EnableTutorials = false });
             await engine.StartAsync(_host, state);
-            state.Execute(() => state.BannedLetter = 'z');
 
-            // Round 1: every player submits once → the order wraps → Intermission.
+            // Round 1: every player submits once → the order wraps → Intermission. Era 1 is ban-free,
+            // so the first banned letter is set by this Intermission's Sniper Ban.
             await engine.SubmitWordAsync(state.TurnManager.TurnOrder[0], "cat", state);
             await engine.SubmitWordAsync(state.TurnManager.TurnOrder[1], "tea", state);
             await engine.SubmitWordAsync(state.TurnManager.TurnOrder[2], "ant", state);

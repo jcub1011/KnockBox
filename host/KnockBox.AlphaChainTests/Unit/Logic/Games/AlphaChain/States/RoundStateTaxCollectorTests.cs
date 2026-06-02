@@ -46,6 +46,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             for (int i = 0; i < playerCount; i++)
                 state.RegisterPlayer(MakePlayer(i));
 
+            // Tutorials off so the game starts directly in RoundState.
+            state.UpdateSettings(s => s with { EnableTutorials = false });
             await engine.StartAsync(_host, state);
             state.Execute(() => state.BannedLetter = banned);
             return (engine, state);

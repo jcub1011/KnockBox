@@ -121,6 +121,13 @@
                        checked="@s.SurvivalMode"
                        @onchange="OnSurvivalChanged" />
             </label>
+
+            <label class="ac-settings-field ac-settings-field-row" title="@TutorialsTip">
+                <span>Enable Tutorials</span>
+                <input type="checkbox"
+                       checked="@s.EnableTutorials"
+                       @onchange="OnTutorialsChanged" />
+            </label>
         </div>
 
         @if (!validation.IsValid)
@@ -147,6 +154,7 @@
             <div title="@ReactionsTip"><dt>Reactions / Era</dt><dd>@s.ReactionsDealtPerEra</dd></div>
             <div title="@EngineAnimTip"><dt>Engine Animation</dt><dd>@s.EngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture) s</dd></div>
             <div title="@SurvivalTip"><dt>Survival Mode</dt><dd>@(s.SurvivalMode ? "On" : "Off")</dd></div>
+            <div title="@TutorialsTip"><dt>Enable Tutorials</dt><dd>@(s.EnableTutorials ? "On" : "Off")</dd></div>
         </dl>
     }
 </section>
@@ -168,6 +176,7 @@
     private const string ModifiersTip = "Modifier cards dealt to each player every Intermission. Modifiers are persistent engine cards processed left-to-right (additives first, multipliers last).";
     private const string ReactionsTip = "Single-use Reaction cards dealt to each player every Intermission. They sit in hand and auto-fire on game events (e.g. Amnesty, Free Throw, Overtime, Toll Booth).";
     private const string SurvivalTip = "When on, a player who misses the shot clock is eliminated for good instead of being penalized and staying in.";
+    private const string TutorialsTip = "When on, three short non-interactive tutorials play at their cue points (word chain at the start, the scoring engine when the first era ends, and the tax before the first banned letter is chosen). You can skip each one as host.";
     private const string EngineAnimTip = "Total length of the score-replay animation that runs each accepted word through the Engine Bay so everyone sees how the score is built. Constant regardless of how many cards you hold — bigger engines just animate faster.";
 
     private readonly CancellationTokenSource _cts = new();
@@ -200,6 +209,7 @@
 
     private void SetBanMode(BanLetterMode mode) => UpdateSetting(s => s with { BanMode = mode });
     private void OnSurvivalChanged(ChangeEventArgs e) => UpdateSetting(s => s with { SurvivalMode = e.Value is true });
+    private void OnTutorialsChanged(ChangeEventArgs e) => UpdateSetting(s => s with { EnableTutorials = e.Value is true });
 
     private void OnShotClockChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { ShotClockSeconds = v });
     private void OnEraIntervalChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { EraInterval = v });
