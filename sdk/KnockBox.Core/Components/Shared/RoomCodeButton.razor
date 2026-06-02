@@ -10,13 +10,13 @@
    class="@ClassName @(_isRevealed ? "revealed" : "")"
    @onclick="Toggle"
    @onclick:preventDefault="true"
-   @oncontextmenu="CopyCodeAsync"
+   @oncontextmenu="OnContextMenu"
    @oncontextmenu:preventDefault="true"
    @onpointerdown="OnPointerDown"
    @onpointerup="OnPointerUp"
    @onpointercancel="OnPointerCancel"
    @onpointerleave="OnPointerCancel"
-   title="Click to reveal. Right-click/long-press to copy. Middle-click to join in a new tab.">
+   title="Click to reveal. Right-click/long-press to copy code. Ctrl+right-click to copy link. Middle-click to join in a new tab.">
     <span class="@CoverClassName">@CoverText</span>
     <span class="@ValueClassName">@Code</span>
 </a>
@@ -46,6 +46,10 @@
 
     private void Toggle() => _isRevealed = !_isRevealed;
 
+    // Right-click copies the room code; Ctrl+right-click copies the full join URL.
+    private Task OnContextMenu(MouseEventArgs e) =>
+        e.CtrlKey ? CopyJoinUrlAsync() : CopyCodeAsync();
+
     private async Task CopyCodeAsync()
     {
         if (!GameSessionService.TryGetCurrentSession(out var session)) return;
@@ -60,10 +64,31 @@
         }
     }
 
+    private async Task CopyJoinUrlAsync()
+    {
+        if (JoinUrl == "#") return;
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", JoinUrl);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error copying join URL.");
+        }
+    }
+
     private void OnPointerDown(PointerEventArgs e)
     {
-        if (e.PointerType != "touch") return;
+        // Touch long-press copies the room code.
+        if (e.PointerType == "touch")
+        {
+            StartHold(CopyCodeAsync);
+        }
+    }
 
+    private void StartHold(Func<Task> onHold)
+    {
         CancelLongPress();
         var cts = new CancellationTokenSource();
         _longPressCts = cts;
@@ -74,12 +99,12 @@
             try
             {
                 await Task.Delay(500, token);
-                await InvokeAsync(CopyCodeAsync);
+                await InvokeAsync(onHold);
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Long-press copy failed.");
+                Logger.LogError(ex, "Hold action failed.");
             }
         }, token);
     }
