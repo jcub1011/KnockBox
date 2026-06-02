@@ -12,8 +12,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 {
     /// <summary>
     /// Exercises the 0-point utility cards whose effect is a submit-path rule rather than a score:
-    /// The Faraday Cage (immunity to the owner's own card-bans), The Wildcard (Succession bypass),
-    /// and The Prism (clock refill on a failed/typo submission, once per turn).
+    /// The Wildcard (Succession bypass) and The Prism (clock refill on a failed/typo submission,
+    /// once per turn), plus that an owner's own card-ban still taxes their word.
     /// </summary>
     [TestClass]
     public class UtilityCardTests
@@ -58,31 +58,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         private static void SetCardBan(AlphaChainGameState state, string playerId, string cardId, char letter) =>
             state.Execute(() => state.GamePlayers[playerId].CardBannedLetters[cardId] = letter);
 
-        // ── The Faraday Cage (immune to own card-bans) ───────────────────────
+        // ── Own card-bans tax the owner's word ───────────────────────────────
 
         [TestMethod]
-        public async Task FaradayCage_MakesOwnerImmuneToTheirOwnCardBan()
+        public async Task OwnCardBan_TaxesTheOwnersWordToZero()
         {
-            // Roulette Wheel rolls a personal 't' ban; "cat" uses it. The Faraday Cage makes the
-            // owner immune, so the word is NOT taxed and still earns the Roulette ×1.75 (3 → 5).
-            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
-            using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
-
-            GiveModifier(state, submitter, "roulette-wheel");
-            GiveModifier(state, submitter, "faraday-cage");
-            SetCardBan(state, submitter, "roulette-wheel", 't');
-
-            var outcome = await engine.SubmitWordAsync(submitter, "cat", state);
-            Assert.IsTrue(outcome.TryGetSuccess(out var result));
-            Assert.IsInstanceOfType<SubmitWordResult.Accepted>(result, "Faraday Cage immunity → not taxed.");
-            Assert.AreEqual(5, state.GamePlayers[submitter].Score, "Roulette ×1.75 on the clean (immune) word.");
-        }
-
-        [TestMethod]
-        public async Task WithoutFaradayCage_OwnCardBanStillTaxes()
-        {
-            // Control: same setup minus the Faraday Cage → the card-ban 't' taxes the word to 0.
+            // Roulette Wheel rolls a personal 't' ban; "cat" uses it → the card-ban 't' taxes the
+            // word to 0 despite the Roulette ×1.75.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
             var submitter = state.TurnManager.CurrentPlayer!;

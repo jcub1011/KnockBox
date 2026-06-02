@@ -40,23 +40,23 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
         [
             new ModifierCard(
                 "anchor", "The Anchor",
-                "Adds a flat +12 to your word, always.",
+                "Adds a flat +6 to your word, always.",
                 ModifierKind.Additive,
                 Always,
-                static _ => 12) { Icon = "anchor" },
+                static _ => 6) { Icon = "anchor" },
 
             new ModifierCard(
                 "consonant-crunch", "Consonant Crunch",
                 "Adds +2 for every consonant in your word.",
                 ModifierKind.Additive,
                 Always,
-                static ctx => 2 * ctx.Consonants) { Icon = "consonant" },
+                static ctx => 2 * ctx.Word.Count(ctx.IsConsonant)) { Icon = "consonant" },
 
             new ModifierCard(
                 "vowel-surge", "Vowel Surge",
                 "×2 when your word has more vowels than consonants.",
                 ModifierKind.Multiplicative,
-                static ctx => ctx.Vowels > ctx.Consonants,
+                static ctx => ctx.Word.Count(ctx.IsVowel) > ctx.Word.Count(ctx.IsConsonant),
                 static _ => 2) { Icon = "wave" },
 
             new ModifierCard(
@@ -75,7 +75,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
 
             new ModifierCard(
                 "sprinter", "Sprinter",
-                "When your word is 4 letters or shorter, ×(1 + 0.1 per second left on your clock) — blitz short words for a soaring multiplier.",
+                "When your word is 4 letters or shorter, ×(1 + 0.1 per second left on your clock).",
                 ModifierKind.Multiplicative,
                 static ctx => ctx.Length <= 4,
                 static ctx => 1.0 + SprinterPerSecond * ctx.RemainingSeconds) { Icon = "sprinter" },
@@ -90,18 +90,18 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
             // ── Big-word / linguistic niche cards (feedback §1, §2, §4) ──
             new ModifierCard(
                 "sesquipedalian", "Sesquipedalian",
-                "×3 when your word is 10 letters or longer. Clamped to the max word score — a guaranteed payout for the truly long.",
+                "×3 when your word is 10 letters or longer. Clamped to the max word score.",
                 ModifierKind.Multiplicative,
                 static ctx => ctx.Length >= 10,
                 static _ => 3.0) { Icon = "tower" },
 
             new ModifierCard(
                 "guttural-roar", "Guttural Roar",
-                "×1.5 when your word's only vowels are 'A' or 'E' (no I, O or U) — the multiplicative answer to Vowel Surge.",
+                "×1.5 when your word's only vowels are 'A' or 'E'.",
                 ModifierKind.Multiplicative,
-                static ctx => !ctx.Word.Contains('i') && !ctx.Word.Contains('o') && !ctx.Word.Contains('u'),
+                static ctx => ctx.Word.Where(c => ctx.IsVowel(c)).All(c => c is 'a' or 'e'),
                 static _ => 1.5) { Icon = "roar" },
-
+            
             new ModifierCard(
                 "high-roller", "High Roller",
                 "Adds +20 when your word begins with a rare tile — Q, X, Z or J.",
@@ -113,32 +113,32 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
                 "perfect-link", "Perfect Link",
                 "×1.5 when your word ends in a vowel — hand the next player an easy letter, pad your own score.",
                 ModifierKind.Multiplicative,
-                static ctx => ctx.Length > 0 && "aeiou".Contains(ctx.Word[^1]),
+                static ctx => ctx.Length > 0 && ctx.IsVowel(ctx.Word[^1]),
                 static _ => 1.5) { Icon = "link" },
 
             // ── Glass-cannon clock cards (feedback §5): big multipliers paid for in clock time ──
             new ModifierCard(
                 "the-vault", "The Vault",
-                "×1.5 on every word, but permanently shaves 3 seconds off your shot clock while equipped.",
+                "×1.5 on every word, but shortens your shot clock by 10% while equipped.",
                 ModifierKind.Multiplicative,
                 Always,
                 static _ => 1.5)
-            { Icon = "vault", Clock = new ClockEffect(DeltaSeconds: -3) },
+            { Icon = "vault", Clock = new ClockEffect(DeltaFraction: -0.10) },
 
             new ModifierCard(
                 "redline", "Redline",
-                "×1.5 on every word, but permanently shortens your shot clock by 10% while equipped.",
+                "×2 on every word, but shortens your shot clock by 20% while equipped.",
                 ModifierKind.Multiplicative,
                 Always,
-                static _ => 1.5)
-            { Icon = "redline", Clock = new ClockEffect(DeltaFraction: -0.10) },
+                static _ => 2)
+            { Icon = "redline", Clock = new ClockEffect(DeltaFraction: -0.20) },
 
             new ModifierCard(
                 "panic-button", "Panic Button",
-                "Halves your shot clock. ×1.35 normally — but ×2.7 if you submit in the final 2 seconds.",
+                "Halves your shot clock. ×1.35 normally — but ×2.7 if you submit before the final 2 seconds.",
                 ModifierKind.Multiplicative,
                 Always,
-                static ctx => ctx.RemainingSeconds <= DangerZoneSeconds ? 2.7 : 1.35)
+                static ctx => ctx.RemainingSeconds >= DangerZoneSeconds ? 2.7 : 1.35)
             { Icon = "panic", Clock = new ClockEffect(DeltaFraction: -0.50) },
 
             // Hyper-Drive is inert in the pipeline (Trigger Never); its power is the era-scoped
@@ -222,19 +222,20 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
 
             // Adrenaline Spike: shaves a flat 4s off your clock and only pays out (×2.5) if you submit
             // inside the danger zone (final 2s). Submitting early scores 0 — the ×0 zeroes the word.
-            new ModifierCard(
-                "adrenaline-spike", "Adrenaline Spike",
-                "Shaves 4 seconds off your shot clock. ×2.5 — but ONLY if you submit in the final 2 seconds. Submit early and the word scores 0.",
-                ModifierKind.Multiplicative,
-                Always,
-                static ctx => ctx.RemainingSeconds <= DangerZoneSeconds ? 2.5 : 0.0)
-            { Icon = "adrenaline", Clock = new ClockEffect(DeltaSeconds: -4) },
+            // Too much overlap with the existing glass cannon cards.
+            //new ModifierCard(
+            //    "adrenaline-spike", "Adrenaline Spike",
+            //    "Shaves 4 seconds off your shot clock. ×2.5 — but ONLY if you submit in the final 2 seconds. Submit early and the word scores 0.",
+            //    ModifierKind.Multiplicative,
+            //    Always,
+            //    static ctx => ctx.RemainingSeconds <= DangerZoneSeconds ? 2.5 : 0.0)
+            //{ Icon = "adrenaline", Clock = new ClockEffect(DeltaSeconds: -4) },
 
             // The Double Down: rewards double letters (the 'ff' in coffin) with ×2, punishes their
             // absence with ×0.5. A swingy multiplier that rewards a specific word shape.
             new ModifierCard(
                 "double-down", "The Double Down",
-                "×2 when your word has a double letter (the 'ff' in coffin). No double letter? Your score is halved (×0.5).",
+                "×2 when your word has a double letter (the 'ff' in coffin). No double letter? Your score is reduced (×0.75).",
                 ModifierKind.Multiplicative,
                 Always,
                 static ctx => ctx.HasDoubleLetter ? 2.0 : 0.5)
@@ -244,7 +245,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
             // Heat Sink rescue). In exchange, a colossal +0.5× per letter of the played word.
             new ModifierCard(
                 "anchor-chain", "The Anchor Chain",
-                "Locks your shot clock to a strict, unmodifiable 5 seconds for the era. In exchange: ×(0.5 per letter) of your word — long words explode.",
+                "Locks your shot clock to a strict, unmodifiable 5 seconds for the era. In exchange: ×(0.5 per letter) of your word",
                 ModifierKind.Multiplicative,
                 Always,
                 static ctx => 0.5 * ctx.Length)
@@ -257,31 +258,32 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
             // next clock of every player currently ahead of you on cumulative score.
             new ModifierCard(
                 "flak-cannon", "Flak Cannon",
-                "Adds a flat +5. At the end of your turn, automatically shaves 2 seconds off the next shot clock of every player scoring higher than you.",
+                "Grants 0 points. Takes 2 seconds off the next shot clock of every player scoring higher than you.",
                 ModifierKind.Additive,
                 Always,
-                static _ => 5)
+                static _ => 0)
             { Icon = "flak-cannon", AutoTimeShave = new AutoTimeShaveRule(Seconds: 2, Target: AutoTimeShaveTarget.HigherScore) },
 
             // Scattershot: a minor ×1.15 that, on every submission, fires a 3s time-shave at any
             // opponent who has played a double-letter word this era.
-            new ModifierCard(
-                "scattershot", "Scattershot",
-                "×1.15 on your words. On every submission, shaves 3 seconds off the next clock of any opponent who has played a double-letter word this era.",
-                ModifierKind.Multiplicative,
-                Always,
-                static _ => 1.15)
-            { Icon = "scattershot", AutoTimeShave = new AutoTimeShaveRule(Seconds: 3, Target: AutoTimeShaveTarget.PlayedDoubleLetterThisEra) },
+            // Target is too niche and easy to avoid.
+            //new ModifierCard(
+            //    "scattershot", "Scattershot",
+            //    "×1.15 on your words. On every submission, shaves 3 seconds off the next clock of any opponent who has played a double-letter word this era.",
+            //    ModifierKind.Multiplicative,
+            //    Always,
+            //    static _ => 1.15)
+            //{ Icon = "scattershot", AutoTimeShave = new AutoTimeShaveRule(Seconds: 3, Target: AutoTimeShaveTarget.PlayedDoubleLetterThisEra) },
 
             // The Bounty Hunter: 0 points (×1.0). Marks the round's leader; if that leader plays a
             // word shorter than 6 letters on their turn, they are docked a flat 30 points.
             new ModifierCard(
                 "bounty-hunter", "The Bounty Hunter",
-                "Grants 0 points. Marks the leader each round — if they play a word shorter than 6 letters, they lose 30 points.",
+                "Grants 0 points. Marks the leader each round — if they play a word shorter than 6 letters, they lose 15 points.",
                 ModifierKind.Multiplicative,
                 Always,
                 static _ => 1.0)
-            { Icon = "bounty-hunter", LeaderPenalty = new LeaderPenaltyRule(MinLength: 6, Penalty: 30) },
+            { Icon = "bounty-hunter", LeaderPenalty = new LeaderPenaltyRule(MinLength: 6, Penalty: 15) },
 
             // Tracer Round: 0 points (×1.0). At the end of your turn, the letter your word ends on is
             // forced onto the next player as a one-turn personal banned letter.
@@ -297,7 +299,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
             //    and reflects incoming automated attacks, decaying −0.1× per block into a burden. ──
             new ModifierCard(
                 "titanium-mirror", "The Titanium Mirror",
-                "Passive ×1.0. Automatically blocks and reflects incoming attacks (time shaves, point drains, letter hijacks) back at their source — but loses 0.1× per block for the era, decaying into a burden.",
+                $"Passive ×1.0. Automatically blocks and reflects incoming attacks (time shaves, point drains, letter hijacks) back at their source — but loses 0.1× per block, carrying its decay across eras until discarded.",
                 ModifierKind.Multiplicative,
                 Always,
                 static ctx => ctx.ShieldMultiplier)
@@ -309,7 +311,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
             // (but NOT The Anchor Chain, whose clock override is unmodifiable).
             new ModifierCard(
                 "heat-sink", "The Heat Sink",
-                "Grants 0 points but adds a flat +5 seconds to your shot clock — breathing room for the glass-cannon clock cards.",
+                "Grants 0 points but adds a flat +5 seconds to your shot clock.",
                 ModifierKind.Multiplicative,
                 Always,
                 static _ => 1.0)
@@ -317,19 +319,20 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
 
             // The Faraday Cage: 0 points (×1.0). Immune to your OWN era-rolled personal card-bans, so
             // Roulette Wheel / The Toll Booth boost you without limiting your vocabulary.
-            new ModifierCard(
-                "faraday-cage", "The Faraday Cage",
-                "Grants 0 points. You are immune to personal banned letters generated by your own cards (Roulette Wheel, The Toll Booth) — keep the boosts, lose the vocabulary tax.",
-                ModifierKind.Multiplicative,
-                Always,
-                static _ => 1.0)
-            { Icon = "faraday-cage", ImmuneToOwnCardBans = true },
+            // Simply negates the effects of your choices. Boring.
+            //new ModifierCard(
+            //    "faraday-cage", "The Faraday Cage",
+            //    "Grants 0 points. You are immune to personal banned letters generated by your own cards (Roulette Wheel, The Toll Booth) — keep the boosts, lose the vocabulary tax.",
+            //    ModifierKind.Multiplicative,
+            //    Always,
+            //    static _ => 1.0)
+            //{ Icon = "faraday-cage", ImmuneToOwnCardBans = true },
 
             // The Prism: 0 points (×1.0). A failed/typo submission refills your clock to full once per
             // turn instead of running it down — the essential pairing for The Blindfold.
             new ModifierCard(
                 "prism", "The Prism",
-                "Grants 0 points. If your word is a typo or fails validation, your shot clock resets to full — once per turn — instead of ticking away. The Blindfold's best friend.",
+                "Grants 0 points. If your word is a typo or fails validation, your shot clock resets to full — once per turn — instead of ticking away.",
                 ModifierKind.Multiplicative,
                 Always,
                 static _ => 1.0)
@@ -349,7 +352,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
             // evaluating every other card's trigger (forces tricky conditionals like Vowel Surge).
             new ModifierCard(
                 "catalyst", "The Catalyst",
-                "Grants 0 points. For every other card in your bay, the letters Y, W and H count as both a vowel AND a consonant — forcing tricky conditional triggers.",
+                "Grants 0 points. For every other card in your bay, the letters Y, W and H count as both a vowel AND a consonant.",
                 ModifierKind.Multiplicative,
                 Always,
                 static _ => 1.0)

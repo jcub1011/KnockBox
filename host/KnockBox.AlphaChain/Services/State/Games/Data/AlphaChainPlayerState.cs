@@ -95,9 +95,10 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
 
         /// <summary>
         /// The owner's live Titanium Mirror multiplier. Starts at 1.0 (a passive ×1.0 placeholder)
-        /// and drops by the shield's decay per attack it blocks and reflects this era, possibly
-        /// below 1.0 into a scoring burden. Feeds the Titanium Mirror card's scoring factor via
-        /// <c>WordContext.ShieldMultiplier</c>. Reset to 1.0 at each era boundary.
+        /// and drops by the shield's decay per attack it blocks and reflects, possibly below 1.0
+        /// into a scoring burden. Feeds the Titanium Mirror card's scoring factor via
+        /// <c>WordContext.ShieldMultiplier</c>. The decay persists across eras; it returns to 1.0
+        /// only when a fresh mirror is dealt to the player (a replacement) — see DealCards.
         /// </summary>
         public double ShieldMultiplier { get; set; } = 1.0;
 

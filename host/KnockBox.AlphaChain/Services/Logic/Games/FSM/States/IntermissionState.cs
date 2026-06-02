@@ -227,15 +227,28 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 // Fresh reveal list for this Intermission's deal.
                 player.NewlyDealtModifierIds.Clear();
 
-                // Distinct modifiers the player doesn't already hold (bay ids must stay unique).
+                // Distinct modifiers the player doesn't already hold (bay ids must stay unique). A
+                // player may hold at most one shield, so shields are excluded once they hold one.
                 var heldIds = player.EngineBay.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
+                bool hasShield = player.EngineBay.Any(c => c.Shield is not null);
                 var pool = ModifierLibrary.All.Where(c => !heldIds.Contains(c.Id)).ToList();
+                if (hasShield)
+                    pool.RemoveAll(c => c.Shield is not null);
+
                 for (int i = 0; i < modCount && pool.Count > 0; i++)
                 {
                     int idx = context.Rng.GetRandomInt(pool.Count);
-                    player.EngineBay.Add(pool[idx]); // append-to-right; resequenced in Optimization.
-                    player.NewlyDealtModifierIds.Add(pool[idx].Id);
+                    var dealt = pool[idx];
+                    player.EngineBay.Add(dealt); // append-to-right; resequenced in Optimization.
+                    player.NewlyDealtModifierIds.Add(dealt.Id);
                     pool.RemoveAt(idx);
+                    if (dealt.Shield is not null)
+                    {
+                        // A freshly dealt shield is the player's replacement mirror: it starts
+                        // un-decayed, and no further shield may be dealt in this same deal.
+                        player.ShieldMultiplier = 1.0;
+                        pool.RemoveAll(c => c.Shield is not null);
+                    }
                 }
             }
         }
@@ -368,13 +381,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             // Drop the deal-reveal markers so they don't bleed into the next era's round UI, and
             // reset the era-scoped card state so each era starts clean: the Hyper-Drive latch, the
-            // Titanium Mirror's decayed multiplier, the Scattershot double-letter flag, any transient
-            // hijack ban, and the per-turn Prism flag.
+            // Scattershot double-letter flag, any transient hijack ban, and the per-turn Prism flag.
+            // The Titanium Mirror's decayed multiplier is NOT reset here — it persists across eras
+            // and only returns to 1.0 when a fresh mirror is dealt (see DealCards).
             foreach (var player in state.GamePlayers.Values)
             {
                 player.NewlyDealtModifierIds.Clear();
                 player.HyperDriveActive = false;
-                player.ShieldMultiplier = 1.0;
                 player.PlayedDoubleLetterWordThisEra = false;
                 player.PersonalBannedLetter = null;
                 player.PrismUsedThisTurn = false;

@@ -60,7 +60,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         [TestMethod]
         public async Task TaxCollector_CollectsHalfTheWouldBeScore()
         {
-            // "cat" + Anchor → would-be 15; banned 'a' taxes it. Tax Collector owner takes 50% → 8.
+            // "cat" + Anchor → would-be 9; banned 'a' taxes it. Tax Collector owner takes 50% → 5.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
             using var _ = state;
             var submitter = state.TurnManager.CurrentPlayer!;
@@ -72,7 +72,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             await engine.SubmitWordAsync(submitter, "cat", state);
 
             Assert.AreEqual(0, state.GamePlayers[submitter].Score);
-            Assert.AreEqual(8, state.GamePlayers[owner].Score, "Tax Collector collects round(15 × 0.5).");
+            Assert.AreEqual(5, state.GamePlayers[owner].Score, "Tax Collector collects round(9 × 0.5) = 5 (half-up).");
         }
 
         // ── The Toll Booth (card-ban siphon) ────────────────────────────────
@@ -80,8 +80,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         [TestMethod]
         public async Task TollBooth_MintsCut_WhenOpponentUsesRolledLetter()
         {
-            // Clean word (banned 'z' absent from "cat"); submitter Anchor → earns 15. Owner's Toll
-            // Booth letter 't' is in "cat" → owner minted round(15 × 0.2) = 3; submitter keeps 15.
+            // Clean word (banned 'z' absent from "cat"); submitter Anchor → earns 9. Owner's Toll
+            // Booth letter 't' is in "cat" → owner minted round(9 × 0.2) = 2; submitter keeps 9.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
             using var _ = state;
             var submitter = state.TurnManager.CurrentPlayer!;
@@ -93,8 +93,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
-            Assert.AreEqual(15, state.GamePlayers[submitter].Score, "Submitter keeps their full score.");
-            Assert.AreEqual(3, state.GamePlayers[owner].Score, "Owner is minted 20% of the earned 15.");
+            Assert.AreEqual(9, state.GamePlayers[submitter].Score, "Submitter keeps their full score.");
+            Assert.AreEqual(2, state.GamePlayers[owner].Score, "Owner is minted round(9 × 0.2) = 2 (half-up).");
         }
 
         [TestMethod]

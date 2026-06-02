@@ -36,6 +36,7 @@
                             @onkeydown="e => OnKeyDown(e, index)">
                         <GameCard Name="@card.Name" Description="@card.Description" Icon="@card.Icon"
                                   Category="CardCategory.Modifier" Kind="card.Kind"
+                                  ValueText="@ShieldValueText(card)"
                                   Compact="@ReadOnly" Dragging="@(_dragIndex == index)" />
                     </button>
                 }
@@ -66,6 +67,17 @@
 
     /// <summary>Heading shown above the slots.</summary>
     [Parameter] public string Title { get; set; } = "Engine Bay";
+
+    /// <summary>
+    /// The owner's live Titanium Mirror multiplier. When supplied, the shield card in this bay
+    /// shows its current factor (e.g. "×0.7") in place of the bare "×", so the player can see how
+    /// far the mirror has decayed. Null leaves the shield card showing the default operator.
+    /// </summary>
+    [Parameter] public double? ShieldMultiplier { get; set; }
+
+    /// <summary>The live "×N.N" glyph for the shield card, or null for every other card.</summary>
+    private string? ShieldValueText(ModifierCard card) =>
+        card.Shield is not null && ShieldMultiplier is { } sm ? $"×{sm:0.0}" : null;
 
     /// <summary>Raised with the new ordering of card ids when the player moves a card.</summary>
     [Parameter] public EventCallback<IReadOnlyList<string>> OnReorder { get; set; }

@@ -1,3 +1,5 @@
+using System.Buffers;
+
 namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
 {
     /// <summary>
@@ -15,22 +17,23 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
     /// </summary>
     /// <param name="Word">The normalized (trimmed, lower-case) word.</param>
     /// <param name="Length">Letter count of <paramref name="Word"/>.</param>
-    /// <param name="Vowels">Number of vowels (a, e, i, o, u) in the word.</param>
-    /// <param name="Consonants">Number of consonant letters in the word.</param>
     /// <param name="BannedLetter">The match's banned letter (lower-case), or null when unset.</param>
     /// <param name="ContainsBannedLetter">True when <paramref name="Word"/> contains the banned letter.</param>
     public sealed record WordContext(
         string Word,
         int Length,
-        int Vowels,
-        int Consonants,
         char? BannedLetter,
         bool ContainsBannedLetter)
     {
-        private const string VowelSet = "aeiou";
+        private static readonly SearchValues<char> VowelSet = SearchValues.Create("aeiou");
 
         /// <summary>Letters that count as <i>both</i> vowel and consonant under The Catalyst.</summary>
-        private const string CatalystAmbiguous = "ywh";
+        private static readonly SearchValues<char> CataclystVowelSet = SearchValues.Create("aeiouywh");
+
+        /// <summary>
+        /// If vowel and consonant detection should follow catalyst rules.
+        /// </summary>
+        public bool UseCatalystRules { get; init; }
 
         /// <summary>Seconds left on the submitter's shot clock at the moment of submission.
         /// Read by time-aware cards (Sprinter, Panic Button). Defaults to 0.</summary>
@@ -60,6 +63,27 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
         public double ShieldMultiplier { get; init; } = 1.0;
 
         /// <summary>
+        /// Checks if the character is a vowel, respecting engine modifiers.
+        /// </summary>
+        /// <param name="character"></param>
+        /// <returns></returns>
+        public bool IsVowel(char character)
+        {
+            return UseCatalystRules ? CataclystVowelSet.Contains(character) : VowelSet.Contains(character);
+        }
+
+        /// <summary>
+        /// Checks if the character is a consonant, respecting engine modifiers.
+        /// </summary>
+        /// <param name="character"></param>
+        /// <returns></returns>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Kept instance for future-proofing.")]
+        public bool IsConsonant(char character)
+        {
+            return !VowelSet.Contains(character);
+        }
+
+        /// <summary>
         /// Builds a <see cref="WordContext"/> from a normalized word and the match's banned
         /// letter. Counts vowels/consonants over ASCII letters only; non-letter characters
         /// (which a dictionary word should not contain) are ignored by both counters.
@@ -84,39 +108,16 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
             double shieldMultiplier = 1.0,
             bool catalyst = false)
         {
-            int vowels = 0;
-            int consonants = 0;
-            foreach (char c in normalizedWord)
-            {
-                if (c is < 'a' or > 'z') continue;
-
-                // The Catalyst: Y, W and H count as both a vowel and a consonant simultaneously.
-                if (catalyst && CatalystAmbiguous.Contains(c))
-                {
-                    vowels++;
-                    consonants++;
-                }
-                else if (VowelSet.Contains(c))
-                {
-                    vowels++;
-                }
-                else
-                {
-                    consonants++;
-                }
-            }
-
             bool containsBanned = bannedLetter is { } b && normalizedWord.Contains(b);
             bool hasDoubleLetter = HasAdjacentDuplicate(normalizedWord);
 
             return new WordContext(
                 normalizedWord,
                 normalizedWord.Length,
-                vowels,
-                consonants,
                 bannedLetter,
                 containsBanned)
             {
+                UseCatalystRules = catalyst,
                 RemainingSeconds = remainingSeconds,
                 ShotClockSeconds = shotClockSeconds,
                 MultiplierScale = multiplierScale,

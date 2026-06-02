@@ -34,7 +34,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
 
         // Starts a game on a fixed dictionary with the banned letter set. "anchor" adds a flat
-        // +12, so an "anchor"-only bay makes the taxed word's would-be score easy to reason about.
+        // +6, so an "anchor"-only bay makes the taxed word's would-be score easy to reason about.
         private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartGameAsync(
             StubWordListService words, int playerCount, char banned)
         {
@@ -62,8 +62,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         [TestMethod]
         public async Task OpponentTaxedWord_PaysHalfWouldBeScore_ToTaxCollectorOwner_SubmitterGetsZero()
         {
-            // Banned 'a' is inside "cat". Submitter has an Anchor (+12) so the would-be score is
-            // (length 3 + 12) = 15; the owner should collect round(15 × 0.5) = 8 (half-up).
+            // Banned 'a' is inside "cat". Submitter has an Anchor (+6) so the would-be score is
+            // (length 3 + 6) = 9; the owner should collect round(9 × 0.5) = 5 (half-up).
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
             using var _ = state;
             var submitter = state.TurnManager.CurrentPlayer!;
@@ -77,14 +77,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(result);
 
             Assert.AreEqual(0, state.GamePlayers[submitter].Score, "Taxed submitter must score 0.");
-            Assert.AreEqual(8, state.GamePlayers[owner].Score, "Owner collects half the would-be 15.");
+            Assert.AreEqual(5, state.GamePlayers[owner].Score, "Owner collects half the would-be 9.");
 
             // The play feed records the bounty that was paid.
-            Assert.AreEqual(8, state.PlayLog[^1].TaxBounty);
+            Assert.AreEqual(5, state.PlayLog[^1].TaxBounty);
 
             // The score replay surfaces who stole the points (and how much) so the strip can list them.
             var replay = state.LatestScoreReplay!;
-            Assert.AreEqual(8, replay.TaxBounty);
+            Assert.AreEqual(5, replay.TaxBounty);
             CollectionAssert.AreEqual(
                 new[] { state.GamePlayers[owner].DisplayName },
                 replay.TaxCollectors!.ToArray());
@@ -144,18 +144,18 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var owner1 = state.TurnManager.TurnOrder[1];
             var owner2 = state.TurnManager.TurnOrder[2];
 
-            GiveModifier(state, submitter, "anchor"); // would-be 15
+            GiveModifier(state, submitter, "anchor"); // would-be 9
             GiveTaxCollector(state, owner1);
             GiveTaxCollector(state, owner2);
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
-            Assert.AreEqual(8, state.GamePlayers[owner1].Score);
-            Assert.AreEqual(8, state.GamePlayers[owner2].Score);
+            Assert.AreEqual(5, state.GamePlayers[owner1].Score);
+            Assert.AreEqual(5, state.GamePlayers[owner2].Score);
 
             // Both owners are listed (sorted) on the replay so the strip shows every thief.
             var replay = state.LatestScoreReplay!;
-            Assert.AreEqual(8, replay.TaxBounty);
+            Assert.AreEqual(5, replay.TaxBounty);
             CollectionAssert.AreEquivalent(
                 new[] { state.GamePlayers[owner1].DisplayName, state.GamePlayers[owner2].DisplayName },
                 replay.TaxCollectors!.ToArray());

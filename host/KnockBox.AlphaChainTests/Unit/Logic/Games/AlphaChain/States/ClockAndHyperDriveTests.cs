@@ -59,27 +59,27 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         // ── Clock effects (ComputeArmedShotClockSeconds) ────────────────────
 
         [TestMethod]
-        public async Task Vault_ShavesThreeSecondsOffArmedClock()
+        public async Task Vault_ShortensClockByTenPercent()
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
             var id = state.TurnManager.CurrentPlayer!;
             GiveModifier(state, id, "the-vault");
 
-            // Default shot clock 12 − 3 = 9.
-            Assert.AreEqual(9, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+            // 12 × 0.9 = 10.8 → 11 (half-up).
+            Assert.AreEqual(11, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
         }
 
         [TestMethod]
-        public async Task Redline_ShortensClockByTenPercent()
+        public async Task Redline_ShortensClockByTwentyPercent()
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
             var id = state.TurnManager.CurrentPlayer!;
             GiveModifier(state, id, "redline");
 
-            // 12 × 0.9 = 10.8 → 11 (half-up).
-            Assert.AreEqual(11, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+            // 12 × 0.8 = 9.6 → 10 (half-up).
+            Assert.AreEqual(10, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
         }
 
         [TestMethod]
@@ -100,10 +100,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
             var id = state.TurnManager.CurrentPlayer!;
-            GiveModifier(state, id, "redline");    // −10%
-            GiveModifier(state, id, "the-vault");  // −3s
+            GiveModifier(state, id, "redline");    // −20%
+            GiveModifier(state, id, "the-vault");  // −10%
 
-            // 12 × 0.9 − 3 = 7.8 → 8 (half-up).
+            // Fractions sum: −20% − 10% = −30% → 12 × 0.7 = 8.4 → 8 (half-up).
             Assert.AreEqual(8, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
         }
 
@@ -114,10 +114,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             using var _ = state;
             var id = state.TurnManager.CurrentPlayer!;
             GiveModifier(state, id, "panic-button"); // −50%
-            GiveModifier(state, id, "redline");      // −10%
-            GiveModifier(state, id, "the-vault");    // −3s
+            GiveModifier(state, id, "redline");      // −20%
+            GiveModifier(state, id, "the-vault");    // −10%
 
-            // 12 × 0.4 − 3 = 1.8 → 2 → floored to MinShotClockSeconds (3).
+            // −50% − 20% − 10% = −80% → 12 × 0.2 = 2.4 → 2 → floored to MinShotClockSeconds (3).
             Assert.AreEqual(AlphaChainGameState.MinShotClockSeconds,
                 state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
         }
@@ -132,18 +132,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             // Default shot clock 12 + 5 = 17.
             Assert.AreEqual(17, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
-        }
-
-        [TestMethod]
-        public async Task AdrenalineSpike_ShavesFourSeconds()
-        {
-            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
-            using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
-            GiveModifier(state, id, "adrenaline-spike");
-
-            // 12 − 4 = 8.
-            Assert.AreEqual(8, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
         }
 
         [TestMethod]

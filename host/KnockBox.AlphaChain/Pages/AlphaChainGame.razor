@@ -203,7 +203,8 @@
                            frozen and only resequenced at Intermission (Optimization). The bay is
                            always Locked here, so no OnReorder handler is wired. *@
                         <EngineBay Cards="myCards.EngineBay" Slots="myCards.ModifierSlots"
-                                   Locked="true" Title="Your Engine Bay" />
+                                   Locked="true" Title="Your Engine Bay"
+                                   ShieldMultiplier="myCards.ShieldMultiplier" />
                     </div>
                 }
 
@@ -213,7 +214,8 @@
                     <div class="ac-opponent-bays">
                         @foreach (var opp in Opponents)
                         {
-                            <EngineBay Cards="opp.EngineBay" Slots="opp.ModifierSlots" ReadOnly="true" Title="@opp.DisplayName" />
+                            <EngineBay Cards="opp.EngineBay" Slots="opp.ModifierSlots" ReadOnly="true"
+                                       Title="@opp.DisplayName" ShieldMultiplier="opp.ShieldMultiplier" />
                         }
                     </div>
                 }

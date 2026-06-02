@@ -12,8 +12,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 {
     /// <summary>
     /// Exercises the automated, rule-driven engine effects that replaced the abolished reaction
-    /// tier — all through the real submit path: Flak Cannon and Scattershot time-shaves, the Bounty
-    /// Hunter's leader drain, Tracer Round's end-letter hijack, and The Titanium Mirror's
+    /// tier — all through the real submit path: the Flak Cannon time-shave, the Bounty Hunter's
+    /// leader drain, Tracer Round's end-letter hijack, and The Titanium Mirror's
     /// block-reflect-decay — plus the standings helpers on <see cref="EngineEffectResolver"/>.
     /// </summary>
     [TestClass]
@@ -63,7 +63,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         // ── Flak Cannon (time-shave at higher-scored players) ────────────────
 
         [TestMethod]
-        public async Task FlakCannon_AddsFlatFive_AndShavesHigherScoredPlayers()
+        public async Task FlakCannon_GrantsZeroPoints_AndShavesHigherScoredPlayers()
         {
             // 3 players so the shaved player (index 2) is not the immediate next seat — otherwise its
             // queued shave would be debited into the clock (and cleared) before we can observe it.
@@ -77,7 +77,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
-            Assert.AreEqual(8, state.GamePlayers[submitter].Score, "length 3 + flat 5.");
+            Assert.AreEqual(3, state.GamePlayers[submitter].Score, "Flak Cannon grants 0 points → just the length 3.");
             Assert.AreEqual(2, state.GamePlayers[ahead].QueuedTimePenaltySeconds, "Higher-scored player is shaved 2s.");
         }
 
@@ -126,29 +126,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                 "Victim's freshly-armed clock is debited the 2s shave.");
         }
 
-        // ── Scattershot (time-shave at double-letter opponents) ──────────────
+        // ── Double-letter era flag ───────────────────────────────────────────
 
         [TestMethod]
-        public async Task Scattershot_ShavesOpponentsWhoPlayedDoubleLetterThisEra()
-        {
-            // doubler is index 2 (not the immediate next seat) so its queued shave survives to assert.
-            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 3, banned: 'z');
-            using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
-            var clean = state.TurnManager.TurnOrder[1];
-            var doubler = state.TurnManager.TurnOrder[2];
-
-            GiveModifier(state, submitter, "scattershot");
-            state.Execute(() => state.GamePlayers[doubler].PlayedDoubleLetterWordThisEra = true);
-
-            await engine.SubmitWordAsync(submitter, "cat", state);
-
-            Assert.AreEqual(3, state.GamePlayers[doubler].QueuedTimePenaltySeconds, "Double-letter player is shaved 3s.");
-            Assert.AreEqual(0, state.GamePlayers[clean].QueuedTimePenaltySeconds, "A clean player is not shaved.");
-        }
-
-        [TestMethod]
-        public async Task DoubleLetterWord_FlagsSubmitterForScattershotTargeting()
+        public async Task DoubleLetterWord_FlagsSubmitterForTheEra()
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("ee"), playerCount: 2, banned: 'z');
             using var _ = state;

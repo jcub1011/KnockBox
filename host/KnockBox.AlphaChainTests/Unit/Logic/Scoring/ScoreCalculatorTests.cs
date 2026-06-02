@@ -136,10 +136,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Scoring
         private static ModifierCard Card(string id) => ModifierLibrary.FindById(id)!;
 
         [TestMethod]
-        public void Anchor_AddsFlatTwelve()
+        public void Anchor_AddsFlatSix()
         {
-            // "cat"(3) + 12 = 15, always.
-            Assert.AreEqual(15, _calc.Calculate(Ctx("cat"), [Card("anchor")]));
+            // "cat"(3) + 6 = 9, always.
+            Assert.AreEqual(9, _calc.Calculate(Ctx("cat"), [Card("anchor")]));
         }
 
         [TestMethod]
@@ -199,11 +199,12 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Scoring
         }
 
         [TestMethod]
-        public void PanicButton_DoublesInFinalTwoSeconds()
+        public void PanicButton_BigMultiplierBeforeFinalTwoSeconds_NormalInside()
         {
-            // "cat" with >2s left → ×1.35 → 3 × 1.35 = 4.05 → 4; with ≤2s left → ×2.7 → 8.1 → 8.
-            Assert.AreEqual(4, _calc.Calculate(Ctx("cat", remainingSeconds: 9), [Card("panic-button")]));
-            Assert.AreEqual(8, _calc.Calculate(Ctx("cat", remainingSeconds: 2), [Card("panic-button")]));
+            // Submit before the final 2 seconds (≥2s left) → ×2.7 → 3 × 2.7 = 8.1 → 8.
+            Assert.AreEqual(8, _calc.Calculate(Ctx("cat", remainingSeconds: 9), [Card("panic-button")]));
+            // Inside the final 2 seconds (<2s left) → ×1.35 → 3 × 1.35 = 4.05 → 4.
+            Assert.AreEqual(4, _calc.Calculate(Ctx("cat", remainingSeconds: 1), [Card("panic-button")]));
         }
 
         [TestMethod]
@@ -345,27 +346,11 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Scoring
         }
 
         [TestMethod]
-        public void AdrenalineSpike_ScoresZeroOutsideTheDangerZone_MultipliesInside()
+        public void FlakCannon_IsScoreNeutralInThePipeline()
         {
-            var spike = Card("adrenaline-spike");
-            // >2s left → ×0 → the whole word scores 0 (the "submit early scores 0" rule).
-            Assert.AreEqual(0, _calc.Calculate(Ctx("cat", remainingSeconds: 9), [spike]));
-            // ≤2s left → ×2.5 → 3 × 2.5 = 7.5 → 8.
-            Assert.AreEqual(8, _calc.Calculate(Ctx("cat", remainingSeconds: 2), [spike]));
-        }
-
-        [TestMethod]
-        public void FlakCannon_AddsFlatFiveInThePipeline()
-        {
-            // The auto time-shave is resolved in RoundState; the pipeline contribution is just +5.
-            Assert.AreEqual(8, _calc.Calculate(Ctx("cat"), [Card("flak-cannon")]));
-        }
-
-        [TestMethod]
-        public void Scattershot_MultipliesByOnePointOneFive()
-        {
-            // "bridge"(6) × 1.15 = 6.9 → 7 (half-up).
-            Assert.AreEqual(7, _calc.Calculate(Ctx("bridge"), [Card("scattershot")]));
+            // Flak Cannon grants 0 points; its auto time-shave is resolved in RoundState. In the
+            // scoring pipeline it is an additive +0, so the word just scores its length.
+            Assert.AreEqual(3, _calc.Calculate(Ctx("cat"), [Card("flak-cannon")]));
         }
 
         [TestMethod]
@@ -383,9 +368,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Scoring
         [TestMethod]
         public void ZeroPointUtilityCards_LeaveScoreAtTheWordLength()
         {
-            // Heat Sink, Faraday Cage, Prism, Wildcard, Catalyst, Bounty Hunter and Tracer Round are
-            // ×1.0 placeholders in the pipeline — their power lives in side effects, not scoring.
-            foreach (var id in new[] { "heat-sink", "faraday-cage", "prism", "wildcard", "catalyst", "bounty-hunter", "tracer-round" })
+            // Heat Sink, Prism, Wildcard, Catalyst, Bounty Hunter and Tracer Round are ×1.0
+            // placeholders in the pipeline — their power lives in side effects, not scoring.
+            foreach (var id in new[] { "heat-sink", "prism", "wildcard", "catalyst", "bounty-hunter", "tracer-round" })
                 Assert.AreEqual(6, _calc.Calculate(Ctx("bridge"), [Card(id)]), $"{id} should be score-neutral.");
         }
 
@@ -403,12 +388,52 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Scoring
         public void Catalyst_CountsYWHasBothVowelAndConsonant()
         {
             var plain = WordContext.Build("why", null, 0, 12, 1.0);
-            Assert.AreEqual(0, plain.Vowels, "Y/W/H are plain consonants without The Catalyst.");
-            Assert.AreEqual(3, plain.Consonants);
+            Assert.AreEqual(0, plain.Word.Count(plain.IsVowel), "Y/W/H are plain consonants without The Catalyst.");
+            Assert.AreEqual(3, plain.Word.Count(plain.IsConsonant));
 
             var catalyst = WordContext.Build("why", null, 0, 12, 1.0, catalyst: true);
-            Assert.AreEqual(3, catalyst.Vowels, "The Catalyst counts Y/W/H as vowels too…");
-            Assert.AreEqual(3, catalyst.Consonants, "…and as consonants simultaneously.");
+            Assert.AreEqual(3, catalyst.Word.Count(catalyst.IsVowel), "The Catalyst counts Y/W/H as vowels too…");
+            Assert.AreEqual(3, catalyst.Word.Count(catalyst.IsConsonant), "…and as consonants simultaneously.");
+        }
+
+        // A context with The Catalyst active (Y/W/H count as vowels for trigger evaluation).
+        private static WordContext Catalyst(string word) =>
+            WordContext.Build(word, null, 0, 12, 1.0, catalyst: true);
+
+        [TestMethod]
+        public void PerfectLink_Catalyst_FiresWhenEndingInY()
+        {
+            // "happy" ends in 'y': a plain consonant → skip → score == length 5.
+            Assert.AreEqual(5, _calc.Calculate(Ctx("happy"), [Card("perfect-link")]));
+            // With The Catalyst, 'y' is a vowel → ×1.5 → 5 × 1.5 = 7.5 → 8 (half-up).
+            Assert.AreEqual(8, _calc.Calculate(Catalyst("happy"), [Card("perfect-link")]));
+        }
+
+        [TestMethod]
+        public void GutturalRoar_Catalyst_FlipsOffWhenYWBecomeVowels()
+        {
+            // "way" plain: only vowel is 'a' → all vowels a/e → ×1.5 → 3 × 1.5 = 4.5 → 5.
+            Assert.AreEqual(5, _calc.Calculate(Ctx("way"), [Card("guttural-roar")]));
+            // With The Catalyst, 'w' and 'y' are vowels too → not all a/e → skip → score == length 3.
+            Assert.AreEqual(3, _calc.Calculate(Catalyst("way"), [Card("guttural-roar")]));
+        }
+
+        [TestMethod]
+        public void VowelSurge_Catalyst_FiresWhenAmbiguousLettersTipTheVowelCount()
+        {
+            // "way" plain: vowels 1 (a) ≤ consonants 2 (w,y) → skip → score == length 3.
+            Assert.AreEqual(3, _calc.Calculate(Ctx("way"), [Card("vowel-surge")]));
+            // With The Catalyst: vowels 3 (w,a,y) > consonants 2 (w,y) → ×2 → 3 × 2 = 6.
+            Assert.AreEqual(6, _calc.Calculate(Catalyst("way"), [Card("vowel-surge")]));
+        }
+
+        [TestMethod]
+        public void ConsonantCrunch_Catalyst_LeavesConsonantScoringUnchanged()
+        {
+            // Consonant detection ignores The Catalyst, so the +2-per-consonant bonus is identical
+            // with or without it. "why" → w,h,y are consonants (3) → +6 → 3 + 6 = 9, both ways.
+            Assert.AreEqual(9, _calc.Calculate(Ctx("why"), [Card("consonant-crunch")]));
+            Assert.AreEqual(9, _calc.Calculate(Catalyst("why"), [Card("consonant-crunch")]));
         }
 
         // ── CalculateSteps (per-step trace for the score-replay animation) ──────

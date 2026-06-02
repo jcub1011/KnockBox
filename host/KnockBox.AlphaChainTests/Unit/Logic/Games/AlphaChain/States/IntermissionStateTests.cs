@@ -310,15 +310,82 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             state.Execute(() =>
             {
                 state.GamePlayers[picker].HyperDriveActive = true;
-                state.GamePlayers[picker].ShieldMultiplier = 0.6;
                 state.GamePlayers[picker].PlayedDoubleLetterWordThisEra = true;
             });
 
             await engine.SelectSniperBanAsync(picker, 'q', state);
 
             Assert.IsFalse(state.GamePlayers[picker].HyperDriveActive, "Hyper-Drive latch clears across an era.");
-            Assert.AreEqual(1.0, state.GamePlayers[picker].ShieldMultiplier, 1e-9, "Titanium Mirror resets to 1.0 each era.");
             Assert.IsFalse(state.GamePlayers[picker].PlayedDoubleLetterWordThisEra, "Double-letter flag resets each era.");
+            // The Titanium Mirror's decayed multiplier is intentionally NOT era-scoped — see
+            // Mirror_DecayPersistsAcrossEras_WhenKept and Mirror_ResetsToOne_WhenFreshShieldDealt.
+        }
+
+        // ── Titanium Mirror: one-per-player + cross-era decay persistence ───────
+
+        [TestMethod]
+        public async Task DealCards_NeverDealsASecondShield_WhenPlayerAlreadyHoldsOne()
+        {
+            // Deal the maximum cards per era so a shield would be a likely draw if it weren't excluded.
+            var (_, state) = await StartGameAsync(playerCount: 2, configure: s =>
+                s.UpdateSettings(set => set with { ModifiersDealtPerEra = AlphaChainSettings.MaxCardsDealtPerEra }));
+            using var _ = state;
+
+            var playerId = state.TurnManager.TurnOrder[0];
+            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(ModifierLibrary.FindById("titanium-mirror")!));
+
+            EnterIntermission(state);
+
+            Assert.AreEqual(1, state.GamePlayers[playerId].EngineBay.Count(c => c.Shield is not null),
+                "a player who already holds a shield must never be dealt a second one");
+        }
+
+        [TestMethod]
+        public async Task Mirror_DecayPersistsAcrossEras_WhenKept()
+        {
+            var (engine, state) = await StartGameAsync(playerCount: 2);
+            using var _ = state;
+            EnterIntermission(state);
+            AdvanceToSniperBan(engine, state);
+
+            // Picker keeps a decayed mirror into the next era; nothing deals them a replacement.
+            var picker = state.SniperBanUserId!;
+            state.Execute(() =>
+            {
+                state.GamePlayers[picker].EngineBay.Add(ModifierLibrary.FindById("titanium-mirror")!);
+                state.GamePlayers[picker].ShieldMultiplier = 0.6;
+            });
+
+            await engine.SelectSniperBanAsync(picker, 'q', state); // era advances → CompleteIntermission
+
+            Assert.AreEqual(0.6, state.GamePlayers[picker].ShieldMultiplier, 1e-9,
+                "a kept mirror carries its decayed multiplier across the era boundary");
+        }
+
+        [TestMethod]
+        public async Task Mirror_ResetsToOne_WhenFreshShieldDealt()
+        {
+            // ModifiersDealtPerEra = 1 and a bay pre-stocked with every non-shield card leaves the
+            // mirror as the only draw, so the fresh-shield reset path is exercised deterministically.
+            var (_, state) = await StartGameAsync(playerCount: 2, configure: s =>
+                s.UpdateSettings(set => set with { ModifiersDealtPerEra = 1 }));
+            using var _ = state;
+
+            var playerId = state.TurnManager.TurnOrder[0];
+            state.Execute(() =>
+            {
+                var player = state.GamePlayers[playerId];
+                player.EngineBay.Clear();
+                player.EngineBay.AddRange(ModifierLibrary.All.Where(c => c.Shield is null));
+                player.ShieldMultiplier = 0.6; // dormant decay left over from a discarded mirror
+            });
+
+            EnterIntermission(state); // DealCards must hand this player the mirror and reset to 1.0
+
+            var dealt = state.GamePlayers[playerId];
+            Assert.IsTrue(dealt.EngineBay.Any(c => c.Shield is not null), "the only legal draw is the mirror");
+            Assert.AreEqual(1.0, dealt.ShieldMultiplier, 1e-9,
+                "a freshly dealt (replacement) mirror resets the decayed multiplier to 1.0");
         }
 
         [TestMethod]

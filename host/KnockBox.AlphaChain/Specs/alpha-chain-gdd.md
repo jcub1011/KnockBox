@@ -79,10 +79,11 @@ Hands-free offensive cards that fire from the leaderboard or linguistic patterns
     one-turn personal banned letter for the next player.
 
 ### 3.5 The Shield
-*   **The Titanium Mirror** — starts the era as a passive ×1.0. Automatically blocks and **reflects**
+*   **The Titanium Mirror** — a passive ×1.0 when fresh. Automatically blocks and **reflects**
     incoming automated attacks (time shaves, point drains, letter hijacks) back at their source, but
     its multiplier permanently drops **−0.1× per block** (1.0 → 0.9 → 0.8 …), decaying into a scoring
-    **burden** you carry until the next Intermission.
+    **burden**. The decay carries **across eras** — it is *not* reset at the Intermission. The only
+    way back to ×1.0 is to be dealt a **fresh mirror** (a replacement); a player holds at most one.
 
 ### 3.6 Tax Economy
 These resolve reactively against *opponents'* submissions (see §2.2); they do not fold into the
