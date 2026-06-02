@@ -3,6 +3,54 @@
      viewBox="0 0 300 200"
      preserveAspectRatio="xMidYMid slice"
      aria-hidden="true">
+    <style>
+/* EMBEDDED FONTS BEGIN */
+@font-face {
+    font-family: 'Bricolage Grotesque';
+    font-style: normal;
+    font-weight: 800;
+    src: url('data:font/woff2;base64,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') format('woff2');
+}
+@font-face {
+    font-family: 'Google Sans Code';
+    font-style: normal;
+    font-weight: 700;
+    src: url('data:font/woff2;base64,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') format('woff2');
+}
+/* EMBEDDED FONTS END */
+        .ac-word {
+            font-family: 'Bricolage Grotesque', 'Outfit', system-ui, sans-serif;
+            font-weight: 800;
+            font-size: 46px;
+            letter-spacing: 2px;
+            fill: url(#ac-wordmark);
+        }
+        .ac-tag {
+            font-family: 'Google Sans Code', 'Courier New', monospace;
+            font-weight: 700;
+            font-size: 9.5px;
+            letter-spacing: 3px;
+            fill: #9fd6ec;
+            filter: drop-shadow(0 0 5px rgba(0, 229, 255, 0.35));
+        }
+        .ac-link { fill: none; stroke-width: 8.5; stroke-linecap: round; stroke-linejoin: round; }
+        .ac-link-1 { stroke: #00e5ff; animation: ac-breathe-c 3.6s ease-in-out infinite; }
+        .ac-link-2 { stroke: #ff2e8b; animation: ac-breathe-m 3.6s ease-in-out infinite; animation-delay: -1.8s; }
+
+        /* Breathe the glow only -- keep the rings fully opaque so the interlock stays crisp. */
+        @keyframes ac-breathe-c {
+            0%, 100% { filter: drop-shadow(0 0 3px rgba(0, 229, 255, 0.50)); }
+            50%      { filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.95)); }
+        }
+        @keyframes ac-breathe-m {
+            0%, 100% { filter: drop-shadow(0 0 3px rgba(255, 46, 139, 0.50)); }
+            50%      { filter: drop-shadow(0 0 10px rgba(255, 46, 139, 0.95)); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .ac-link-1, .ac-link-2 { animation: none; }
+        }
+    </style>
+
     <defs>
         <radialGradient id="ac-bg" cx="0.5" cy="0.1" r="1.1">
             <stop offset="0%"   stop-color="#141a30"/>
@@ -17,19 +65,23 @@
             <stop offset="0%"  stop-color="#ff2e8b" stop-opacity="0.20"/>
             <stop offset="70%" stop-color="#ff2e8b" stop-opacity="0"/>
         </radialGradient>
-        <linearGradient id="ac-wordmark" x1="0" y1="0" x2="1" y2="0">
+        <linearGradient id="ac-wordmark" x1="0" y1="0" x2="1" y2="0.25">
             <stop offset="0"   stop-color="#00e5ff"/>
+            <stop offset="0.5" stop-color="#b97bff"/>
             <stop offset="1"   stop-color="#ff2e8b"/>
         </linearGradient>
         <pattern id="ac-grid" width="20" height="20" patternUnits="userSpaceOnUse">
             <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
         </pattern>
-        <filter id="ac-name-glow" x="-10%" y="-40%" width="120%" height="180%">
-            <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#00e5ff" flood-opacity="0.45"/>
+        <filter id="ac-name-glow" x="-12%" y="-45%" width="124%" height="190%">
+            <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#00e5ff" flood-opacity="0.40"/>
         </filter>
-        <filter id="ac-tile-glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#00e5ff" flood-opacity="0.6"/>
-        </filter>
+        <!-- Restores the magenta link's lower crossing on top of the cyan link, so
+             the two rings interlock (cyan in front up top, magenta in front below)
+             while both rings stay completely intact. -->
+        <clipPath id="ac-cross">
+            <circle cx="150" cy="123" r="12"/>
+        </clipPath>
     </defs>
 
     <!-- Base + glows + grid -->
@@ -38,40 +90,19 @@
     <rect width="300" height="200" fill="url(#ac-glow-mag)"/>
     <rect width="300" height="200" fill="url(#ac-grid)"/>
 
-    <!-- Letter-tile chain: C·A·T·E·R, the trailing tile lit as the "link" -->
-    <g font-family="'JetBrains Mono','Courier New',monospace" font-size="18" font-weight="700" text-anchor="middle">
-        <!-- C -->
-        <rect x="63"  y="24" width="30" height="30" rx="5" fill="#141a30" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
-        <text x="78"  y="45" fill="#eaf2ff">C</text>
-        <!-- A -->
-        <rect x="99"  y="24" width="30" height="30" rx="5" fill="#141a30" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
-        <text x="114" y="45" fill="#eaf2ff">A</text>
-        <!-- T -->
-        <rect x="135" y="24" width="30" height="30" rx="5" fill="#141a30" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
-        <text x="150" y="45" fill="#eaf2ff">T</text>
-        <!-- E -->
-        <rect x="171" y="24" width="30" height="30" rx="5" fill="#141a30" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
-        <text x="186" y="45" fill="#eaf2ff">E</text>
-        <!-- R - lit link tile -->
-        <rect x="207" y="24" width="30" height="30" rx="5" fill="rgba(0,229,255,0.18)" stroke="#00e5ff" stroke-width="1.5" filter="url(#ac-tile-glow)"/>
-        <text x="222" y="45" fill="#00e5ff">R</text>
+    <!-- Hero wordmark, top line -->
+    <text x="150" y="64" text-anchor="middle" class="ac-word" filter="url(#ac-name-glow)">ALPHA</text>
+
+    <!-- Forged link: magenta ring, cyan ring on top, then magenta's lower crossing redrawn -->
+    <rect class="ac-link ac-link-2" x="145" y="82" width="34" height="46" rx="17"/>
+    <rect class="ac-link ac-link-1" x="121" y="82" width="34" height="46" rx="17"/>
+    <g clip-path="url(#ac-cross)">
+        <rect class="ac-link ac-link-2" x="145" y="82" width="34" height="46" rx="17"/>
     </g>
 
-    <!-- Interlocking chain-link glyph -->
-    <g fill="none" stroke="url(#ac-wordmark)" stroke-width="7" stroke-linecap="round" filter="url(#ac-name-glow)">
-        <rect x="116" y="74" width="40" height="22" rx="11"/>
-        <rect x="146" y="74" width="40" height="22" rx="11"/>
-    </g>
-
-    <!-- Wordmark -->
-    <g font-family="'Arial Black','Arial Bold',Impact,sans-serif" font-weight="800" text-anchor="middle">
-        <text x="150" y="138" font-size="40" letter-spacing="2"
-              fill="url(#ac-wordmark)" filter="url(#ac-name-glow)">ALPHA</text>
-        <text x="150" y="170" font-size="26" letter-spacing="8" fill="#eaf2ff">CHAIN</text>
-    </g>
+    <!-- Hero wordmark, bottom line -->
+    <text x="150" y="166" text-anchor="middle" class="ac-word" filter="url(#ac-name-glow)">CHAIN</text>
 
     <!-- Tagline -->
-    <text x="150" y="190" text-anchor="middle"
-          font-family="'Manrope',system-ui,sans-serif" font-size="9" font-weight="600"
-          letter-spacing="3" fill="rgba(234,242,255,0.6)">WORD-CHAIN&#160;ENGINE&#160;BUILDER</text>
+    <text x="150" y="190" text-anchor="middle" class="ac-tag">WORD-CHAIN&#160;ENGINE&#160;BUILDER</text>
 </svg>
