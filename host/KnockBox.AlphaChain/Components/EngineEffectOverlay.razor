@@ -1,22 +1,21 @@
 @using KnockBox.AlphaChain.Services.State.Games.Data
-@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
 
-@* Prominent, transient overlay announcing the reactions that just auto-fired — so a targeted
-   player understands what hit them, which card did it, and why. The parent @keys this on the
-   reaction-notice sequence so the pop+fade animation replays exactly once per fire. *@
+@* Prominent, transient overlay announcing the automated engine effects that just fired — so a
+   targeted player understands what hit them, which card did it, and why. The parent @keys this on
+   the engine-notice sequence so the pop+fade animation replays exactly once per fire. *@
 
 @if (Notices.Count > 0)
 {
     <div class="ac-rx-overlay" aria-live="polite">
         @foreach (var n in Notices)
         {
-            var youHit = n.TargetUserId == CurrentUserId && n.Class == ReactionClass.Offensive && !n.Negated;
+            var youHit = n.TargetUserId == CurrentUserId && n.Class == EngineEffectClass.Offensive && !n.Negated;
             var tone = n.Negated
                 ? "ac-rx-negate"
                 : n.Class switch
                 {
-                    ReactionClass.Offensive => "ac-rx-attack",
-                    ReactionClass.Special => "ac-rx-special",
+                    EngineEffectClass.Offensive => "ac-rx-attack",
+                    EngineEffectClass.Special => "ac-rx-special",
                     _ => "ac-rx-defend"
                 };
             <div class="ac-rx-card @tone @(youHit ? "ac-rx-you" : "")">
@@ -32,21 +31,21 @@
 }
 
 @code {
-    /// <summary>The reactions to announce. Parent passes <c>GameState.LatestReactionNotices</c>.</summary>
-    [Parameter] public IReadOnlyList<ReactionEvent> Notices { get; set; } = [];
+    /// <summary>The engine effects to announce. Parent passes <c>GameState.LatestEngineNotices</c>.</summary>
+    [Parameter] public IReadOnlyList<EngineEffectEvent> Notices { get; set; } = [];
 
     /// <summary>The local player's id, so the overlay can emphasize hits against them.</summary>
     [Parameter] public string? CurrentUserId { get; set; }
 
-    private string Headline(ReactionEvent n)
+    private string Headline(EngineEffectEvent n)
     {
         bool holderIsYou = n.HolderUserId == CurrentUserId;
         bool targetIsYou = n.TargetUserId == CurrentUserId;
 
         if (n.TargetUserId is null)
-            return holderIsYou ? "Your reaction fired" : $"{n.HolderName}'s reaction fired";
+            return holderIsYou ? "Your engine fired" : $"{n.HolderName}'s engine fired";
         if (targetIsYou)
-            return n.Negated ? $"You reflected {n.HolderName}'s attack" : $"Hit by {n.HolderName}";
+            return n.Negated ? $"Your Mirror reflected {n.HolderName}'s attack" : $"Hit by {n.HolderName}";
         if (holderIsYou)
             return $"You hit {n.TargetName}";
         return $"{n.HolderName} → {n.TargetName}";

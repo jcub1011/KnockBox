@@ -123,14 +123,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Data
         public void ModifiersPerEra_ZeroIsAllowed()
             => Assert.IsTrue(new AlphaChainSettings { ModifiersDealtPerEra = 0 }.Validate().IsValid);
 
-        [TestMethod]
-        public void ReactionsPerEra_Negative_IsInvalid()
-            => Assert.IsFalse(new AlphaChainSettings { ReactionsDealtPerEra = -1 }.Validate().IsValid);
-
-        [TestMethod]
-        public void ReactionsPerEra_ZeroIsAllowed()
-            => Assert.IsTrue(new AlphaChainSettings { ReactionsDealtPerEra = 0 }.Validate().IsValid);
-
         // ── Ban mode ────────────────────────────────────────────────────────
 
         [TestMethod]

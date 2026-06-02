@@ -76,7 +76,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
             state.OptimizationSubmissions.Clear();
             state.PlayedWords.Clear();
             state.PlayLog.Clear();
-            state.CensorExemptUserIds.Clear();
             state.CurrentRound = 0;
             state.CurrentEra = 0;
             state.IntermissionPhase = default;
@@ -90,11 +89,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
             state.LastWord = null;
             state.RequiredStartLetter = null;
             state.BannedLetter = null;
-            state.CensorBannedLetter = null;
-            state.CensorImposedAtRound = 0;
-            state.PendingForcedPersonalBan = null;
-            state.LatestReactionNotices = [];
-            state.ReactionNoticeSequence = 0;
+            state.RoundLeaderUserId = null;
+            state.LatestEngineNotices = [];
+            state.EngineNoticeSequence = 0;
             state.Results = null;
             state.SetPhase(AlphaChainGamePhase.Setup);
         }

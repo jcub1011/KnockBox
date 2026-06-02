@@ -130,8 +130,8 @@ namespace KnockBox.AlphaChain.Services.State.Games
 
         /// <summary>
         /// The letter the next word must start with (lower-case), or null when the next
-        /// player has a free choice — at game start, after a banned-letter-as-last-letter
-        /// play, and when a Free Throw reaction clears it at turn start.
+        /// player has a free choice — at game start and after a banned-letter-as-last-letter
+        /// play. A player holding The Wildcard may ignore this requirement on their own turn.
         /// </summary>
         public char? RequiredStartLetter { get; set; }
 
@@ -143,43 +143,26 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// </summary>
         public char? BannedLetter { get; set; }
 
-        // ── Censor reaction (board-wide transient ban) ────────────────────────
+        /// <summary>
+        /// The player marked as the round's leader at round start (highest score; ties broken by
+        /// earliest turn order), or null before the first mark. The Bounty Hunter docks this player
+        /// if they submit a too-short word on their turn this round. Re-snapshotted each round wrap.
+        /// </summary>
+        public string? RoundLeaderUserId { get; set; }
+
+        // ── Engine-effect notice channel (off-submission automated effects) ───
 
         /// <summary>
-        /// An extra, transient board-wide banned letter (lower-case) imposed by a Censor reaction,
-        /// or null when none is active. It triggers the Zero-Point Tax like <see cref="BannedLetter"/>
-        /// but lasts only one full turn rotation and never clears <see cref="RequiredStartLetter"/>.
-        /// Kept separate so <c>IntermissionState</c> remains the sole writer of <see cref="BannedLetter"/>.
+        /// Automated engine effects that fired outside a word submission (e.g. a Titanium Mirror
+        /// reflection landing on a later turn), published so clients animate them. Submission-time
+        /// effects instead ride on the word's <see cref="LatestScoreReplay"/>. Replaced wholesale
+        /// on each fire.
         /// </summary>
-        public char? CensorBannedLetter { get; set; }
+        public IReadOnlyList<EngineEffectEvent> LatestEngineNotices { get; set; } = [];
 
-        /// <summary>User ids of the Riposte holders captured when the active Censor was imposed;
-        /// they are exempt from <see cref="CensorBannedLetter"/> for its duration.</summary>
-        public HashSet<string> CensorExemptUserIds { get; } = new(StringComparer.Ordinal);
-
-        /// <summary>The round number in which the active <see cref="CensorBannedLetter"/> was imposed;
-        /// it clears on the first turn-order wrap after this round. Meaningful only while a Censor is active.</summary>
-        public int CensorImposedAtRound { get; set; }
-
-        /// <summary>
-        /// A personal banned letter (lower-case) that a Bait &amp; Switch play forces onto the very
-        /// next active player; applied to that player's <see cref="AlphaChainPlayerState.PersonalBannedLetter"/>
-        /// once the turn advances to them, then cleared. Null when no forced ban is pending.
-        /// </summary>
-        public char? PendingForcedPersonalBan { get; set; }
-
-        // ── Reaction notice channel (off-submission reactions) ────────────────
-
-        /// <summary>
-        /// The reactions that fired outside a word submission (Free Throw at turn start, Overtime
-        /// at clock expiry), published so clients animate them. Submission-time reactions instead
-        /// ride on the word's <see cref="LatestScoreReplay"/>. Replaced wholesale on each fire.
-        /// </summary>
-        public IReadOnlyList<ReactionEvent> LatestReactionNotices { get; set; } = [];
-
-        /// <summary>Monotonic counter bumped whenever <see cref="LatestReactionNotices"/> changes,
-        /// so the reaction overlay <c>@key</c>s off it and animates exactly once.</summary>
-        public int ReactionNoticeSequence { get; set; }
+        /// <summary>Monotonic counter bumped whenever <see cref="LatestEngineNotices"/> changes,
+        /// so the engine-effect overlay <c>@key</c>s off it and animates exactly once.</summary>
+        public int EngineNoticeSequence { get; set; }
 
         /// <summary>The shortest a shot clock can be armed to, so the glass-cannon clock cards
         /// (Vault, Redline, Panic Button, Hyper-Drive) can shorten but never zero/invert it.</summary>
@@ -204,9 +187,22 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// Hyper-Drive override when latched), then every <see cref="ClockEffect"/> in their Engine
         /// Bay folded in (fractions first, then flat seconds), floored at
         /// <see cref="MinShotClockSeconds"/>. Pure function of the player's bay + match settings.
+        /// <para>
+        /// The Anchor Chain's <see cref="ClockOverride"/> short-circuits all of that: it pins the
+        /// clock to a strict, unmodifiable length (the smallest override if several are equipped),
+        /// ignoring every <see cref="ClockEffect"/> and the Hyper-Drive override alike.
+        /// </para>
         /// </summary>
         public int ComputeArmedShotClockSeconds(AlphaChainPlayerState player)
         {
+            // The Anchor Chain pins the clock: unmodifiable, ignores ClockEffects + Hyper-Drive.
+            int? fixedSeconds = null;
+            foreach (var card in player.EngineBay)
+                if (card.ClockOverride is { } co && (fixedSeconds is null || co.Seconds < fixedSeconds))
+                    fixedSeconds = co.Seconds;
+            if (fixedSeconds is { } pinned)
+                return Math.Max(MinShotClockSeconds, pinned);
+
             double seconds = Settings.ShotClockSeconds;
 
             // A latched Hyper-Drive overrides the base clock for the rest of the era.

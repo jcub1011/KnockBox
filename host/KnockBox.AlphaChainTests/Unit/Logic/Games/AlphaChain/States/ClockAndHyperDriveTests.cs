@@ -42,7 +42,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             for (int i = 0; i < playerCount; i++)
                 state.RegisterPlayer(MakePlayer(i));
 
-            state.UpdateSettings(s => s with { EnableTutorials = false });
+            // Pin the shot clock to 12s so the clock-math expectations below are independent of the
+            // configured default (which is 20s).
+            state.UpdateSettings(s => s with { EnableTutorials = false, ShotClockSeconds = 12 });
             await engine.StartAsync(_host, state);
 
             if (banned is { } b)
@@ -118,6 +120,44 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // 12 × 0.4 − 3 = 1.8 → 2 → floored to MinShotClockSeconds (3).
             Assert.AreEqual(AlphaChainGameState.MinShotClockSeconds,
                 state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+        }
+
+        [TestMethod]
+        public async Task HeatSink_AddsFiveSeconds()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
+            using var _ = state;
+            var id = state.TurnManager.CurrentPlayer!;
+            GiveModifier(state, id, "heat-sink");
+
+            // Default shot clock 12 + 5 = 17.
+            Assert.AreEqual(17, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+        }
+
+        [TestMethod]
+        public async Task AdrenalineSpike_ShavesFourSeconds()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
+            using var _ = state;
+            var id = state.TurnManager.CurrentPlayer!;
+            GiveModifier(state, id, "adrenaline-spike");
+
+            // 12 − 4 = 8.
+            Assert.AreEqual(8, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+        }
+
+        [TestMethod]
+        public async Task AnchorChain_PinsClockToFive_IgnoringEveryOtherClockEffect()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
+            using var _ = state;
+            var id = state.TurnManager.CurrentPlayer!;
+            GiveModifier(state, id, "anchor-chain"); // fixed, unmodifiable 5s
+            GiveModifier(state, id, "heat-sink");    // +5s … which the override ignores
+            GiveModifier(state, id, "the-vault");    // −3s … also ignored
+
+            Assert.AreEqual(5, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]),
+                "The Anchor Chain pins the clock to a strict, unmodifiable 5 seconds.");
         }
 
         // ── Hyper-Drive latch (submit path) ─────────────────────────────────

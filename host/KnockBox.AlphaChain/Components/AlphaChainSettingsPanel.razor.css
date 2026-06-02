@@ -123,6 +123,31 @@
     font-weight: 600;
 }
 
+.ac-settings-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.85rem;
+}
+
+.ac-settings-reset {
+    padding: 0.4rem 0.9rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    font: inherit;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.ac-settings-reset:hover {
+    border-color: var(--ac-cyan, #00e5ff);
+    color: var(--ac-cyan, #00e5ff);
+    background: color-mix(in srgb, var(--ac-cyan) 12%, transparent);
+}
+
 /* ── Non-host read-only view ─────────────────────────────────────────── */
 .ac-settings-readout {
     display: grid;

@@ -33,10 +33,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         public const int MaxEraCount = 50;
 
         /// <summary>Minimum intermission card-select timer, in seconds.</summary>
-        public const int MinIntermissionSeconds = 5;
+        public const int MinIntermissionSeconds = 10;
 
         /// <summary>Upper bound on the intermission card-select timer, in seconds.</summary>
-        public const int MaxIntermissionSeconds = 300;
+        public const int MaxIntermissionSeconds = 180;
 
         /// <summary>Minimum sniper-ban timer, in seconds.</summary>
         public const int MinSniperBanSeconds = 5;
@@ -51,10 +51,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         public const int MaxCardsDealtPerEra = 10;
 
         /// <summary>Minimum total runtime of the score-replay animation, in seconds.</summary>
-        public const double MinEngineAnimationSeconds = 1.0;
+        public const double MinEngineAnimationSeconds = 0.5;
 
         /// <summary>Maximum total runtime of the score-replay animation, in seconds.</summary>
-        public const double MaxEngineAnimationSeconds = 6.0;
+        public const double MaxEngineAnimationSeconds = 10.0;
 
         // ── Settings ───────────────────────────────────────────────────────────
 
@@ -63,10 +63,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         public BanLetterMode BanMode { get; init; } = BanLetterMode.All;
 
         /// <summary>Seconds on the per-turn shot clock.</summary>
-        public int ShotClockSeconds { get; init; } = 12;
+        public int ShotClockSeconds { get; init; } = 20;
 
         /// <summary>Seconds players have to draft cards at an intermission (M4).</summary>
-        public int IntermissionCardSelectSeconds { get; init; } = 30;
+        public int IntermissionCardSelectSeconds { get; init; } = 60;
 
         /// <summary>Seconds the Sniper action card grants to choose a banned letter (M3+).</summary>
         public int SniperBanSeconds { get; init; } = 15;
@@ -88,19 +88,17 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         /// </summary>
         public bool EnableTutorials { get; init; } = true;
 
-        /// <summary>Modifier cards dealt to each player at an intermission. Consumed in M4.</summary>
+        /// <summary>Modifier cards dealt to each player at an intermission. The Engine Bay is the
+        /// only card tier now (the hand-played reaction tier is abolished), so this governs the
+        /// whole per-era deal.</summary>
         public int ModifiersDealtPerEra { get; init; } = 3;
-
-        /// <summary>Reaction cards dealt to each player at an intermission. They sit in hand and
-        /// auto-fire on game events.</summary>
-        public int ReactionsDealtPerEra { get; init; } = 2;
 
         /// <summary>
         /// Total runtime (seconds) of the score-replay animation that plays through the Engine
         /// Bay on every accepted word. Constant regardless of bay size — per-step time shrinks
         /// as cards are added — so a long engine never drags the game out.
         /// </summary>
-        public double EngineAnimationSeconds { get; init; } = 2.5;
+        public double EngineAnimationSeconds { get; init; } = 1.0;
 
         /// <summary>
         /// Start-time-only choice set by the lobby's two start buttons (host as shared
@@ -139,9 +137,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
 
             if (ModifiersDealtPerEra < MinCardsDealtPerEra || ModifiersDealtPerEra > MaxCardsDealtPerEra)
                 violations.Add($"Modifiers dealt per era must be between {MinCardsDealtPerEra} and {MaxCardsDealtPerEra}.");
-
-            if (ReactionsDealtPerEra < MinCardsDealtPerEra || ReactionsDealtPerEra > MaxCardsDealtPerEra)
-                violations.Add($"Reactions dealt per era must be between {MinCardsDealtPerEra} and {MaxCardsDealtPerEra}.");
 
             if (EngineAnimationSeconds < MinEngineAnimationSeconds || EngineAnimationSeconds > MaxEngineAnimationSeconds)
                 violations.Add($"Engine animation must be between {MinEngineAnimationSeconds:0.#} and {MaxEngineAnimationSeconds:0.#} seconds.");

@@ -102,19 +102,9 @@ namespace KnockBox.AlphaChain.Pages
         protected string BannedLetterDisplay =>
             GameState.BannedLetter is { } c ? char.ToUpperInvariant(c).ToString() : "—";
 
-        /// <summary>The extra board-wide Censor letter as an upper-case string, or null when no
-        /// Censor is active. Shown beside the banned letter so affected players can see it.</summary>
-        protected string? CensorBannedLetterDisplay =>
-            GameState.CensorBannedLetter is { } c ? char.ToUpperInvariant(c).ToString() : null;
-
-        /// <summary>Whether the local player is exempt from the active Censor (holds a Riposte).
-        /// Exempt players still see the letter, marked as not applying to them.</summary>
-        protected bool AmCensorExempt =>
-            CurrentUserId is { } id && GameState.CensorExemptUserIds.Contains(id);
-
-        /// <summary>The personal Jinx letter on the local player as an upper-case string, or null
-        /// when none. Shown beside the banned letter so the cursed player can see it (it is
-        /// personal — only the affected player sees their own Jinx).</summary>
+        /// <summary>The personal hijack letter forced onto the local player (Tracer Round / Bait &amp;
+        /// Switch) as an upper-case string, or null when none. Shown beside the banned letter so the
+        /// cursed player can see it (it is personal — only the affected player sees their own).</summary>
         protected string? PersonalBannedLetterDisplay =>
             MyPlayer?.PersonalBannedLetter is { } c ? char.ToUpperInvariant(c).ToString() : null;
 
@@ -260,6 +250,11 @@ namespace KnockBox.AlphaChain.Pages
         protected bool LocalPlayerHasTunnelVision =>
             MyPlayer?.EngineBay.Any(c => c.MasksPreviousWord) == true;
 
+        /// <summary>Whether the local player holds The Blindfold — their own word-input text is hidden
+        /// while they type (a self-inflicted UI penalty traded for a multiplier; input still works).</summary>
+        protected bool LocalPlayerHidesInput =>
+            MyPlayer?.EngineBay.Any(c => c.HidesOwnInput) == true;
+
         /// <summary>Whether the local user is the room host (gates the debug "Grant Cards" button).</summary>
         protected bool IsHost => CurrentUserId is not null && CurrentUserId == GameState.Host.Id;
 
@@ -389,21 +384,9 @@ namespace KnockBox.AlphaChain.Pages
                     _lastArmSig = sig;
                     if (CanSubmit)
                     {
-                        // Feedback Loop: consume any queued silence and lock the input client-side for
-                        // its first seconds (the chain/clock still run — that's the penalty).
-                        int silenceMs = 0;
-                        if (MyPlayer is { QueuedSilenceSeconds: > 0 } me)
-                        {
-                            silenceMs = me.QueuedSilenceSeconds * 1000;
-                            GameState.Execute(() => me.QueuedSilenceSeconds = 0);
-                        }
-
                         var remainingMs = Math.Max(0, (GameState.PhaseEndTime - DateTimeOffset.UtcNow).TotalMilliseconds);
                         await _inputModule.InvokeVoidAsync("armDeadline", _inputId, remainingMs, AutoSubmitLeadMs);
-                        if (silenceMs > 0)
-                            await _inputModule.InvokeVoidAsync("silence", _inputId, silenceMs);
-                        else
-                            await _inputModule.InvokeVoidAsync("focus", _inputId);
+                        await _inputModule.InvokeVoidAsync("focus", _inputId);
                     }
                     else
                     {

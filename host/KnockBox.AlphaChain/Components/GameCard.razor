@@ -38,11 +38,8 @@
     /// <summary>Top-level category, drives the accent tint + operator.</summary>
     [Parameter] public CardCategory Category { get; set; } = CardCategory.Modifier;
 
-    /// <summary>Modifier kind (additive/multiplicative); null for reaction cards.</summary>
+    /// <summary>Modifier kind (additive/multiplicative).</summary>
     [Parameter] public ModifierKind? Kind { get; set; }
-
-    /// <summary>Reaction role (defensive/offensive/special); drives the reaction sub-tint. Null for modifiers.</summary>
-    [Parameter] public ReactionClass? ReactionClass { get; set; }
 
     /// <summary>Overrides the operator/value glyph (e.g. "×1.5" in the score overlay).</summary>
     [Parameter] public string? ValueText { get; set; }
@@ -65,18 +62,12 @@
     /// <summary>Compact variant (hides the description, narrower) for opponent summaries.</summary>
     [Parameter] public bool Compact { get; set; }
 
-    /// <summary>Full root class string (base + category + reaction sub-tint + state modifiers).</summary>
-    private string RootClass => $"gc-card gc-{CategoryClass}{ReactionClassModifier}{StateClasses}";
+    /// <summary>Full root class string (base + category + state modifiers).</summary>
+    private string RootClass => $"gc-card gc-{CategoryClass}{StateClasses}";
 
-    /// <summary>reaction / additive / multiplicative — selects the accent variable.</summary>
-    private string CategoryClass => Category == CardCategory.Reaction
-        ? "reaction"
-        : Kind == ModifierKind.Multiplicative ? "multiplicative" : "additive";
-
-    /// <summary>Reaction sub-tint class (defensive/offensive/special), empty for modifiers.</summary>
-    private string ReactionClassModifier => Category == CardCategory.Reaction && ReactionClass is { } rc
-        ? $" gc-reaction-{rc.ToString().ToLowerInvariant()}"
-        : "";
+    /// <summary>additive / multiplicative — selects the accent variable.</summary>
+    private string CategoryClass =>
+        Kind == ModifierKind.Multiplicative ? "multiplicative" : "additive";
 
     /// <summary>The operator glyph: explicit override, else + / × for modifiers, else none.</summary>
     private string? OperatorSymbol => ValueText ?? Kind switch

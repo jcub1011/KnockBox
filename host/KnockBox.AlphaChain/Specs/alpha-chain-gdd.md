@@ -17,77 +17,93 @@
 *   If a player submits a word containing a **Banned Letter**, the word is accepted to keep the chain alive, but the total score for that turn is **0**. 
 *   This acts as a tactical "pass" to reset the clock and shift a difficult starting letter to the next opponent.
 *   If a player plays a word with a banned letter as the last letter, then the next player can play any word.
-*   **Tax Collector payout:** A taxed word is not merely lost points — any opponent holding a **Tax Collector** modifier (§3.1) collects **half** of the score the word would otherwise have made. A banned-letter play can therefore actively feed your rivals.
+*   **Tax Collector payout:** A taxed word is not merely lost points — any opponent holding a **Tax Collector** modifier (§3.6) collects **half** of the score the word would otherwise have made. A banned-letter play can therefore actively feed your rivals.
 
 ---
 
 ## 3. The Card System
 
-### 3.1 Modifier Cards (Engine)
-Modifiers are persistent cards that stay in a player's "Engine Bay." They are processed in a **Strict Left-to-Right Pipeline**.
+Every card in the game is a persistent **Modifier Card** slotted into the player's **Engine Bay**.
+The previous hand-held "Reaction" tier is **abolished** — there is one unified card tier. The bay
+starts at **3 Modifier Slots** and gains +1 each Intermission, so defensive, utility, offensive and
+scoring cards all compete for the same scarce slots (the **Intermission Dilemma**).
 
-*   **Additive Cards (+):** Best placed on the left.
-    *   **The Anchor** (+12 flat bonus).
-    *   **Consonant Crunch** (+2 per consonant).
-    *   **Brick Layer** (+1 per letter when the word is 6+ letters).
-    *   **Letter Hoarder** (+1 per distinct letter).
-    *   **High Roller** (+20 when the word begins with a rare tile — Q, X, Z or J).
-*   **Multiplicative Cards (×):** Best placed on the right.
-    *   **Vowel Surge** (2× if vowels > consonants).
-    *   **The Architect** (**2×** for 8+ letter words).
-    *   **Sesquipedalian** (3× for 10+ letter words — clamped to the max score, a guaranteed payout).
-    *   **Guttural Roar** (1.5× when the word's only vowels are A/E — the multiplicative counterpart to Vowel Surge).
-    *   **Perfect Link** (1.5× when the word ends in a vowel — sets the next player up, pads your score).
-    *   **Sprinter** (when the word is ≤4 letters, ×(1 + 0.1 per second left on your clock) — blitz short words for a soaring multiplier).
+Two architecture rules govern every card:
+*   **Zero UI Disruption.** No card may alter, glitch, or blind an *opponent's* interface. Any UI or
+    timing pain a card inflicts is **self-inflicted**, chosen willingly for a big payoff.
+*   **Zero Manual Targeting.** There is no point-and-click targeting during live rounds. All
+    offensive cards fire automatically from rule-driven linguistic or leaderboard triggers.
 
-**Glass-cannon clock cards.** Big multipliers paid for in shot-clock time. Each applies its clock
-effect (fraction first, then flat seconds) when its owner's turn arms, floored at a 3s minimum.
-*   **The Vault** (1.5× always, but permanently −3s shot clock).
-*   **Redline** (1.5× always, but permanently −10% shot clock).
-*   **Panic Button** (−50% shot clock; ×1.35 normally, ×2.7 if you submit in the final 2 seconds).
-*   **Hyper-Drive** (submit in under 3 seconds to latch: your clock drops to 5s for the rest of the
-    era, but **every multiplier you own is doubled**). Inert in the pipeline; its power is the latch.
-*   **Tunnel Vision** (2× always, but your UI masks the first & last letter of the most recent chain
-    word — you rely on memory or the required-start letter; the chain rule is still enforced).
+### 3.1 Core Scorers
+The pipeline `Score = (L + ΣA) × ΠM` is a **Strict Left-to-Right** walk; place additives left and
+multipliers right.
+*   **Additive (+):** **The Anchor** (+12), **Consonant Crunch** (+2/consonant), **Brick Layer**
+    (+1/letter at 6+ letters), **Letter Hoarder** (+1/distinct letter), **High Roller** (+20 on a
+    Q/X/Z/J start).
+*   **Multiplicative (×):** **Vowel Surge** (×2 if vowels > consonants), **The Architect** (×2 at 8+),
+    **Sesquipedalian** (×3 at 10+), **Guttural Roar** (×1.5 when the only vowels are A/E),
+    **Perfect Link** (×1.5 ending in a vowel), **Sprinter** (≤4 letters → ×(1 + 0.1/second left)).
 
-**Reactive-bounty / tax-economy cards.** These do **not** fold into their owner's own scoring
-pipeline; they resolve reactively against *opponents'* submissions (see §2.2).
-*   **Tax Collector** — when an opponent eats the Zero-Point Tax, collect **half** the points the
-    word would have scored.
-*   **Enforcer** — a stronger Tax Collector: collect **75%**. A player's matching collectors take the
-    single highest rate (Tax Collector + Enforcer = 75%, **not** 125%).
-*   **IRS** — when *your own* word is hit by the Zero-Point Tax, score a flat **+15** instead of 0, and
-    no Tax Collector profits from it.
+### 3.2 Glass Cannon & Chain Gambler (high-risk multipliers)
+Big multipliers paid for in your **own** clock, UI, or rules. Clock effects apply when the owner's
+turn arms (fraction first, then flat seconds), floored at a 3s minimum.
+*   **Redline** — ×1.5 always; permanently −10% shot clock.
+*   **The Blindfold** — ×1.8 always; hides **your own** input box while you type (no peeking at typos).
+*   **Adrenaline Spike** — −4s shot clock; ×2.5 **only** if you submit in the final 2 seconds, else the
+    word scores **0**.
+*   **Panic Button** — −50% shot clock; ×1.35 normally, ×2.7 in the final 2 seconds.
+*   **The Double Down** — ×2 if your word has a double letter (the 'ff' in *coffin*), else ×0.5.
+*   **The Anchor Chain** — pins your clock to a strict, **unmodifiable 5 s** for the era; in exchange,
+    ×(0.5 per letter) of the played word.
+*   **The Vault** — ×1.5 always; permanently −3s shot clock.
+*   **Hyper-Drive** — submit in under 3s to latch: clock drops to 5s for the era, **every multiplier
+    doubled**. Inert in the pipeline; its power is the latch.
+*   **Tunnel Vision** — ×2 always; your UI masks the first & last letter of the most recent chain word.
+
+### 3.3 The Smuggler (random personal bans)
+Each era these roll the owner a random **personal banned letter** (drawn from the legal pool, dodging
+the era letter) that triggers the Zero-Point Tax for the owner alone.
+*   **The Roulette Wheel** — ×1.75 on every word you keep clean of both bans.
+*   **The Toll Booth** — bank **20%** of any opponent's score when their word uses your personal letter
+    (they keep their points; you are minted the cut).
+
+### 3.4 Automated Aggro (zero-friction PvP)
+Hands-free offensive cards that fire from the leaderboard or linguistic patterns — never targeted.
+*   **Flak Cannon** — +5 flat; at the end of your turn, shaves ~2s off the next clock of **every player
+    scoring higher than you**.
+*   **Scattershot** — ×1.15; on every submission, shaves ~3s off any opponent who has played a
+    double-letter word this era.
+*   **The Bounty Hunter** — 0 points; marks the round's leader — if they play a word shorter than 6
+    letters, they are docked **−30 points**.
+*   **Tracer Round** — 0 points; at the end of your turn, the letter your word **ends on** becomes a
+    one-turn personal banned letter for the next player.
+
+### 3.5 The Shield
+*   **The Titanium Mirror** — starts the era as a passive ×1.0. Automatically blocks and **reflects**
+    incoming automated attacks (time shaves, point drains, letter hijacks) back at their source, but
+    its multiplier permanently drops **−0.1× per block** (1.0 → 0.9 → 0.8 …), decaying into a scoring
+    **burden** you carry until the next Intermission.
+
+### 3.6 Tax Economy
+These resolve reactively against *opponents'* submissions (see §2.2); they do not fold into the
+owner's own scoring pipeline.
+*   **Tax Collector** — when an opponent eats the Zero-Point Tax, collect **half** the would-be score.
+*   **The IRS Agent** — 0 points; when *your own* word is taxed, no Tax Collector profits from it.
 *   **Bait & Switch** — when your word is taxed, force the offending banned letter onto the **next
     player** as a personal ban for their turn.
 
-**Personal-ban cards.** Each era these roll the owner a random **personal banned letter** (drawn from
-the match's legal pool, dodging the era letter) that triggers the Zero-Point Tax for the owner alone.
-*   **The Roulette Wheel** — reward: ×1.75 on every word you keep clean (taxed words score 0 anyway).
-*   **Smuggler's Toll** — reward: bank **20%** of any opponent's score when their word uses your
-    personal letter (they keep their points; you are minted the cut).
-
-### 3.2 Reaction Cards (Tactical)
-Single-use cards that sit passively in a player's hand and **auto-fire on game events** — only
-when they would actually help (never wasted), with no manual play and no targeting. They replace
-the original hand-played "action cards", whose mid-turn sifting was dead weight under the shot
-clock. At most one matching reaction per holder fires per event (oldest first).
-
-**Defensive** (fire on something that happens to you):
-*   **Amnesty:** When you play a banned-letter word, the Zero-Point Tax is suppressed and the word scores in full.
-*   **Free Throw:** When your turn opens on a rare required letter (Q/X/Z/J/K/V), the requirement is cleared. *(Reworked from the original "Pivot".)*
-*   **Overtime:** When your shot clock runs out, gain a few seconds and keep your turn — once (saves you from a 0-score timeout, or elimination in Survival).
-*   **Windfall:** When you fall to last place, immediately draw 2 more reaction cards — **at most once per era**, so a player riding the 3rd/4th boundary can't loop-draw their deck.
-
-**Offensive** (fire on an opponent's action; routed through Riposte):
-*   **Toll Booth:** When an opponent *ahead of you* posts a 7+ letter word, **steal 20% of the points they just earned** (it hurts them and helps you, without locking them out of playing).
-*   **Frostbite:** When an opponent overtakes you specifically, shave ~5 s off their next shot clock.
-*   **Jinx:** When an opponent takes the overall lead, curse their next word with a personal banned letter.
-
-**Special:**
-*   **Censor:** When you fall to last place, ban an extra letter for everyone for one round (Riposte holders are spared).
-*   **Riposte:** When an attack reaction targets you, negate it and reflect it back at the caster; against board-wide effects (Censor), its holder is simply exempt.
-*   **Feedback Loop:** When your Riposte negates an attacker, **silence** them — their word input is locked for the first 3 seconds of their next turn (the shot clock keeps running).
+### 3.7 Utility (counter-balances, 0 points)
+Lifesavers that occupy a scoring slot but pair with the high-risk cards above.
+*   **The Heat Sink** — +5s shot clock (neutralises Redline / Adrenaline Spike — but not the Anchor
+    Chain's unmodifiable clock).
+*   **The Faraday Cage** — immune to personal banned letters generated by **your own** cards (Roulette
+    Wheel, The Toll Booth) — keep the boosts without the vocabulary tax.
+*   **The Prism** — if your word is a typo or fails validation, your shot clock resets to full (once
+    per turn) instead of ending the turn. The Blindfold's essential pairing.
+*   **The Wildcard** — your words may ignore the Succession rule (need not begin with the previous
+    word's last letter).
+*   **The Catalyst** — the letters Y, W and H count as **both** vowel and consonant when evaluating
+    every other card's trigger.
 
 ---
 
@@ -96,7 +112,7 @@ clock. At most one matching reaction per holder fires per event (oldest first).
 The game is divided into 4-round "Eras." At the end of every 4th round, the game enters an **Intermission Phase**.
 
 ### 4.1 Intermission Phase Steps
-1.  **The Deal:** Every player receives a fresh hand of Modifier and Reaction cards (§3.1–§3.2).
+1.  **The Deal:** Every player receives fresh Modifier cards (§3) appended to their Engine Bay.
 2.  **Expansion:** Every player gains one additional **Modifier Slot**.
 3.  **Optimization (Fog of War):** Players rearrange their current and new modifiers. Opponents' cards are hidden during this step.
 4.  **The Sniper Ban:** The player in **last place** selects any letter of the alphabet to be the **Banned Letter** for the next 4 rounds.
@@ -143,22 +159,24 @@ The shipped implementation makes the following confirmed, intentional departures
 design above. They are recorded here so the GDD stays the single source of truth for *what the
 game actually does*.
 
-*   **Tactical cards are auto-firing reactions, not hand-played actions.** The original §3.2
-    action cards (Pivot, Amnesty, Time Thief) were proactive — you had to find and play the right
-    card mid-turn, which was friction under the shot clock. They are replaced by the reaction system
-    described in §3.2: cards sit in hand and auto-fire on game events, only when beneficial. Amnesty
-    is preserved (now auto-firing), Pivot became **Free Throw** (rare-letter rescue at turn start),
-    Time Thief is removed, and seven new cards were added (Overtime, Windfall, Toll Booth, Frostbite,
-    Jinx, Censor, Riposte). A "reaction strike" overlay tells a targeted player what hit them and why.
-    *(Confirmed intentional.)*
-*   **Era 1 is cardless.** Players start with an empty Engine Bay and empty hand; the first Deal
-    happens at the first Intermission (after `EraInterval` rounds), not at game start.
+*   **One unified card tier (no hand-played or reaction cards).** Both the original proactive action
+    cards *and* the later auto-firing reaction hand are abolished — every card is now a persistent
+    Engine Bay **Modifier** (§3). Offensive behaviour that used to live in the reaction hand is
+    re-homed as automated modifiers that fire from leaderboard/linguistic rules with no targeting and
+    no opponent-UI disruption: the old Toll Booth reaction became the engine **Toll Booth** (§3.3),
+    Riposte became **The Titanium Mirror** (§3.5), and Jinx/Frostbite/Censor are superseded by
+    **Tracer Round**, **Flak Cannon** and the Sniper Ban. Amnesty/Free Throw/Overtime/Windfall/
+    Feedback Loop are dropped (their roles are covered by utility modifiers like the Faraday Cage,
+    Wildcard, Heat Sink and Prism). An "engine effect" overlay tells a targeted player what hit them
+    and why. *(Confirmed intentional.)*
+*   **Era 1 is cardless.** Players start with an empty Engine Bay; the first Deal happens at the first
+    Intermission (after `EraInterval` rounds), not at game start.
 *   **Starting `ModifierSlots = 3`.** The GDD only specifies that Expansion grants +1 slot per
     Intermission; the starting capacity of 3 is an implementation choice.
 *   **Shot clock configurable 5–60 s** rather than the GDD's stated 10–15 s window — the wider
     range gives hosts more room for very fast or very relaxed matches.
-*   **"Fresh hand" = append, not replace.** Dealt modifiers/actions accumulate on the existing
-    bay/hand; a Deal never clears what a player already holds.
+*   **"Fresh deal" = append, not replace.** Dealt modifiers accumulate on the existing Engine Bay;
+    a Deal never clears what a player already holds.
 *   **Distinct modifiers.** Dealt modifiers are always distinct from the cards a player already
     holds (the Engine Bay is keyed by card id for reordering), which caps a player's lifetime
     modifiers at the catalogue size.
@@ -190,13 +208,17 @@ game actually does*.
     latched Hyper-Drive change the *owner's* armed shot clock — fractions applied before flat
     seconds, floored at a 3s minimum — so the clock can shorten but never zero or invert.
 *   **Generalised siphons.** The Tax Collector bounty is one case of a general "siphon": a player's
-    matching collectors take the single highest rate (no stacking), and Smuggler's Toll siphons on a
+    matching collectors take the single highest rate (no stacking), and The Toll Booth siphons on a
     *normally-scored* word that used the owner's era-rolled personal letter (minting the owner a cut
-    without docking the submitter). IRS can suppress the taxed bounty entirely.
+    without docking the submitter). The IRS Agent can suppress the taxed bounty entirely.
+*   **Automated attacks route through the Titanium Mirror.** The offensive modifiers (Flak Cannon and
+    Scattershot time-shaves, the Bounty Hunter point-drain, Tracer Round and Bait & Switch letter
+    hijacks) all resolve through a single helper that lets the victim's Titanium Mirror block and
+    reflect the hit back at its caster (decaying its multiplier per block). The pass is single-shot —
+    a reflected hit always lands on the caster and is never itself re-reflected.
 *   **Deterministic submit time.** The submission timestamp is threaded into the FSM (not read from
-    the wall clock mid-pipeline) so time-aware scoring (Sprinter, Panic Button) and the Hyper-Drive
-    elapsed check are reproducible under test.
-*   **Feedback Loop silence is client-enforced.** A queued silence locks the word input (readOnly +
-    a key-swallowing flag in `alpha-chain-input.js`) for its first seconds; the shot clock keeps
-    running, so the silence is a real tempo penalty. The lock is owner-only and presentational —
-    server validation is unchanged.
+    the wall clock mid-pipeline) so time-aware scoring (Sprinter, Panic Button, Adrenaline Spike) and
+    the Hyper-Drive elapsed check are reproducible under test.
+*   **The Blindfold is client-enforced.** While the local player holds The Blindfold, a CSS class
+    hides their own input text (the caret stays visible). The input still works and server validation
+    is unchanged — only the rendered glyphs are hidden, so the penalty is purely self-inflicted.

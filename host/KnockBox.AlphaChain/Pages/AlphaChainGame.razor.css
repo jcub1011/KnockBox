@@ -285,6 +285,19 @@
     opacity: 0.85;
 }
 
+/* The Blindfold: the owner's own typed text is hidden while they type — a self-inflicted UI
+   penalty traded for a multiplier. The input still works; only the rendered glyphs are hidden
+   (the caret stays visible so the player knows the field is focused). */
+.ac-word-input-blind {
+    color: transparent;
+    text-shadow: none;
+    caret-color: var(--ac-ink);
+}
+
+.ac-word-input-blind::selection {
+    background: transparent;
+}
+
 .ac-submit-btn {
     flex: 0 0 auto;
     padding: 0 1.4rem;
@@ -450,7 +463,22 @@
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
+/* Your own row stands out so you can find yourself at a glance during the word-entry phase:
+   a brighter accent wash, an inset ring, and a thicker accent edge — on top of the name colour. */
+.ac-lb-me {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent);
+    border-left-width: 5px;
+}
+
 .ac-lb-me .ac-lb-name { color: var(--accent); font-weight: 800; }
+
+/* "you" pill on your own leaderboard row. */
+.ac-tag-you {
+    background: var(--accent);
+    color: #04121a;
+    border-color: var(--accent);
+}
 
 .ac-lb-rank {
     flex: 0 0 1.2rem;

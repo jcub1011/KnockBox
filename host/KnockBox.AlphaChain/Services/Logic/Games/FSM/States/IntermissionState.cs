@@ -213,19 +213,19 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
         // ── Sub-phase entry helpers ──────────────────────────────────────────
 
-        /// <summary>Deal: weighted (currently uniform) draws appended to each active player's hand.
-        /// Records the dealt cards on the player so the Optimization panel can flag them NEW.</summary>
+        /// <summary>Deal: weighted (currently uniform) draws of distinct modifiers appended to each
+        /// active player's Engine Bay. Records the dealt cards on the player so the Optimization
+        /// panel can flag them NEW. (The hand-played reaction tier is abolished — modifiers are the
+        /// only card type dealt now.)</summary>
         private static void DealCards(AlphaChainGameContext context)
         {
             var state = context.State;
             int modCount = state.Settings.ModifiersDealtPerEra;
-            int reactCount = state.Settings.ReactionsDealtPerEra;
 
             foreach (var player in ActivePlayers(state))
             {
-                // Fresh reveal lists for this Intermission's deal.
+                // Fresh reveal list for this Intermission's deal.
                 player.NewlyDealtModifierIds.Clear();
-                player.NewlyDealtReactions.Clear();
 
                 // Distinct modifiers the player doesn't already hold (bay ids must stay unique).
                 var heldIds = player.EngineBay.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
@@ -236,14 +236,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                     player.EngineBay.Add(pool[idx]); // append-to-right; resequenced in Optimization.
                     player.NewlyDealtModifierIds.Add(pool[idx].Id);
                     pool.RemoveAt(idx);
-                }
-
-                // Reactions may repeat in hand.
-                for (int i = 0; i < reactCount && ReactionLibrary.All.Length > 0; i++)
-                {
-                    int idx = context.Rng.GetRandomInt(ReactionLibrary.All.Length);
-                    player.ReactionHand.Add(ReactionLibrary.All[idx]);
-                    player.NewlyDealtReactions.Add(ReactionLibrary.All[idx]);
                 }
             }
         }
@@ -375,18 +367,19 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.OptimizationSubmissions.Clear();
 
             // Drop the deal-reveal markers so they don't bleed into the next era's round UI, and
-            // drop any board-wide Censor — it never carries across an era boundary. Reset the
-            // era-scoped card state too (Hyper-Drive latch, Windfall guard) so each era starts clean.
+            // reset the era-scoped card state so each era starts clean: the Hyper-Drive latch, the
+            // Titanium Mirror's decayed multiplier, the Scattershot double-letter flag, any transient
+            // hijack ban, and the per-turn Prism flag.
             foreach (var player in state.GamePlayers.Values)
             {
                 player.NewlyDealtModifierIds.Clear();
-                player.NewlyDealtReactions.Clear();
                 player.HyperDriveActive = false;
-                player.WindfallFiredThisEra = false;
+                player.ShieldMultiplier = 1.0;
+                player.PlayedDoubleLetterWordThisEra = false;
+                player.PersonalBannedLetter = null;
+                player.PrismUsedThisTurn = false;
             }
-            state.CensorBannedLetter = null;
-            state.CensorExemptUserIds.Clear();
-            state.PendingForcedPersonalBan = null;
+            state.RoundLeaderUserId = null;
 
             if (state.CurrentEra > state.Settings.EraCount)
                 return new GameOverState();

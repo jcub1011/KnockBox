@@ -43,9 +43,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
         /// player's bay (Vault, Redline, Panic Button). Null = no clock effect.</summary>
         public ClockEffect? Clock { get; init; }
 
-        /// <summary>Reactive payout from opponents' submissions (Tax Collector, Enforcer,
-        /// Smuggler's Toll). Null = none. A siphon card's <see cref="Trigger"/> is typically
-        /// <c>Never</c> so it never folds into its owner's own pipeline.</summary>
+        /// <summary>Reactive payout from opponents' submissions (Tax Collector, The Toll Booth).
+        /// Null = none. A siphon card's <see cref="Trigger"/> is typically <c>Never</c> so it never
+        /// folds into its owner's own pipeline.</summary>
         public SiphonRule? Siphon { get; init; }
 
         /// <summary>When true, the owner rolls a fresh random personal banned letter at each era
@@ -67,5 +67,45 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
         /// <summary>When true, this card masks the previous word's first &amp; last letters in its
         /// owner's UI only (Tunnel Vision). Presentational; the chain rule is still server-enforced.</summary>
         public bool MasksPreviousWord { get; init; }
+
+        /// <summary>Pins the owner's shot clock to a fixed, unmodifiable length for the era
+        /// (The Anchor Chain). Null = the clock follows the base + <see cref="Clock"/> effects.</summary>
+        public ClockOverride? ClockOverride { get; init; }
+
+        /// <summary>Hands-free time-shave fired at matching opponents at the end of the owner's turn
+        /// (Flak Cannon, Scattershot). Null = none.</summary>
+        public AutoTimeShaveRule? AutoTimeShave { get; init; }
+
+        /// <summary>Drains a flat penalty from the round's marked leader on a too-short word
+        /// (The Bounty Hunter). Null = none.</summary>
+        public LeaderPenaltyRule? LeaderPenalty { get; init; }
+
+        /// <summary>Marks this card as the Titanium Mirror: blocks &amp; reflects incoming automated
+        /// attacks, decaying its scoring multiplier per block. Null = not a shield.</summary>
+        public ShieldRule? Shield { get; init; }
+
+        /// <summary>When true, hides the owner's own word-input text while typing (The Blindfold) —
+        /// a self-inflicted UI penalty traded for a multiplier. Presentational; input still works.</summary>
+        public bool HidesOwnInput { get; init; }
+
+        /// <summary>When true, the owner's word-ending letter is forced onto the next player as a
+        /// personal banned letter at the end of the owner's turn (Tracer Round).</summary>
+        public bool HijacksEndLetter { get; init; }
+
+        /// <summary>When true, the owner is immune to their own era-rolled personal card-bans
+        /// (The Faraday Cage) — Roulette Wheel / Toll Booth self-boosts without the vocabulary tax.</summary>
+        public bool ImmuneToOwnCardBans { get; init; }
+
+        /// <summary>When true, a failed dictionary/typo submission refills the owner's shot clock to
+        /// full once per turn instead of running it down (The Prism). Pairs with The Blindfold.</summary>
+        public bool RefillsClockOnFailedValidation { get; init; }
+
+        /// <summary>When true, the owner may ignore the Succession (chain) rule — their word need not
+        /// begin with the previous word's last letter (The Wildcard).</summary>
+        public bool IgnoresSuccessionRule { get; init; }
+
+        /// <summary>When true, the letters Y, W and H count as <i>both</i> vowel and consonant when
+        /// evaluating every other card's trigger (The Catalyst).</summary>
+        public bool CatalystAmbiguousLetters { get; init; }
     }
 }

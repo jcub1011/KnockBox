@@ -76,10 +76,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             foreach (var player in state.GamePlayers.Values)
             {
                 Assert.AreEqual(state.Settings.ModifiersDealtPerEra, player.EngineBay.Count, "modifier deal count");
-                Assert.AreEqual(state.Settings.ReactionsDealtPerEra, player.ReactionHand.Count, "reaction deal count");
                 // Dealt cards are tracked so the Optimization panel can flag them NEW.
                 Assert.AreEqual(state.Settings.ModifiersDealtPerEra, player.NewlyDealtModifierIds.Count, "new modifier ids");
-                Assert.AreEqual(state.Settings.ReactionsDealtPerEra, player.NewlyDealtReactions.Count, "new reactions");
             }
         }
 
@@ -94,7 +92,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             EnterIntermission(state);
 
             Assert.AreEqual(0, state.GamePlayers[eliminatedId].EngineBay.Count);
-            Assert.AreEqual(0, state.GamePlayers[eliminatedId].ReactionHand.Count);
         }
 
         [TestMethod]
@@ -313,13 +310,15 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             state.Execute(() =>
             {
                 state.GamePlayers[picker].HyperDriveActive = true;
-                state.GamePlayers[picker].WindfallFiredThisEra = true;
+                state.GamePlayers[picker].ShieldMultiplier = 0.6;
+                state.GamePlayers[picker].PlayedDoubleLetterWordThisEra = true;
             });
 
             await engine.SelectSniperBanAsync(picker, 'q', state);
 
             Assert.IsFalse(state.GamePlayers[picker].HyperDriveActive, "Hyper-Drive latch clears across an era.");
-            Assert.IsFalse(state.GamePlayers[picker].WindfallFiredThisEra, "Windfall guard resets each era.");
+            Assert.AreEqual(1.0, state.GamePlayers[picker].ShieldMultiplier, 1e-9, "Titanium Mirror resets to 1.0 each era.");
+            Assert.IsFalse(state.GamePlayers[picker].PlayedDoubleLetterWordThisEra, "Double-letter flag resets each era.");
         }
 
         [TestMethod]

@@ -13,7 +13,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
     public enum SiphonTrigger
     {
         /// <summary>An opponent's word was zeroed by the match's era banned letter
-        /// (Tax Collector, Enforcer). The owner collects a cut of the would-be score.</summary>
+        /// (Tax Collector). The owner collects a cut of the would-be score.</summary>
         OpponentEraTaxed,
 
         /// <summary>An opponent's (normally-scored) word contained THIS card owner's personal
@@ -52,4 +52,51 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
     /// <paramref name="MultiplierScale"/> for the rest of the era.
     /// </summary>
     public sealed record HyperdriveRule(double ThresholdSeconds, int ClockOverrideSeconds, double MultiplierScale);
+
+    /// <summary>
+    /// The Anchor Chain: pins the owner's shot clock to a strict, unmodifiable
+    /// <paramref name="Seconds"/> for the whole era. Resolved in
+    /// <c>AlphaChainGameState.ComputeArmedShotClockSeconds</c>, where it overrides the base clock
+    /// and short-circuits every <see cref="ClockEffect"/> and Hyper-Drive override — the trade-off
+    /// for its huge per-letter multiplier.
+    /// </summary>
+    public sealed record ClockOverride(int Seconds);
+
+    /// <summary>Who an <see cref="AutoTimeShaveRule"/> automatically fires its time-shave at.</summary>
+    public enum AutoTimeShaveTarget
+    {
+        /// <summary>Every active opponent whose cumulative score is higher than the owner's
+        /// (Flak Cannon) — a hands-free catch-up ping at the leaders.</summary>
+        HigherScore,
+
+        /// <summary>Every active opponent who has played a double-letter word this era
+        /// (Scattershot) — punishes the "Apple"/"coffin" crowd.</summary>
+        PlayedDoubleLetterThisEra,
+    }
+
+    /// <summary>
+    /// A hands-free offensive time-shave a modifier fires at the end of its owner's turn: each
+    /// opponent matching <paramref name="Target"/> has <paramref name="Seconds"/> queued off their
+    /// next shot clock (Flak Cannon, Scattershot). Resolved in <c>RoundState</c> after scoring and
+    /// routed through each victim's Titanium Mirror. No manual targeting — pure rule-driven PvP.
+    /// </summary>
+    public sealed record AutoTimeShaveRule(int Seconds, AutoTimeShaveTarget Target);
+
+    /// <summary>
+    /// The Bounty Hunter: the player marked as the round's leader (snapshot at round start) loses a
+    /// flat <paramref name="Penalty"/> points if they submit a word shorter than
+    /// <paramref name="MinLength"/> letters. Resolved in <c>RoundState</c> on the leader's submission
+    /// and routed through their Titanium Mirror (a reflected drain hits the bounty's owner instead).
+    /// </summary>
+    public sealed record LeaderPenaltyRule(int MinLength, int Penalty);
+
+    /// <summary>
+    /// The Titanium Mirror: a shield whose multiplier starts at <paramref name="Start"/> (a passive
+    /// ×1.0 placeholder) and drops by <paramref name="DecayPerBlock"/> each time it blocks and
+    /// reflects an incoming automated attack (time-shave, point-drain, letter-hijack). The live
+    /// multiplier lives on <c>AlphaChainPlayerState.ShieldMultiplier</c> (reset each era) and feeds
+    /// the card's scoring factor via <see cref="WordContext.ShieldMultiplier"/>; enough deflections
+    /// decay it below 1.0 into a scoring burden carried until the next Intermission.
+    /// </summary>
+    public sealed record ShieldRule(double Start = 1.0, double DecayPerBlock = 0.1);
 }

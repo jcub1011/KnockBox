@@ -1,14 +1,13 @@
 # Milestone 3 — Card System
 
-> **Superseded (action cards → reaction cards).** The hand-played **action card** system described
-> below (Pivot, Amnesty, Time Thief; `ActionCard`/`ActionKind`/`ActionLibrary`, `PlayActionCommand`,
-> `PendingAction`, the `ActionHand` UI) has been replaced by an **auto-firing reaction system**.
-> Reactions sit in a player's hand and fire automatically on game events, only when beneficial — no
-> manual play, no targeting. The modifier/scoring half of this milestone is unchanged. See
-> **`alpha-chain-gdd.md` §3.2** for the catalogue and `Services/Logic/Games/FSM/ReactionResolver.cs`
-> for the dispatch. Type renames: `ActionCard`→`ReactionCard`, `ActionLibrary`→`ReactionLibrary`,
-> `ActionHand`→`ReactionHand`, `ActionsDealtPerEra`→`ReactionsDealtPerEra`; `PlayActionCommand` and
-> `PendingAction` are removed. The text below is retained for historical context.
+> **Superseded (unified Modifier tier — no action or reaction cards).** This milestone first shipped
+> hand-played *action* cards, then an auto-firing *reaction* hand. Both tiers are now **abolished**:
+> every card is a persistent Engine Bay **Modifier**. `ReactionCard`/`ReactionLibrary`/`ReactionHand`/
+> `ReactionResolver` and `ReactionsDealtPerEra` are removed; the offensive reactions are re-homed as
+> automated modifiers (Flak Cannon, Scattershot, Bounty Hunter, Tracer Round, The Toll Booth) and a
+> shield (The Titanium Mirror), all resolved in `Services/Logic/Games/FSM/EngineEffectResolver.cs`.
+> The modifier/scoring half of this milestone is unchanged. See **`alpha-chain-gdd.md` §3** for the
+> current catalogue. The text below is retained for historical context.
 
 ## Goal
 

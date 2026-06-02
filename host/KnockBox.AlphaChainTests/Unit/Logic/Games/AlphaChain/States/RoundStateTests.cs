@@ -243,31 +243,22 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
         // ── Stated-rule decisions (resolved, not open questions) ────────────────
 
-        private static void GiveReaction(AlphaChainGameState state, string playerId, string cardId) =>
-            state.Execute(() => state.GamePlayers[playerId].ReactionHand.Add(
-                global::KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.ReactionLibrary.FindById(cardId)!));
-
         [TestMethod]
-        public async Task Amnesty_WithBannedLastLetter_ScoresFullAndClearsChain()
+        public async Task BannedLastLetter_ClearsChain_EvenWhenTaxed()
         {
-            // A held Amnesty auto-suppresses the tax (full points) AND a banned-letter-as-last-letter
-            // still clears RequiredStartLetter for the next player — the chain-clearing effect is
-            // independent of scoring.
+            // A banned-letter-as-last-letter still clears RequiredStartLetter for the next player —
+            // the chain-clearing effect is independent of the Zero-Point Tax the word incurs.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 't');
             using var _ = state;
             var current = state.TurnManager.CurrentPlayer!;
 
-            GiveReaction(state, current, "amnesty");
-
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
-            // Tax suppressed → scored as a normal length-3 word (empty bay), not zeroed.
-            Assert.IsInstanceOfType<SubmitWordResult.Accepted>(outcome);
-            Assert.AreEqual(3, state.GamePlayers[current].Score);
-            // Banned 't' as the last letter clears the chain regardless of the Amnesty.
+            // 't' is banned and present → Zero-Point Tax (score 0)…
+            Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(outcome);
+            Assert.AreEqual(0, state.GamePlayers[current].Score);
+            // …but as the LAST letter it still clears the chain for the next player.
             Assert.IsNull(state.RequiredStartLetter);
-            // Amnesty fired (banned letter present) → consumed.
-            Assert.AreEqual(0, state.GamePlayers[current].ReactionHand.Count);
         }
 
         [TestMethod]

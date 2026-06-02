@@ -54,7 +54,6 @@
                         <IntermissionOptimizationPanel Cards="me.EngineBay"
                                                        Slots="me.ModifierSlots"
                                                        NewCardIds="me.NewlyDealtModifierIds"
-                                                       NewReactions="me.NewlyDealtReactions"
                                                        SubmittedCount="OptimizationSubmittedCount"
                                                        TotalCount="OptimizationTotalCount"
                                                        HasSubmitted="HasSubmittedOptimization"
@@ -116,15 +115,10 @@
                         <span class="ac-cmd-label">Banned</span>
                         <span class="ac-cmd-letters">
                             <span class="ac-cmd-letter">@BannedLetterDisplay</span>
-                            @if (CensorBannedLetterDisplay is { } censor)
-                            {
-                                <span class="ac-cmd-letter ac-cmd-censor @(AmCensorExempt ? "ac-cmd-censor-exempt" : "")"
-                                      title="@(AmCensorExempt ? "Censor: extra banned letter this round (you are immune via Riposte)" : "Censor: extra banned letter for everyone this round")">@censor</span>
-                            }
-                            @if (PersonalBannedLetterDisplay is { } jinx)
+                            @if (PersonalBannedLetterDisplay is { } hijack)
                             {
                                 <span class="ac-cmd-letter ac-cmd-jinx"
-                                      title="Jinx: a personal banned letter on your next word">@jinx</span>
+                                      title="A personal banned letter forced onto your next word (Tracer Round / Bait & Switch)">@hijack</span>
                             }
                         </span>
                     </div>
@@ -151,8 +145,8 @@
                           title="@(GameState.RequiredStartLetter is null ? "Free choice — any letter" : "Your word must start with this letter")">
                         @(GameState.RequiredStartLetter is { } req ? char.ToUpperInvariant(req).ToString() : "∗")
                     </span>
-                    <input @ref="_wordInputRef" class="ac-word-input" type="text"
-                           placeholder="@(AwaitingTransition ? TransitionHoldMessage : CanSubmit ? "type a word…" : $"{CurrentPlayerName} is playing…")"
+                    <input @ref="_wordInputRef" class="ac-word-input @(LocalPlayerHidesInput ? "ac-word-input-blind" : "")" type="text"
+                           placeholder="@(AwaitingTransition ? TransitionHoldMessage : CanSubmit ? (LocalPlayerHidesInput ? "blind — type a word…" : "type a word…") : $"{CurrentPlayerName} is playing…")"
                            disabled="@(!CanSubmit)"
                            autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
                     <button type="button" class="ac-submit-btn" disabled="@(!CanSubmit || IsSubmitting)"
@@ -174,10 +168,10 @@
                                       ReplayTotalSeconds="GameState.Settings.EngineAnimationSeconds" />
                 }
 
-                @* ── Reaction strike overlay: announces auto-fired reactions, emphasising hits
-                      against the local player. Keyed on the notice sequence so it replays once. *@
-                <ReactionOverlay @key="GameState.ReactionNoticeSequence"
-                                 Notices="GameState.LatestReactionNotices" CurrentUserId="CurrentUserId" />
+                @* ── Engine-effect strike overlay: announces auto-fired modifier effects, emphasising
+                      hits against the local player. Keyed on the notice sequence so it replays once. *@
+                <EngineEffectOverlay @key="GameState.EngineNoticeSequence"
+                                     Notices="GameState.LatestEngineNotices" CurrentUserId="CurrentUserId" />
 
                 @* ── Chain trail ── *@
                 @if (ChainTrail.Count > 0)
@@ -201,7 +195,7 @@
                     </div>
                 }
 
-                @* ── Cards: own Engine Bay + Reaction Hand ── *@
+                @* ── Cards: own Engine Bay (the only card tier) ── *@
                 @if (MyPlayer is { } myCards)
                 {
                     <div class="ac-cards">
@@ -210,7 +204,6 @@
                            always Locked here, so no OnReorder handler is wired. *@
                         <EngineBay Cards="myCards.EngineBay" Slots="myCards.ModifierSlots"
                                    Locked="true" Title="Your Engine Bay" />
-                        <ReactionHand Cards="myCards.ReactionHand" />
                     </div>
                 }
 
@@ -244,6 +237,10 @@
                                 <span class="ac-lb-rank">@rank</span>
                                 <span class="ac-lb-name">
                                     @p.DisplayName
+                                    @if (isMe)
+                                    {
+                                        <span class="ac-tag ac-tag-you">you</span>
+                                    }
                                     @if (p.IsEliminated)
                                     {
                                         <span class="ac-tag">out</span>

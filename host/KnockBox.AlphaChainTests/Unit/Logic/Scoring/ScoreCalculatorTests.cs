@@ -319,6 +319,98 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Scoring
             }
         }
 
+        // ── New archetype cards (Glass Cannon / Aggro / Shield / Utility) ───
+
+        [TestMethod]
+        public void Blindfold_MultipliesByOnePointEight()
+        {
+            // "cat"(3) × 1.8 = 5.4 → 5 (half-up). The input-hiding is presentational; only the ×1.8 scores.
+            Assert.AreEqual(5, _calc.Calculate(Ctx("cat"), [Card("blindfold")]));
+        }
+
+        [TestMethod]
+        public void DoubleDown_DoublesWithADoubleLetter_HalvesWithout()
+        {
+            var dd = Card("double-down");
+            Assert.AreEqual(12, _calc.Calculate(Ctx("coffin"), [dd]), "'ff' double → ×2 → 6 × 2.");
+            Assert.AreEqual(2, _calc.Calculate(Ctx("cat"), [dd]), "no double → ×0.5 → 3 × 0.5 = 1.5 → 2.");
+        }
+
+        [TestMethod]
+        public void AnchorChain_MultipliesByHalfPerLetter()
+        {
+            var ac = Card("anchor-chain");
+            Assert.AreEqual(18, _calc.Calculate(Ctx("bridge"), [ac]), "6 × (0.5 × 6 = 3).");
+            Assert.AreEqual(5, _calc.Calculate(Ctx("cat"), [ac]), "3 × (0.5 × 3 = 1.5) = 4.5 → 5.");
+        }
+
+        [TestMethod]
+        public void AdrenalineSpike_ScoresZeroOutsideTheDangerZone_MultipliesInside()
+        {
+            var spike = Card("adrenaline-spike");
+            // >2s left → ×0 → the whole word scores 0 (the "submit early scores 0" rule).
+            Assert.AreEqual(0, _calc.Calculate(Ctx("cat", remainingSeconds: 9), [spike]));
+            // ≤2s left → ×2.5 → 3 × 2.5 = 7.5 → 8.
+            Assert.AreEqual(8, _calc.Calculate(Ctx("cat", remainingSeconds: 2), [spike]));
+        }
+
+        [TestMethod]
+        public void FlakCannon_AddsFlatFiveInThePipeline()
+        {
+            // The auto time-shave is resolved in RoundState; the pipeline contribution is just +5.
+            Assert.AreEqual(8, _calc.Calculate(Ctx("cat"), [Card("flak-cannon")]));
+        }
+
+        [TestMethod]
+        public void Scattershot_MultipliesByOnePointOneFive()
+        {
+            // "bridge"(6) × 1.15 = 6.9 → 7 (half-up).
+            Assert.AreEqual(7, _calc.Calculate(Ctx("bridge"), [Card("scattershot")]));
+        }
+
+        [TestMethod]
+        public void TitaniumMirror_UsesItsLiveShieldMultiplierAsTheScoringFactor()
+        {
+            var mirror = Card("titanium-mirror");
+            // Fresh shield 1.0 → ×1.0 → length unchanged.
+            var full = WordContext.Build("bridge", null, 0, 12, 1.0, shieldMultiplier: 1.0);
+            Assert.AreEqual(6, _calc.Calculate(full, [mirror]));
+            // Decayed into a burden (0.5) → ×0.5 → 6 × 0.5 = 3.
+            var decayed = WordContext.Build("bridge", null, 0, 12, 1.0, shieldMultiplier: 0.5);
+            Assert.AreEqual(3, _calc.Calculate(decayed, [mirror]));
+        }
+
+        [TestMethod]
+        public void ZeroPointUtilityCards_LeaveScoreAtTheWordLength()
+        {
+            // Heat Sink, Faraday Cage, Prism, Wildcard, Catalyst, Bounty Hunter and Tracer Round are
+            // ×1.0 placeholders in the pipeline — their power lives in side effects, not scoring.
+            foreach (var id in new[] { "heat-sink", "faraday-cage", "prism", "wildcard", "catalyst", "bounty-hunter", "tracer-round" })
+                Assert.AreEqual(6, _calc.Calculate(Ctx("bridge"), [Card(id)]), $"{id} should be score-neutral.");
+        }
+
+        // ── WordContext shape (double letters + The Catalyst's Y/W/H ambiguity) ──
+
+        [TestMethod]
+        public void HasDoubleLetter_DetectsAdjacentDuplicates()
+        {
+            Assert.IsTrue(WordContext.Build("coffin", null).HasDoubleLetter, "'ff' is a double letter.");
+            Assert.IsTrue(WordContext.Build("apple", null).HasDoubleLetter, "'pp' is a double letter.");
+            Assert.IsFalse(WordContext.Build("cat", null).HasDoubleLetter, "no adjacent duplicates.");
+        }
+
+        [TestMethod]
+        public void Catalyst_CountsYWHasBothVowelAndConsonant()
+        {
+            var plain = WordContext.Build("why", null, 0, 12, 1.0);
+            Assert.AreEqual(0, plain.Vowels, "Y/W/H are plain consonants without The Catalyst.");
+            Assert.AreEqual(3, plain.Consonants);
+
+            var catalyst = WordContext.Build("why", null, 0, 12, 1.0, catalyst: true);
+            Assert.AreEqual(3, catalyst.Vowels, "The Catalyst counts Y/W/H as vowels too…");
+            Assert.AreEqual(3, catalyst.Consonants, "…and as consonants simultaneously.");
+        }
+
         // ── CalculateSteps (per-step trace for the score-replay animation) ──────
 
         [TestMethod]

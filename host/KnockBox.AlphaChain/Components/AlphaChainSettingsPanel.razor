@@ -96,15 +96,6 @@
                        @oninput="OnModifiersChanged" />
             </label>
 
-            <label class="ac-settings-field" title="@ReactionsTip">
-                <span>Reactions / Era</span>
-                <input type="number"
-                       min="@AlphaChainSettings.MinCardsDealtPerEra"
-                       max="@AlphaChainSettings.MaxCardsDealtPerEra"
-                       value="@s.ReactionsDealtPerEra"
-                       @oninput="OnReactionsChanged" />
-            </label>
-
             <label class="ac-settings-field ac-settings-field-full" title="@EngineAnimTip">
                 <span>Engine Animation <strong>@s.EngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture) s</strong></span>
                 <input type="range"
@@ -139,6 +130,12 @@
                 }
             </ul>
         }
+
+        <div class="ac-settings-actions">
+            <button type="button" class="ac-settings-reset" title="@ResetTip" @onclick="ResetToDefaults">
+                Reset Defaults
+            </button>
+        </div>
     }
     else
     {
@@ -151,7 +148,6 @@
             <div title="@IntermissionTip"><dt>Intermission Timer</dt><dd>@s.IntermissionCardSelectSeconds s</dd></div>
             <div title="@SniperBanTip"><dt>Sniper Ban Timer</dt><dd>@s.SniperBanSeconds s</dd></div>
             <div title="@ModifiersTip"><dt>Modifiers / Era</dt><dd>@s.ModifiersDealtPerEra</dd></div>
-            <div title="@ReactionsTip"><dt>Reactions / Era</dt><dd>@s.ReactionsDealtPerEra</dd></div>
             <div title="@EngineAnimTip"><dt>Engine Animation</dt><dd>@s.EngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture) s</dd></div>
             <div title="@SurvivalTip"><dt>Survival Mode</dt><dd>@(s.SurvivalMode ? "On" : "Off")</dd></div>
             <div title="@TutorialsTip"><dt>Enable Tutorials</dt><dd>@(s.EnableTutorials ? "On" : "Off")</dd></div>
@@ -171,13 +167,13 @@
     private const string ShotClockTip = "Seconds each player has to submit a valid word on their turn. GDD baseline is 10–15 s; go lower for frantic matches or higher for relaxed ones.";
     private const string EraIntervalTip = "Rounds per Era. At the end of each Era the game pauses for an Intermission: deal cards, gain a Modifier slot, reorder your engine, and last place picks the next Banned Letter.";
     private const string EraCountTip = "How many Eras are played before the match ends. Highest cumulative score at the end of the final Era wins.";
-    private const string IntermissionTip = "Seconds players have during an Intermission to draft and rearrange their Modifier and Reaction cards.";
+    private const string IntermissionTip = "Seconds players have during an Intermission to draft and rearrange their Engine Bay modifier cards.";
     private const string SniperBanTip = "Seconds the last-place player has to pick the next Banned Letter. If they don't choose in time, a legal letter is banned at random.";
-    private const string ModifiersTip = "Modifier cards dealt to each player every Intermission. Modifiers are persistent engine cards processed left-to-right (additives first, multipliers last).";
-    private const string ReactionsTip = "Single-use Reaction cards dealt to each player every Intermission. They sit in hand and auto-fire on game events (e.g. Amnesty, Free Throw, Overtime, Toll Booth).";
+    private const string ModifiersTip = "Modifier cards dealt to each player every Intermission. Modifiers are persistent engine cards processed left-to-right (additives first, multipliers last) — the only card tier in the game.";
     private const string SurvivalTip = "When on, a player who misses the shot clock is eliminated for good instead of being penalized and staying in.";
     private const string TutorialsTip = "When on, three short non-interactive tutorials play at their cue points (word chain at the start, the scoring engine when the first era ends, and the tax before the first banned letter is chosen). You can skip each one as host.";
     private const string EngineAnimTip = "Total length of the score-replay animation that runs each accepted word through the Engine Bay so everyone sees how the score is built. Constant regardless of how many cards you hold — bigger engines just animate faster.";
+    private const string ResetTip = "Reset every match rule back to its default value.";
 
     private readonly CancellationTokenSource _cts = new();
     private Task? _saveTask;
@@ -207,6 +203,10 @@
         PersistSettings();
     }
 
+    // Resets every match rule to its default by swapping in a fresh settings record. HostPlays is a
+    // start-time choice (never persisted) and is left at its default false like the rest.
+    private void ResetToDefaults() => UpdateSetting(_ => new AlphaChainSettings());
+
     private void SetBanMode(BanLetterMode mode) => UpdateSetting(s => s with { BanMode = mode });
     private void OnSurvivalChanged(ChangeEventArgs e) => UpdateSetting(s => s with { SurvivalMode = e.Value is true });
     private void OnTutorialsChanged(ChangeEventArgs e) => UpdateSetting(s => s with { EnableTutorials = e.Value is true });
@@ -217,7 +217,6 @@
     private void OnIntermissionChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { IntermissionCardSelectSeconds = v });
     private void OnSniperBanChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { SniperBanSeconds = v });
     private void OnModifiersChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { ModifiersDealtPerEra = v });
-    private void OnReactionsChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { ReactionsDealtPerEra = v });
 
     // EngineAnimationSeconds is a double (range slider, 0.5 s steps); parsed invariant so the
     // browser's dot-decimal value is read correctly regardless of host locale.

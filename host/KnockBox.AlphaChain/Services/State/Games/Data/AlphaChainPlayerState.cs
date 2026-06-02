@@ -52,10 +52,6 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         /// </summary>
         public List<ModifierCard> EngineBay { get; } = new();
 
-        /// <summary>The reaction cards currently in the player's hand. They sit passively and
-        /// auto-fire on game events (see <c>ReactionResolver</c>); they are never played by hand.</summary>
-        public List<ReactionCard> ReactionHand { get; } = new();
-
         /// <summary>
         /// Ids of the modifier cards dealt to this player in the current Intermission, so the
         /// Optimization panel can flag them NEW and pop them in (the deal reveal now lives in
@@ -65,23 +61,17 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         public HashSet<string> NewlyDealtModifierIds { get; } = new(StringComparer.Ordinal);
 
         /// <summary>
-        /// The reaction cards dealt to this player in the current Intermission, shown as a reveal
-        /// strip in the Optimization panel. Repopulated each deal, cleared when the Intermission
-        /// completes. A list (not a set) because reaction hands may hold duplicates.
-        /// </summary>
-        public List<ReactionCard> NewlyDealtReactions { get; } = new();
-
-        /// <summary>
-        /// A personal banned letter imposed by an opponent's Jinx reaction (lower-case), or null
-        /// when none is active. Like the match's banned letter it triggers the Zero-Point Tax,
-        /// but it affects only this player and is consumed by their next accepted submission.
+        /// A transient personal banned letter (lower-case) forced onto this player by an opponent's
+        /// automated letter-hijack modifier (Tracer Round's end-letter, Bait &amp; Switch's taxed
+        /// letter), or null when none is active. Like the match's banned letter it triggers the
+        /// Zero-Point Tax, but it affects only this player and is consumed by their next accepted submission.
         /// </summary>
         public char? PersonalBannedLetter { get; set; } = null;
 
         /// <summary>
-        /// Shot-clock seconds owed to this player from attack reactions (Toll Booth, Frostbite)
-        /// that fired while they were not the active player. Applied (and cleared) the next time
-        /// they take a turn — see <c>RoundState.ApplyQueuedTimePenalty</c>.
+        /// Shot-clock seconds owed to this player from automated time-shave modifiers (Flak Cannon,
+        /// Scattershot) that fired while they were not the active player. Applied (and cleared) the
+        /// next time they take a turn — see <c>RoundState.ApplyQueuedTimePenalty</c>.
         /// </summary>
         public int QueuedTimePenaltySeconds { get; set; } = 0;
 
@@ -104,16 +94,23 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         public bool HyperDriveActive { get; set; } = false;
 
         /// <summary>
-        /// Seconds this player is "silenced" (word input locked) at the start of their next turn,
-        /// queued by a Feedback Loop when a holder's Riposte negated this player's attack. Read and
-        /// cleared by the client at turn start.
+        /// The owner's live Titanium Mirror multiplier. Starts at 1.0 (a passive ×1.0 placeholder)
+        /// and drops by the shield's decay per attack it blocks and reflects this era, possibly
+        /// below 1.0 into a scoring burden. Feeds the Titanium Mirror card's scoring factor via
+        /// <c>WordContext.ShieldMultiplier</c>. Reset to 1.0 at each era boundary.
         /// </summary>
-        public int QueuedSilenceSeconds { get; set; } = 0;
+        public double ShieldMultiplier { get; set; } = 1.0;
 
         /// <summary>
-        /// True once this player's Windfall has fired in the current era, so a player oscillating on
-        /// the last-place boundary can't loop-draw their deck. Reset at each era boundary.
+        /// True once this player has played a word containing a double letter this era — the target
+        /// test for an opponent's Scattershot. Reset at each era boundary.
         /// </summary>
-        public bool WindfallFiredThisEra { get; set; } = false;
+        public bool PlayedDoubleLetterWordThisEra { get; set; } = false;
+
+        /// <summary>
+        /// True once this player's The Prism has already refilled the clock on a failed submission
+        /// this turn (the once-per-turn cap). Reset whenever a fresh turn arms for this player.
+        /// </summary>
+        public bool PrismUsedThisTurn { get; set; } = false;
     }
 }
