@@ -17,6 +17,7 @@
 *   If a player submits a word containing a **Banned Letter**, the word is accepted to keep the chain alive, but the total score for that turn is **0**. 
 *   This acts as a tactical "pass" to reset the clock and shift a difficult starting letter to the next opponent.
 *   If a player plays a word with a banned letter as the last letter, then the next player can play any word.
+*   **Tax Collector payout:** A taxed word is not merely lost points — any opponent holding a **Tax Collector** modifier (§3.1) collects **half** of the score the word would otherwise have made. A banned-letter play can therefore actively feed your rivals.
 
 ---
 
@@ -26,11 +27,20 @@
 Modifiers are persistent cards that stay in a player's "Engine Bay." They are processed in a **Strict Left-to-Right Pipeline**.
 
 *   **Additive Cards (+):** Best placed on the left.
-    *   *Example:* **The Anchor** (+12 flat bonus).
-    *   *Example:* **Consonant Crunch** (+2 per consonant).
+    *   **The Anchor** (+12 flat bonus).
+    *   **Consonant Crunch** (+2 per consonant).
+    *   **Brick Layer** (+1 per letter when the word is 6+ letters).
+    *   **Letter Hoarder** (+1 per distinct letter).
 *   **Multiplicative Cards (×):** Best placed on the right.
-    *   *Example:* **Vowel Surge** (2× if vowels > consonants).
-    *   *Example:* **The Architect** (1.5× for 8+ letter words).
+    *   **Vowel Surge** (2× if vowels > consonants).
+    *   **The Architect** (1.5× for 8+ letter words).
+    *   **Sprinter** (1.25× when the word is 4 letters or shorter).
+
+**Tax Collector (reactive bounty).** A special modifier that does **not** fold into its owner's own
+scoring pipeline. Instead it pays out reactively: whenever an *opponent* plays a banned-letter word
+and eats the Zero-Point Tax (§2.2), each Tax Collector owner collects **half** the points that word
+would have scored. It is the engine-side counterpart to the Zero-Point Tax — a banned-letter play
+that scores 0 for the speaker can still pay out to everyone holding this card.
 
 ### 3.2 Reaction Cards (Tactical)
 Single-use cards that sit passively in a player's hand and **auto-fire on game events** — only
@@ -60,7 +70,7 @@ clock. At most one matching reaction per holder fires per event (oldest first).
 The game is divided into 4-round "Eras." At the end of every 4th round, the game enters an **Intermission Phase**.
 
 ### 4.1 Intermission Phase Steps
-1.  **The Deal:** Every player receives a fresh hand of Modifier and Action cards.
+1.  **The Deal:** Every player receives a fresh hand of Modifier and Reaction cards (§3.1–§3.2).
 2.  **Expansion:** Every player gains one additional **Modifier Slot**.
 3.  **Optimization (Fog of War):** Players rearrange their current and new modifiers. Opponents' cards are hidden during this step.
 4.  **The Sniper Ban:** The player in **last place** selects any letter of the alphabet to be the **Banned Letter** for the next 4 rounds.
@@ -105,7 +115,7 @@ game actually does*.
     card mid-turn, which was friction under the shot clock. They are replaced by the reaction system
     described in §3.2: cards sit in hand and auto-fire on game events, only when beneficial. Amnesty
     is preserved (now auto-firing), Pivot became **Free Throw** (rare-letter rescue at turn start),
-    Time Thief is removed, and six new cards were added (Overtime, Windfall, Toll Booth, Frostbite,
+    Time Thief is removed, and seven new cards were added (Overtime, Windfall, Toll Booth, Frostbite,
     Jinx, Censor, Riposte). A "reaction strike" overlay tells a targeted player what hit them and why.
     *(Confirmed intentional.)*
 *   **Era 1 is cardless.** Players start with an empty Engine Bay and empty hand; the first Deal
