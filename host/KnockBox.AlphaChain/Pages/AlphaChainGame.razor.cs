@@ -1,7 +1,7 @@
 using KnockBox.AlphaChain.Components;
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
-using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM.States;
 using KnockBox.AlphaChain.Services.State.Games;
@@ -107,6 +107,19 @@ namespace KnockBox.AlphaChain.Pages
         /// cursed player can see it (it is personal — only the affected player sees their own).</summary>
         protected string? PersonalBannedLetterDisplay =>
             MyPlayer?.PersonalBannedLetter is { } c ? char.ToUpperInvariant(c).ToString() : null;
+
+        /// <summary>The local player's era-rolled personal banned letters (The Roulette Wheel, The Toll
+        /// Booth) as distinct upper-case strings. Like <see cref="PersonalBannedLetterDisplay"/> these
+        /// are personal — only the owner sees their own — and are shown beside the era ban in their own
+        /// colour so the player understands why those letters tax them.</summary>
+        protected IReadOnlyList<string> CardBannedLetterDisplays =>
+            MyPlayer is { } me
+                ? me.CardBannedLetters.Values
+                    .Select(c => char.ToUpperInvariant(c).ToString())
+                    .Distinct()
+                    .OrderBy(s => s, StringComparer.Ordinal)
+                    .ToList()
+                : [];
 
         /// <summary>Total duration of the per-turn shot clock (for the countdown ring).</summary>
         protected TimeSpan ShotClockDuration => TimeSpan.FromSeconds(GameState.Settings.ShotClockSeconds);
@@ -248,12 +261,12 @@ namespace KnockBox.AlphaChain.Pages
         /// <summary>Whether the local player holds Tunnel Vision — their view masks the first and last
         /// letter of the most recent chain word (owner-only; the chain rule is still server-enforced).</summary>
         protected bool LocalPlayerHasTunnelVision =>
-            MyPlayer?.EngineBay.Any(c => c.MasksPreviousWord) == true;
+            MyPlayer?.EngineBay.Any(c => c is IPreviousWordMask) == true;
 
         /// <summary>Whether the local player holds The Blindfold — their own word-input text is hidden
         /// while they type (a self-inflicted UI penalty traded for a multiplier; input still works).</summary>
         protected bool LocalPlayerHidesInput =>
-            MyPlayer?.EngineBay.Any(c => c.HidesOwnInput) == true;
+            MyPlayer?.EngineBay.Any(c => c is IInputMask) == true;
 
         /// <summary>Whether the local user is the room host (gates the debug "Grant Cards" button).</summary>
         protected bool IsHost => CurrentUserId is not null && CurrentUserId == GameState.Host.Id;

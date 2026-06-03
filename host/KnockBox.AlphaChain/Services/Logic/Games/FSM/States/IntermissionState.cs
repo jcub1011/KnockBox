@@ -1,5 +1,5 @@
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
-using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 using KnockBox.Core.Primitives.Returns;
@@ -173,7 +173,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             // Every id must be a card the player currently holds. The dealt cards were already
             // appended to the bay in the Deal sub-phase, so "current bay" is the full candidate set.
-            var heldIds = player.EngineBay.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
+            var heldIds = player.EngineBay.Select(c => c.GetId().ToString()).ToHashSet(StringComparer.Ordinal);
             foreach (var id in ids)
                 if (!heldIds.Contains(id))
                     return new ResultError("That card isn't in your Engine Bay.",
@@ -229,25 +229,25 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
                 // Distinct modifiers the player doesn't already hold (bay ids must stay unique). A
                 // player may hold at most one shield, so shields are excluded once they hold one.
-                var heldIds = player.EngineBay.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
-                bool hasShield = player.EngineBay.Any(c => c.Shield is not null);
-                var pool = ModifierLibrary.All.Where(c => !heldIds.Contains(c.Id)).ToList();
+                var heldIds = player.EngineBay.Select(c => c.GetId()).ToHashSet();
+                bool hasShield = player.EngineBay.Any(c => ModifierCardFactory.ShieldIds.Contains(c.GetId()));
+                var pool = ModifierCardFactory.AllDealableIds.Where(id => !heldIds.Contains(id)).ToList();
                 if (hasShield)
-                    pool.RemoveAll(c => c.Shield is not null);
+                    pool.RemoveAll(id => ModifierCardFactory.ShieldIds.Contains(id));
 
                 for (int i = 0; i < modCount && pool.Count > 0; i++)
                 {
                     int idx = context.Rng.GetRandomInt(pool.Count);
-                    var dealt = pool[idx];
-                    player.EngineBay.Add(dealt); // append-to-right; resequenced in Optimization.
-                    player.NewlyDealtModifierIds.Add(dealt.Id);
+                    var dealtId = pool[idx];
+                    player.EngineBay.Add(context.ModifierFactory.CreateCard(default, dealtId)); // append-to-right; resequenced in Optimization.
+                    player.NewlyDealtModifierIds.Add(dealtId);
                     pool.RemoveAt(idx);
-                    if (dealt.Shield is not null)
+                    if (ModifierCardFactory.ShieldIds.Contains(dealtId))
                     {
                         // A freshly dealt shield is the player's replacement mirror: it starts
                         // un-decayed, and no further shield may be dealt in this same deal.
                         player.ShieldMultiplier = 1.0;
-                        pool.RemoveAll(c => c.Shield is not null);
+                        pool.RemoveAll(id => ModifierCardFactory.ShieldIds.Contains(id));
                     }
                 }
             }
@@ -270,7 +270,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.OptimizationSubmissions.Clear();
             foreach (var player in ActivePlayers(state))
             {
-                var ids = player.EngineBay.Select(c => c.Id).ToList();
+                var ids = player.EngineBay.Select(c => c.GetId().ToString()).ToList();
                 state.OptimizationSubmissions[player.UserId] =
                     new OptimizationSubmission(player.UserId, ids, Submitted: false);
             }
@@ -331,8 +331,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
                 if (state.OptimizationSubmissions.TryGetValue(player.UserId, out var sub) && sub.Submitted)
                 {
-                    var byId = player.EngineBay.ToDictionary(c => c.Id, StringComparer.Ordinal);
-                    var reordered = new List<ModifierCard>(sub.ModifierBayIds.Count);
+                    var byId = player.EngineBay.ToDictionary(c => c.GetId().ToString(), StringComparer.Ordinal);
+                    var reordered = new List<IModifierCard>(sub.ModifierBayIds.Count);
                     foreach (var id in sub.ModifierBayIds)
                         if (byId.TryGetValue(id, out var card))
                             reordered.Add(card);
@@ -397,41 +397,36 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             if (state.CurrentEra > state.Settings.EraCount)
                 return new GameOverState();
 
-            // Roll fresh personal banned letters for the new era now that the bay is final and the
-            // Sniper Ban has set the era letter (so the personal ban can dodge it).
-            RollPersonalBans(context);
+            // Fire the era-start hooks now that the bay is final and the Sniper Ban has set the era
+            // letter (so a card's personal-ban roll can dodge it). Roulette Wheel / Toll Booth roll
+            // their personal banned letters here via OnEraStart.
+            FireEraStartHooks(context);
             return new RoundState();
         }
 
         /// <summary>
-        /// Rolls a fresh personal banned letter for every active player's
-        /// <c>RollsPersonalBanAtEraStart</c> modifier cards (Roulette Wheel, Smuggler's Toll), keyed
-        /// by card id. Drawn from the match's legal ban pool, avoiding the era banned letter so the
-        /// personal ban is a distinct hazard. Stale rolls are cleared first (a re-roll each era).
+        /// Clears each active player's era-rolled card bans, then fires every card's
+        /// <see cref="IModifierCard.OnEraStart"/> hook (Roulette Wheel / Toll Booth roll a personal
+        /// banned letter through the per-room <c>IBanLetterService</c>).
         /// </summary>
-        private static void RollPersonalBans(AlphaChainGameContext context)
+        private static void FireEraStartHooks(AlphaChainGameContext context)
         {
             var state = context.State;
+            var services = context.EvaluationServices;
+            services.BeginResolution(DateTimeOffset.UtcNow);
+
             foreach (var player in ActivePlayers(state))
             {
                 player.CardBannedLetters.Clear();
+                var ctx = new EngineEvaluationContext(string.Empty, Array.Empty<char>(), new[] { player })
+                {
+                    Bay = player.EngineBay,
+                    Services = services,
+                    PlayerIndex = 0,
+                };
                 foreach (var card in player.EngineBay)
-                    if (card.RollsPersonalBanAtEraStart)
-                        player.CardBannedLetters[card.Id] = DrawPersonalBan(context, state.BannedLetter);
+                    ctx = card.OnEraStart(ctx, card);
             }
-        }
-
-        /// <summary>Draws a legal personal banned letter, nudging off the era ban if it collides.</summary>
-        private static char DrawPersonalBan(AlphaChainGameContext context, char? eraBan)
-        {
-            string pool = BanLetterPool.For(context.State.Settings.BanMode);
-            char letter = BanLetterPool.Draw(context.State.Settings.BanMode, context.Rng);
-            if (eraBan is { } e && letter == e && pool.Length > 1)
-            {
-                int idx = pool.IndexOf(letter);
-                letter = pool[(idx + 1) % pool.Length];
-            }
-            return letter;
         }
 
         // ── Shared helpers ───────────────────────────────────────────────────

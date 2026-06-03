@@ -1,4 +1,4 @@
-using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 
 namespace KnockBox.AlphaChain.Services.State.Games.Data
 {
@@ -50,7 +50,7 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         /// The player's Engine Bay: an ordered list of modifier cards (left → right is the
         /// scoring pipeline order). Bounded by <see cref="ModifierSlots"/>.
         /// </summary>
-        public List<ModifierCard> EngineBay { get; } = new();
+        public List<IModifierCard> EngineBay { get; } = new();
 
         /// <summary>
         /// Ids of the modifier cards dealt to this player in the current Intermission, so the
@@ -58,7 +58,7 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         /// Optimization instead of a dedicated sub-phase). Repopulated each deal, cleared when
         /// the Intermission completes.
         /// </summary>
-        public HashSet<string> NewlyDealtModifierIds { get; } = new(StringComparer.Ordinal);
+        public HashSet<ModifierId> NewlyDealtModifierIds { get; } = new();
 
         /// <summary>
         /// A transient personal banned letter (lower-case) forced onto this player by an opponent's
@@ -84,7 +84,7 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         /// Zero-Point Tax for this player; re-rolled each era. Separate from
         /// <see cref="PersonalBannedLetter"/> (the transient Jinx/Bait &amp; Switch ban).
         /// </summary>
-        public Dictionary<string, char> CardBannedLetters { get; } = new(StringComparer.Ordinal);
+        public Dictionary<ModifierId, char> CardBannedLetters { get; } = new();
 
         /// <summary>
         /// True once Hyper-Drive has latched this era: the owner's shot clock is overridden short

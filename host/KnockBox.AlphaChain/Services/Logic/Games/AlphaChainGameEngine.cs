@@ -1,7 +1,8 @@
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM.States;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
@@ -27,7 +28,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
     public class AlphaChainGameEngine(
         IWordListService wordList,
         IRandomNumberService rng,
-        IScoreCalculator scoreCalculator,
+        IEngineEvaluator evaluator,
+        IModifierCardFactory modifierFactory,
         ILogger<AlphaChainGameEngine> logger,
         ILogger<AlphaChainGameState> stateLogger) : AbstractGameEngine<AlphaChainGameState>(2, 8)
     {
@@ -110,7 +112,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
                     "AlphaChainSettings.Validate reported: " + validation.Summary));
             }
 
-            var context = new AlphaChainGameContext(gameState, this, wordList, rng, scoreCalculator, logger);
+            var context = new AlphaChainGameContext(gameState, this, wordList, rng, evaluator, modifierFactory, logger);
             var fsm = new FiniteStateMachine<AlphaChainGameContext, AlphaChainCommand>(logger);
             context.Fsm = fsm;
 

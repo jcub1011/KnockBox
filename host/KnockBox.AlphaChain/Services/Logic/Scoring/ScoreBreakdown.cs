@@ -1,4 +1,4 @@
-using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 
 namespace KnockBox.AlphaChain.Services.Logic.Scoring
 {
@@ -7,9 +7,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Scoring
     /// score-replay overlay can animate the running total updating per card. Plain data (no
     /// delegates) so it is safe to stash on game state and render to every client.
     /// </summary>
-    /// <param name="CardId">Stable id of the card at this step.</param>
+    /// <param name="CardId">Stable id of the card at this step (the card's <see cref="ModifierId"/> token).</param>
     /// <param name="Name">Card display name.</param>
-    /// <param name="Icon">Card icon key (see <see cref="ModifierCard.Icon"/>).</param>
+    /// <param name="Icon">Card icon key.</param>
     /// <param name="Kind">Additive or multiplicative.</param>
     /// <param name="Triggered">Whether the card's trigger fired for this word.</param>
     /// <param name="ValueText">The applied operator/value (e.g. "+12", "×1.5"), or "—" when skipped.</param>
@@ -18,7 +18,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Scoring
         string CardId,
         string Name,
         string Icon,
-        ModifierKind Kind,
+        ModifierType Kind,
         bool Triggered,
         string ValueText,
         int RunningScore);

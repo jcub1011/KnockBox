@@ -1,7 +1,8 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -39,7 +40,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             StubWordListService words, int playerCount, char banned)
         {
             var engine = new AlphaChainGameEngine(
-                words, new FixedRandomNumberService(), new ScoreCalculator(),
+                words, new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -54,16 +55,16 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         }
 
         private static void GiveModifier(AlphaChainGameState state, string playerId, string cardId) =>
-            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(ModifierLibrary.FindById(cardId)!));
+            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
 
         private static void GiveTaxCollector(AlphaChainGameState state, string playerId) =>
-            GiveModifier(state, playerId, ModifierLibrary.TaxCollectorId);
+            GiveModifier(state, playerId, TestModifierCards.TaxCollectorId);
 
         [TestMethod]
         public async Task OpponentTaxedWord_PaysHalfWouldBeScore_ToTaxCollectorOwner_SubmitterGetsZero()
         {
-            // Banned 'a' is inside "cat". Submitter has an Anchor (+6) so the would-be score is
-            // (length 3 + 6) = 9; the owner should collect round(9 × 0.5) = 5 (half-up).
+            // Banned 'a' is inside "cat". Submitter has an Anchor (+10) so the would-be score is
+            // (length 3 + 10) = 13; the owner should collect round(13 × 0.5) = 7 (half-up).
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
             using var _ = state;
             var submitter = state.TurnManager.CurrentPlayer!;
@@ -77,14 +78,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(result);
 
             Assert.AreEqual(0, state.GamePlayers[submitter].Score, "Taxed submitter must score 0.");
-            Assert.AreEqual(5, state.GamePlayers[owner].Score, "Owner collects half the would-be 9.");
+            Assert.AreEqual(7, state.GamePlayers[owner].Score, "Owner collects half the would-be 13.");
 
             // The play feed records the bounty that was paid.
-            Assert.AreEqual(5, state.PlayLog[^1].TaxBounty);
+            Assert.AreEqual(7, state.PlayLog[^1].TaxBounty);
 
             // The score replay surfaces who stole the points (and how much) so the strip can list them.
             var replay = state.LatestScoreReplay!;
-            Assert.AreEqual(5, replay.TaxBounty);
+            Assert.AreEqual(7, replay.TaxBounty);
             CollectionAssert.AreEqual(
                 new[] { state.GamePlayers[owner].DisplayName },
                 replay.TaxCollectors!.ToArray());
@@ -144,18 +145,18 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var owner1 = state.TurnManager.TurnOrder[1];
             var owner2 = state.TurnManager.TurnOrder[2];
 
-            GiveModifier(state, submitter, "anchor"); // would-be 9
+            GiveModifier(state, submitter, "anchor"); // would-be 13
             GiveTaxCollector(state, owner1);
             GiveTaxCollector(state, owner2);
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
-            Assert.AreEqual(5, state.GamePlayers[owner1].Score);
-            Assert.AreEqual(5, state.GamePlayers[owner2].Score);
+            Assert.AreEqual(7, state.GamePlayers[owner1].Score);
+            Assert.AreEqual(7, state.GamePlayers[owner2].Score);
 
             // Both owners are listed (sorted) on the replay so the strip shows every thief.
             var replay = state.LatestScoreReplay!;
-            Assert.AreEqual(5, replay.TaxBounty);
+            Assert.AreEqual(7, replay.TaxBounty);
             CollectionAssert.AreEquivalent(
                 new[] { state.GamePlayers[owner1].DisplayName, state.GamePlayers[owner2].DisplayName },
                 replay.TaxCollectors!.ToArray());

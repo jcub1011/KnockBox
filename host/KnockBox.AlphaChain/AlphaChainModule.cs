@@ -1,6 +1,7 @@
 using KnockBox.AlphaChain.Components;
 using KnockBox.AlphaChain.Services.Logic.Games;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.Core.Plugins;
 using Microsoft.AspNetCore.Components;
 
@@ -13,10 +14,11 @@ namespace KnockBox.AlphaChain
 
         public void RegisterServices(IPluginRegistration registration)
         {
-            // The deterministic scoring pipeline is a stateless singleton shared by every
-            // Alpha Chain room; the engine resolves it from DI and forwards it onto the
-            // per-game context.
-            registration.AddSingleton<IScoreCalculator, ScoreCalculator>();
+            // The sequential scoring driver and the modifier-card factory are stateless singletons
+            // shared by every Alpha Chain room; the engine resolves them from DI and forwards them
+            // onto the per-game context.
+            registration.AddSingleton<IEngineEvaluator, EngineEvaluator>();
+            registration.AddSingleton<IModifierCardFactory, ModifierCardFactory>();
             registration.AddGameEngine<AlphaChainGameEngine>();
         }
 

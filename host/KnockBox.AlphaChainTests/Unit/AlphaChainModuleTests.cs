@@ -1,6 +1,7 @@
 using KnockBox.AlphaChain;
 using KnockBox.AlphaChain.Services.Logic.Games;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.Core.Plugins;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 
@@ -40,8 +41,12 @@ namespace KnockBox.AlphaChain.Tests.Unit
 
             CollectionAssert.Contains(
                 registration.Singletons,
-                (typeof(IScoreCalculator), typeof(ScoreCalculator)),
-                "IScoreCalculator must be registered as a singleton backed by ScoreCalculator.");
+                (typeof(IEngineEvaluator), typeof(EngineEvaluator)),
+                "IEngineEvaluator must be registered as a singleton backed by EngineEvaluator.");
+            CollectionAssert.Contains(
+                registration.Singletons,
+                (typeof(IModifierCardFactory), typeof(ModifierCardFactory)),
+                "IModifierCardFactory must be registered as a singleton backed by ModifierCardFactory.");
             CollectionAssert.Contains(
                 registration.GameEngines,
                 typeof(AlphaChainGameEngine),

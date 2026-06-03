@@ -109,6 +109,16 @@
     align-self: center;
 }
 
+/* A personal banned letter rolled by the player's own card (The Roulette Wheel / The Toll Booth):
+   smaller, amber, only the owner sees their own — distinct from the era ban (red) and a forced
+   hijack ban (rose). */
+.ac-cmd-banned .ac-cmd-cardban {
+    font-size: clamp(1.4rem, 4.5vw, 2.1rem);
+    color: var(--ac-amber, #f5a623);
+    text-shadow: 0 0 12px color-mix(in srgb, var(--ac-amber, #f5a623) 55%, transparent);
+    align-self: center;
+}
+
 /* ── Shot-clock ring ──────────────────────────────────────────────────── */
 .ac-cmd-clock {
     display: flex;
@@ -328,6 +338,40 @@
     opacity: 0.4;
     cursor: not-allowed;
     filter: grayscale(40%);
+}
+
+/* ── Game-over actions: the host's Return to Lobby button ──────────────── */
+.ac-results-actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.25rem;
+}
+
+/* Matches the in-game submit button (cyan, hard border + shadow, press nudge), with the
+   standalone vertical padding it needs outside the submit input row. */
+.ac-results-btn {
+    padding: 0.7rem 1.8rem;
+    border: 3px solid #000;
+    border-radius: 0.6rem;
+    background: var(--ac-cyan);
+    color: #04121a;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    box-shadow: var(--ac-shadow-sm);
+    transition: transform 0.08s, box-shadow 0.08s, filter 0.15s;
+}
+
+.ac-results-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 #000;
+}
+
+.ac-results-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #000;
 }
 
 /* ── Entry status: pending action + feedback ──────────────────────────── */

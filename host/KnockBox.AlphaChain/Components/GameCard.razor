@@ -1,4 +1,4 @@
-@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
+@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
 @* The single, uniform card renderer used everywhere a modifier or reaction card appears
    (Engine Bay, Reaction Hand, Optimization panel, score overlay). Every card has the same
@@ -35,11 +35,8 @@
     /// <summary>Icon key resolved by <see cref="CardIcon"/>.</summary>
     [Parameter] public string? Icon { get; set; }
 
-    /// <summary>Top-level category, drives the accent tint + operator.</summary>
-    [Parameter] public CardCategory Category { get; set; } = CardCategory.Modifier;
-
-    /// <summary>Modifier kind (additive/multiplicative).</summary>
-    [Parameter] public ModifierKind? Kind { get; set; }
+    /// <summary>Modifier type (additive/multiplicative), driving the accent tint + operator glyph.</summary>
+    [Parameter] public ModifierType? Kind { get; set; }
 
     /// <summary>Overrides the operator/value glyph (e.g. "×1.5" in the score overlay).</summary>
     [Parameter] public string? ValueText { get; set; }
@@ -67,13 +64,13 @@
 
     /// <summary>additive / multiplicative — selects the accent variable.</summary>
     private string CategoryClass =>
-        Kind == ModifierKind.Multiplicative ? "multiplicative" : "additive";
+        Kind == ModifierType.Multiplier ? "multiplicative" : "additive";
 
     /// <summary>The operator glyph: explicit override, else + / × for modifiers, else none.</summary>
     private string? OperatorSymbol => ValueText ?? Kind switch
     {
-        ModifierKind.Additive => "+",
-        ModifierKind.Multiplicative => "×",
+        ModifierType.Additive => "+",
+        ModifierType.Multiplier => "×",
         _ => null
     };
 

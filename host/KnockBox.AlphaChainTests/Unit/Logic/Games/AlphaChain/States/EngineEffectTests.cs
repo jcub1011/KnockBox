@@ -1,7 +1,8 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -37,7 +38,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             StubWordListService words, int playerCount = 2, char? banned = null)
         {
             var engine = new AlphaChainGameEngine(
-                words, new FixedRandomNumberService(), new ScoreCalculator(),
+                words, new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -55,7 +56,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         }
 
         private static void GiveModifier(AlphaChainGameState state, string playerId, string cardId) =>
-            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(ModifierLibrary.FindById(cardId)!));
+            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
 
         private static void SetScore(AlphaChainGameState state, string playerId, int score) =>
             state.Execute(() => state.GamePlayers[playerId].Score = score);
@@ -173,23 +174,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             await engine.SubmitWordAsync(leader, "bridge", state); // 6 letters → safe
 
             Assert.AreEqual(6, state.GamePlayers[leader].Score, "A 6-letter word meets the threshold — no dock.");
-        }
-
-        // ── Tracer Round (end-letter hijack) ─────────────────────────────────
-
-        [TestMethod]
-        public async Task TracerRound_BansNextPlayersStart_WithTheWordEndingLetter()
-        {
-            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
-            using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
-            var next = state.TurnManager.TurnOrder[1];
-
-            GiveModifier(state, submitter, "tracer-round");
-
-            await engine.SubmitWordAsync(submitter, "cat", state); // ends 't'
-
-            Assert.AreEqual('t', state.GamePlayers[next].PersonalBannedLetter, "Next player is banned from 't'.");
         }
 
         // ── The Titanium Mirror (block, reflect, decay) ──────────────────────

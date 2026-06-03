@@ -1,7 +1,8 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -36,7 +37,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             StubWordListService words, int playerCount = 2, char? banned = null)
         {
             var engine = new AlphaChainGameEngine(
-                words, new FixedRandomNumberService(), new ScoreCalculator(),
+                words, new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -53,10 +54,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         }
 
         private static void GiveModifier(AlphaChainGameState state, string playerId, string cardId) =>
-            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(ModifierLibrary.FindById(cardId)!));
+            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
 
         private static void SetCardBan(AlphaChainGameState state, string playerId, string cardId, char letter) =>
-            state.Execute(() => state.GamePlayers[playerId].CardBannedLetters[cardId] = letter);
+            state.Execute(() => state.GamePlayers[playerId].CardBannedLetters[TestModifierCards.ToId(cardId)] = letter);
 
         // ── Own card-bans tax the owner's word ───────────────────────────────
 
@@ -141,20 +142,21 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         [TestMethod]
         public async Task Catalyst_FlipsAVowelConditional_ThroughTheSubmitPath()
         {
-            // "yew": normally vowels=1 (e), consonants=2 (y, w) → Vowel Surge (×2 when vowels >
-            // consonants) does NOT trigger. With The Catalyst, y and w count as both, so vowels=3 >
-            // consonants=2 and Vowel Surge fires: length 3 → ×2 = 6.
+            // "yew": normally vowels=1 (e), consonants=2 (y, w) → Vowel Surge (×3 when vowels >
+            // consonants) does NOT trigger. The Catalyst is placed BEFORE Vowel Surge so its vowel
+            // override applies to it (the capability-walk idiom is position-dependent): y and w then
+            // count as vowels too, so vowels=3 > consonants=2 and Vowel Surge fires: length 3 → ×3 = 9.
             var (engine, state) = await StartGameAsync(new StubWordListService("yew"), banned: 'z');
             using var _ = state;
             var submitter = state.TurnManager.CurrentPlayer!;
 
-            GiveModifier(state, submitter, "vowel-surge");
             GiveModifier(state, submitter, "catalyst");
+            GiveModifier(state, submitter, "vowel-surge");
 
             await engine.SubmitWordAsync(submitter, "yew", state);
 
-            Assert.AreEqual(6, state.GamePlayers[submitter].Score,
-                "Catalyst makes y/w vowels too → Vowel Surge triggers ×2 on the length-3 word.");
+            Assert.AreEqual(9, state.GamePlayers[submitter].Score,
+                "Catalyst (placed first) makes y/w vowels too → Vowel Surge triggers ×3 on the length-3 word.");
         }
 
         [TestMethod]

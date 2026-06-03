@@ -2,7 +2,8 @@ using System.Text;
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -45,7 +46,7 @@ namespace KnockBox.AlphaChain.Tests.Integration
         {
             var words = new AnyWordListService();
             var engine = new AlphaChainGameEngine(
-                words, new FixedRandomNumberService(), new ScoreCalculator(),
+                words, new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -123,7 +124,7 @@ namespace KnockBox.AlphaChain.Tests.Integration
                 Assert.IsTrue(player.EngineBay.Count <= player.ModifierSlots,
                     $"Player {player.UserId} overflowed their Engine Bay ({player.EngineBay.Count} > {player.ModifierSlots}).");
 
-                var distinctIds = player.EngineBay.Select(c => c.Id).Distinct().Count();
+                var distinctIds = player.EngineBay.Select(c => c.GetId()).Distinct().Count();
                 Assert.AreEqual(player.EngineBay.Count, distinctIds,
                     $"Player {player.UserId} has duplicate modifier ids in their bay.");
             }

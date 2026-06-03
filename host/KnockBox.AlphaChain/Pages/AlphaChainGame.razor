@@ -16,7 +16,7 @@
         @if (IsHost)
         {
             <div class="ac-results-actions">
-                <button class="ac-start-btn ac-start-primary" @onclick="ReturnToLobbyAsync">
+                <button class="ac-results-btn" @onclick="ReturnToLobbyAsync">
                     Return to Lobby
                 </button>
             </div>
@@ -119,6 +119,11 @@
                             {
                                 <span class="ac-cmd-letter ac-cmd-jinx"
                                       title="A personal banned letter forced onto your next word (Tracer Round / Bait & Switch)">@hijack</span>
+                            }
+                            @foreach (var cardBan in CardBannedLetterDisplays)
+                            {
+                                <span class="ac-cmd-letter ac-cmd-cardban"
+                                      title="A personal banned letter from one of your own cards (The Roulette Wheel / The Toll Booth)">@cardBan</span>
                             }
                         </span>
                     </div>

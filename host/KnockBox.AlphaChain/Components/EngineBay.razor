@@ -1,4 +1,4 @@
-@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
+@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
 @* A player's Engine Bay: an ordered row of modifier slots, left → right is the scoring
    pipeline order. Reorder is HTML5 drag-and-drop with a keyboard fallback (focus a card,
@@ -34,8 +34,8 @@
                             @ondragstart="() => _dragIndex = index"
                             @ondragend="() => _dragIndex = null"
                             @onkeydown="e => OnKeyDown(e, index)">
-                        <GameCard Name="@card.Name" Description="@card.Description" Icon="@card.Icon"
-                                  Category="CardCategory.Modifier" Kind="card.Kind"
+                        <GameCard Name="@card.GetName()" Description="@card.GetDescription()" Icon="@card.GetIcon()"
+                                  Kind="card.GetModifierType(default)"
                                   ValueText="@ShieldValueText(card)"
                                   Compact="@ReadOnly" Dragging="@(_dragIndex == index)" />
                     </button>
@@ -51,7 +51,7 @@
 
 @code {
     /// <summary>The ordered modifier cards in the bay (left → right = pipeline order).</summary>
-    [Parameter] public IReadOnlyList<ModifierCard> Cards { get; set; } = [];
+    [Parameter] public IReadOnlyList<IModifierCard> Cards { get; set; } = [];
 
     /// <summary>How many slots to render (capacity). Empty slots render as placeholders.</summary>
     [Parameter] public int Slots { get; set; } = 3;
@@ -76,8 +76,8 @@
     [Parameter] public double? ShieldMultiplier { get; set; }
 
     /// <summary>The live "×N.N" glyph for the shield card, or null for every other card.</summary>
-    private string? ShieldValueText(ModifierCard card) =>
-        card.Shield is not null && ShieldMultiplier is { } sm ? $"×{sm:0.0}" : null;
+    private string? ShieldValueText(IModifierCard card) =>
+        card is IAttackInterceptor && ShieldMultiplier is { } sm ? $"×{sm:0.0}" : null;
 
     /// <summary>Raised with the new ordering of card ids when the player moves a card.</summary>
     [Parameter] public EventCallback<IReadOnlyList<string>> OnReorder { get; set; }
@@ -117,7 +117,7 @@
         to = Math.Clamp(to, 0, count - 1);
         if (from == to) return;
 
-        var ids = Cards.Select(c => c.Id).ToList();
+        var ids = Cards.Select(c => c.GetId().ToString()).ToList();
         var moved = ids[from];
         ids.RemoveAt(from);
         ids.Insert(to, moved);

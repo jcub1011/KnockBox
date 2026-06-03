@@ -1,6 +1,7 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -35,7 +36,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             StubWordListService words, int playerCount = 2, char? banned = null)
         {
             var engine = new AlphaChainGameEngine(
-                words, new FixedRandomNumberService(), new ScoreCalculator(),
+                words, new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -54,7 +55,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         }
 
         private static void GiveModifier(AlphaChainGameState state, string playerId, string cardId) =>
-            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(ModifierLibrary.FindById(cardId)!));
+            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
 
         // ── Clock effects (ComputeArmedShotClockSeconds) ────────────────────
 
@@ -123,15 +124,15 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         }
 
         [TestMethod]
-        public async Task HeatSink_AddsFiveSeconds()
+        public async Task HeatSink_LengthensTheShotClock()
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
             var id = state.TurnManager.CurrentPlayer!;
             GiveModifier(state, id, "heat-sink");
 
-            // Default shot clock 12 + 5 = 17.
-            Assert.AreEqual(17, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+            // Heat Sink declares a +0.3 fractional clock effect, so 12 × (1 + 0.3) = 15.6 → 16.
+            Assert.AreEqual(16, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
         }
 
         [TestMethod]

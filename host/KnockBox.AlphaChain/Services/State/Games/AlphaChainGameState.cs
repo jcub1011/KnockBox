@@ -1,5 +1,5 @@
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
-using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 using KnockBox.Core.Primitives.Returns;
@@ -195,35 +195,23 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// </summary>
         public int ComputeArmedShotClockSeconds(AlphaChainPlayerState player)
         {
-            // The Anchor Chain pins the clock: unmodifiable, ignores ClockEffects + Hyper-Drive.
-            int? fixedSeconds = null;
-            foreach (var card in player.EngineBay)
-                if (card.ClockOverride is { } co && (fixedSeconds is null || co.Seconds < fixedSeconds))
-                    fixedSeconds = co.Seconds;
-            if (fixedSeconds is { } pinned)
+            // A single-player context so the clock capabilities can read this owner (e.g. Hyper-Drive's
+            // latch) via ctx.GetPlayer(PlayerIndex).
+            var ctx = new EngineEvaluationContext(string.Empty, Array.Empty<char>(), new[] { player })
+            {
+                Bay = player.EngineBay,
+                PlayerIndex = 0,
+            };
+            var bay = (IReadOnlyList<IModifierCard>)player.EngineBay;
+
+            // The Anchor Chain pins the clock: unmodifiable, ignores clock effects + Hyper-Drive.
+            if (bay.FixedShotClockSeconds(ctx) is { } pinned)
                 return Math.Max(MinShotClockSeconds, pinned);
 
-            double seconds = Settings.ShotClockSeconds;
-
-            // A latched Hyper-Drive overrides the base clock for the rest of the era.
-            if (player.HyperDriveActive)
-                foreach (var card in player.EngineBay)
-                    if (card.Hyperdrive is { } hd)
-                    {
-                        seconds = hd.ClockOverrideSeconds;
-                        break;
-                    }
-
-            // Permanent per-owner clock effects: apply all fractions, then all flat seconds.
-            double fraction = 0;
-            int flat = 0;
-            foreach (var card in player.EngineBay)
-                if (card.Clock is { } ce)
-                {
-                    fraction += ce.DeltaFraction;
-                    flat += ce.DeltaSeconds;
-                }
-
+            // The base clock — or a latched Hyper-Drive's replacement — then per-owner clock effects:
+            // all fractions, then all flat seconds.
+            double seconds = bay.BaseShotClockSeconds(ctx) ?? Settings.ShotClockSeconds;
+            var (fraction, flat) = bay.ShotClockEffect();
             seconds = seconds * (1 + fraction) + flat;
 
             int armed = (int)Math.Round(seconds, MidpointRounding.AwayFromZero);

@@ -1,7 +1,8 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -36,7 +37,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             StubWordListService words, int playerCount, char banned)
         {
             var engine = new AlphaChainGameEngine(
-                words, new FixedRandomNumberService(), new ScoreCalculator(),
+                words, new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -50,29 +51,29 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         }
 
         private static void GiveModifier(AlphaChainGameState state, string playerId, string cardId) =>
-            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(ModifierLibrary.FindById(cardId)!));
+            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
 
         private static void SetCardBan(AlphaChainGameState state, string playerId, string cardId, char letter) =>
-            state.Execute(() => state.GamePlayers[playerId].CardBannedLetters[cardId] = letter);
+            state.Execute(() => state.GamePlayers[playerId].CardBannedLetters[TestModifierCards.ToId(cardId)] = letter);
 
         // ── Tax Collector ───────────────────────────────────────────────────
 
         [TestMethod]
         public async Task TaxCollector_CollectsHalfTheWouldBeScore()
         {
-            // "cat" + Anchor → would-be 9; banned 'a' taxes it. Tax Collector owner takes 50% → 5.
+            // "cat" + Anchor → would-be 13 (3 + 10); banned 'a' taxes it. Tax Collector owner takes 50%.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
             using var _ = state;
             var submitter = state.TurnManager.CurrentPlayer!;
             var owner = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, submitter, "anchor");
-            GiveModifier(state, owner, ModifierLibrary.TaxCollectorId);
+            GiveModifier(state, owner, TestModifierCards.TaxCollectorId);
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
             Assert.AreEqual(0, state.GamePlayers[submitter].Score);
-            Assert.AreEqual(5, state.GamePlayers[owner].Score, "Tax Collector collects round(9 × 0.5) = 5 (half-up).");
+            Assert.AreEqual(7, state.GamePlayers[owner].Score, "Tax Collector collects round(13 × 0.5) = 7 (half-up).");
         }
 
         // ── The Toll Booth (card-ban siphon) ────────────────────────────────
@@ -80,8 +81,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         [TestMethod]
         public async Task TollBooth_MintsCut_WhenOpponentUsesRolledLetter()
         {
-            // Clean word (banned 'z' absent from "cat"); submitter Anchor → earns 9. Owner's Toll
-            // Booth letter 't' is in "cat" → owner minted round(9 × 0.2) = 2; submitter keeps 9.
+            // Clean word (banned 'z' absent from "cat"); submitter Anchor → earns 13 (3 + 10). Owner's
+            // Toll Booth letter 't' is in "cat" → owner minted round(13 × 0.2) = 3; submitter keeps 13.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
             using var _ = state;
             var submitter = state.TurnManager.CurrentPlayer!;
@@ -93,8 +94,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
-            Assert.AreEqual(9, state.GamePlayers[submitter].Score, "Submitter keeps their full score.");
-            Assert.AreEqual(2, state.GamePlayers[owner].Score, "Owner is minted round(9 × 0.2) = 2 (half-up).");
+            Assert.AreEqual(13, state.GamePlayers[submitter].Score, "Submitter keeps their full score.");
+            Assert.AreEqual(3, state.GamePlayers[owner].Score, "Owner is minted round(13 × 0.2) = 3 (half-up).");
         }
 
         [TestMethod]
@@ -127,7 +128,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var owner = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, submitter, "irs");
-            GiveModifier(state, owner, ModifierLibrary.TaxCollectorId);
+            GiveModifier(state, owner, TestModifierCards.TaxCollectorId);
 
             var outcome = await engine.SubmitWordAsync(submitter, "cat", state);
             Assert.IsTrue(outcome.TryGetSuccess(out var result));

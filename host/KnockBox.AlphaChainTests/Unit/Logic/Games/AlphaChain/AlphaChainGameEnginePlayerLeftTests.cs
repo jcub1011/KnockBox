@@ -1,6 +1,7 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -34,7 +35,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
             int playerCount, bool survival)
         {
             var engine = new AlphaChainGameEngine(
-                new StubWordListService(), new FixedRandomNumberService(), new ScoreCalculator(),
+                new StubWordListService(), new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -114,7 +115,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
         private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartAndEnterIntermissionAsync()
         {
             var engine = new AlphaChainGameEngine(
-                new StubWordListService("cat", "tea", "ant"), new FixedRandomNumberService(), new ScoreCalculator(),
+                new StubWordListService("cat", "tea", "ant"), new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;

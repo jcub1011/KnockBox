@@ -1,4 +1,4 @@
-@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
+@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
 @* Optimization sub-phase: the local player privately resequences their Engine Bay and,
    when it overflows the (newly expanded) slot count, discards the excess. Reorder is HTML5
@@ -36,7 +36,7 @@
             int index = i;
             var card = Kept[index];
             bool overCapacity = index >= Slots;
-            bool isNew = NewCardIds.Contains(card.Id);
+            bool isNew = NewCardIds.Contains(card.GetId());
 
             <li class="ac-im-opt-slot @(overCapacity ? "ac-im-opt-overflow" : "")"
                 @ondragover:preventDefault="!HasSubmitted"
@@ -50,8 +50,8 @@
                         @ondragstart="() => _dragIndex = index"
                         @ondragend="() => _dragIndex = null"
                         @onkeydown="e => OnKeyDown(e, index)">
-                    <GameCard Name="@card.Name" Description="@card.Description" Icon="@card.Icon"
-                              Category="CardCategory.Modifier" Kind="card.Kind"
+                    <GameCard Name="@card.GetName()" Description="@card.GetDescription()" Icon="@card.GetIcon()"
+                              Kind="card.GetModifierType(default)"
                               Dragging="@(_dragIndex == index)" New="@isNew"
                               BadgeText="@(isNew ? "NEW" : null)" />
                 </button>
@@ -72,9 +72,9 @@
                 <button type="button" class="ac-cardbtn"
                         disabled="@HasSubmitted"
                         title="Put back"
-                        @onclick="() => Restore(card.Id)">
-                    <GameCard Name="@card.Name" Description="@card.Description" Icon="@card.Icon"
-                              Category="CardCategory.Modifier" Kind="card.Kind"
+                        @onclick="() => Restore(card.GetId())">
+                    <GameCard Name="@card.GetName()" Description="@card.GetDescription()" Icon="@card.GetIcon()"
+                              Kind="card.GetModifierType(default)"
                               Compact="true" Dim="true" />
                 </button>
             }
@@ -90,13 +90,13 @@
 
 @code {
     /// <summary>The local player's candidate cards (current bay + just-dealt), in current order.</summary>
-    [Parameter] public IReadOnlyList<ModifierCard> Cards { get; set; } = [];
+    [Parameter] public IReadOnlyList<IModifierCard> Cards { get; set; } = [];
 
     /// <summary>The local player's (post-expansion) slot capacity.</summary>
     [Parameter] public int Slots { get; set; }
 
     /// <summary>Ids of modifier cards freshly dealt this Intermission — flagged NEW + popped in.</summary>
-    [Parameter] public IReadOnlyCollection<string> NewCardIds { get; set; } = [];
+    [Parameter] public IReadOnlyCollection<ModifierId> NewCardIds { get; set; } = [];
 
     /// <summary>How many players have locked in.</summary>
     [Parameter] public int SubmittedCount { get; set; }
@@ -110,8 +110,8 @@
     /// <summary>Raised with the kept ordering (≤ Slots) when the player locks in.</summary>
     [Parameter] public EventCallback<IReadOnlyList<string>> OnSubmit { get; set; }
 
-    private List<ModifierCard> Kept = new();
-    private List<ModifierCard> Discarded = new();
+    private List<IModifierCard> Kept = new();
+    private List<IModifierCard> Discarded = new();
     private int? _dragIndex;
     private string? _seededFor;
 
@@ -123,7 +123,7 @@
         // Seed the working lists once from the incoming card order. Re-seed only if the
         // candidate set changes identity (e.g., a fresh optimization), never on every render,
         // so the player's in-progress reorder isn't clobbered by state-change re-renders.
-        var signature = string.Join(",", Cards.Select(c => c.Id));
+        var signature = string.Join(",", Cards.Select(c => c.GetId()));
         if (_seededFor != signature)
         {
             Kept = Cards.ToList();
@@ -175,10 +175,10 @@
         Discarded.Add(card);
     }
 
-    private void Restore(string id)
+    private void Restore(ModifierId id)
     {
         if (HasSubmitted) return;
-        var card = Discarded.FirstOrDefault(c => c.Id == id);
+        var card = Discarded.FirstOrDefault(c => c.GetId() == id);
         if (card is null) return;
         Discarded.Remove(card);
         Kept.Add(card);
@@ -187,6 +187,6 @@
     private async Task ConfirmAsync()
     {
         if (HasSubmitted || Overflow > 0) return;
-        await OnSubmit.InvokeAsync(Kept.Select(c => c.Id).ToList());
+        await OnSubmit.InvokeAsync(Kept.Select(c => c.GetId().ToString()).ToList());
     }
 }
