@@ -1,5 +1,6 @@
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 using KnockBox.Core.Primitives.Returns;
@@ -246,7 +247,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                     {
                         // A freshly dealt shield is the player's replacement mirror: it starts
                         // un-decayed, and no further shield may be dealt in this same deal.
-                        player.ShieldMultiplier = 1.0;
+                        context.EvaluationServices.Get<IShieldService>()?.GrantFresh(player);
                         pool.RemoveAll(id => ModifierCardFactory.ShieldIds.Contains(id));
                     }
                 }
@@ -379,18 +380,17 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.SniperBanUserId = null;
             state.OptimizationSubmissions.Clear();
 
-            // Drop the deal-reveal markers so they don't bleed into the next era's round UI, and
-            // reset the era-scoped card state so each era starts clean: the Hyper-Drive latch, the
-            // Scattershot double-letter flag, any transient hijack ban, and the per-turn Prism flag.
-            // The Titanium Mirror's decayed multiplier is NOT reset here — it persists across eras
-            // and only returns to 1.0 when a fresh mirror is dealt (see DealCards).
+            // Drop the deal-reveal markers so they don't bleed into the next era's round UI, then fire
+            // the era-start boundary across every room state service so each owns its own era reset:
+            // the Hyper-Drive latch, the Scattershot double-letter flag, any transient hijack ban, and
+            // the era-rolled card bans all clear here. The Titanium Mirror's decayed multiplier is NOT
+            // reset (no OnEraStarted) — it persists across eras and only returns to 1.0 when a fresh
+            // mirror is dealt (see DealCards). This runs before FireEraStartHooks so cards re-roll
+            // their bans into a freshly-cleared slate.
             foreach (var player in state.GamePlayers.Values)
             {
                 player.NewlyDealtModifierIds.Clear();
-                player.HyperDriveActive = false;
-                player.PlayedDoubleLetterWordThisEra = false;
-                player.PersonalBannedLetter = null;
-                player.PrismUsedThisTurn = false;
+                context.EvaluationServices.FireEraStarted(player);
             }
             state.RoundLeaderUserId = null;
 
@@ -408,9 +408,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         }
 
         /// <summary>
-        /// Clears each active player's era-rolled card bans, then fires every card's
-        /// <see cref="IModifierCard.OnEraStart"/> hook (Roulette Wheel / Toll Booth roll a personal
-        /// banned letter through the per-room <c>IBanLetterService</c>).
+        /// Fires every card's <see cref="IModifierCard.OnEraStart"/> hook (Roulette Wheel / Toll Booth
+        /// roll a personal banned letter through the per-room <c>IBanLetterService</c> into
+        /// <c>ICardBanService</c>). The era-rolled bans were already cleared by the era-start boundary
+        /// in <see cref="CompleteIntermission"/>, so each card rolls into a clean slate.
         /// </summary>
         private static void FireEraStartHooks(AlphaChainGameContext context)
         {
@@ -420,7 +421,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             foreach (var player in ActivePlayers(state))
             {
-                player.CardBannedLetters.Clear();
                 var ctx = new EngineEvaluationContext(string.Empty, Array.Empty<char>(), new[] { player })
                 {
                     Bay = player.EngineBay,

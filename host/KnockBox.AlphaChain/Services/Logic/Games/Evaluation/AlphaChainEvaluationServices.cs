@@ -15,15 +15,22 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
     /// </summary>
     public sealed class AlphaChainEvaluationServices : IServiceProvider
     {
-        private readonly IBanLetterService _ban;
-        private readonly IShotClockService _clock;
-        private readonly IEngineEffects _effects;
+        private readonly Dictionary<Type, object> _services = new();
 
-        public AlphaChainEvaluationServices(AlphaChainGameState state, IRandomNumberService rng)
+        public AlphaChainEvaluationServices(AlphaChainGameState state, IRandomNumberService rng, IModifierCardFactory factory)
         {
-            _ban = new BanLetterService(state, rng);
-            _clock = new ShotClockService(state, this);
-            _effects = new EngineEffects(state, this);
+            // Core infrastructure services every room needs, regardless of which cards are in play.
+            _services[typeof(IBanLetterService)] = new BanLetterService(state, rng);
+            _services[typeof(IShotClockService)] = new ShotClockService(state, this);
+            _services[typeof(IEngineEffects)] = new EngineEffects(state, this);
+            // A player fact no card owns yet (Scattershot, forward-looking) lives here as core state.
+            _services[typeof(IDoubleLetterTracker)] = new DoubleLetterTracker();
+
+            // Card-contributed state services: instantiate the union across the whole catalogue so a
+            // service exists even when the card writes to an opponent who doesn't hold it. Duplicate
+            // contracts (e.g. Roulette Wheel + Toll Booth both want ICardBanService) collapse to one.
+            foreach (var desc in factory.AllCardRoomServices())
+                _services.TryAdd(desc.Contract, desc.Create(state));
         }
 
         /// <summary>The timestamp of the command currently being resolved (used for clock refills).</summary>
@@ -53,12 +60,33 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
             if (amount > EraTaxBounty) EraTaxBounty = amount;
         }
 
-        public object? GetService(Type serviceType)
+        public object? GetService(Type serviceType) => _services.GetValueOrDefault(serviceType);
+
+        /// <summary>Typed convenience over <see cref="GetService"/> for plugin-internal callers.</summary>
+        public T? Get<T>() where T : class => GetService(typeof(T)) as T;
+
+        /// <summary>Every registered service that owns scoped player state (for lifecycle dispatch).</summary>
+        public IEnumerable<IRoomStateService> StateServices => _services.Values.OfType<IRoomStateService>();
+
+        /// <summary>Fires the turn-start boundary across every state service for <paramref name="player"/>.</summary>
+        public void FireTurnStarted(AlphaChainPlayerState player)
         {
-            if (serviceType == typeof(IBanLetterService)) return _ban;
-            if (serviceType == typeof(IShotClockService)) return _clock;
-            if (serviceType == typeof(IEngineEffects)) return _effects;
-            return null;
+            foreach (var service in StateServices)
+                service.OnTurnStarted(player);
+        }
+
+        /// <summary>Fires the era-start boundary across every state service for <paramref name="player"/>.</summary>
+        public void FireEraStarted(AlphaChainPlayerState player)
+        {
+            foreach (var service in StateServices)
+                service.OnEraStarted(player);
+        }
+
+        /// <summary>Clears all scoped state (back-to-lobby / new match).</summary>
+        public void Reset()
+        {
+            foreach (var service in StateServices)
+                service.Reset();
         }
     }
 
@@ -125,16 +153,17 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
         public void TimeShave(IModifierCard source, AlphaChainPlayerState caster, AlphaChainPlayerState victim, int seconds)
         {
             if (seconds <= 0) return;
+            var penalties = owner.Get<ITimePenaltyService>();
 
             if (TryDeflect(victim) is { } mirror)
             {
-                caster.QueuedTimePenaltySeconds += seconds;
+                penalties?.Queue(caster, seconds);
                 AddNotice(Reflect(mirror, victim, caster,
                     $"Reflected {source.GetName()} — −{seconds}s off {caster.DisplayName}'s next clock"));
                 return;
             }
 
-            victim.QueuedTimePenaltySeconds += seconds;
+            penalties?.Queue(victim, seconds);
             AddNotice(Attack(source, caster, victim, $"−{seconds}s next shot clock"));
         }
 
@@ -157,27 +186,28 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
         public void LetterHijack(IModifierCard source, AlphaChainPlayerState caster, AlphaChainPlayerState victim, char letter)
         {
             letter = char.ToLowerInvariant(letter);
+            var hijack = owner.Get<IHijackBanService>();
 
             if (TryDeflect(victim) is { } mirror)
             {
-                caster.PersonalBannedLetter ??= letter;
+                hijack?.Curse(caster, letter);
                 AddNotice(Reflect(mirror, victim, caster,
                     $"Reflected {source.GetName()} — '{char.ToUpperInvariant(letter)}' banned for {caster.DisplayName}"));
                 return;
             }
 
-            if (victim.PersonalBannedLetter is not null) return;
-
-            victim.PersonalBannedLetter = letter;
+            // Curse is a no-op (returns false) when the victim already carries a hijack ban — match the
+            // old "leave as-is, post no notice" behavior by gating the notice on a successful curse.
+            if (hijack is null || !hijack.Curse(victim, letter)) return;
             AddNotice(Attack(source, caster, victim, $"next word bans '{char.ToUpperInvariant(letter)}'"));
         }
 
-        /// <summary>If the victim holds a Titanium Mirror, lets it block (decaying its shield) and returns
-        /// the intercepting card so the caller can reflect the hit; else null.</summary>
-        private static IModifierCard? TryDeflect(AlphaChainPlayerState victim)
+        /// <summary>If the victim holds a Titanium Mirror, lets it block (decaying its shield via the
+        /// shield service) and returns the intercepting card so the caller can reflect the hit; else null.</summary>
+        private IModifierCard? TryDeflect(AlphaChainPlayerState victim)
         {
             var interceptor = ((IReadOnlyList<IModifierCard>)victim.EngineBay).AttackInterceptor();
-            if (interceptor is IModifierCard card && interceptor.TryIntercept(victim, card))
+            if (interceptor is IModifierCard card && interceptor.TryIntercept(victim, card, owner))
                 return card;
             return null;
         }

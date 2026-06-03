@@ -173,7 +173,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             state.Execute(() => state.PhaseEndTime = armAt.AddSeconds(12));
             await engine.SubmitWordAsync(id, "cat", state, armAt.AddSeconds(2));
 
-            Assert.IsTrue(state.GamePlayers[id].HyperDriveActive, "Fast submit should latch Hyper-Drive.");
+            Assert.IsTrue(RoomStateProbe.HyperDriveActive(state, id), "Fast submit should latch Hyper-Drive.");
             // Once latched, the owner's clock is overridden to the rule's 5s.
             Assert.AreEqual(5, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
         }
@@ -191,7 +191,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             state.Execute(() => state.PhaseEndTime = armAt.AddSeconds(12));
             await engine.SubmitWordAsync(id, "cat", state, armAt.AddSeconds(10));
 
-            Assert.IsFalse(state.GamePlayers[id].HyperDriveActive, "Slow submit must not latch Hyper-Drive.");
+            Assert.IsFalse(RoomStateProbe.HyperDriveActive(state, id), "Slow submit must not latch Hyper-Drive.");
         }
     }
 }

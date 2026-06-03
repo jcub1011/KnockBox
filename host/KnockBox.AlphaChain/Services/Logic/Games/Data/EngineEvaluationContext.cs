@@ -116,9 +116,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
 
         /// <summary>The current player's score, or 0 when the index is out of range.</summary>
         public int GetScore(int playerIndex) => GetPlayer(playerIndex)?.Score ?? 0;
-
-        /// <summary>The live Titanium Mirror multiplier of the player at <paramref name="playerIndex"/> (1.0 when none).</summary>
-        public double GetShieldMultiplier(int playerIndex) => GetPlayer(playerIndex)?.ShieldMultiplier ?? 1.0;
     }
 
     /// <summary>

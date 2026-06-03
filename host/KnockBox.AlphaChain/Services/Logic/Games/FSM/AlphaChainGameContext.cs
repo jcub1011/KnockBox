@@ -54,7 +54,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
         /// Cards resolve engine operations (ban rolls, attacks, clock refills) from it; the FSM refreshes
         /// its per-resolution scratch state via <see cref="AlphaChainEvaluationServices.BeginResolution"/>.
         /// </summary>
-        public AlphaChainEvaluationServices EvaluationServices { get; } = new(state, rng);
+        public AlphaChainEvaluationServices EvaluationServices { get; } = new(state, rng, modifierFactory);
 
         /// <summary>
         /// The outcome of the most recent <see cref="SubmitWordCommand"/>. The FSM writes

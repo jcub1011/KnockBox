@@ -36,7 +36,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     }
 
     /// <summary>The Toll Booth — inert in scoring; rolls a personal ban each era and tolls opponents who use it.</summary>
-    public sealed class TollBoothCard : MultiplicativeCardBase
+    public sealed class TollBoothCard : MultiplicativeCardBase, IContributesRoomServices
     {
         /// <summary>Fraction of an opponent's earned score this card mints when they use its rolled ban letter.</summary>
         public const double Rate = 0.20;
@@ -52,7 +52,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         {
             var owner = context.GetPlayer(context.PlayerIndex);
             if (owner is not null && context.Service<IBanLetterService>()?.RollPersonalBan() is { } ban)
-                owner.CardBannedLetters[GetId()] = ban;
+                context.Service<ICardBanService>()?.Roll(owner, GetId(), ban);
             return context;
         }
 
@@ -66,17 +66,20 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             if (owner is null || owner.UserId == res.SubmitterUserId)
                 return context;
 
-            if (owner.CardBannedLetters.TryGetValue(GetId(), out var banned) && res.Word.Contains(banned))
+            if (context.Service<ICardBanService>()?.BanFor(owner, GetId()) is { } banned && res.Word.Contains(banned))
             {
                 int amount = ModifierMath.ClampScore(res.EarnedScore * Rate);
                 if (amount > 0) owner.Score += amount;
             }
             return context;
         }
+
+        public IEnumerable<RoomServiceDescriptor> GetRoomServices()
+            => [new(typeof(ICardBanService), static _ => new CardBanService())];
     }
 
     /// <summary>The Roulette Wheel — ×1.75 on every clean word; rolls a personal ban each era.</summary>
-    public sealed class RouletteWheelCard : MultiplicativeCardBase
+    public sealed class RouletteWheelCard : MultiplicativeCardBase, IContributesRoomServices
     {
         public override ModifierId GetId() => ModifierId.RouletteWheel;
         public override string GetName() => "The Roulette Wheel";
@@ -88,9 +91,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         {
             var owner = context.GetPlayer(context.PlayerIndex);
             if (owner is not null && context.Service<IBanLetterService>()?.RollPersonalBan() is { } ban)
-                owner.CardBannedLetters[GetId()] = ban;
+                context.Service<ICardBanService>()?.Roll(owner, GetId(), ban);
             return context;
         }
+
+        public IEnumerable<RoomServiceDescriptor> GetRoomServices()
+            => [new(typeof(ICardBanService), static _ => new CardBanService())];
     }
 
     /// <summary>The Bounty Hunter — inert (×1.0); docks the round leader on a too-short word.</summary>
@@ -127,7 +133,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     }
 
     /// <summary>Flak Cannon — 0 points; shaves the next clock of every player scoring higher than the owner.</summary>
-    public sealed class FlakCannonCard : AdditiveCardBase
+    public sealed class FlakCannonCard : AdditiveCardBase, IContributesRoomServices
     {
         /// <summary>Seconds shaved off each higher-scoring opponent's next clock.</summary>
         public const int ShaveSeconds = 2;
@@ -149,10 +155,15 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
             return context;
         }
+
+        // The time-shave it fires lands on a victim who doesn't hold this card, so the service must
+        // exist room-wide regardless of who's dealt the cannon (the catalogue-union guarantees that).
+        public IEnumerable<RoomServiceDescriptor> GetRoomServices()
+            => [new(typeof(ITimePenaltyService), static _ => new TimePenaltyService())];
     }
 
     /// <summary>Bait &amp; Switch — inert; on a taxed word, curses the next player with the offending letter.</summary>
-    public sealed class BaitAndSwitchCard : MultiplicativeCardBase
+    public sealed class BaitAndSwitchCard : MultiplicativeCardBase, IContributesRoomServices
     {
         public override ModifierId GetId() => ModifierId.BaitAndSwitch;
         public override string GetName() => "Bait & Switch";
@@ -177,5 +188,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
             return context;
         }
+
+        // The hijack ban it inflicts lands on the next player, who doesn't hold this card, so the
+        // service must exist room-wide regardless of who's dealt Bait & Switch.
+        public IEnumerable<RoomServiceDescriptor> GetRoomServices()
+            => [new(typeof(IHijackBanService), static _ => new HijackBanService())];
     }
 }

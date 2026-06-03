@@ -29,11 +29,12 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
             static _ => true, (_, _) => factor);
 
         // Builds an evaluation context. A player (index 0) is always present so shield/Hyper-Drive
-        // capability cards have an owner to read; pass a configured one for those cases.
+        // capability cards have an owner to read; pass a stub services provider (see Services) when a
+        // card needs to read its room state (the shield multiplier, the Hyper-Drive latch).
         private static EngineEvaluationContext Ctx(
             string word, IReadOnlyList<IModifierCard> bay,
             double remaining = 0, double shotClock = 12, char? banned = null,
-            AlphaChainPlayerState? player = null)
+            AlphaChainPlayerState? player = null, IServiceProvider? services = null)
         {
             player ??= new AlphaChainPlayerState { UserId = "p0" };
             return new EngineEvaluationContext(
@@ -42,10 +43,39 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
                 new[] { player })
             {
                 Bay = bay,
+                Services = services,
                 PlayerIndex = 0,
                 RemainingShotClockDuration = remaining,
                 ShotClockDuration = shotClock,
             };
+        }
+
+        // A stub room-state provider: card state now lives in services, so the evaluator tests inject
+        // fixed shield / Hyper-Drive readings instead of setting fields on the player.
+        private static IServiceProvider Services(double? shield = null, bool hyperDriveLatched = false)
+            => new StubServices(shield, hyperDriveLatched);
+
+        private sealed class StubServices(double? shield, bool hyperDriveLatched) : IServiceProvider
+        {
+            public object? GetService(Type serviceType)
+            {
+                if (serviceType == typeof(IShieldService) && shield is { } s) return new FixedShield(s);
+                if (serviceType == typeof(IHyperDriveService)) return new FixedHyperDrive(hyperDriveLatched);
+                return null;
+            }
+        }
+
+        private sealed class FixedShield(double multiplier) : IShieldService
+        {
+            public double GetMultiplier(AlphaChainPlayerState player) => multiplier;
+            public void Decay(AlphaChainPlayerState player, double step) { }
+            public void GrantFresh(AlphaChainPlayerState player) { }
+        }
+
+        private sealed class FixedHyperDrive(bool latched) : IHyperDriveService
+        {
+            public bool IsLatched(AlphaChainPlayerState player) => latched;
+            public void Latch(AlphaChainPlayerState player) { }
         }
 
         // ── Core pipeline parity ────────────────────────────────────────────
@@ -220,11 +250,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         [TestMethod]
         public void TitaniumMirror_UsesLiveShieldMultiplierAsTheFactor()
         {
-            var full = new AlphaChainPlayerState { UserId = "p0", ShieldMultiplier = 1.0 };
-            Assert.AreEqual(6, _eval.Calculate(Ctx("bridge", [Card(ModifierId.TitaniumMirror)], player: full)));
+            // No shield service → the card falls back to a passive ×1.0.
+            Assert.AreEqual(6, _eval.Calculate(Ctx("bridge", [Card(ModifierId.TitaniumMirror)], services: Services(shield: 1.0))));
 
-            var decayed = new AlphaChainPlayerState { UserId = "p0", ShieldMultiplier = 0.5 };
-            Assert.AreEqual(3, _eval.Calculate(Ctx("bridge", [Card(ModifierId.TitaniumMirror)], player: decayed)));
+            Assert.AreEqual(3, _eval.Calculate(Ctx("bridge", [Card(ModifierId.TitaniumMirror)], services: Services(shield: 0.5))));
         }
 
         // ── Hyper-Drive multiplier scale (seeded from the bay) ──────────────
@@ -232,16 +261,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         [TestMethod]
         public void HyperDrive_WhenLatched_DoublesEveryMultiplicativeFactor()
         {
-            var latched = new AlphaChainPlayerState { UserId = "p0", HyperDriveActive = true };
             // scale 2 turns a ×3 into ×6; Hyper-Drive itself is inert in the pipeline.
-            Assert.AreEqual(4 * 6, _eval.Calculate(Ctx("cats", [Card(ModifierId.HyperDrive), Mult(3)], player: latched)));
+            Assert.AreEqual(4 * 6, _eval.Calculate(Ctx("cats", [Card(ModifierId.HyperDrive), Mult(3)], services: Services(hyperDriveLatched: true))));
         }
 
         [TestMethod]
         public void HyperDrive_WhenNotLatched_LeavesMultipliersAlone()
         {
-            var idle = new AlphaChainPlayerState { UserId = "p0", HyperDriveActive = false };
-            Assert.AreEqual(4 * 3, _eval.Calculate(Ctx("cats", [Card(ModifierId.HyperDrive), Mult(3)], player: idle)));
+            Assert.AreEqual(4 * 3, _eval.Calculate(Ctx("cats", [Card(ModifierId.HyperDrive), Mult(3)], services: Services(hyperDriveLatched: false))));
         }
 
         // ── The Catalyst: capability-interface idiom, now position-dependent ──
@@ -321,8 +348,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
             foreach (var id in ModifierCardFactory.AllDealableIds)
                 foreach (var word in new[] { "cat", "bridge", "elephants", "aerie" })
                 {
-                    var player = new AlphaChainPlayerState { UserId = "p0", ShieldMultiplier = 1.0 };
-                    int score = _eval.Calculate(Ctx(word, [Card(id)], remaining: 5, shotClock: 12, banned: 'a', player: player));
+                    var player = new AlphaChainPlayerState { UserId = "p0" };
+                    int score = _eval.Calculate(Ctx(word, [Card(id)], remaining: 5, shotClock: 12, banned: 'a', player: player, services: Services(shield: 1.0)));
                     Assert.IsTrue(score >= 0 && score <= ModifierMath.MaxWordScore,
                         $"Card [{id}] on '{word}' produced out-of-range score {score}.");
                 }

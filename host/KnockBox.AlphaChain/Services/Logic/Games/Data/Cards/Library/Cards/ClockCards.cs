@@ -1,4 +1,5 @@
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 
 namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 {
@@ -78,7 +79,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     /// every other card. The latch is read by <see cref="IBaseShotClockProvider"/> (clock) and
     /// <see cref="IMultiplierScaleProvider"/> (scale) while active.
     /// </summary>
-    public sealed class HyperDriveCard : MultiplicativeCardBase, IBaseShotClockProvider, IMultiplierScaleProvider
+    public sealed class HyperDriveCard : MultiplicativeCardBase, IBaseShotClockProvider, IMultiplierScaleProvider, IContributesRoomServices
     {
         /// <summary>Submit faster than this (elapsed seconds) to latch the overdrive.</summary>
         public const double ThresholdSeconds = 3;
@@ -100,19 +101,29 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override EngineEvaluationContext OnWordAccepted(EngineEvaluationContext context, IModifierCard self)
         {
             var owner = context.GetPlayer(context.PlayerIndex);
-            if (owner is { HyperDriveActive: false })
+            var overdrive = context.Service<IHyperDriveService>();
+            if (owner is not null && overdrive is not null && !overdrive.IsLatched(owner))
             {
                 double elapsed = context.ModifiedShotClockDuration - context.RemainingShotClockDuration;
                 if (elapsed < ThresholdSeconds)
-                    owner.HyperDriveActive = true;
+                    overdrive.Latch(owner);
             }
             return context;
         }
 
         public int? GetBaseShotClockSeconds(EngineEvaluationContext context)
-            => context.GetPlayer(context.PlayerIndex)?.HyperDriveActive == true ? OverdriveClockSeconds : null;
+            => IsLatched(context) ? OverdriveClockSeconds : null;
 
         public double GetMultiplierScale(EngineEvaluationContext context)
-            => context.GetPlayer(context.PlayerIndex)?.HyperDriveActive == true ? OverdriveScale : 1.0;
+            => IsLatched(context) ? OverdriveScale : 1.0;
+
+        public IEnumerable<RoomServiceDescriptor> GetRoomServices()
+            => [new(typeof(IHyperDriveService), static _ => new HyperDriveService())];
+
+        private static bool IsLatched(EngineEvaluationContext context)
+        {
+            var owner = context.GetPlayer(context.PlayerIndex);
+            return owner is not null && context.Service<IHyperDriveService>()?.IsLatched(owner) == true;
+        }
     }
 }

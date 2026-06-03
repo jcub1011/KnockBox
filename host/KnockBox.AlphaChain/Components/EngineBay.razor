@@ -1,3 +1,4 @@
+@using KnockBox.AlphaChain.Services.Logic.Games.Data
 @using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
 @* A player's Engine Bay: an ordered row of modifier slots, left → right is the scoring
@@ -36,7 +37,7 @@
                             @onkeydown="e => OnKeyDown(e, index)">
                         <GameCard Name="@card.GetName()" Description="@card.GetDescription()" Card="@card.GetId()"
                                   Kind="card.GetModifierType(default)"
-                                  ValueText="@ShieldValueText(card)"
+                                  ValueText="@BadgeFor(card)"
                                   Compact="@ReadOnly" Dragging="@(_dragIndex == index)" />
                     </button>
                 }
@@ -69,15 +70,14 @@
     [Parameter] public string Title { get; set; } = "Engine Bay";
 
     /// <summary>
-    /// The owner's live Titanium Mirror multiplier. When supplied, the shield card in this bay
-    /// shows its current factor (e.g. "×0.7") in place of the bare "×", so the player can see how
-    /// far the mirror has decayed. Null leaves the shield card showing the default operator.
+    /// A display-only evaluation context for this bay's owner (carrying the room state services), so
+    /// each card can surface its own live status glyph via <see cref="IModifierCard.GetBayBadge"/> —
+    /// e.g. the Titanium Mirror's "×0.7". Null (e.g. before the game starts) shows no badges.
     /// </summary>
-    [Parameter] public double? ShieldMultiplier { get; set; }
+    [Parameter] public EngineEvaluationContext? BadgeContext { get; set; }
 
-    /// <summary>The live "×N.N" glyph for the shield card, or null for every other card.</summary>
-    private string? ShieldValueText(IModifierCard card) =>
-        card is IAttackInterceptor && ShieldMultiplier is { } sm ? $"×{sm:0.0}" : null;
+    /// <summary>The card's own live status glyph for this owner, or null for the default operator.</summary>
+    private string? BadgeFor(IModifierCard card) => BadgeContext is { } ctx ? card.GetBayBadge(ctx) : null;
 
     /// <summary>Raised with the new ordering of card ids when the player moves a card.</summary>
     [Parameter] public EventCallback<IReadOnlyList<string>> OnReorder { get; set; }

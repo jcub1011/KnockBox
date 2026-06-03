@@ -2,6 +2,7 @@ using KnockBox.AlphaChain.Components;
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM.States;
 using KnockBox.AlphaChain.Services.State.Games;
@@ -106,20 +107,39 @@ namespace KnockBox.AlphaChain.Pages
         /// Switch) as an upper-case string, or null when none. Shown beside the banned letter so the
         /// cursed player can see it (it is personal — only the affected player sees their own).</summary>
         protected string? PersonalBannedLetterDisplay =>
-            MyPlayer?.PersonalBannedLetter is { } c ? char.ToUpperInvariant(c).ToString() : null;
+            MyPlayer is { } me && RoomService<IHijackBanService>()?.Peek(me) is { } c
+                ? char.ToUpperInvariant(c).ToString()
+                : null;
 
         /// <summary>The local player's era-rolled personal banned letters (The Roulette Wheel, The Toll
         /// Booth) as distinct upper-case strings. Like <see cref="PersonalBannedLetterDisplay"/> these
         /// are personal — only the owner sees their own — and are shown beside the era ban in their own
         /// colour so the player understands why those letters tax them.</summary>
         protected IReadOnlyList<string> CardBannedLetterDisplays =>
-            MyPlayer is { } me
-                ? me.CardBannedLetters.Values
+            MyPlayer is { } me && RoomService<ICardBanService>() is { } bans
+                ? bans.BansFor(me)
                     .Select(c => char.ToUpperInvariant(c).ToString())
                     .Distinct()
                     .OrderBy(s => s, StringComparer.Ordinal)
                     .ToList()
                 : [];
+
+        /// <summary>Resolves a room-scoped card-state service from the running game's context, or null
+        /// before the game starts. Used for the personal/card ban displays above.</summary>
+        private T? RoomService<T>() where T : class => GameState.Context?.EvaluationServices.Get<T>();
+
+        /// <summary>A display-only evaluation context for <paramref name="player"/>'s Engine Bay,
+        /// carrying the room state services so each card can render its own live badge (e.g. the
+        /// Titanium Mirror's decayed "×0.7"). Null before the game starts.</summary>
+        protected EngineEvaluationContext? BadgeContextFor(AlphaChainPlayerState player)
+            => GameState.Context is { } context
+                ? new EngineEvaluationContext(string.Empty, Array.Empty<char>(), new[] { player })
+                {
+                    Bay = player.EngineBay,
+                    Services = context.EvaluationServices,
+                    PlayerIndex = 0,
+                }
+                : null;
 
         /// <summary>Total duration of the per-turn shot clock (for the countdown ring).</summary>
         protected TimeSpan ShotClockDuration => TimeSpan.FromSeconds(GameState.Settings.ShotClockSeconds);

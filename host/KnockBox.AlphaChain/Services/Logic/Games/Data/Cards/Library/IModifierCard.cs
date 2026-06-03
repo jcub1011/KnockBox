@@ -111,6 +111,53 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         /// <summary>Fired on the owner when their submission fails validation (a typo) — The Prism refills the clock.</summary>
         EngineEvaluationContext OnValidationFailed(EngineEvaluationContext context, IModifierCard self) => context;
+
+        /// <summary>
+        /// An optional live status glyph (e.g. The Titanium Mirror's "×0.7") for this card in the Engine
+        /// Bay UI, read from the owner's room-state services via <paramref name="context"/>; null for the
+        /// default operator. Lets a card surface its own per-player state with no UI special-casing.
+        /// </summary>
+        string? GetBayBadge(EngineEvaluationContext context) => null;
+    }
+
+    // ── Card-contributed room state services ────────────────────────────────────
+
+    /// <summary>
+    /// Declares a room-scoped state service a card relies on: the <paramref name="Contract"/> the card
+    /// resolves via <see cref="EngineEvaluationContext.Service{T}"/>, and a <paramref name="Create"/>
+    /// factory the per-room container calls once (handed the game state for the rare service that needs
+    /// it). Several cards may declare the same contract — the container collapses duplicates to one.
+    /// </summary>
+    public readonly record struct RoomServiceDescriptor(
+        Type Contract,
+        Func<KnockBox.AlphaChain.Services.State.Games.AlphaChainGameState, object> Create);
+
+    /// <summary>
+    /// Implemented by a card that owns per-player state: it declares the room-scoped service(s) that
+    /// hold that state. The per-room container instantiates the union across the whole card catalogue,
+    /// so a service exists even when the card writes to an opponent who doesn't hold it.
+    /// </summary>
+    public interface IContributesRoomServices
+    {
+        /// <summary>The room state services this card relies on.</summary>
+        IEnumerable<RoomServiceDescriptor> GetRoomServices();
+    }
+
+    /// <summary>
+    /// A room-scoped, player-keyed state service. The engine fires the scope boundaries generically
+    /// across every registered service, so each service resets its own state next to where it lives —
+    /// never in the FSM. All hooks default to no-ops; a service overrides only the scope it cares about.
+    /// </summary>
+    public interface IRoomStateService
+    {
+        /// <summary>Turn-scoped reset/consume for <paramref name="player"/> as their turn arms.</summary>
+        void OnTurnStarted(AlphaChainPlayerState player) { }
+
+        /// <summary>Era-scoped reset for <paramref name="player"/> at an era boundary.</summary>
+        void OnEraStarted(AlphaChainPlayerState player) { }
+
+        /// <summary>Clears all state (back-to-lobby / new match).</summary>
+        void Reset() { }
     }
 
     // ── Capability interfaces (discovered by walking the bay) ───────────────────
@@ -194,9 +241,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     public interface IAttackInterceptor
     {
         /// <summary>Attempts to intercept an attack targeting <paramref name="owner"/>; returns true when
-        /// it blocked (and reflected) the hit, having applied its own decay. <paramref name="self"/> is the
-        /// intercepting card.</summary>
-        bool TryIntercept(AlphaChainPlayerState owner, IModifierCard self);
+        /// it blocked (and reflected) the hit, having applied its own decay through <paramref name="services"/>
+        /// (e.g. the shield service). <paramref name="self"/> is the intercepting card.</summary>
+        bool TryIntercept(AlphaChainPlayerState owner, IModifierCard self, IServiceProvider services);
     }
 
     /// <summary>Hides the owner's own word-input box while typing (The Blindfold). Presentational.</summary>

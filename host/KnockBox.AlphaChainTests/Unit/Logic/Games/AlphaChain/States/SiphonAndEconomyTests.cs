@@ -63,7 +63,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
 
         private static void SetCardBan(AlphaChainGameState state, string playerId, string cardId, char letter) =>
-            state.Execute(() => state.GamePlayers[playerId].CardBannedLetters[TestModifierCards.ToId(cardId)] = letter);
+            state.Execute(() => RoomStateProbe.SetCardBan(state, playerId, TestModifierCards.ToId(cardId), letter));
 
         // ── Tax Collector ───────────────────────────────────────────────────
 
@@ -164,7 +164,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             await engine.SubmitWordAsync(submitter, "cat", state);
 
             Assert.AreEqual(next, state.TurnManager.CurrentPlayer, "Turn advanced to the next player.");
-            Assert.AreEqual('a', state.GamePlayers[next].PersonalBannedLetter, "Next player is cursed with the offending 'a'.");
+            Assert.AreEqual('a', RoomStateProbe.PersonalBannedLetter(state, next), "Next player is cursed with the offending 'a'.");
         }
 
         // ── Roulette Wheel (reward + self-tax) ──────────────────────────────

@@ -124,6 +124,15 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             };
         }
 
+        /// <inheritdoc />
+        public IEnumerable<RoomServiceDescriptor> AllCardRoomServices()
+        {
+            foreach (var id in AllDealableIds)
+                if (CreateCard(default, id) is IContributesRoomServices contributor)
+                    foreach (var descriptor in contributor.GetRoomServices())
+                        yield return descriptor;
+        }
+
         /// <summary>Every dealable card id (the catalogue, minus <see cref="ModifierId.Unknown"/>).</summary>
         public static readonly IReadOnlyList<ModifierId> AllDealableIds =
             Enum.GetValues<ModifierId>().Where(id => id != ModifierId.Unknown).ToArray();

@@ -88,7 +88,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             await engine.SubmitWordAsync(submitter, "cat", state);
 
             Assert.AreEqual(3, state.GamePlayers[submitter].Score, "Flak Cannon grants 0 points → just the length 3.");
-            Assert.AreEqual(2, state.GamePlayers[ahead].QueuedTimePenaltySeconds, "Higher-scored player is shaved 2s.");
+            Assert.AreEqual(2, RoomStateProbe.QueuedTimePenalty(state, ahead), "Higher-scored player is shaved 2s.");
         }
 
         [TestMethod]
@@ -105,7 +105,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
-            Assert.AreEqual(0, state.GamePlayers[behind].QueuedTimePenaltySeconds, "A lower-scored player is not shaved.");
+            Assert.AreEqual(0, RoomStateProbe.QueuedTimePenalty(state, behind), "A lower-scored player is not shaved.");
         }
 
         [TestMethod]
@@ -126,7 +126,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             await engine.SubmitWordAsync(submitter, "cat", state, t0);
 
             Assert.AreEqual(victim, state.TurnManager.CurrentPlayer, "Turn advanced to the shaved next-seat player.");
-            Assert.AreEqual(0, state.GamePlayers[victim].QueuedTimePenaltySeconds, "Queued shave was consumed, not left pending.");
+            Assert.AreEqual(0, RoomStateProbe.QueuedTimePenalty(state, victim), "Queued shave was consumed, not left pending.");
 
             // The freshly-armed clock is the base shot clock minus the 2s shave. Assert the duration
             // (tolerant of the sub-ms gap between t0 and the arm's own timestamp) — an un-shaved clock
@@ -147,7 +147,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             await engine.SubmitWordAsync(submitter, "ee", state);
 
-            Assert.IsTrue(state.GamePlayers[submitter].PlayedDoubleLetterWordThisEra,
+            Assert.IsTrue(RoomStateProbe.PlayedDoubleLetterWordThisEra(state, submitter),
                 "A word with a double letter flags the player for the rest of the era.");
         }
 
@@ -201,9 +201,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
-            Assert.AreEqual(0, state.GamePlayers[ahead].QueuedTimePenaltySeconds, "Mirror blocks the shave.");
-            Assert.AreEqual(2, state.GamePlayers[submitter].QueuedTimePenaltySeconds, "The shave is reflected at the caster.");
-            Assert.AreEqual(0.9, state.GamePlayers[ahead].ShieldMultiplier, 1e-9, "Mirror decays 1.0 → 0.9 per block.");
+            Assert.AreEqual(0, RoomStateProbe.QueuedTimePenalty(state, ahead), "Mirror blocks the shave.");
+            Assert.AreEqual(2, RoomStateProbe.QueuedTimePenalty(state, submitter), "The shave is reflected at the caster.");
+            Assert.AreEqual(0.9, RoomStateProbe.ShieldMultiplier(state, ahead), 1e-9, "Mirror decays 1.0 → 0.9 per block.");
         }
 
         [TestMethod]
@@ -216,7 +216,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var submitter = state.TurnManager.CurrentPlayer!;
             GiveModifier(state, submitter, "titanium-mirror");
 
-            Assert.AreEqual(1.0, state.GamePlayers[submitter].ShieldMultiplier, 1e-9, "Shield seeds at 1.0 at game start.");
+            Assert.AreEqual(1.0, RoomStateProbe.ShieldMultiplier(state, submitter), 1e-9, "Shield seeds at 1.0 at game start.");
 
             await engine.SubmitWordAsync(submitter, "basketball", state);
 

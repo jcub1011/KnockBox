@@ -71,7 +71,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
         protected override void ResetForLobby(AlphaChainGameState state)
         {
             // SetupState re-snapshots GamePlayers from the roster on the next start, so
-            // clearing the per-match state here is sufficient. Settings are preserved.
+            // clearing the per-match state here is sufficient. Settings are preserved. Dropping the
+            // Context also drops its EvaluationServices (the room-scoped card-state services); the next
+            // StartAsyncCore builds a fresh Context + services, so no card state leaks across matches.
             state.Context = null;
             state.GamePlayers.Clear();
             state.TurnManager.TurnOrder.Clear();

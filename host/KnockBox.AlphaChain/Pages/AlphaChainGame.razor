@@ -214,7 +214,7 @@
                            always Locked here, so no OnReorder handler is wired. *@
                         <EngineBay Cards="myCards.EngineBay" Slots="myCards.ModifierSlots"
                                    Locked="true" Title="Your Engine Bay"
-                                   ShieldMultiplier="myCards.ShieldMultiplier" />
+                                   BadgeContext="BadgeContextFor(myCards)" />
                     </div>
                 }
 
@@ -225,7 +225,7 @@
                         @foreach (var opp in Opponents)
                         {
                             <EngineBay Cards="opp.EngineBay" Slots="opp.ModifierSlots" ReadOnly="true"
-                                       Title="@opp.DisplayName" ShieldMultiplier="opp.ShieldMultiplier" />
+                                       Title="@opp.DisplayName" BadgeContext="BadgeContextFor(opp)" />
                         }
                     </div>
                 }

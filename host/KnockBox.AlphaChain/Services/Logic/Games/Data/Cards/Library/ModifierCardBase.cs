@@ -55,6 +55,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public virtual EngineEvaluationContext OnTurnEnded(EngineEvaluationContext context, IModifierCard self) => context;
         public virtual EngineEvaluationContext OnOpponentWordResolved(EngineEvaluationContext context, IModifierCard self) => context;
         public virtual EngineEvaluationContext OnValidationFailed(EngineEvaluationContext context, IModifierCard self) => context;
+
+        public virtual string? GetBayBadge(EngineEvaluationContext context) => null;
     }
 
     /// <summary>A class-based card that adds to the score.</summary>

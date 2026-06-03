@@ -303,9 +303,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             await engine.SelectSniperBanAsync(picker, 'q', state); // era advances → RollPersonalBans
 
-            var bans = state.GamePlayers[picker].CardBannedLetters;
-            Assert.IsTrue(bans.ContainsKey(TestModifierCards.ToId("roulette-wheel")), "Roulette Wheel rolls a personal ban at era start.");
-            Assert.AreNotEqual('q', bans[TestModifierCards.ToId("roulette-wheel")], "The rolled personal ban dodges the era banned letter.");
+            var rolledBan = RoomStateProbe.CardBan(state, picker, TestModifierCards.ToId("roulette-wheel"));
+            Assert.IsNotNull(rolledBan, "Roulette Wheel rolls a personal ban at era start.");
+            Assert.AreNotEqual('q', rolledBan, "The rolled personal ban dodges the era banned letter.");
         }
 
         [TestMethod]
@@ -319,14 +319,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var picker = state.SniperBanUserId!;
             state.Execute(() =>
             {
-                state.GamePlayers[picker].HyperDriveActive = true;
-                state.GamePlayers[picker].PlayedDoubleLetterWordThisEra = true;
+                RoomStateProbe.LatchHyperDrive(state, picker);
+                RoomStateProbe.MarkDoubleLetterPlayed(state, picker);
             });
 
             await engine.SelectSniperBanAsync(picker, 'q', state);
 
-            Assert.IsFalse(state.GamePlayers[picker].HyperDriveActive, "Hyper-Drive latch clears across an era.");
-            Assert.IsFalse(state.GamePlayers[picker].PlayedDoubleLetterWordThisEra, "Double-letter flag resets each era.");
+            Assert.IsFalse(RoomStateProbe.HyperDriveActive(state, picker), "Hyper-Drive latch clears across an era.");
+            Assert.IsFalse(RoomStateProbe.PlayedDoubleLetterWordThisEra(state, picker), "Double-letter flag resets each era.");
             // The Titanium Mirror's decayed multiplier is intentionally NOT era-scoped — see
             // Mirror_DecayPersistsAcrossEras_WhenKept and Mirror_ResetsToOne_WhenFreshShieldDealt.
         }
@@ -363,12 +363,12 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             state.Execute(() =>
             {
                 state.GamePlayers[picker].EngineBay.Add(TestModifierCards.Create("titanium-mirror"));
-                state.GamePlayers[picker].ShieldMultiplier = 0.6;
+                RoomStateProbe.SetShieldMultiplier(state, picker, 0.6);
             });
 
             await engine.SelectSniperBanAsync(picker, 'q', state); // era advances → CompleteIntermission
 
-            Assert.AreEqual(0.6, state.GamePlayers[picker].ShieldMultiplier, 1e-9,
+            Assert.AreEqual(0.6, RoomStateProbe.ShieldMultiplier(state, picker), 1e-9,
                 "a kept mirror carries its decayed multiplier across the era boundary");
         }
 
@@ -387,14 +387,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                 var player = state.GamePlayers[playerId];
                 player.EngineBay.Clear();
                 player.EngineBay.AddRange(ModifierCardFactory.AllDealableIds.Where(id => !ModifierCardFactory.ShieldIds.Contains(id)).Select(id => TestModifierCards.Create(id)));
-                player.ShieldMultiplier = 0.6; // dormant decay left over from a discarded mirror
+                RoomStateProbe.SetShieldMultiplier(state, playerId, 0.6); // dormant decay left over from a discarded mirror
             });
 
             EnterIntermission(state); // DealCards must hand this player the mirror and reset to 1.0
 
             var dealt = state.GamePlayers[playerId];
             Assert.IsTrue(dealt.EngineBay.Any(c => TestModifierCards.IsShield(c)), "the only legal draw is the mirror");
-            Assert.AreEqual(1.0, dealt.ShieldMultiplier, 1e-9,
+            Assert.AreEqual(1.0, RoomStateProbe.ShieldMultiplier(state, playerId), 1e-9,
                 "a freshly dealt (replacement) mirror resets the decayed multiplier to 1.0");
         }
 

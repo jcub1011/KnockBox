@@ -33,7 +33,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.PendingTransitionAt = null;
             state.PendingTransitionIsGameOver = false;
 
-            BeginRound(state);
+            BeginRound(context);
 
             context.Logger.LogDebug(
                 "Alpha Chain FSM → RoundState (era {era}, round {round}, active {player})",
@@ -109,7 +109,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             int playerIndex = player is null ? -1 : players.IndexOf(player);
             double remaining = Math.Max(0, (state.PhaseEndTime - cmd.Now).TotalSeconds);
 
-            var evalCtx = new EngineEvaluationContext(word, CollectBannedLetters(state, player), players)
+            // The submitter's transient hijack ban and era-rolled card bans now live in room services,
+            // not on the player. Snapshot them once for the tax check / offending-letter / context below.
+            char? hijackBan = player is null ? null : services.Get<IHijackBanService>()?.Peek(player);
+            IReadOnlyCollection<char> cardBans = player is null
+                ? []
+                : services.Get<ICardBanService>()?.BansFor(player) ?? [];
+
+            var evalCtx = new EngineEvaluationContext(word, CollectBannedLetters(state, hijackBan, cardBans), players)
             {
                 Bay = player?.EngineBay ?? [],
                 Services = services,
@@ -151,8 +158,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             //    ban, or any era-rolled card-ban (unless a Faraday-style immunity applies).
             bool faraday = player is not null && evalCtx.Bay.ImmuneToOwnCardBans(evalCtx);
             bool taxed =
-                ContainsAny(word, state.BannedLetter, player?.PersonalBannedLetter)
-                || (!faraday && ContainsAnyOf(word, player?.CardBannedLetters.Values));
+                ContainsAny(word, state.BannedLetter, hijackBan)
+                || (!faraday && ContainsAnyOf(word, cardBans));
 
             // 8. Scoring pipeline (sequential, left → right over the bay).
             var breakdown = context.Evaluator.CalculateSteps(evalCtx, taxed);
@@ -171,13 +178,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             // The banned letter the word used, captured before the personal ban is consumed.
             char? offendingLetter = (taxed && player is not null)
-                ? FirstBannedLetterUsed(word, state.BannedLetter, player.PersonalBannedLetter,
-                    faraday ? null : player.CardBannedLetters.Values)
+                ? FirstBannedLetterUsed(word, state.BannedLetter, hijackBan,
+                    faraday ? null : cardBans)
                 : null;
 
-            // 9. Consume the submitter's transient personal ban.
+            // 9. Consume the submitter's transient hijack ban.
             if (player is not null)
-                player.PersonalBannedLetter = null;
+                services.Get<IHijackBanService>()?.ConsumeFor(player);
 
             // 10. Record the play and update the chain.
             state.PlayedWords.Add(word);
@@ -202,7 +209,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
                 // Track a double-letter word so opponents' Scattershot can target this player this era.
                 if (HasDoubleLetter(word))
-                    player.PlayedDoubleLetterWordThisEra = true;
+                    services.Get<IDoubleLetterTracker>()?.Mark(player);
 
                 // 11b. OnOpponentWordResolved — reactive economy/penalties on every OTHER active player
                 //      (Tax Collector, Toll Booth, Bounty Hunter), each routed through their cards.
@@ -261,14 +268,16 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
         // ── Banned-letter helpers ─────────────────────────────────────────────
 
-        /// <summary>The banned letters in effect for <paramref name="player"/> (era + personal hijack +
-        /// era-rolled card bans), surfaced on the evaluation context for cards that read them.</summary>
-        private static IReadOnlyList<char> CollectBannedLetters(AlphaChainGameState state, AlphaChainPlayerState? player)
+        /// <summary>The banned letters in effect for the submitter (era + personal hijack +
+        /// era-rolled card bans), surfaced on the evaluation context for cards that read them. The
+        /// personal hijack and card bans are read from the room services and passed in.</summary>
+        private static IReadOnlyList<char> CollectBannedLetters(
+            AlphaChainGameState state, char? hijackBan, IReadOnlyCollection<char> cardBans)
         {
             var letters = new List<char>();
             if (state.BannedLetter is { } era) letters.Add(era);
-            if (player?.PersonalBannedLetter is { } personal) letters.Add(personal);
-            if (player is not null) letters.AddRange(player.CardBannedLetters.Values);
+            if (hijackBan is { } personal) letters.Add(personal);
+            letters.AddRange(cardBans);
             return letters;
         }
 
@@ -325,18 +334,21 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         }
 
         /// <summary>Clears any active board-state at the start of a round and marks the leader the
-        /// Bounty Hunter watches, then arms the opening player's once-per-turn Prism flag.</summary>
-        private static void BeginRound(AlphaChainGameState state)
+        /// Bounty Hunter watches, then arms the opening player's turn-scoped state (e.g. the Prism's
+        /// once-per-turn refill guard).</summary>
+        private static void BeginRound(AlphaChainGameContext context)
         {
+            var state = context.State;
             state.RoundLeaderUserId = EngineEffectResolver.LeaderUserId(state);
-            BeginTurnFor(state, state.TurnManager.CurrentPlayer);
+            BeginTurnFor(context, state.TurnManager.CurrentPlayer);
         }
 
-        /// <summary>Resets the per-turn state for the now-active player (The Prism's once-per-turn refill flag).</summary>
-        private static void BeginTurnFor(AlphaChainGameState state, string? userId)
+        /// <summary>Fires the turn-start boundary for the now-active player, so every room state service
+        /// re-arms its per-turn state (The Prism's once-per-turn refill guard).</summary>
+        private static void BeginTurnFor(AlphaChainGameContext context, string? userId)
         {
-            if (userId is not null && state.GamePlayers.TryGetValue(userId, out var player))
-                player.PrismUsedThisTurn = false;
+            if (userId is not null && context.State.GamePlayers.TryGetValue(userId, out var player))
+                context.EvaluationServices.FireTurnStarted(player);
         }
 
         // ── Debug turn advance (kept from M1) ────────────────────────────────
@@ -430,8 +442,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             }
 
             state.ResetTurnTimer(now);
-            BeginTurnFor(state, state.TurnManager.CurrentPlayer);
-            ApplyQueuedTimePenalty(state);
+            BeginTurnFor(context, state.TurnManager.CurrentPlayer);
+            ApplyQueuedTimePenalty(context);
             return null;
         }
 
@@ -454,15 +466,17 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             return TimeSpan.FromSeconds(rows * stepSeconds + 0.8);
         }
 
-        private static void ApplyQueuedTimePenalty(AlphaChainGameState state)
+        private static void ApplyQueuedTimePenalty(AlphaChainGameContext context)
         {
+            var state = context.State;
             var current = state.TurnManager.CurrentPlayer;
             if (current is null) return;
 
-            if (state.GamePlayers.TryGetValue(current, out var player) && player.QueuedTimePenaltySeconds > 0)
+            if (state.GamePlayers.TryGetValue(current, out var player))
             {
-                state.PhaseEndTime = state.PhaseEndTime.AddSeconds(-player.QueuedTimePenaltySeconds);
-                player.QueuedTimePenaltySeconds = 0;
+                int seconds = context.EvaluationServices.Get<ITimePenaltyService>()?.ConsumeFor(player) ?? 0;
+                if (seconds > 0)
+                    state.PhaseEndTime = state.PhaseEndTime.AddSeconds(-seconds);
             }
         }
 

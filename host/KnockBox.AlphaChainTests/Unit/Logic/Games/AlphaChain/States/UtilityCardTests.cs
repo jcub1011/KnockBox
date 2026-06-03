@@ -66,7 +66,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
 
         private static void SetCardBan(AlphaChainGameState state, string playerId, string cardId, char letter) =>
-            state.Execute(() => state.GamePlayers[playerId].CardBannedLetters[TestModifierCards.ToId(cardId)] = letter);
+            state.Execute(() => RoomStateProbe.SetCardBan(state, playerId, TestModifierCards.ToId(cardId), letter));
 
         // ── Own card-bans tax the owner's word ───────────────────────────────
 
@@ -136,7 +136,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.IsTrue(first.TryGetSuccess(out var r1));
             Assert.IsInstanceOfType<SubmitWordResult.RejectedNotInDictionary>(r1);
             Assert.AreEqual(t0.AddSeconds(20), state.PhaseEndTime, "The Prism refills the clock to a full 20s (the default).");
-            Assert.IsTrue(state.GamePlayers[submitter].PrismUsedThisTurn);
+            Assert.IsTrue(RoomStateProbe.PrismUsedThisTurn(state, submitter));
 
             // A second typo the SAME turn must not refill again (once per turn).
             state.Execute(() => state.PhaseEndTime = t0.AddSeconds(2));

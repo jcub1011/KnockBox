@@ -195,11 +195,14 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// </summary>
         public int ComputeArmedShotClockSeconds(AlphaChainPlayerState player)
         {
-            // A single-player context so the clock capabilities can read this owner (e.g. Hyper-Drive's
-            // latch) via ctx.GetPlayer(PlayerIndex).
+            // A single-player context so the clock capabilities can read this owner via
+            // ctx.GetPlayer(PlayerIndex) and resolve room state services (e.g. Hyper-Drive's latch,
+            // which now lives in IHyperDriveService). Services is null only outside a started game,
+            // where this is never called.
             var ctx = new EngineEvaluationContext(string.Empty, Array.Empty<char>(), new[] { player })
             {
                 Bay = player.EngineBay,
+                Services = Context?.EvaluationServices,
                 PlayerIndex = 0,
             };
             var bay = (IReadOnlyList<IModifierCard>)player.EngineBay;

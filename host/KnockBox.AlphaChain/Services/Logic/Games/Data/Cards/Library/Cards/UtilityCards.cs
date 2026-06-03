@@ -51,7 +51,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     /// clock to full (once per turn) instead of letting it tick down — the essential pairing with The
     /// Blindfold.
     /// </summary>
-    public sealed class PrismCard : MultiplicativeCardBase
+    public sealed class PrismCard : MultiplicativeCardBase, IContributesRoomServices
     {
         public override ModifierId GetId() => ModifierId.Prism;
         public override string GetName() => "The Prism";
@@ -61,14 +61,16 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override EngineEvaluationContext OnValidationFailed(EngineEvaluationContext context, IModifierCard self)
         {
+            // TryConsume returns true at most once per turn (and arms the once-per-turn guard); the
+            // guard re-arms on the owner's next turn-start via IPrismTurnGuard.OnTurnStarted.
             var owner = context.GetPlayer(context.PlayerIndex);
-            if (owner is { PrismUsedThisTurn: false })
-            {
+            if (owner is not null && context.Service<IPrismTurnGuard>()?.TryConsume(owner) == true)
                 context.Service<IShotClockService>()?.RefillToFull(owner);
-                owner.PrismUsedThisTurn = true;
-            }
             return context;
         }
+
+        public IEnumerable<RoomServiceDescriptor> GetRoomServices()
+            => [new(typeof(IPrismTurnGuard), static _ => new PrismTurnGuard())];
     }
 
     /// <summary>
@@ -76,7 +78,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     /// passive ×1.0), and it blocks and reflects incoming automated attacks, decaying that multiplier
     /// by a fixed step per block — possibly below 1.0 into a scoring burden carried across eras.
     /// </summary>
-    public sealed class TitaniumMirrorCard : MultiplicativeCardBase, IAttackInterceptor
+    public sealed class TitaniumMirrorCard : MultiplicativeCardBase, IAttackInterceptor, IContributesRoomServices
     {
         /// <summary>The shield's per-block decay step.</summary>
         public const double DecayPerBlock = 0.1;
@@ -87,12 +89,31 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             => "Passive ×1.0. Automatically blocks and reflects incoming attacks (time shaves, point drains, letter hijacks) back at their source — but loses 0.1× per block, carrying its decay across eras until discarded.";
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
-            => context.GetShieldMultiplier(context.PlayerIndex);
+            => Multiplier(context);
 
-        public bool TryIntercept(AlphaChainPlayerState owner, IModifierCard self)
+        public bool TryIntercept(AlphaChainPlayerState owner, IModifierCard self, IServiceProvider services)
         {
-            owner.ShieldMultiplier = Math.Max(0.0, owner.ShieldMultiplier - DecayPerBlock);
+            (services.GetService(typeof(IShieldService)) as IShieldService)?.Decay(owner, DecayPerBlock);
             return true;
+        }
+
+        /// <summary>Surfaces the live shield factor (e.g. "×0.7") on the bay card so the player can see
+        /// how far the mirror has decayed.</summary>
+        public override string? GetBayBadge(EngineEvaluationContext context)
+        {
+            var owner = context.GetPlayer(context.PlayerIndex);
+            var shield = context.Service<IShieldService>();
+            return owner is not null && shield is not null ? $"×{shield.GetMultiplier(owner):0.0}" : null;
+        }
+
+        public IEnumerable<RoomServiceDescriptor> GetRoomServices()
+            => [new(typeof(IShieldService), static _ => new ShieldService())];
+
+        private static double Multiplier(EngineEvaluationContext context)
+        {
+            var owner = context.GetPlayer(context.PlayerIndex);
+            var shield = context.Service<IShieldService>();
+            return owner is not null && shield is not null ? shield.GetMultiplier(owner) : 1.0;
         }
     }
 }
