@@ -213,12 +213,21 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
             // the originating circuit's blob each time a player fetches.
             StreamOpener = openCt => OpenReadStreamAsync(_length, openCt),
         };
-        _shareRegistry.Register(entry);
-        _publishedShares.Add(token);
+        try
+        {
+            _shareRegistry.Register(entry);
+            _publishedShares.Add(token);
 
-        var url = $"/blob-share/{token:D}";
-        IBlobShare share = new BlobShare(_shareRegistry, token, url, _contentType, _length);
-        return ValueTask.FromResult(ValueResult<IBlobShare, IndexedDbError>.FromValue(share));
+            var url = $"/blob-share/{token:D}";
+            IBlobShare share = new BlobShare(_shareRegistry, token, url, _contentType, _length);
+            return ValueTask.FromResult(ValueResult<IBlobShare, IndexedDbError>.FromValue(share));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Publishing share for blob {BlobId} failed.", _blobId);
+            return ValueTask.FromResult(ValueResult<IBlobShare, IndexedDbError>.FromError(
+                new IndexedDbError(IndexedDbErrorKind.Unknown, $"Failed to publish blob share: {ex.Message}")));
+        }
     }
 
     public override async ValueTask DisposeAsync()

@@ -46,7 +46,16 @@ namespace KnockBox.Services.State.Users
 
                 if (tokenResult.TryGetSuccess(out var token))
                 {
-                    id = Guid.TryParse(token.Token, out var parsed) ? parsed : Guid.CreateVersion7();
+                    if (Guid.TryParse(token.Token, out var parsed))
+                    {
+                        id = parsed;
+                    }
+                    else
+                    {
+                        logger.LogWarning(
+                            "Session token was not a parseable Guid; minting a fallback id {id}. " +
+                            "This suggests a session-token format change.", id);
+                    }
                     logger.LogDebug("Initialized user id to [{id}].", id);
                 }
                 else

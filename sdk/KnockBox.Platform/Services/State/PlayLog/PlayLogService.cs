@@ -107,7 +107,9 @@ public sealed class PlayLogService(
             // read and append. Best-effort reset so the log self-heals rather than staying broken,
             // then surface the failure so callers can distinguish "no logs" from "couldn't read".
             logger.LogWarning("Discarding unreadable play-log history ({error}); resetting storage.", error.InternalMessage);
-            await localStorage.RemoveAsync(Scope, Key).ConfigureAwait(false);
+            var resetResult = await localStorage.RemoveAsync(Scope, Key).ConfigureAwait(false);
+            if (resetResult.TryGetFailure(out var resetError))
+                logger.LogWarning("Failed to reset unreadable play-log storage: {error}", resetError.InternalMessage);
             return error;
         }
 

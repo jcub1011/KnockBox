@@ -51,6 +51,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
         // Not skippable: ignore every command (no SkipTutorialCommand handling).
         public ValueResult<FsmState?> HandleCommand(AlphaChainGameContext context, AlphaChainCommand command)
-            => (ValueResult<FsmState?>)null!;
+            => null;
     }
 }
