@@ -1,4 +1,4 @@
-using System.Text.Json;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.PlayLog;
 using KnockBox.Core.Services.Storage.ClientStorage;
 
@@ -36,84 +36,82 @@ public sealed class PlayLogService(
         try
         {
             await _writeLock.WaitAsync(ct).ConfigureAwait(false);
-            try
-            {
-                var history = await ReadAsync(ct).ConfigureAwait(false);
-                history.Insert(0, log);
-                if (history.Count > MaxEntries)
-                    history.RemoveRange(MaxEntries, history.Count - MaxEntries);
-
-                await localStorage.SetAsync(Scope, Key, history, ct).ConfigureAwait(false);
-            }
-            finally
-            {
-                _writeLock.Release();
-            }
         }
-        catch (OperationCanceledException) { /* Circuit/service tearing down — drop silently. */ }
-        catch (ObjectDisposedException) { /* Storage disposed — drop silently. */ }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error storing play log for game [{game}].", log.GameIdentifier);
-        }
-    }
+        catch (OperationCanceledException) { return; /* Circuit/service tearing down — drop silently. */ }
 
-    public async ValueTask<IReadOnlyList<GameLog>> GetLogsAsync(CancellationToken ct = default)
-    {
         try
         {
-            var history = await ReadAsync(ct).ConfigureAwait(false);
-            // Defensively honor the cap even if a larger list was hand-written to storage.
+            var readResult = await ReadAsync(ct).ConfigureAwait(false);
+            if (readResult.IsCanceled) return;
+
+            // On a read failure ReadAsync has already reset the (unreadable) storage, so we
+            // start from an empty history — the new entry is still recorded and the log heals.
+            readResult.TryGetSuccess(out var history);
+            history ??= [];
+
+            history.Insert(0, log);
             if (history.Count > MaxEntries)
                 history.RemoveRange(MaxEntries, history.Count - MaxEntries);
-            return history;
+
+            var setResult = await localStorage.SetAsync(Scope, Key, history, ct).ConfigureAwait(false);
+            if (setResult.TryGetFailure(out var error))
+                logger.LogError("Error storing play log for game [{game}]: {error}", log.GameIdentifier, error.InternalMessage);
         }
-        catch (OperationCanceledException) { return []; }
-        catch (ObjectDisposedException) { return []; }
-        catch (Exception ex)
+        finally
         {
-            logger.LogError(ex, "Error reading play log.");
-            return [];
+            _writeLock.Release();
         }
     }
 
-    public async ValueTask<IReadOnlyList<GameLog>> GetLogsAsync(string gameIdentifier, CancellationToken ct = default)
+    public async ValueTask<ValueResult<IReadOnlyList<GameLog>>> GetLogsAsync(CancellationToken ct = default)
     {
-        var all = await GetLogsAsync(ct).ConfigureAwait(false);
-        return all
+        var readResult = await ReadAsync(ct).ConfigureAwait(false);
+        if (readResult.IsCanceled) return ValueResult<IReadOnlyList<GameLog>>.FromCancellation();
+        if (readResult.TryGetFailure(out var error)) return error;
+
+        readResult.TryGetSuccess(out var history);
+        // Defensively honor the cap even if a larger list was hand-written to storage.
+        if (history.Count > MaxEntries)
+            history.RemoveRange(MaxEntries, history.Count - MaxEntries);
+        return ValueResult<IReadOnlyList<GameLog>>.FromValue(history);
+    }
+
+    public async ValueTask<ValueResult<IReadOnlyList<GameLog>>> GetLogsAsync(string gameIdentifier, CancellationToken ct = default)
+    {
+        var allResult = await GetLogsAsync(ct).ConfigureAwait(false);
+        if (allResult.IsCanceled) return ValueResult<IReadOnlyList<GameLog>>.FromCancellation();
+        if (allResult.TryGetFailure(out var error)) return error;
+
+        allResult.TryGetSuccess(out var all);
+        IReadOnlyList<GameLog> filtered = all
             .Where(l => string.Equals(l.GameIdentifier, gameIdentifier, StringComparison.Ordinal))
             .ToList();
+        return ValueResult<IReadOnlyList<GameLog>>.FromValue(filtered);
     }
 
-    public async ValueTask ClearAsync(CancellationToken ct = default)
+    public async ValueTask<Result> ClearAsync(CancellationToken ct = default)
     {
-        try
+        var result = await localStorage.RemoveAsync(Scope, Key).ConfigureAwait(false);
+        if (result.TryGetFailure(out var error))
+            logger.LogError("Error clearing play log: {error}", error.InternalMessage);
+        return result;
+    }
+
+    private async ValueTask<ValueResult<List<GameLog>>> ReadAsync(CancellationToken ct)
+    {
+        var result = await localStorage.GetAsync<List<GameLog>>(Scope, Key, ct).ConfigureAwait(false);
+        if (result.IsCanceled) return ValueResult<List<GameLog>>.FromCancellation();
+        if (result.TryGetFailure(out var error))
         {
+            // Corrupt/legacy-shaped JSON (or an interop failure) would otherwise wedge every
+            // read and append. Best-effort reset so the log self-heals rather than staying broken,
+            // then surface the failure so callers can distinguish "no logs" from "couldn't read".
+            logger.LogWarning("Discarding unreadable play-log history ({error}); resetting storage.", error.InternalMessage);
             await localStorage.RemoveAsync(Scope, Key).ConfigureAwait(false);
+            return error;
         }
-        catch (OperationCanceledException) { /* Drop silently. */ }
-        catch (ObjectDisposedException) { /* Drop silently. */ }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error clearing play log.");
-        }
-    }
 
-    private async ValueTask<List<GameLog>> ReadAsync(CancellationToken ct)
-    {
-        try
-        {
-            var stored = await localStorage.GetAsync<List<GameLog>>(Scope, Key, ct).ConfigureAwait(false);
-            return stored ?? [];
-        }
-        catch (JsonException ex)
-        {
-            // Corrupt or legacy-shaped JSON under the key would otherwise wedge every read and
-            // append permanently. Discard it so the log self-heals rather than staying broken.
-            logger.LogWarning(ex, "Discarding corrupt play-log history; resetting storage.");
-            try { await localStorage.RemoveAsync(Scope, Key).ConfigureAwait(false); }
-            catch (Exception removeEx) { logger.LogError(removeEx, "Failed to clear corrupt play-log history."); }
-            return [];
-        }
+        result.TryGetSuccess(out var stored);
+        return stored ?? [];
     }
 }

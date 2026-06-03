@@ -98,12 +98,12 @@ public sealed class LobbyPageBaseTests
         public User? CurrentUser { get; private set; } = user;
         public event Action? UserInitialized;
         public event Action<UserNameChangedArgs>? UserNameChanged;
-        public Task InitializeCurrentUserAsync(CancellationToken ct = default)
+        public Task<Result> InitializeCurrentUserAsync(CancellationToken ct = default)
         {
             UserInitialized?.Invoke();
-            return Task.CompletedTask;
+            return Task.FromResult(Result.Success);
         }
-        public Task ResetIdentityAsync(CancellationToken ct = default) => Task.CompletedTask;
+        public Task<Result> ResetIdentityAsync(CancellationToken ct = default) => Task.FromResult(Result.Success);
         public void SetCurrentUserName(string name)
         {
             if (CurrentUser is null) return;

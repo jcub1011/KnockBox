@@ -618,8 +618,8 @@ public interface IUserService
     event Action? UserInitialized;
     event Action<UserNameChangedArgs>? UserNameChanged;
 
-    Task InitializeCurrentUserAsync(CancellationToken ct = default);
-    Task ResetIdentityAsync(CancellationToken ct = default);
+    Task<Result> InitializeCurrentUserAsync(CancellationToken ct = default);
+    Task<Result> ResetIdentityAsync(CancellationToken ct = default);
     void SetCurrentUserName(string name);
 }
 ```

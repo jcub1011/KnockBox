@@ -1,6 +1,7 @@
 @using System.Globalization
 @using KnockBox.AlphaChain.Services.Logic.Games.Data
 @using KnockBox.AlphaChain.Services.State.Games
+@using KnockBox.Core.Primitives.Returns
 @using KnockBox.Core.Services.Storage.ClientStorage
 @inject ILocalStorageService LocalStorage
 @inject ILogger<AlphaChainSettingsPanel> Logger
@@ -244,28 +245,19 @@
 
     private async Task LoadSettingsAsync()
     {
-        try
+        // A failed or canceled read falls through to the built-in defaults.
+        var savedResult = await LocalStorage.GetAsync<AlphaChainSettings>("alpha-chain", "settings", _cts.Token);
+        if (savedResult.TryGetSuccess(out var saved) && saved is not null && !_userHasEdited)
         {
-            var saved = await LocalStorage.GetAsync<AlphaChainSettings>("alpha-chain", "settings", _cts.Token);
-            if (saved is not null && !_userHasEdited)
+            // HostPlays is a start-time choice, never a saved preference — clear any legacy
+            // persisted value so it can't auto-seat the host.
+            saved = saved with { HostPlays = false };
+            if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
             {
-                // HostPlays is a start-time choice, never a saved preference — clear any legacy
-                // persisted value so it can't auto-seat the host.
-                saved = saved with { HostPlays = false };
-                if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
-                {
-                    Logger.LogError("Failed to apply saved Alpha Chain settings: {Error}", error.PublicMessage);
-                    return;
-                }
-                StateHasChanged();
+                Logger.LogError("Failed to apply saved Alpha Chain settings: {Error}", error.PublicMessage);
+                return;
             }
-        }
-        catch (OperationCanceledException) { /* component disposed */ }
-        catch (ObjectDisposedException) { /* circuit gone */ }
-        catch (JSDisconnectedException) { /* circuit gone */ }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error loading Alpha Chain settings.");
+            StateHasChanged();
         }
     }
 
@@ -283,24 +275,16 @@
         {
             try { await prior; } catch { /* prior failure already logged */ }
         }
-        try
-        {
-            await LocalStorage.SetAsync("alpha-chain", "settings", settings, ct);
-        }
-        catch (OperationCanceledException) { /* component disposed */ }
-        catch (ObjectDisposedException) { /* circuit gone */ }
-        catch (JSDisconnectedException) { /* circuit gone */ }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error saving Alpha Chain settings.");
-        }
+        var saveResult = await LocalStorage.SetAsync("alpha-chain", "settings", settings, ct);
+        if (saveResult.TryGetFailure(out var saveError))
+            Logger.LogError("Error saving Alpha Chain settings: {Error}", saveError.InternalMessage);
     }
 
     public async ValueTask DisposeAsync()
     {
         // Flush the last pending save so a change made right before navigating away isn't
-        // lost. A dead circuit makes SetAsync throw JSDisconnectedException, which
-        // SaveSettingsAsync swallows, so this returns promptly rather than hanging.
+        // lost. A dead circuit makes SetAsync return a failure result, which
+        // SaveSettingsAsync logs and swallows, so this returns promptly rather than hanging.
         if (_saveTask is not null)
         {
             try { await _saveTask; } catch { /* best-effort flush */ }

@@ -1,3 +1,5 @@
+using KnockBox.Core.Primitives.Returns;
+
 namespace KnockBox.Core.Services.State.Users
 {
     public record class UserNameChangedArgs(string PreviousName, string NewName);
@@ -90,18 +92,21 @@ namespace KnockBox.Core.Services.State.Users
         event Action<UserNameChangedArgs>? UserNameChanged;
 
         /// <summary>
-        /// Initializes the current user.
+        /// Initializes the current user. A <see cref="User"/> is always produced (a
+        /// fallback identity is used if the session token can't be obtained); the
+        /// returned result is a failure in that degraded case so callers may surface it.
         /// </summary>
         /// <param name="ct"></param>
-        /// <returns></returns>
-        Task InitializeCurrentUserAsync(CancellationToken ct = default);
+        /// <returns>Success when a real session was established; failure on the degraded
+        /// fallback path; cancellation is reported as a failure result.</returns>
+        Task<Result> InitializeCurrentUserAsync(CancellationToken ct = default);
 
         /// <summary>
         /// Resets the user's identity, generating a new unique id.
         /// </summary>
         /// <param name="ct"></param>
-        /// <returns></returns>
-        Task ResetIdentityAsync(CancellationToken ct = default);
+        /// <returns>The result of re-initializing the current user.</returns>
+        Task<Result> ResetIdentityAsync(CancellationToken ct = default);
 
         /// <summary>
         /// Updates <see cref="CurrentUser"/>'s name. Trims whitespace and caps at

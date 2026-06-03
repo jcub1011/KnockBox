@@ -1,3 +1,5 @@
+using KnockBox.Core.Primitives.Returns;
+
 namespace KnockBox.Core.Services.Storage.IndexedDb
 {
     /// <summary>
@@ -29,7 +31,7 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         /// Reads the entire blob into a single buffer. Convenient for small
         /// payloads; prefer <see cref="OpenReadAsync"/> for media.
         /// </summary>
-        public abstract ValueTask<byte[]> ReadAllBytesAsync(CancellationToken ct = default);
+        public abstract ValueTask<ValueResult<byte[], IndexedDbError>> ReadAllBytesAsync(CancellationToken ct = default);
 
         /// <summary>
         /// Opens a read-only forward stream that pulls chunks from JS on
@@ -37,7 +39,7 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         /// synchronous <c>Read</c> throws <see cref="NotSupportedException"/>.
         /// Disposing the stream does not dispose the blob.
         /// </summary>
-        public abstract ValueTask<Stream> OpenReadAsync(CancellationToken ct = default);
+        public abstract ValueTask<ValueResult<Stream, IndexedDbError>> OpenReadAsync(CancellationToken ct = default);
 
         /// <summary>
         /// Creates (and caches) a <c>blob:</c> object URL pointing at the
@@ -45,7 +47,7 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         /// <c>&lt;audio src&gt;</c>, etc. The URL is revoked when this blob is
         /// disposed.
         /// </summary>
-        public abstract ValueTask<string> CreateObjectUrlAsync(CancellationToken ct = default);
+        public abstract ValueTask<ValueResult<string, IndexedDbError>> CreateObjectUrlAsync(CancellationToken ct = default);
 
         /// <summary>
         /// Publishes this blob as an HTTP-fetchable resource that other
@@ -61,7 +63,7 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         /// scope its distribution accordingly.
         /// </para>
         /// </summary>
-        public abstract ValueTask<IBlobShare> PublishForSharingAsync(
+        public abstract ValueTask<ValueResult<IBlobShare, IndexedDbError>> PublishForSharingAsync(
             BlobShareOptions? options = null,
             CancellationToken ct = default);
 

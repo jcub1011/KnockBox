@@ -3,6 +3,7 @@
 @using KnockBox.Spardle.Models
 @using KnockBox.Spardle
 @using KnockBox.WordService.Contracts
+@using KnockBox.Core.Primitives.Returns
 @using KnockBox.Core.Services.Storage.ClientStorage
 @using Microsoft.Extensions.Logging
 @using Microsoft.JSInterop
@@ -444,9 +445,9 @@
     public async ValueTask DisposeAsync()
     {
         // Flush the last pending save before tearing down so a change made right before
-        // navigating away isn't lost. A dead circuit makes SetAsync throw
-        // JSDisconnectedException, which SaveSettingsAsync swallows, so this returns
-        // promptly rather than hanging.
+        // navigating away isn't lost. A dead circuit makes SetAsync return a failure result,
+        // which SaveSettingsAsync logs and swallows, so this returns promptly rather than
+        // hanging.
         if (_saveTask is not null)
         {
             try { await _saveTask; } catch { /* best-effort flush */ }
@@ -493,36 +494,27 @@
         }
     }
 
-    // Restore the host's previously saved match rules. Missing key → GetAsync returns null,
-    // leaving the engine defaults in place. CustomWordPool is intentionally not persisted,
-    // so CSV/Host-defined pools start empty and must be re-entered.
+    // Restore the host's previously saved match rules. Missing key → GetAsync returns
+    // success-with-null, leaving the engine defaults in place. A failed or canceled read also
+    // falls through to the defaults. CustomWordPool is intentionally not persisted, so
+    // CSV/Host-defined pools start empty and must be re-entered.
     private async Task LoadSettingsAsync()
     {
-        try
+        var savedResult = await LocalStorage.GetAsync<SpardleSettings>("spardle", "settings", _cts.Token);
+        // If the host already edited a setting while the load was in flight,
+        // the user's edit wins — the saved snapshot would clobber it.
+        if (savedResult.TryGetSuccess(out var saved) && saved is not null && !_userHasEdited)
         {
-            var saved = await LocalStorage.GetAsync<SpardleSettings>("spardle", "settings", _cts.Token);
-            // If the host already edited a setting while the load was in flight,
-            // the user's edit wins — the saved snapshot would clobber it.
-            if (saved is not null && !_userHasEdited)
+            // Host participation is now an explicit start-button choice, not a saved
+            // setting. Clear any legacy persisted value so it can't auto-seat the host.
+            saved = saved with { HostPlaysAlong = false };
+            if (State.UpdateSettings(_ => saved).TryGetFailure(out var error))
             {
-                // Host participation is now an explicit start-button choice, not a saved
-                // setting. Clear any legacy persisted value so it can't auto-seat the host.
-                saved = saved with { HostPlaysAlong = false };
-                if (State.UpdateSettings(_ => saved).TryGetFailure(out var error))
-                {
-                    Logger.LogError("Failed to apply saved Spardle settings: {Error}", error.PublicMessage);
-                    return;
-                }
-                _unlimitedTimer = State.Settings.RoundTimer <= TimeSpan.Zero;
-                StateHasChanged();
+                Logger.LogError("Failed to apply saved Spardle settings: {Error}", error.PublicMessage);
+                return;
             }
-        }
-        catch (OperationCanceledException) { /* component disposed */ }
-        catch (ObjectDisposedException) { /* circuit gone */ }
-        catch (JSDisconnectedException) { /* circuit gone */ }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error loading Spardle settings.");
+            _unlimitedTimer = State.Settings.RoundTimer <= TimeSpan.Zero;
+            StateHasChanged();
         }
     }
 
@@ -542,17 +534,9 @@
         {
             try { await prior; } catch { /* prior failure already logged */ }
         }
-        try
-        {
-            await LocalStorage.SetAsync("spardle", "settings", settings, ct);
-        }
-        catch (OperationCanceledException) { /* component disposed */ }
-        catch (ObjectDisposedException) { /* circuit gone */ }
-        catch (JSDisconnectedException) { /* circuit gone */ }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error saving Spardle settings.");
-        }
+        var saveResult = await LocalStorage.SetAsync("spardle", "settings", settings, ct);
+        if (saveResult.TryGetFailure(out var saveError))
+            Logger.LogError("Error saving Spardle settings: {Error}", saveError.InternalMessage);
     }
 
     private async Task StartGame(bool hostAsPlayer)

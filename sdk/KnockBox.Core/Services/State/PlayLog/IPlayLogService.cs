@@ -1,3 +1,5 @@
+using KnockBox.Core.Primitives.Returns;
+
 namespace KnockBox.Core.Services.State.PlayLog;
 
 /// <summary>
@@ -25,19 +27,20 @@ public interface IPlayLogService
     ValueTask StoreLogAsync(GameLog log, CancellationToken ct = default);
 
     /// <summary>
-    /// Returns the full play history, newest first. Empty when nothing has been
-    /// logged yet.
+    /// Returns the full play history, newest first. A success result with an empty
+    /// list means nothing has been logged yet; a failure result means the history
+    /// could not be read (distinct from "empty").
     /// </summary>
-    ValueTask<IReadOnlyList<GameLog>> GetLogsAsync(CancellationToken ct = default);
+    ValueTask<ValueResult<IReadOnlyList<GameLog>>> GetLogsAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Returns the play history for a single game (matched on
     /// <see cref="GameLog.GameIdentifier"/>), newest first.
     /// </summary>
-    ValueTask<IReadOnlyList<GameLog>> GetLogsAsync(string gameIdentifier, CancellationToken ct = default);
+    ValueTask<ValueResult<IReadOnlyList<GameLog>>> GetLogsAsync(string gameIdentifier, CancellationToken ct = default);
 
     /// <summary>
     /// Clears the entire play log.
     /// </summary>
-    ValueTask ClearAsync(CancellationToken ct = default);
+    ValueTask<Result> ClearAsync(CancellationToken ct = default);
 }

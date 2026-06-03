@@ -1,10 +1,10 @@
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Core.Services.Storage.ClientStorage;
 using KnockBox.LinkedList.Services.Logic;
 using KnockBox.LinkedList.Services.Logic.Games;
 using KnockBox.LinkedList.Services.State.Games;
 using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 
 namespace KnockBox.LinkedList.Pages
 {
@@ -294,33 +294,24 @@ namespace KnockBox.LinkedList.Pages
 
         private async Task LoadSettingsAsync()
         {
-            try
+            var savedResult = await LocalStorage.GetAsync<LinkedListSettings>("linked-list", "settings", _cts.Token);
+            // A failed or canceled read is a non-success result that simply falls through to
+            // the built-in defaults. If the host already edited a setting while the load was in
+            // flight, the user's edit wins — the saved snapshot would clobber it.
+            if (savedResult.TryGetSuccess(out var saved) && saved is not null && !_userHasEdited)
             {
-                var saved = await LocalStorage.GetAsync<LinkedListSettings>("linked-list", "settings", _cts.Token);
-                // If the host already edited a setting while the load was in flight,
-                // the user's edit wins — the saved snapshot would clobber it.
-                if (saved is not null && !_userHasEdited)
+                // Host-plays is no longer a persisted toggle — it's decided by the start
+                // button — so force it off here. This also stops a value saved by the old
+                // checkbox from making the host show up as a participant in the lobby.
+                saved = saved with { HostPlays = false };
+                // Apply through GameState directly (not the local UpdateSettings) so the
+                // load doesn't flip _userHasEdited or re-persist the just-loaded value.
+                if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
                 {
-                    // Host-plays is no longer a persisted toggle — it's decided by the start
-                    // button — so force it off here. This also stops a value saved by the old
-                    // checkbox from making the host show up as a participant in the lobby.
-                    saved = saved with { HostPlays = false };
-                    // Apply through GameState directly (not the local UpdateSettings) so the
-                    // load doesn't flip _userHasEdited or re-persist the just-loaded value.
-                    if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
-                    {
-                        Logger.LogError("Failed to apply saved Linked List settings: {Error}", error.PublicMessage);
-                        return;
-                    }
-                    StateHasChanged();
+                    Logger.LogError("Failed to apply saved Linked List settings: {Error}", error.PublicMessage);
+                    return;
                 }
-            }
-            catch (OperationCanceledException) { /* component disposed */ }
-            catch (ObjectDisposedException) { /* circuit gone */ }
-            catch (JSDisconnectedException) { /* circuit gone */ }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error loading Linked List settings.");
+                StateHasChanged();
             }
         }
 
@@ -336,24 +327,17 @@ namespace KnockBox.LinkedList.Pages
             {
                 try { await prior; } catch { /* prior failure already logged */ }
             }
-            try
-            {
-                await LocalStorage.SetAsync("linked-list", "settings", settings, ct);
-            }
-            catch (OperationCanceledException) { /* component disposed */ }
-            catch (ObjectDisposedException) { /* circuit gone */ }
-            catch (JSDisconnectedException) { /* circuit gone */ }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error saving Linked List settings.");
-            }
+            var saveResult = await LocalStorage.SetAsync("linked-list", "settings", settings, ct);
+            // Cancellation is silently ignored; a genuine storage failure is logged.
+            if (saveResult.TryGetFailure(out var saveError))
+                Logger.LogError("Error saving Linked List settings: {Error}", saveError.InternalMessage);
         }
 
         public async ValueTask DisposeAsync()
         {
             // Flush the last pending save before tearing down so a change made right before
-            // navigating away isn't lost. A dead circuit makes SetAsync throw
-            // JSDisconnectedException, which SaveSettingsAsync swallows.
+            // navigating away isn't lost. A dead circuit makes SetAsync return a failure
+            // Result, which SaveSettingsAsync logs.
             if (_saveTask is not null)
             {
                 try { await _saveTask; } catch { /* best-effort flush */ }

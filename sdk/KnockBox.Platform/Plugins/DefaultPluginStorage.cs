@@ -1,4 +1,5 @@
 using KnockBox.Core.Plugins;
+using KnockBox.Core.Primitives.Returns;
 
 namespace KnockBox.Platform.Plugins;
 
@@ -14,40 +15,76 @@ internal sealed class DefaultPluginStorage(string rootDirectory) : IPluginStorag
 {
     private readonly string _root = PluginPathGuard.NormalizeDirectory(rootDirectory);
 
-    public Stream OpenRead(string relativePath)
+    public ValueResult<Stream> OpenRead(string relativePath)
     {
         var full = Resolve(relativePath);
-        return File.OpenRead(full);
+        try
+        {
+            return ValueResult<Stream>.FromValue(File.OpenRead(full));
+        }
+        catch (Exception ex)
+        {
+            return ValueResult<Stream>.FromError(
+                "Unable to open plugin file for reading.", $"Error opening [{relativePath}] for read: {ex}");
+        }
     }
 
-    public Stream OpenWrite(string relativePath)
+    public ValueResult<Stream> OpenWrite(string relativePath)
     {
         var full = Resolve(relativePath);
-        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
-        return File.Create(full);
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+            return ValueResult<Stream>.FromValue(File.Create(full));
+        }
+        catch (Exception ex)
+        {
+            return ValueResult<Stream>.FromError(
+                "Unable to open plugin file for writing.", $"Error opening [{relativePath}] for write: {ex}");
+        }
     }
 
     public bool Exists(string relativePath) => File.Exists(Resolve(relativePath));
 
-    public void Delete(string relativePath)
+    public Result Delete(string relativePath)
     {
         var full = Resolve(relativePath);
-        if (File.Exists(full))
-            File.Delete(full);
+        try
+        {
+            if (File.Exists(full))
+                File.Delete(full);
+            return Result.Success;
+        }
+        catch (Exception ex)
+        {
+            return Result.FromError("Unable to delete plugin file.", $"Error deleting [{relativePath}]: {ex}");
+        }
     }
 
-    public IEnumerable<string> EnumerateFiles(string relativeDir, string searchPattern)
+    public ValueResult<IReadOnlyList<string>> EnumerateFiles(string relativeDir, string searchPattern)
     {
         // Empty means "from root" — skip Resolve (which rejects empty) and
         // start the walk at _root directly.
         var dir = string.IsNullOrEmpty(relativeDir) ? _root : Resolve(relativeDir);
-        if (!Directory.Exists(dir))
-            yield break;
-
-        foreach (var full in Directory.EnumerateFiles(dir, searchPattern, SearchOption.AllDirectories))
+        try
         {
-            var relative = Path.GetRelativePath(_root, full).Replace(Path.DirectorySeparatorChar, '/');
-            yield return relative;
+            if (!Directory.Exists(dir))
+                return ValueResult<IReadOnlyList<string>>.FromValue([]);
+
+            // Materialize inside the try so a mid-iteration I/O error surfaces as a
+            // failure result rather than throwing out of the caller's foreach.
+            var results = new List<string>();
+            foreach (var full in Directory.EnumerateFiles(dir, searchPattern, SearchOption.AllDirectories))
+            {
+                var relative = Path.GetRelativePath(_root, full).Replace(Path.DirectorySeparatorChar, '/');
+                results.Add(relative);
+            }
+            return ValueResult<IReadOnlyList<string>>.FromValue(results);
+        }
+        catch (Exception ex)
+        {
+            return ValueResult<IReadOnlyList<string>>.FromError(
+                "Unable to enumerate plugin files.", $"Error enumerating [{relativeDir}]: {ex}");
         }
     }
 

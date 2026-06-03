@@ -243,26 +243,27 @@ public sealed class UserServiceTests
             lock (_lock) _store.Clear();
         }
 
-        public ValueTask<TType> GetAsync<TType>(string scope, string key, CancellationToken ct = default)
+        public ValueTask<ValueResult<TType?>> GetAsync<TType>(string scope, string key, CancellationToken ct = default)
         {
             lock (_lock)
             {
-                if (_store.TryGetValue((scope, key), out var v) && v is TType t) return new(t);
+                if (_store.TryGetValue((scope, key), out var v) && v is TType t)
+                    return new(ValueResult<TType?>.FromValue(t));
             }
-            return new(default(TType)!);
+            return new(ValueResult<TType?>.FromValue(default));
         }
 
-        public ValueTask SetAsync<TType>(string scope, string key, TType value, CancellationToken ct = default)
+        public ValueTask<Result> SetAsync<TType>(string scope, string key, TType value, CancellationToken ct = default)
         {
             lock (_lock) _store[(scope, key)] = value;
-            return ValueTask.CompletedTask;
+            return new(Result.Success);
         }
 
-        public ValueTask<List<string>> GetKeysAsync(string scope, CancellationToken ct = default) => new(new List<string>());
-        public ValueTask<List<string>> GetAllKeysAsync(CancellationToken ct = default) => new(new List<string>());
-        public ValueTask RemoveAsync(string scope, string key) => ValueTask.CompletedTask;
-        public ValueTask RemoveAsync(string scope) => ValueTask.CompletedTask;
-        public ValueTask ClearAsync() => ValueTask.CompletedTask;
+        public ValueTask<ValueResult<List<string>>> GetKeysAsync(string scope, CancellationToken ct = default) => new(ValueResult<List<string>>.FromValue([]));
+        public ValueTask<ValueResult<List<string>>> GetAllKeysAsync(CancellationToken ct = default) => new(ValueResult<List<string>>.FromValue([]));
+        public ValueTask<Result> RemoveAsync(string scope, string key) => new(Result.Success);
+        public ValueTask<Result> RemoveAsync(string scope) => new(Result.Success);
+        public ValueTask<Result> ClearAsync() => new(Result.Success);
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 

@@ -1,7 +1,7 @@
+@using KnockBox.Core.Primitives.Returns
 @using KnockBox.Core.Services.State.Users
 @using KnockBox.Core.Services.Storage.ClientStorage
 @using KnockBox.Tracery.Services.Logic.Games
-@using Microsoft.JSInterop
 @inject IUserService UserService
 @inject TraceryGameEngine GameEngine
 @inject ILocalStorageService LocalStorage
@@ -155,30 +155,21 @@
 
     private async Task LoadSettingsAsync()
     {
-        try
+        // A failed or canceled read falls through to the built-in defaults.
+        var savedResult = await LocalStorage.GetAsync<TracerySettings>("tracery", "settings", _cts.Token);
+        // If the host already edited a setting while the load was in flight, the user's
+        // edit wins — the saved snapshot would clobber it.
+        if (savedResult.TryGetSuccess(out var saved) && saved is not null && !_userHasEdited)
         {
-            var saved = await LocalStorage.GetAsync<TracerySettings>("tracery", "settings", _cts.Token);
-            // If the host already edited a setting while the load was in flight, the user's
-            // edit wins — the saved snapshot would clobber it.
-            if (saved is not null && !_userHasEdited)
+            // Host participation is now an explicit start-button choice, not a saved
+            // setting. Clear any legacy persisted value so it can't auto-seat the host.
+            saved = saved with { HostPlaysAlong = false };
+            if (State.UpdateSettings(_ => saved).TryGetFailure(out var error))
             {
-                // Host participation is now an explicit start-button choice, not a saved
-                // setting. Clear any legacy persisted value so it can't auto-seat the host.
-                saved = saved with { HostPlaysAlong = false };
-                if (State.UpdateSettings(_ => saved).TryGetFailure(out var error))
-                {
-                    Logger.LogError("Failed to apply saved Tracery settings: {Error}", error.PublicMessage);
-                    return;
-                }
-                StateHasChanged();
+                Logger.LogError("Failed to apply saved Tracery settings: {Error}", error.PublicMessage);
+                return;
             }
-        }
-        catch (OperationCanceledException) { /* component disposed */ }
-        catch (ObjectDisposedException) { /* circuit gone */ }
-        catch (JSDisconnectedException) { /* circuit gone */ }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error loading Tracery settings.");
+            StateHasChanged();
         }
     }
 
@@ -196,17 +187,9 @@
         {
             try { await prior; } catch { /* prior failure already logged */ }
         }
-        try
-        {
-            await LocalStorage.SetAsync("tracery", "settings", settings, ct);
-        }
-        catch (OperationCanceledException) { /* component disposed */ }
-        catch (ObjectDisposedException) { /* circuit gone */ }
-        catch (JSDisconnectedException) { /* circuit gone */ }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error saving Tracery settings.");
-        }
+        var saveResult = await LocalStorage.SetAsync("tracery", "settings", settings, ct);
+        if (saveResult.TryGetFailure(out var saveError))
+            Logger.LogError("Error saving Tracery settings: {Error}", saveError.InternalMessage);
     }
 
     public async ValueTask DisposeAsync()

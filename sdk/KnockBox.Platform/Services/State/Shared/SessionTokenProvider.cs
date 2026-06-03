@@ -21,11 +21,17 @@ public sealed class SessionTokenProvider(ISessionStorageService sessionStorageSe
                 // Get token from storage
                 if (_cachedToken.HashCode == 0)
                 {
-                    string tokenString = await sessionStorageService.GetAsync<string>(nameof(SessionTokenProvider), "token", ct);
+                    var getResult = await sessionStorageService.GetAsync<string>(nameof(SessionTokenProvider), "token", ct);
+                    if (getResult.IsCanceled) return ValueResult<SessionToken>.FromCancellation();
+                    if (getResult.TryGetFailure(out var getError)) return getError;
+                    getResult.TryGetSuccess(out var tokenString);
+
                     if (string.IsNullOrWhiteSpace(tokenString))
                     {
                         tokenString = Guid.CreateVersion7().ToString();
-                        await sessionStorageService.SetAsync(nameof(SessionTokenProvider), "token", tokenString, ct);
+                        var setResult = await sessionStorageService.SetAsync(nameof(SessionTokenProvider), "token", tokenString, ct);
+                        if (setResult.IsCanceled) return ValueResult<SessionToken>.FromCancellation();
+                        if (setResult.TryGetFailure(out var setError)) return setError;
                     }
                     _cachedToken = new SessionToken(tokenString);
 
@@ -54,7 +60,9 @@ public sealed class SessionTokenProvider(ISessionStorageService sessionStorageSe
             try
             {
                 _cachedToken = new SessionToken(Guid.NewGuid());
-                await sessionStorageService.SetAsync(nameof(SessionTokenProvider), "token", _cachedToken.Token, ct);
+                var setResult = await sessionStorageService.SetAsync(nameof(SessionTokenProvider), "token", _cachedToken.Token, ct);
+                if (setResult.IsCanceled) return ValueResult<SessionToken>.FromCancellation();
+                if (setResult.TryGetFailure(out var setError)) return setError;
 
                 return _cachedToken;
             }

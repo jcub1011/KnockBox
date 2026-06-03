@@ -1,5 +1,6 @@
 namespace KnockBox.Services.Logic.Filtering
 {
+    using KnockBox.Core.Primitives.Returns;
     using KnockBox.Core.Services.Logic.Filtering;
 
     internal sealed class ProfanityFilter : IProfanityFilter
@@ -7,15 +8,27 @@ namespace KnockBox.Services.Logic.Filtering
         private const string ProfanityResourceName = "KnockBox.Platform.Data.Statics.Profanities.English.txt";
         private static readonly Lazy<Automaton> AutomatonLazy = new(Automaton.Build, LazyThreadSafetyMode.ExecutionAndPublication);
 
-        public ValueTask<List<ProfanityMatch>?> ExtractProfanitiesAsync(string text, CancellationToken ct = default)
+        public ValueTask<ValueResult<List<ProfanityMatch>?>> ExtractProfanitiesAsync(string text, CancellationToken ct = default)
         {
             if (string.IsNullOrEmpty(text))
             {
-                return ValueTask.FromResult<List<ProfanityMatch>?>(null);
+                return ValueTask.FromResult(ValueResult<List<ProfanityMatch>?>.FromValue(null));
             }
 
-            var matches = AutomatonLazy.Value.Find(text, ct);
-            return ValueTask.FromResult(matches.Count == 0 ? null : matches);
+            try
+            {
+                var matches = AutomatonLazy.Value.Find(text, ct);
+                return ValueTask.FromResult(ValueResult<List<ProfanityMatch>?>.FromValue(matches.Count == 0 ? null : matches));
+            }
+            catch (OperationCanceledException)
+            {
+                return ValueTask.FromResult(ValueResult<List<ProfanityMatch>?>.FromCancellation());
+            }
+            catch (Exception ex)
+            {
+                return ValueTask.FromResult(ValueResult<List<ProfanityMatch>?>.FromError(
+                    "Unable to scan text for profanity.", $"Error extracting profanities: {ex}"));
+            }
         }
 
         private sealed class Automaton

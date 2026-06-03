@@ -1,4 +1,5 @@
 using KnockBox.Core.Plugins;
+using KnockBox.Core.Primitives.Returns;
 
 namespace KnockBox.DndMapperTests.Helpers
 {
@@ -17,42 +18,62 @@ namespace KnockBox.DndMapperTests.Helpers
 
         public IReadOnlyDictionary<string, byte[]> Files => _files;
 
-        public Stream OpenRead(string relativePath)
+        public ValueResult<Stream> OpenRead(string relativePath)
         {
             string normalized = Normalize(relativePath);
             if (!_files.TryGetValue(normalized, out var bytes))
-                throw new FileNotFoundException($"File not found: {normalized}");
-            return new MemoryStream(bytes, writable: false);
+                return ValueResult<Stream>.FromError($"File not found: {normalized}");
+            return ValueResult<Stream>.FromValue(new MemoryStream(bytes, writable: false));
         }
 
-        public Stream OpenWrite(string relativePath)
+        public ValueResult<Stream> OpenWrite(string relativePath)
         {
             string normalized = Normalize(relativePath);
-            if (OpenWriteOverride is not null)
-                return OpenWriteOverride(normalized);
-            return new CapturingStream(this, normalized);
+            try
+            {
+                if (OpenWriteOverride is not null)
+                    return ValueResult<Stream>.FromValue(OpenWriteOverride(normalized));
+                return ValueResult<Stream>.FromValue(new CapturingStream(this, normalized));
+            }
+            catch (Exception ex)
+            {
+                // Lets tests inject a write failure via OpenWriteOverride throwing.
+                return ValueResult<Stream>.FromError("Open write failed.", ex.ToString());
+            }
         }
 
         public bool Exists(string relativePath) => _files.ContainsKey(Normalize(relativePath));
 
-        public void Delete(string relativePath)
+        public Result Delete(string relativePath)
         {
             string normalized = Normalize(relativePath);
-            if (DeleteOverride is not null)
+            try
             {
-                DeleteOverride(normalized);
-                return;
+                if (DeleteOverride is not null)
+                {
+                    DeleteOverride(normalized);
+                    return Result.Success;
+                }
+                _files.Remove(normalized);
+                return Result.Success;
             }
-            _files.Remove(normalized);
+            catch (Exception ex)
+            {
+                // Lets tests inject a delete failure via DeleteOverride throwing.
+                return Result.FromError("Delete failed.", ex.ToString());
+            }
         }
 
-        public IEnumerable<string> EnumerateFiles(string relativeDir, string searchPattern)
+        public ValueResult<IReadOnlyList<string>> EnumerateFiles(string relativeDir, string searchPattern)
         {
             string dir = Normalize(relativeDir);
             string prefix = dir.Length == 0 ? string.Empty : dir + "/";
             // We accept "*" only — that's all the engine uses. Don't bother emulating
             // glob matching here.
-            return _files.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToArray();
+            IReadOnlyList<string> matches = _files.Keys
+                .Where(k => k.StartsWith(prefix, StringComparison.Ordinal))
+                .ToArray();
+            return ValueResult<IReadOnlyList<string>>.FromValue(matches);
         }
 
         public void Seed(string relativePath, byte[] bytes)

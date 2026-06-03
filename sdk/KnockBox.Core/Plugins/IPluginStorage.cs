@@ -1,10 +1,15 @@
+using KnockBox.Core.Primitives.Returns;
+
 namespace KnockBox.Core.Plugins;
 
 /// <summary>
 /// Per-plugin filesystem abstraction rooted at a host-chosen directory. All
 /// paths are interpreted relative to that root; absolute paths, rooted paths,
 /// and paths that escape the root (via <c>..</c> or similar) are rejected with
-/// <see cref="ArgumentException"/>.
+/// <see cref="System.ArgumentException"/> (an authoring/programming error).
+/// Runtime I/O failures are reported through <see cref="Result"/> /
+/// <see cref="ValueResult{T}"/> rather than thrown, so plugin code can branch
+/// without try/catch.
 /// </summary>
 /// <remarks>
 /// This is a contract-level boundary only. Nothing stops plugin code from
@@ -14,16 +19,17 @@ namespace KnockBox.Core.Plugins;
 public interface IPluginStorage
 {
     /// <summary>
-    /// Opens the file at <paramref name="relativePath"/> for reading. Throws
-    /// <see cref="FileNotFoundException"/> if the file does not exist.
+    /// Opens the file at <paramref name="relativePath"/> for reading. Returns a
+    /// failure result when the file is missing or cannot be read.
     /// </summary>
-    Stream OpenRead(string relativePath);
+    ValueResult<Stream> OpenRead(string relativePath);
 
     /// <summary>
     /// Opens the file at <paramref name="relativePath"/> for writing, creating
     /// or truncating. Creates any missing parent directories within the root.
+    /// Returns a failure result when the file cannot be opened.
     /// </summary>
-    Stream OpenWrite(string relativePath);
+    ValueResult<Stream> OpenWrite(string relativePath);
 
     /// <summary>
     /// Returns <c>true</c> if a file exists at <paramref name="relativePath"/>.
@@ -31,14 +37,16 @@ public interface IPluginStorage
     bool Exists(string relativePath);
 
     /// <summary>
-    /// Deletes the file at <paramref name="relativePath"/>. No-op if absent.
+    /// Deletes the file at <paramref name="relativePath"/>. Succeeds (no-op) if
+    /// the file is absent; returns a failure result if the delete fails.
     /// </summary>
-    void Delete(string relativePath);
+    Result Delete(string relativePath);
 
     /// <summary>
     /// Enumerates files under <paramref name="relativeDir"/> (relative to the
     /// plugin root) matching <paramref name="searchPattern"/>. Returned paths
-    /// are relative to the plugin root, using forward slashes.
+    /// are relative to the plugin root, using forward slashes. Returns a failure
+    /// result if enumeration fails.
     /// </summary>
-    IEnumerable<string> EnumerateFiles(string relativeDir, string searchPattern);
+    ValueResult<IReadOnlyList<string>> EnumerateFiles(string relativeDir, string searchPattern);
 }

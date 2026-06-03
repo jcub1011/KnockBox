@@ -2,10 +2,10 @@ using KnockBox.DrawnToDress.Services.Logic.Games;
 using KnockBox.DrawnToDress.Services.State.Games;
 using KnockBox.DrawnToDress.Services.State.Games.Data;
 using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Core.Services.Storage.ClientStorage;
 using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 
 namespace KnockBox.DrawnToDress.Pages
 {
@@ -237,27 +237,18 @@ namespace KnockBox.DrawnToDress.Pages
 
         private async Task LoadSettingsAsync()
         {
-            try
+            // A failed/canceled read falls through to the built-in defaults already on the state.
+            var savedResult = await LocalStorage.GetAsync<DrawnToDressSettings>("drawn-to-dress", "settings", _cts.Token);
+            // If the host already edited a setting while the load was in flight,
+            // the user's edit wins — the saved snapshot would clobber it.
+            if (savedResult.TryGetSuccess(out var saved) && saved is not null && !_userHasEdited)
             {
-                var saved = await LocalStorage.GetAsync<DrawnToDressSettings>("drawn-to-dress", "settings", _cts.Token);
-                // If the host already edited a setting while the load was in flight,
-                // the user's edit wins — the saved snapshot would clobber it.
-                if (saved is not null && !_userHasEdited)
+                if (GameState.UpdateSettings(_ => saved.Normalize()).TryGetFailure(out var error))
                 {
-                    if (GameState.UpdateSettings(_ => saved.Normalize()).TryGetFailure(out var error))
-                    {
-                        Logger.LogError("Failed to apply saved Drawn To Dress settings: {Error}", error.PublicMessage);
-                        return;
-                    }
-                    StateHasChanged();
+                    Logger.LogError("Failed to apply saved Drawn To Dress settings: {Error}", error.PublicMessage);
+                    return;
                 }
-            }
-            catch (OperationCanceledException) { /* component disposed */ }
-            catch (ObjectDisposedException) { /* circuit gone */ }
-            catch (JSDisconnectedException) { /* circuit gone */ }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error loading Drawn To Dress settings.");
+                StateHasChanged();
             }
         }
 
@@ -273,24 +264,16 @@ namespace KnockBox.DrawnToDress.Pages
             {
                 try { await prior; } catch { /* prior failure already logged */ }
             }
-            try
-            {
-                await LocalStorage.SetAsync("drawn-to-dress", "settings", settings, ct);
-            }
-            catch (OperationCanceledException) { /* component disposed */ }
-            catch (ObjectDisposedException) { /* circuit gone */ }
-            catch (JSDisconnectedException) { /* circuit gone */ }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error saving Drawn To Dress settings.");
-            }
+            var saveResult = await LocalStorage.SetAsync("drawn-to-dress", "settings", settings, ct);
+            if (saveResult.TryGetFailure(out var saveError))
+                Logger.LogError("Error saving Drawn To Dress settings: {Error}", saveError.InternalMessage);
         }
 
         public async ValueTask DisposeAsync()
         {
             // Flush the last pending save before tearing down so a change made right before
-            // navigating away isn't lost. A dead circuit makes SetAsync throw
-            // JSDisconnectedException, which SaveSettingsAsync swallows.
+            // navigating away isn't lost. A dead circuit makes SetAsync return a failed Result,
+            // which SaveSettingsAsync logs and swallows.
             if (_saveTask is not null)
             {
                 try { await _saveTask; } catch { /* best-effort flush */ }

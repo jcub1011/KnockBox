@@ -36,10 +36,11 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
             CancellationToken ct = default);
 
         /// <summary>
-        /// Allocates a JS-side <c>Blob</c> from a contiguous .NET buffer. The
-        /// returned blob holds a live JS reference and must be disposed.
+        /// Allocates a JS-side <c>Blob</c> from a contiguous .NET buffer. On
+        /// success the returned blob holds a live JS reference and must be
+        /// disposed.
         /// </summary>
-        ValueTask<IndexedDbBlob> CreateBlobAsync(
+        ValueTask<ValueResult<IndexedDbBlob, IndexedDbError>> CreateBlobAsync(
             ReadOnlyMemory<byte> bytes,
             string contentType,
             CancellationToken ct = default);
@@ -49,9 +50,9 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
         /// <paramref name="stream"/> must be readable and report
         /// <paramref name="length"/> bytes of remaining content. When
         /// <paramref name="leaveOpen"/> is <see langword="false"/>, the stream
-        /// is disposed alongside the returned blob.
+        /// is disposed alongside the operation (regardless of success).
         /// </summary>
-        ValueTask<IndexedDbBlob> CreateBlobAsync(
+        ValueTask<ValueResult<IndexedDbBlob, IndexedDbError>> CreateBlobAsync(
             Stream stream,
             long length,
             string contentType,

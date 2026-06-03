@@ -18,14 +18,15 @@ namespace KnockBox.Services.State.Users
         public event Action? UserInitialized;
         public event Action<UserNameChangedArgs>? UserNameChanged;
 
-        public async Task InitializeCurrentUserAsync(CancellationToken ct = default)
+        public async Task<Result> InitializeCurrentUserAsync(CancellationToken ct = default)
         {
             string name = "Not Set";
             string id = Guid.CreateVersion7().ToString();
+            Result result = Result.Success;
             try
             {
-                var storedName = await localStorageService.GetAsync<string>("user", "name", ct);
-                if (!string.IsNullOrWhiteSpace(storedName))
+                var storedNameResult = await localStorageService.GetAsync<string>("user", "name", ct);
+                if (storedNameResult.TryGetSuccess(out var storedName) && !string.IsNullOrWhiteSpace(storedName))
                 {
                     name = storedName;
                 }
@@ -51,29 +52,31 @@ namespace KnockBox.Services.State.Users
                 else
                 {
                     logger.LogError("Unable to get player session token. Using fallback ID of {id}.", id);
+                    result = Result.FromError(
+                        "Unable to establish a session.",
+                        $"Unable to get player session token; using fallback id {id}.");
                 }
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error initializing current user service.");
+                result = Result.FromError("Error initializing user.", $"Error initializing current user service: {ex}");
             }
 
             CurrentUser = UserFactory.Create(name, id);
             UserInitialized?.Invoke();
+            return result;
         }
 
-        public async Task ResetIdentityAsync(CancellationToken ct = default)
+        public async Task<Result> ResetIdentityAsync(CancellationToken ct = default)
         {
-            try
+            var provisionResult = await sessionTokenProvider.ProvisionNewTokenAsync(ct);
+            if (provisionResult.TryGetFailure(out var error))
             {
-                await sessionTokenProvider.ProvisionNewTokenAsync(ct);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Error resetting user identity.");
+                logger.LogError("Error resetting user identity: {error}", error.InternalMessage);
             }
 
-            await InitializeCurrentUserAsync(ct);
+            return await InitializeCurrentUserAsync(ct);
         }
 
         public void SetCurrentUserName(string name)
@@ -123,15 +126,12 @@ namespace KnockBox.Services.State.Users
 
         private async Task SaveNameAsync(string name, CancellationToken ct)
         {
-            try
+            // Best-effort persist: a failed or canceled write is logged (by the storage
+            // service for the internal detail) and otherwise dropped silently.
+            var result = await localStorageService.SetAsync("user", "name", name, ct);
+            if (result.TryGetFailure(out var error))
             {
-                await localStorageService.SetAsync("user", "name", name, ct);
-            }
-            catch (OperationCanceledException) { /* Service disposed — drop silently. */ }
-            catch (ObjectDisposedException) { /* Service disposed — drop silently. */ }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Error saving user name.");
+                logger.LogError("Error saving user name: {error}", error.InternalMessage);
             }
         }
 
