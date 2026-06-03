@@ -74,6 +74,14 @@ namespace KnockBox.AlphaChain.Tests.Integration
                     continue;
                 }
 
+                // The pre-round "Get Ready" countdown precedes every round (at the start and after
+                // each letter ban); tick past it to begin the round (as the host tick does).
+                if (state.Phase == AlphaChainGamePhase.Countdown)
+                {
+                    engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
+                    continue;
+                }
+
                 // A round-ending word leaves the FSM holding in RoundState so its score animation
                 // can finish; tick past the hold to fire the transition (as the host tick does).
                 if (state.PendingTransitionAt is { } holdUntil)

@@ -46,7 +46,15 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
             state.UpdateSettings(s => s with { EnableTutorials = false, SurvivalMode = survival });
 
             await engine.StartAsync(_host, state);
+            DrainCountdown(engine, state);
             return (engine, state);
+        }
+
+        /// <summary>Ticks past the pre-round "Get Ready" countdown so the FSM lands in RoundState.</summary>
+        private static void DrainCountdown(AlphaChainGameEngine engine, AlphaChainGameState state)
+        {
+            if (state.Phase == AlphaChainGamePhase.Countdown)
+                engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
         }
 
         [TestMethod]
@@ -126,6 +134,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
             // Tutorials off so round 1 → Intermission directly (no Engine/Tax tutorial detours).
             state.UpdateSettings(s => s with { EraInterval = 1, EraCount = 3, EnableTutorials = false });
             await engine.StartAsync(_host, state);
+            DrainCountdown(engine, state);
 
             // Round 1: every player submits once → the order wraps → Intermission. Era 1 is ban-free,
             // so the first banned letter is set by this Intermission's Sniper Ban.
@@ -163,6 +172,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
             TickAt(engine, state, t0, 60);   // Optimization times out → SniperBan
             TickAt(engine, state, t0, 120);  // SniperBan times out → random draw → complete
 
+            // CompleteIntermission now opens a "Get Ready" countdown before the next era's round.
+            DrainCountdown(engine, state);
             Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
             Assert.IsNotNull(state.BannedLetter);
             Assert.AreEqual(2, state.CurrentEra);
@@ -191,6 +202,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
             // the game proceeds — it never hangs waiting on a departed picker.
             TickAt(engine, state, t0, 120);
 
+            // CompleteIntermission now opens a "Get Ready" countdown before the next era's round.
+            DrainCountdown(engine, state);
             Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
             Assert.IsNotNull(state.BannedLetter);
         }

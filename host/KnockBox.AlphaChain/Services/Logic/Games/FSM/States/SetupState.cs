@@ -45,11 +45,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 "Alpha Chain FSM → SetupState ({count} participants, era 1 is ban-free)",
                 state.GamePlayers.Count);
 
-            // When tutorials are enabled, the Shiritori tutorial plays before the first round;
-            // otherwise drop straight into the round loop.
+            // A short "Get Ready" countdown always precedes the first turn so players aren't thrown
+            // straight into the shot clock. When tutorials are enabled the Shiritori tutorial plays
+            // first, then the countdown, then the round loop.
             return state.Settings.EnableTutorials
-                ? new TutorialState(TutorialKind.Shiritori, new RoundState())
-                : new RoundState();
+                ? new TutorialState(TutorialKind.Shiritori, new CountdownState(new RoundState()))
+                : new CountdownState(new RoundState());
         }
 
         public Result OnExit(AlphaChainGameContext context) => Result.Success;

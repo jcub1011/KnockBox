@@ -401,7 +401,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             // letter (so a card's personal-ban roll can dodge it). Roulette Wheel / Toll Booth roll
             // their personal banned letters here via OnEraStart.
             FireEraStartHooks(context);
-            return new RoundState();
+
+            // A short "Get Ready" countdown precedes the next era's first turn so players have a beat
+            // to absorb the freshly-banned letter before the shot clock starts.
+            return new CountdownState(new RoundState());
         }
 
         /// <summary>

@@ -47,11 +47,19 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
         private async Task<AlphaChainGameState> CreateStartedGameAsync(int playerCount = 2, bool hostPlays = false)
         {
             var state = await CreateStateWithPlayersAsync(playerCount);
-            // Tutorials off so the game starts directly in RoundState (these tests assert the
-            // round/turn lifecycle, not the tutorial flow).
+            // Tutorials off so the game starts straight at the pre-round countdown (these tests assert
+            // the round/turn lifecycle, not the tutorial flow); drain the countdown to land in RoundState.
             state.UpdateSettings(s => s with { EnableTutorials = false, HostPlays = hostPlays });
             await _engine.StartAsync(_host, state);
+            DrainCountdown(state);
             return state;
+        }
+
+        /// <summary>Ticks past the pre-round "Get Ready" countdown so the FSM lands in RoundState.</summary>
+        private void DrainCountdown(AlphaChainGameState state)
+        {
+            if (state.Phase == AlphaChainGamePhase.Countdown)
+                _engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
         }
 
         // ── Engine properties ─────────────────────────────────────────────────
@@ -96,6 +104,23 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
             Assert.IsNotNull(state.Context!.Fsm);
             Assert.AreEqual(1, state.CurrentEra);
             Assert.AreEqual(1, state.CurrentRound);
+        }
+
+        [TestMethod]
+        public async Task StartAsync_WithoutTutorials_EntersGetReadyCountdownBeforeRound()
+        {
+            var state = await CreateStateWithPlayersAsync(2);
+            state.UpdateSettings(s => s with { EnableTutorials = false });
+            using var _ = state;
+
+            await _engine.StartAsync(_host, state);
+
+            // A short "Get Ready" countdown precedes the first turn rather than dropping straight in.
+            Assert.AreEqual(AlphaChainGamePhase.Countdown, state.Phase);
+
+            // It ticks into the round once the dwell elapses.
+            _engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
+            Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
         }
 
         [TestMethod]
@@ -168,6 +193,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
             state.UpdateSettings(s => s with { EraInterval = 2, EraCount = 1, EnableTutorials = false });
             await _engine.StartAsync(_host, state);
             using var _ = state;
+            DrainCountdown(state); // step past the pre-round "Get Ready" countdown into RoundState
 
             int lastScheduledRound = state.Settings.EraInterval * state.Settings.EraCount; // 2
             // Advance until the game ends: (players × rounds) advances at most.

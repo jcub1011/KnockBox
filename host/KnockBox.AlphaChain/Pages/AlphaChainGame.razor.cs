@@ -187,6 +187,10 @@ namespace KnockBox.AlphaChain.Pages
 
         // ── Intermission (M4) ───────────────────────────────────────────────
 
+        /// <summary>The configured duration of the pre-round "Get Ready" countdown, feeding the
+        /// shared client-side <c>CountdownClock</c> on the Countdown phase overlay.</summary>
+        protected TimeSpan CountdownDuration => TimeSpan.FromSeconds(GameState.Settings.PreRoundCountdownSeconds);
+
         /// <summary>The configured duration of the current Intermission sub-phase, or
         /// <see cref="TimeSpan.Zero"/> when the sub-phase has no countdown. Feeds the shared
         /// client-side <c>CountdownClock</c> so the timer ticks smoothly off the circuit.</summary>

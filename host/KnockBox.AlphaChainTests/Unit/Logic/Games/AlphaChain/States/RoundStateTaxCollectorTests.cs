@@ -1,4 +1,5 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
+using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
@@ -50,8 +51,16 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // Tutorials off so the game starts directly in RoundState.
             state.UpdateSettings(s => s with { EnableTutorials = false });
             await engine.StartAsync(_host, state);
+            DrainCountdown(engine, state);
             state.Execute(() => state.BannedLetter = banned);
             return (engine, state);
+        }
+
+        /// <summary>Ticks past the pre-round "Get Ready" countdown so the FSM lands in RoundState.</summary>
+        private static void DrainCountdown(AlphaChainGameEngine engine, AlphaChainGameState state)
+        {
+            if (state.Phase == AlphaChainGamePhase.Countdown)
+                engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
         }
 
         private static void GiveModifier(AlphaChainGameState state, string playerId, string cardId) =>

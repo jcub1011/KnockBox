@@ -66,14 +66,19 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         }
 
         [TestMethod]
-        public async Task Start_WithoutTutorials_GoesStraightToRound_AndEraOneIsBanFree()
+        public async Task Start_WithoutTutorials_EntersGetReadyCountdownThenRound_AndEraOneIsBanFree()
         {
-            var (_, state) = await StartGameAsync(new StubWordListService(), playerCount: 3,
+            var (engine, state) = await StartGameAsync(new StubWordListService(), playerCount: 3,
                 configure: s => s.UpdateSettings(c => c with { EnableTutorials = false }));
             using var _ = state;
 
-            Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
+            // With tutorials off the game opens on the "Get Ready" countdown rather than the round itself.
+            Assert.AreEqual(AlphaChainGamePhase.Countdown, state.Phase);
             Assert.IsNull(state.BannedLetter, "era 1 is ban-free");
+
+            // The countdown drains into the round once its dwell elapses.
+            engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
+            Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
         }
 
         // ── Auto-advance + host skip ────────────────────────────────────────────
@@ -89,20 +94,28 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             engine.Tick(state.Context!, t0.AddSeconds(1));
             Assert.AreEqual(AlphaChainGamePhase.Tutorial, state.Phase);
 
-            // Past the dwell → the round begins.
+            // Past the dwell → the "Get Ready" countdown opens (not the round directly).
             engine.Tick(state.Context!, t0.AddSeconds(TutorialState.DurationFor(TutorialKind.Shiritori).TotalSeconds + 1));
+            Assert.AreEqual(AlphaChainGamePhase.Countdown, state.Phase);
+
+            // The countdown then drains into the round.
+            engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
             Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
         }
 
         [TestMethod]
-        public async Task ShiritoriTutorial_HostSkip_EntersRoundImmediately()
+        public async Task ShiritoriTutorial_HostSkip_EntersGetReadyCountdownThenRound()
         {
             var (engine, state) = await StartGameAsync(new StubWordListService(), playerCount: 3);
             using var _ = state;
 
             var result = await engine.SkipTutorialAsync(_host.Id, state);
 
+            // Skipping the tutorial advances to the "Get Ready" countdown, which then opens the round.
             Assert.IsTrue(result.IsSuccess);
+            Assert.AreEqual(AlphaChainGamePhase.Countdown, state.Phase);
+
+            engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
             Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
         }
 
@@ -127,8 +140,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                 configure: s => s.UpdateSettings(c => c with { EraInterval = 1, EraCount = 3 }));
             using var _ = state;
 
-            // Skip the opening Shiritori tutorial to begin round 1.
+            // Skip the opening Shiritori tutorial, then tick past the "Get Ready" countdown to begin round 1.
             await engine.SkipTutorialAsync(_host.Id, state);
+            engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
             Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
 
             // Round 1: the chain wraps → era 1 ends. With no cards yet there's no replay hold, so
@@ -183,6 +197,11 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                 else if (state.PendingTransitionAt is { } holdUntil)
                 {
                     engine.Tick(state.Context!, holdUntil.AddSeconds(1));
+                }
+                else if (state.Phase == AlphaChainGamePhase.Countdown)
+                {
+                    // The pre-round "Get Ready" countdown precedes every round; tick past it.
+                    engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
                 }
                 else
                 {

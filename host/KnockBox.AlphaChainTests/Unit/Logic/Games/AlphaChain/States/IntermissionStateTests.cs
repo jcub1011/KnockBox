@@ -63,6 +63,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         private static void EnterIntermission(AlphaChainGameState state)
             => state.Execute(() => state.Context!.Fsm.TransitionTo(state.Context, new IntermissionState()));
 
+        /// <summary>Ticks past the pre-round "Get Ready" countdown so the FSM lands in RoundState.</summary>
+        private static void DrainCountdown(AlphaChainGameEngine engine, AlphaChainGameState state)
+        {
+            if (state.Phase == AlphaChainGamePhase.Countdown)
+                engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
+        }
+
         // ── Deal + Expansion (applied instantly on entry) ──────────────────────
 
         [TestMethod]
@@ -276,8 +283,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             Assert.IsTrue(result.IsSuccess);
             Assert.AreEqual('q', state.BannedLetter);
-            Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
             Assert.AreEqual(eraBefore + 1, state.CurrentEra);
+            // A "Get Ready" countdown now precedes the next era's round; it drains into RoundState.
+            DrainCountdown(engine, state);
+            Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
         }
 
         [TestMethod]
@@ -401,6 +410,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             clock = clock.AddSeconds(60);
             engine.Tick(state.Context!, clock); // SniperBan timeout
 
+            // A "Get Ready" countdown now precedes the next era's round; it drains into RoundState.
+            DrainCountdown(engine, state);
             Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
             Assert.IsTrue(state.BannedLetter is { } b && "aeiou".Contains(b), "timeout letter must be legal under Vowels");
         }
@@ -617,6 +628,11 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                         clock = clock.AddSeconds(100);
                         engine.Tick(state.Context!, clock);
                     }
+                }
+                else if (state.Phase == AlphaChainGamePhase.Countdown)
+                {
+                    // The "Get Ready" countdown precedes each round; tick past it to begin the round.
+                    engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
                 }
                 else
                 {

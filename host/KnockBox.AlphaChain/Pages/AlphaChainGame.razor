@@ -84,6 +84,11 @@
         <TutorialOverlay @key="GameState.CurrentTutorial" Kind="GameState.CurrentTutorial"
                          IsHost="IsHost" OnSkip="SkipTutorialAsync" />
     }
+    else if (GameState.Phase == AlphaChainGamePhase.Countdown)
+    {
+        <CountdownOverlay EndTimeUtc="GameState.SubPhaseEndTime" Duration="CountdownDuration"
+                          Era="GameState.CurrentEra" BannedLetter="GameState.BannedLetter" />
+    }
     else
     {
         <div class="ac-round">
