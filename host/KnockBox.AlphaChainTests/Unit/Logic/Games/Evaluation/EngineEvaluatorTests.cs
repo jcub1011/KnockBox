@@ -21,11 +21,11 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
 
         // Trivial test doubles.
         private static CommonModifier Additive(double value) => new(
-            ModifierId.Unknown, "Add", "", "", ModifierType.Additive,
+            ModifierId.Unknown, "Add", "", ModifierType.Additive,
             static _ => true, (_, _) => value);
 
         private static CommonModifier Mult(double factor) => new(
-            ModifierId.Unknown, "Mul", "", "", ModifierType.Multiplier,
+            ModifierId.Unknown, "Mul", "", ModifierType.Multiplier,
             static _ => true, (_, _) => factor);
 
         // Builds an evaluation context. A player (index 0) is always present so shield/Hyper-Drive
@@ -73,7 +73,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         [TestMethod]
         public void ConditionalMiss_CardIgnored()
         {
-            var never = new CommonModifier(ModifierId.Unknown, "X", "", "", ModifierType.Multiplier,
+            var never = new CommonModifier(ModifierId.Unknown, "X", "", ModifierType.Multiplier,
                 static _ => false, static (_, _) => 100);
             Assert.AreEqual(3, _eval.Calculate(Ctx("cat", [never])));
         }

@@ -7,7 +7,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.VowelSurge;
         public override string GetName() => "Vowel Surge";
-        public override string GetIcon() => "wave";
         public override string GetDescription() => "×3 when your word has more vowels than consonants.";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
@@ -21,7 +20,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.GutturalRoar;
         public override string GetName() => "Guttural Roar";
-        public override string GetIcon() => "roar";
         public override string GetDescription() => "×1.5 when your word's only vowels are 'A' or 'E'.";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
@@ -35,7 +33,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.PerfectLink;
         public override string GetName() => "Perfect Link";
-        public override string GetIcon() => "link";
         public override string GetDescription()
             => "×1.5 when your word ends in a vowel — hand the next player an easy letter, pad your own score.";
 
@@ -58,7 +55,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.Catalyst;
         public override string GetName() => "The Catalyst";
-        public override string GetIcon() => "catalyst";
         public override string GetDescription()
             => "Grants 0 points. For every card placed after it, the letters Y, W and H count as both a vowel AND a consonant.";
 

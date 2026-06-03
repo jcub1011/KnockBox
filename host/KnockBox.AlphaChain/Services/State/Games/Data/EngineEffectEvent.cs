@@ -1,3 +1,5 @@
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+
 namespace KnockBox.AlphaChain.Services.State.Games.Data
 {
     /// <summary>Broad role of an automated engine effect, used purely for UI tinting.</summary>
@@ -20,9 +22,8 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
     /// are carried on the word's <see cref="ScoreReplay"/>; off-submission effects are surfaced via
     /// the state's notice channel.
     /// </summary>
-    /// <param name="CardId">Stable id of the modifier card whose capability fired.</param>
+    /// <param name="CardId">The modifier card whose capability fired — its <see cref="ModifierId"/>, which also keys its icon glyph.</param>
     /// <param name="CardName">Display name of the card.</param>
-    /// <param name="Icon">Icon key for <c>CardIcon</c>.</param>
     /// <param name="Class">Defensive / Offensive / Special, for tinting.</param>
     /// <param name="HolderUserId">The player who owns the firing card.</param>
     /// <param name="HolderName">Display name of the holder.</param>
@@ -31,9 +32,8 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
     /// <param name="Reason">Short human-readable explanation of what happened ("−2s next clock").</param>
     /// <param name="Negated">True when this fire was a Titanium Mirror blocking/reflecting an incoming attack.</param>
     public sealed record EngineEffectEvent(
-        string CardId,
+        ModifierId CardId,
         string CardName,
-        string Icon,
         EngineEffectClass Class,
         string HolderUserId,
         string HolderName,

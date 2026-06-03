@@ -16,73 +16,73 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             {
                 // ── Data-defined scoring cards ───────────────────────────────────
                 ModifierId.TheAnchor => new CommonModifier(
-                    ModifierId.TheAnchor, "The Anchor", "anchor",
+                    ModifierId.TheAnchor, "The Anchor",
                     "Adds a flat +10 to your word, always.",
                     ModifierType.Additive, Always,
                     static (_, _) => 10.0),
 
                 ModifierId.Vanilla => new CommonModifier(
-                    ModifierId.Vanilla, "Vanilla", "vanilla",
+                    ModifierId.Vanilla, "Vanilla",
                     "Adds +1 for every letter in your word.",
                     ModifierType.Additive, Always,
                     static (ctx, _) => ctx.Word.Length),
 
                 ModifierId.ConsonantCrunch => new CommonModifier(
-                    ModifierId.ConsonantCrunch, "Consonant Crunch", "consonant",
+                    ModifierId.ConsonantCrunch, "Consonant Crunch",
                     "Adds +2 for every consonant in your word.",
                     ModifierType.Additive, Always,
                     static (ctx, self) => 2.0 * self.GetConsonantIndicies(ctx).Count()),
 
                 ModifierId.VocalVowels => new CommonModifier(
-                    ModifierId.VocalVowels, "Vocal Vowels", "vocal",
+                    ModifierId.VocalVowels, "Vocal Vowels",
                     "Adds +3 for every vowel in your word.",
                     ModifierType.Additive, Always,
                     // Counts vowels (the legacy card counted consonants — a bug, fixed here to match its name/description).
                     static (ctx, self) => 3.0 * self.GetVowelIndicies(ctx).Count()),
 
                 ModifierId.TheArchitect => new CommonModifier(
-                    ModifierId.TheArchitect, "The Architect", "architect",
+                    ModifierId.TheArchitect, "The Architect",
                     "×2 when your word is 8 letters or longer.",
                     ModifierType.Multiplier,
                     static ctx => ctx.Word.Length >= 8,
                     static (_, _) => 2.0),
 
                 ModifierId.BrickLayer => new CommonModifier(
-                    ModifierId.BrickLayer, "Brick Layer", "brick",
+                    ModifierId.BrickLayer, "Brick Layer",
                     "Adds +1 per letter when your word is 6 letters or longer.",
                     ModifierType.Additive,
                     static ctx => ctx.Word.Length >= 6,
                     static (ctx, _) => ctx.Word.Length),
 
                 ModifierId.Speedracer => new CommonModifier(
-                    ModifierId.Speedracer, "Speedracer", "speedracer",
+                    ModifierId.Speedracer, "Speedracer",
                     "When your word is longer than 4 letters, you get a multiplier (1 / ([remaining time] / [total time])). Max of 2x.",
                     ModifierType.Multiplier,
                     static ctx => ctx.Word.Length > 4,
                     static (ctx, _) => Math.Min(1.0 / (ctx.RemainingShotClockDuration / ctx.ShotClockDuration), 2.0)),
 
                 ModifierId.LetterHoarder => new CommonModifier(
-                    ModifierId.LetterHoarder, "Letter Hoarder", "hoarder",
+                    ModifierId.LetterHoarder, "Letter Hoarder",
                     "Adds +1 for every distinct letter in your word.",
                     ModifierType.Additive, Always,
                     static (ctx, _) => ctx.Word.Distinct().Count()),
 
                 ModifierId.Sesquipedalian => new CommonModifier(
-                    ModifierId.Sesquipedalian, "Sesquipedalian", "tower",
+                    ModifierId.Sesquipedalian, "Sesquipedalian",
                     "×3 when your word is 10 letters or longer. Clamped to the max word score.",
                     ModifierType.Multiplier,
                     static ctx => ctx.Word.Length >= 10,
                     static (_, _) => 3.0),
 
                 ModifierId.HighRoller => new CommonModifier(
-                    ModifierId.HighRoller, "High Roller", "dice",
+                    ModifierId.HighRoller, "High Roller",
                     "Adds +20 when your word begins with a rare letter — Q, X, Z or J.",
                     ModifierType.Additive,
                     static ctx => ctx.Word.Length > 0 && ctx.Word[0] is 'q' or 'x' or 'z' or 'j',
                     static (_, _) => 20.0),
 
                 ModifierId.DoubleDown => new CommonModifier(
-                    ModifierId.DoubleDown, "The Double Down", "double-down",
+                    ModifierId.DoubleDown, "The Double Down",
                     "×2 when your word has repeat letters. No repeat letters? Your score is reduced (×0.5).",
                     ModifierType.Multiplier, Always,
                     // Words are normalized lowercase-alpha, so distinct-vs-length detects any repeat letter.
@@ -118,7 +118,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
                 ModifierId.BaitAndSwitch => new BaitAndSwitchCard(),
 
                 _ => new CommonModifier(
-                    ModifierId.Unknown, "Unknown", string.Empty, "Unknown",
+                    ModifierId.Unknown, "Unknown", "Unknown",
                     ModifierType.Additive, static _ => false,
                     static (_, _) => 0.0),
             };

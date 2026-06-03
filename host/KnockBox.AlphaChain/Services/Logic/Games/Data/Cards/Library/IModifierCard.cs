@@ -71,9 +71,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         /// <summary>The card's display name.</summary>
         string GetName();
 
-        /// <summary>The card's stable icon key (resolved by <c>CardIcon</c> to an inline SVG glyph).</summary>
-        string GetIcon();
-
         /// <summary>The card's static rules text, for display outside an evaluation (bay/optimization UI).</summary>
         string GetDescription();
 

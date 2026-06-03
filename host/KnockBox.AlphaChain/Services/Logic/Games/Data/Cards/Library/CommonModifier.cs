@@ -10,7 +10,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     /// </summary>
     /// <param name="Id">The card's stable identity.</param>
     /// <param name="Name">Display name.</param>
-    /// <param name="Icon">Icon key.</param>
     /// <param name="Description">Static rules text.</param>
     /// <param name="ModifierType">Whether <see cref="MagnitudeProvider"/> is an addend or a factor.</param>
     /// <param name="TriggerChecker">Whether the card contributes for the current word.</param>
@@ -18,7 +17,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     public readonly record struct CommonModifier(
         ModifierId Id,
         string Name,
-        string Icon,
         string Description,
         ModifierType ModifierType,
         Func<EngineEvaluationContext, bool> TriggerChecker,
@@ -28,8 +26,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public ModifierId GetId() => Id;
 
         public string GetName() => Name;
-
-        public string GetIcon() => Icon;
 
         public string GetDescription() => Description;
 

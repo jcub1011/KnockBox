@@ -1,36 +1,52 @@
-@* A distinct inline SVG glyph per card, keyed by ModifierCard.Icon / ReactionCard.Icon.
-   Stroke uses currentColor so the parent (GameCard) can tint it to the card's category
-   accent. Inline SVG (not static files) keeps icons working without per-plugin static-asset
-   path wiring and lets them inherit color cleanly. *@
+@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
+
+@* A distinct inline SVG glyph per card, keyed by the card's ModifierId. Stroke uses
+   currentColor so the parent (GameCard) can tint it to the card's category accent. Inline
+   SVG (not static files) keeps icons working without per-plugin static-asset path wiring and
+   lets them inherit color cleanly. *@
 
 <svg class="gc-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-    @switch (Icon)
+    @switch (Card)
     {
-        case "anchor":
+        case ModifierId.TheAnchor:
             <circle cx="12" cy="5" r="2.3" />
             <line x1="12" y1="7.3" x2="12" y2="20" />
             <line x1="8" y1="11" x2="16" y2="11" />
             <path d="M4 13a8 8 0 0 0 16 0" />
             break;
 
-        case "consonant":
+        case ModifierId.Vanilla:
+            @* Vanilla — a scoop on a cone (+1 per letter, the plain staple). *@
+            <circle cx="12" cy="8" r="4" />
+            <path d="M8 10.5 L12 21 L16 10.5" />
+            break;
+
+        case ModifierId.ConsonantCrunch:
             @* Crunch — a jagged saw line. *@
             <polyline points="3,8 7,8 9.5,16 13,8 16,16 21,8" />
             break;
 
-        case "wave":
+        case ModifierId.VocalVowels:
+            @* Vocal Vowels — a speech bubble with vowel dots (+3 per vowel). *@
+            <path d="M5 5h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H10l-4 3v-3H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+            <circle cx="9" cy="10" r="0.6" />
+            <circle cx="12" cy="10" r="0.6" />
+            <circle cx="15" cy="10" r="0.6" />
+            break;
+
+        case ModifierId.VowelSurge:
             @* Vowel surge — a rolling wave. *@
             <path d="M3 13c2.2 0 2.2-5 4.5-5s2.3 5 4.5 5 2.2-5 4.5-5 2.3 5 4.5 5" />
             break;
 
-        case "architect":
+        case ModifierId.TheArchitect:
             @* Roof + crossbeam. *@
             <polyline points="4,18 12,5 20,18" />
             <line x1="7.2" y1="13" x2="16.8" y2="13" />
             break;
 
-        case "brick":
+        case ModifierId.BrickLayer:
             <rect x="3.5" y="6" width="17" height="12" rx="0.5" />
             <line x1="3.5" y1="12" x2="20.5" y2="12" />
             <line x1="12" y1="6" x2="12" y2="12" />
@@ -38,26 +54,26 @@
             <line x1="16.3" y1="12" x2="16.3" y2="18" />
             break;
 
-        case "sprinter":
+        case ModifierId.Speedracer:
             @* Lightning bolt — speed. *@
             <polygon points="13,2 6,13 11,13 10,22 18,9 12,9" />
             break;
 
-        case "hoarder":
+        case ModifierId.LetterHoarder:
             @* Stacked coins. *@
             <ellipse cx="12" cy="7" rx="7" ry="2.6" />
             <path d="M5 7v4c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V7" />
             <path d="M5 11v4c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-4" />
             break;
 
-        case "tax":
+        case ModifierId.TaxCollector:
             @* Percent sign. *@
             <circle cx="7" cy="7" r="2.4" />
             <circle cx="17" cy="17" r="2.4" />
             <line x1="6" y1="18" x2="18" y2="6" />
             break;
 
-        case "tower":
+        case ModifierId.Sesquipedalian:
             @* Sesquipedalian — a tall, many-storey tower. *@
             <rect x="8" y="3" width="8" height="18" rx="0.6" />
             <line x1="8" y1="8" x2="16" y2="8" />
@@ -65,7 +81,7 @@
             <line x1="8" y1="16" x2="16" y2="16" />
             break;
 
-        case "roar":
+        case ModifierId.GutturalRoar:
             @* Guttural Roar — sound waves bursting out. *@
             <path d="M5 9v6" />
             <path d="M9 6.5c2 2 2 9 0 11" />
@@ -73,7 +89,7 @@
             <path d="M17 7c1.6 1.6 1.6 8.4 0 10" />
             break;
 
-        case "dice":
+        case ModifierId.HighRoller:
             @* High Roller — a die showing five pips. *@
             <rect x="4" y="4" width="16" height="16" rx="2.5" />
             <circle cx="8.5" cy="8.5" r="0.6" />
@@ -83,13 +99,13 @@
             <circle cx="15.5" cy="15.5" r="0.6" />
             break;
 
-        case "link":
+        case ModifierId.PerfectLink:
             @* Perfect Link — two interlocking chain links. *@
             <rect x="3" y="9" width="11" height="6" rx="3" />
             <rect x="10" y="9" width="11" height="6" rx="3" />
             break;
 
-        case "vault":
+        case ModifierId.TheVault:
             @* The Vault — a safe door with a dial. *@
             <rect x="3.5" y="4" width="17" height="16" rx="1.5" />
             <circle cx="12" cy="12" r="4" />
@@ -97,26 +113,26 @@
             <line x1="12" y1="12" x2="14.5" y2="13.5" />
             break;
 
-        case "redline":
+        case ModifierId.Redline:
             @* Redline — a tachometer pushed past the line. *@
             <path d="M4 16a8 8 0 0 1 16 0" />
             <line x1="12" y1="16" x2="17" y2="11" />
             <line x1="18.5" y1="6.5" x2="20.5" y2="4.5" />
             break;
 
-        case "panic":
+        case ModifierId.PanicButton:
             @* Panic Button — a big round button. *@
             <circle cx="12" cy="12" r="9" />
             <circle cx="12" cy="12" r="4.2" />
             break;
 
-        case "hyper-drive":
+        case ModifierId.HyperDrive:
             @* Hyper-Drive — fast-forward double chevron. *@
             <polyline points="4,6 11,12 4,18" />
             <polyline points="12,6 19,12 12,18" />
             break;
 
-        case "irs":
+        case ModifierId.IrsAgent:
             @* IRS — a stamped document. *@
             <rect x="5.5" y="3.5" width="13" height="17" rx="1" />
             <line x1="8.5" y1="8" x2="15.5" y2="8" />
@@ -124,7 +140,7 @@
             <line x1="8.5" y1="15" x2="13" y2="15" />
             break;
 
-        case "roulette":
+        case ModifierId.RouletteWheel:
             @* The Roulette Wheel — a spoked wheel. *@
             <circle cx="12" cy="12" r="8.5" />
             <circle cx="12" cy="12" r="2" />
@@ -134,13 +150,13 @@
             <line x1="18" y1="6" x2="6" y2="18" />
             break;
 
-        case "smuggler":
-            @* Smuggler's Toll — a tied sack. *@
+        case ModifierId.TollBooth:
+            @* The Toll Booth — a tied sack. *@
             <path d="M9 7c-3 2-4 6-4 8a7 7 0 0 0 14 0c0-2-1-6-4-8z" />
             <path d="M9 7l1.5-3h3L15 7z" />
             break;
 
-        case "bait-switch":
+        case ModifierId.BaitAndSwitch:
             @* Bait & Switch — two swapping arrows. *@
             <polyline points="7,8 4,8 4,5" />
             <path d="M4 8c3-3 9-3 12 0" />
@@ -148,7 +164,7 @@
             <path d="M20 16c-3 3-9 3-12 0" />
             break;
 
-        case "blindfold":
+        case ModifierId.Blindfold:
             @* The Blindfold — a band across closed eyes. *@
             <path d="M3 12c3-4 15-4 18 0" />
             <line x1="3" y1="11" x2="21" y2="13" />
@@ -156,21 +172,13 @@
             <line x1="16" y1="11.4" x2="17" y2="15" />
             break;
 
-        case "adrenaline":
-            @* Adrenaline Spike — a syringe. *@
-            <line x1="4" y1="20" x2="14" y2="10" />
-            <line x1="11" y1="7" x2="17" y2="13" />
-            <line x1="14.5" y1="3.5" x2="20.5" y2="9.5" />
-            <line x1="6" y1="14" x2="9" y2="17" />
-            break;
-
-        case "double-down":
+        case ModifierId.DoubleDown:
             @* The Double Down — two stacked chevrons (×2). *@
             <polyline points="6,5 12,11 18,5" />
             <polyline points="6,12 12,18 18,12" />
             break;
 
-        case "anchor-chain":
+        case ModifierId.AnchorChain:
             @* The Anchor Chain — an anchor wrapped in a chain link. *@
             <circle cx="12" cy="5" r="2.2" />
             <line x1="12" y1="7.2" x2="12" y2="19" />
@@ -178,22 +186,12 @@
             <rect x="9.5" y="10" width="5" height="3.4" rx="1.7" />
             break;
 
-        case "flak-cannon":
+        case ModifierId.FlakCannon:
             @* Flak Cannon — a burst / explosion star. *@
             <polygon points="12,3 14,9 20,7 16,12 20,17 14,15 12,21 10,15 4,17 8,12 4,7 10,9" />
             break;
 
-        case "scattershot":
-            @* Scattershot — a spray of pellets. *@
-            <circle cx="6" cy="7" r="1.1" />
-            <circle cx="11" cy="5" r="1.1" />
-            <circle cx="16" cy="8" r="1.1" />
-            <circle cx="8" cy="13" r="1.1" />
-            <circle cx="14" cy="14" r="1.1" />
-            <circle cx="18" cy="17" r="1.1" />
-            break;
-
-        case "bounty-hunter":
+        case ModifierId.BountyHunter:
             @* The Bounty Hunter — a target crosshair. *@
             <circle cx="12" cy="12" r="8" />
             <circle cx="12" cy="12" r="3.2" />
@@ -203,22 +201,14 @@
             <line x1="18" y1="12" x2="21.5" y2="12" />
             break;
 
-        case "tracer-round":
-            @* Tracer Round — an arrow leaving a trail. *@
-            <line x1="3" y1="19" x2="18" y2="6" />
-            <polyline points="13,5 19,5 19,11" />
-            <line x1="3" y1="13" x2="6" y2="16" />
-            <line x1="6.5" y1="11" x2="9.5" y2="14" />
-            break;
-
-        case "titanium-mirror":
+        case ModifierId.TitaniumMirror:
             @* The Titanium Mirror — a reflective shield. *@
             <path d="M12 3l7 3v4.6c0 4.8-3.4 7.7-7 8.9-3.6-1.2-7-4.1-7-8.9V6z" />
             <line x1="9.5" y1="7.5" x2="7.5" y2="13" />
             <line x1="13.5" y1="7" x2="9.5" y2="16" />
             break;
 
-        case "heat-sink":
+        case ModifierId.HeatSink:
             @* The Heat Sink — finned radiator. *@
             <rect x="4" y="6" width="16" height="5" rx="1" />
             <line x1="7" y1="11" x2="7" y2="19" />
@@ -227,16 +217,7 @@
             <line x1="17" y1="11" x2="17" y2="19" />
             break;
 
-        case "faraday-cage":
-            @* The Faraday Cage — a shielded box grid. *@
-            <rect x="4" y="4" width="16" height="16" rx="1.5" />
-            <line x1="9.3" y1="4" x2="9.3" y2="20" />
-            <line x1="14.6" y1="4" x2="14.6" y2="20" />
-            <line x1="4" y1="9.3" x2="20" y2="9.3" />
-            <line x1="4" y1="14.6" x2="20" y2="14.6" />
-            break;
-
-        case "prism":
+        case ModifierId.Prism:
             @* The Prism — a triangle splitting a beam. *@
             <polygon points="12,4 20,18 4,18" />
             <line x1="2" y1="11" x2="9" y2="11" />
@@ -244,12 +225,12 @@
             <line x1="14" y1="14.5" x2="22" y2="15" />
             break;
 
-        case "wildcard":
+        case ModifierId.Wildcard:
             @* The Wildcard — a star (any letter goes). *@
             <polygon points="12,3 14.6,9.3 21,9.6 16,13.7 17.7,20 12,16.3 6.3,20 8,13.7 3,9.6 9.4,9.3" />
             break;
 
-        case "catalyst":
+        case ModifierId.Catalyst:
             @* The Catalyst — an Erlenmeyer flask. *@
             <path d="M9 3v6L4.5 18a1.5 1.5 0 0 0 1.4 2.1h12.2A1.5 1.5 0 0 0 19.5 18L15 9V3" />
             <line x1="8" y1="3" x2="16" y2="3" />
@@ -263,6 +244,6 @@
 </svg>
 
 @code {
-    /// <summary>The card's icon key (see <c>ModifierCard.Icon</c> / <c>ReactionCard.Icon</c>).</summary>
-    [Parameter] public string? Icon { get; set; }
+    /// <summary>The card whose glyph to render, keyed by its <see cref="ModifierId"/>.</summary>
+    [Parameter] public ModifierId Card { get; set; }
 }

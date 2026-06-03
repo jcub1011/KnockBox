@@ -183,11 +183,11 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
         }
 
         private static EngineEffectEvent Attack(IModifierCard card, AlphaChainPlayerState holder, AlphaChainPlayerState target, string reason)
-            => new(card.GetId().ToString(), card.GetName(), card.GetIcon(), EngineEffectClass.Offensive,
+            => new(card.GetId(), card.GetName(), EngineEffectClass.Offensive,
                 holder.UserId, holder.DisplayName, target.UserId, target.DisplayName, reason);
 
         private static EngineEffectEvent Reflect(IModifierCard mirror, AlphaChainPlayerState holder, AlphaChainPlayerState target, string reason)
-            => new(mirror.GetId().ToString(), mirror.GetName(), mirror.GetIcon(), EngineEffectClass.Special,
+            => new(mirror.GetId(), mirror.GetName(), EngineEffectClass.Special,
                 holder.UserId, holder.DisplayName, target.UserId, target.DisplayName, reason, Negated: true);
 
         private int TurnIndex(string userId)

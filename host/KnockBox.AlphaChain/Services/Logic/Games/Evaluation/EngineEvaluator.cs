@@ -52,7 +52,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
                 }
 
                 steps.Add(new ScoreStep(
-                    card.GetId().ToString(), card.GetName(), card.GetIcon(),
+                    card.GetId(), card.GetName(),
                     type, triggered, valueText, ModifierMath.ClampScore(ctx.ValueToAdd)));
             }
 

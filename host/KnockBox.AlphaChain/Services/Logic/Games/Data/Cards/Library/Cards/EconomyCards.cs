@@ -11,7 +11,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.TaxCollector;
         public override string GetName() => "Tax Collector";
-        public override string GetIcon() => "tax";
         public override string GetDescription()
             => "When an opponent plays a banned-letter word, collect half the points it would have scored.";
 
@@ -44,7 +43,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.TollBooth;
         public override string GetName() => "The Toll Booth";
-        public override string GetIcon() => "smuggler";
         public override string GetDescription()
             => "Each era, rolls you a personal banned letter (Zero-Point Tax if you use it). Toll: bank 20% of any opponent's score when their word uses that letter.";
 
@@ -82,7 +80,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.RouletteWheel;
         public override string GetName() => "The Roulette Wheel";
-        public override string GetIcon() => "roulette";
         public override string GetDescription()
             => "Each era, rolls you a personal banned letter (Zero-Point Tax if you use it). Reward: ×1.75 on every word you keep clean.";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.75;
@@ -107,7 +104,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.BountyHunter;
         public override string GetName() => "The Bounty Hunter";
-        public override string GetIcon() => "bounty-hunter";
         public override string GetDescription()
             => "Grants 0 points. Marks the leader each round — if they play a word shorter than 6 letters, they lose 15 points.";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
@@ -138,7 +134,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.FlakCannon;
         public override string GetName() => "Flak Cannon";
-        public override string GetIcon() => "flak-cannon";
         public override string GetDescription()
             => "Grants 0 points. Takes 2 seconds off the next shot clock of every player scoring higher than you.";
 
@@ -161,7 +156,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.BaitAndSwitch;
         public override string GetName() => "Bait & Switch";
-        public override string GetIcon() => "bait-switch";
         public override string GetDescription()
             => "When your word is hit by the Zero-Point Tax, curse the next player with that exact banned letter for their next turn.";
 

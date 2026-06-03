@@ -7,7 +7,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.TheVault;
         public override string GetName() => "The Vault";
-        public override string GetIcon() => "vault";
         public override string GetDescription() => "×1.5 on every word, but shortens your shot clock by 10% while equipped.";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.5;
 
@@ -20,7 +19,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.Redline;
         public override string GetName() => "Redline";
-        public override string GetIcon() => "redline";
         public override string GetDescription() => "×2 on every word, but shortens your shot clock by 20% while equipped.";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 2.0;
 
@@ -36,7 +34,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.PanicButton;
         public override string GetName() => "Panic Button";
-        public override string GetIcon() => "panic";
         public override string GetDescription()
             => "Halves your shot clock. ×1.35 normally — but ×2.7 if you submit before the final 2 seconds.";
 
@@ -52,7 +49,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.HeatSink;
         public override string GetName() => "The Heat Sink";
-        public override string GetIcon() => "heat-sink";
         public override string GetDescription() => "Grants 0 points but lengthens your shot clock by 30%.";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 
@@ -68,7 +64,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.AnchorChain;
         public override string GetName() => "The Anchor Chain";
-        public override string GetIcon() => "anchor-chain";
         public override string GetDescription()
             => "Locks your shot clock to a strict, unmodifiable 5 seconds for the era. In exchange: ×(0.5 per letter) of your word.";
 
@@ -96,7 +91,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.HyperDrive;
         public override string GetName() => "Hyper-Drive";
-        public override string GetIcon() => "hyper-drive";
         public override string GetDescription()
             => "Submit in under 3 seconds to overdrive: your shot clock drops to 5s for the rest of the era, but every multiplier you own is doubled.";
 

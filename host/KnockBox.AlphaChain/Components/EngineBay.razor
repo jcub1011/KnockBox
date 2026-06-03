@@ -34,7 +34,7 @@
                             @ondragstart="() => _dragIndex = index"
                             @ondragend="() => _dragIndex = null"
                             @onkeydown="e => OnKeyDown(e, index)">
-                        <GameCard Name="@card.GetName()" Description="@card.GetDescription()" Icon="@card.GetIcon()"
+                        <GameCard Name="@card.GetName()" Description="@card.GetDescription()" Card="@card.GetId()"
                                   Kind="card.GetModifierType(default)"
                                   ValueText="@ShieldValueText(card)"
                                   Compact="@ReadOnly" Dragging="@(_dragIndex == index)" />

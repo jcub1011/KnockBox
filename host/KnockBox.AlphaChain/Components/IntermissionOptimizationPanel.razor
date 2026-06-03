@@ -50,7 +50,7 @@
                         @ondragstart="() => _dragIndex = index"
                         @ondragend="() => _dragIndex = null"
                         @onkeydown="e => OnKeyDown(e, index)">
-                    <GameCard Name="@card.GetName()" Description="@card.GetDescription()" Icon="@card.GetIcon()"
+                    <GameCard Name="@card.GetName()" Description="@card.GetDescription()" Card="@card.GetId()"
                               Kind="card.GetModifierType(default)"
                               Dragging="@(_dragIndex == index)" New="@isNew"
                               BadgeText="@(isNew ? "NEW" : null)" />
@@ -73,7 +73,7 @@
                         disabled="@HasSubmitted"
                         title="Put back"
                         @onclick="() => Restore(card.GetId())">
-                    <GameCard Name="@card.GetName()" Description="@card.GetDescription()" Icon="@card.GetIcon()"
+                    <GameCard Name="@card.GetName()" Description="@card.GetDescription()" Card="@card.GetId()"
                               Kind="card.GetModifierType(default)"
                               Compact="true" Dim="true" />
                 </button>

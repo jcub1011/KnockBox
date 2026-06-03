@@ -34,7 +34,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public abstract ModifierId GetId();
         public abstract string GetName();
-        public abstract string GetIcon();
         public abstract string GetDescription();
         public virtual string GetDescription(EngineEvaluationContext context) => GetDescription();
 

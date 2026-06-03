@@ -19,7 +19,7 @@
                     _ => "ac-rx-defend"
                 };
             <div class="ac-rx-card @tone @(youHit ? "ac-rx-you" : "")">
-                <span class="ac-rx-icon"><CardIcon Icon="@n.Icon" /></span>
+                <span class="ac-rx-icon"><CardIcon Card="@n.CardId" /></span>
                 <div class="ac-rx-body">
                     <span class="ac-rx-name">@n.CardName@(n.Negated ? " — reflected!" : "")</span>
                     <span class="ac-rx-head">@Headline(n)</span>

@@ -25,7 +25,7 @@
                 ? (step.Kind == ModifierType.Additive ? "ac-replay-add" : "ac-replay-mul")
                 : "ac-replay-skip";
             <span class="ac-replay-seq @kindClass" style="animation-delay: calc(var(--ac-step) * @(i + 1))">
-                <span class="ac-replay-icon"><CardIcon Icon="@step.Icon" /></span>
+                <span class="ac-replay-icon"><CardIcon Card="@step.CardId" /></span>
                 <span class="ac-replay-op">@(step.Triggered ? step.ValueText : "—")</span>
                 <span class="ac-replay-run">@step.RunningScore</span>
             </span>
@@ -58,7 +58,7 @@
             var fx = fired[i];
             <div class="ac-replay-rx @(fx.Negated ? "ac-replay-rx-negate" : fx.Class == EngineEffectClass.Offensive ? "ac-replay-rx-attack" : fx.Class == EngineEffectClass.Special ? "ac-replay-rx-special" : "ac-replay-rx-defend")"
                  style="animation-delay: calc(var(--ac-step) * @(EffectRowBase + i))">
-                <span class="ac-replay-rx-icon"><CardIcon Icon="@fx.Icon" /></span>
+                <span class="ac-replay-rx-icon"><CardIcon Card="@fx.CardId" /></span>
                 <span class="ac-replay-rx-name">@fx.CardName</span>
                 <span class="ac-replay-rx-reason">@fx.Reason</span>
             </div>

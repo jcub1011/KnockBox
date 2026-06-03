@@ -8,7 +8,7 @@
 
 <div class="@RootClass">
     <div class="gc-head">
-        <span class="gc-icon"><CardIcon Icon="@Icon" /></span>
+        <span class="gc-icon"><CardIcon Card="@Card" /></span>
         @if (OperatorSymbol is { } op)
         {
             <span class="gc-op">@op</span>
@@ -32,8 +32,8 @@
     /// <summary>Inline rules text shown on the card (no hover needed).</summary>
     [Parameter] public string? Description { get; set; }
 
-    /// <summary>Icon key resolved by <see cref="CardIcon"/>.</summary>
-    [Parameter] public string? Icon { get; set; }
+    /// <summary>The card whose glyph to show, resolved by <see cref="CardIcon"/>.</summary>
+    [Parameter] public ModifierId Card { get; set; }
 
     /// <summary>Modifier type (additive/multiplicative), driving the accent tint + operator glyph.</summary>
     [Parameter] public ModifierType? Kind { get; set; }
