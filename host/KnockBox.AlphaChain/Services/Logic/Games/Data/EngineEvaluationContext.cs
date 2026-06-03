@@ -67,9 +67,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         /// </summary>
         public double MultiplierScale { get; init; } = 1.0;
 
-        /// <summary>True when <see cref="Word"/> contains an adjacent duplicate letter (the 'ff' in <i>coffin</i>).</summary>
-        public bool HasDoubleLetter { get; init; }
-
         /// <summary>
         /// The just-resolved submission relevant to the current hook: the owner's own word for
         /// <see cref="IModifierCard.OnWordAccepted"/>/<see cref="IModifierCard.OnTurnEnded"/>, or the

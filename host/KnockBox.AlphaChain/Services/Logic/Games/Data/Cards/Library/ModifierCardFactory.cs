@@ -76,16 +76,17 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
                 ModifierId.HighRoller => new CommonModifier(
                     ModifierId.HighRoller, "High Roller", "dice",
-                    "Adds +20 when your word begins with a rare tile — Q, X, Z or J.",
+                    "Adds +20 when your word begins with a rare letter — Q, X, Z or J.",
                     ModifierType.Additive,
                     static ctx => ctx.Word.Length > 0 && ctx.Word[0] is 'q' or 'x' or 'z' or 'j',
                     static (_, _) => 20.0),
 
                 ModifierId.DoubleDown => new CommonModifier(
                     ModifierId.DoubleDown, "The Double Down", "double-down",
-                    "×2 when your word has a double letter (the 'ff' in coffin). No double letter? Your score is reduced (×0.5).",
+                    "×2 when your word has repeat letters. No repeat letters? Your score is reduced (×0.5).",
                     ModifierType.Multiplier, Always,
-                    static (ctx, _) => ctx.HasDoubleLetter ? 2.0 : 0.5),
+                    // Words are normalized lowercase-alpha, so distinct-vs-length detects any repeat letter.
+                    static (ctx, _) => ctx.Word.Distinct().Count() != ctx.Word.Length ? 2.0 : 0.5),
 
                 // ── Letter-classification cards ──────────────────────────────────
                 ModifierId.VowelSurge => new VowelSurgeCard(),

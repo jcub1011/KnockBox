@@ -120,7 +120,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                     : state.ComputeArmedShotClockSeconds(player),
                 RemainingShotClockDuration = remaining,
                 Score = player?.Score ?? 0,
-                HasDoubleLetter = HasDoubleLetter(word),
             };
 
             // 4. Chain (succession) rule — a held Wildcard exempts the owner.
@@ -202,7 +201,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                     evalCtx = card.OnWordAccepted(evalCtx, card);
 
                 // Track a double-letter word so opponents' Scattershot can target this player this era.
-                if (evalCtx.HasDoubleLetter)
+                if (HasDoubleLetter(word))
                     player.PlayedDoubleLetterWordThisEra = true;
 
                 // 11b. OnOpponentWordResolved — reactive economy/penalties on every OTHER active player

@@ -28,13 +28,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
             ModifierId.Unknown, "Mul", "", "", ModifierType.Multiplier,
             static _ => true, (_, _) => factor);
 
-        private static bool HasDouble(string word)
-        {
-            for (int i = 1; i < word.Length; i++)
-                if (word[i] is >= 'a' and <= 'z' && word[i] == word[i - 1]) return true;
-            return false;
-        }
-
         // Builds an evaluation context. A player (index 0) is always present so shield/Hyper-Drive
         // capability cards have an owner to read; pass a configured one for those cases.
         private static EngineEvaluationContext Ctx(
@@ -52,7 +45,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
                 PlayerIndex = 0,
                 RemainingShotClockDuration = remaining,
                 ShotClockDuration = shotClock,
-                HasDoubleLetter = HasDouble(word),
             };
         }
 
@@ -175,9 +167,12 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         }
 
         [TestMethod]
-        public void DoubleDown_DoublesWithADoubleLetter_HalvesWithout()
+        public void DoubleDown_DoublesWithARepeatLetter_HalvesWithout()
         {
+            // Consecutive repeat ("ff") and a non-consecutive repeat ("banana": a×3, n×2) both trigger ×2.
             Assert.AreEqual(12, _eval.Calculate(Ctx("coffin", [Card(ModifierId.DoubleDown)])));
+            Assert.AreEqual(12, _eval.Calculate(Ctx("banana", [Card(ModifierId.DoubleDown)])));
+            // All-distinct letters → ×0.5.
             Assert.AreEqual(2, _eval.Calculate(Ctx("cat", [Card(ModifierId.DoubleDown)])));
         }
 
