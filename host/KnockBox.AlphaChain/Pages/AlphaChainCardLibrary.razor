@@ -1,0 +1,54 @@
+@page "/room/alpha-chain/card-library"
+
+@using KnockBox.AlphaChain.Services.Logic.Games.Data
+@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
+@inject IModifierCardFactory CardFactory
+
+@* Hidden card-library easter egg. A literal route, so it outranks the lobby's
+   "/room/alpha-chain/{ObfuscatedRoomCode}" param route and never needs a session. Lays out every
+   dealable card with GameCard — the same renderer the game uses — so it's an exact preview of each
+   card's icon, name, description, and additive/multiplicative tint. Not linked from anywhere. *@
+
+<PageTitle>Alpha Chain · Card Library</PageTitle>
+
+<HeadContent>
+    <link href="_content/KnockBox.AlphaChain/css/alpha-chain-theme.css" rel="stylesheet" />
+    <link href="_content/KnockBox.AlphaChain/KnockBox.AlphaChain.styles.css" rel="stylesheet" />
+    <link href="_content/KnockBox.AlphaChain/css/cards.css" rel="stylesheet" />
+</HeadContent>
+
+<div class="content">
+    <div class="ac-library">
+        <header class="ac-library-head">
+            <span class="ac-library-brand">ALPHA CHAIN</span>
+            <span class="ac-library-tagline">Card Library · @Cards.Count cards</span>
+        </header>
+
+        <div class="ac-library-grid">
+            @foreach (var card in Cards)
+            {
+                <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Kind="@card.Kind" />
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>Display projection of a card: everything GameCard needs, resolved once at init.</summary>
+    private sealed record CardInfo(ModifierId Id, string Name, string Description, ModifierType Kind);
+
+    private List<CardInfo> Cards { get; set; } = [];
+
+    protected override void OnInitialized()
+    {
+        // An empty display context: card construction never dereferences it, and the modifier-type
+        // lookup is constant per card, so this is enough to read each card's static presentation.
+        var context = new EngineEvaluationContext(string.Empty, [], []);
+
+        Cards = ModifierCardFactory.AllDealableIds
+            .Select(id => CardFactory.CreateCard(context, id))
+            .Select(card => new CardInfo(
+                card.GetId(), card.GetName(), card.GetDescription(), card.GetModifierType(context)))
+            .ToList();
+    }
+}
