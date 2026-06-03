@@ -32,7 +32,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
                 return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromError("It is not your turn.");
             }
 
-            if (!context.GamePlayers.TryGetValue(currentPlayerId, out var player))
+            if (currentPlayerId is not { } currentPlayerIdVal || !context.GamePlayers.TryGetValue(currentPlayerIdVal, out var player))
             {
                 return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromError("Current player not found.");
             }
@@ -42,9 +42,9 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
 
         private ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> ResolveSpin(HiddenAgendaGameContext context, HiddenAgendaPlayerState player)
         {
-            if (player.DetourPending && player.DetourTargetPlayerId != null)
+            if (player.DetourPending && player.DetourTargetPlayerId is { } detourTargetId)
             {
-                if (context.GamePlayers.TryGetValue(player.DetourTargetPlayerId, out var target) && target.LastMoveDestination != null)
+                if (context.GamePlayers.TryGetValue(detourTargetId, out var target) && target.LastMoveDestination != null)
                 {
                     player.LastSpinResult = target.LastSpinResult;
                     context.State.CurrentSpinResult = target.LastSpinResult;
@@ -78,7 +78,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
             if (!context.State.Settings.EnableTimers) return null;
 
             var currentPlayerId = context.State.TurnManager.CurrentPlayer;
-            if (currentPlayerId != null && context.GamePlayers.TryGetValue(currentPlayerId, out var player))
+            if (currentPlayerId is { } cpId && context.GamePlayers.TryGetValue(cpId, out var player))
             {
                 return ResolveSpin(context, player);
             }

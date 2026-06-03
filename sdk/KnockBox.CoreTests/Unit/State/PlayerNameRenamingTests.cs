@@ -13,8 +13,8 @@ public sealed class PlayerNameRenamingTests
     {
     }
 
-    private static User MakeUser(string name, string id = "") =>
-        UserFactory.Create(name, string.IsNullOrEmpty(id) ? Guid.NewGuid().ToString() : id);
+    private static User MakeUser(string name, Guid? id = null) =>
+        UserFactory.Create(name, id ?? Guid.NewGuid());
 
     private static ILogger MakeLogger() => Mock.Of<ILogger>();
 
@@ -104,7 +104,7 @@ public sealed class PlayerNameRenamingTests
         using var state = MakeState(host);
         state.Execute(() => state.SetJoinable(true));
 
-        var userId = Guid.NewGuid().ToString();
+        var userId = Guid.NewGuid();
         var player1 = MakeUser("Alice", userId);
         state.RegisterPlayer(player1);
         Assert.AreEqual("Alice", DisplayNameFor(state, player1));

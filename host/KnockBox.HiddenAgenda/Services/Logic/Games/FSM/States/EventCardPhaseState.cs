@@ -15,7 +15,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> OnEnter(HiddenAgendaGameContext context)
         {
             var currentPlayerId = context.State.TurnManager.CurrentPlayer;
-            if (currentPlayerId == null || !context.GamePlayers.TryGetValue(currentPlayerId, out var player))
+            if (currentPlayerId is not { } currentPlayerIdVal || !context.GamePlayers.TryGetValue(currentPlayerIdVal, out var player))
             {
                 return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromValue(context.AdvanceToNextPlayerOrEndRound());
             }
@@ -43,7 +43,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
                 return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromError("It is not your turn.");
             }
 
-            if (!context.GamePlayers.TryGetValue(currentPlayerId, out var player))
+            if (currentPlayerId is not { } currentPlayerIdVal2 || !context.GamePlayers.TryGetValue(currentPlayerIdVal2, out var player))
             {
                 return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromError("Current player not found.");
             }

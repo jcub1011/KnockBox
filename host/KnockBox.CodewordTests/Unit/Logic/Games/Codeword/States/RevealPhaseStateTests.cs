@@ -19,9 +19,21 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         private CodewordGameState _state = default!;
         private CodewordGameContext _context = default!;
 
+        private Guid _p0Id = default!;
+        private Guid _p1Id = default!;
+        private Guid _p2Id = default!;
+        private Guid _p3Id = default!;
+        private Guid _p4Id = default!;
+
         [TestInitialize]
         public void Setup()
         {
+            _p0Id = Guid.NewGuid();
+            _p1Id = Guid.NewGuid();
+            _p2Id = Guid.NewGuid();
+            _p3Id = Guid.NewGuid();
+            _p4Id = Guid.NewGuid();
+
             _rng = new Mock<IRandomNumberService>();
             _rng.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>()))
                 .Returns(0);
@@ -30,18 +42,18 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             _logger = new Mock<ILogger>();
             _stateLogger = new Mock<ILogger<CodewordGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new CodewordGameState(host, _stateLogger.Object);
             _context = new CodewordGameContext(_state, _rng.Object, _logger.Object);
 
-            AddPlayer("p0", "Player 0", Role.Agent, "Ocean");
-            AddPlayer("p1", "Player 1", Role.Agent, "Ocean");
-            AddPlayer("p2", "Player 2", Role.Insider, "Lake");
-            AddPlayer("p3", "Player 3", Role.Agent, "Ocean");
+            AddPlayer(_p0Id, "Player 0", Role.Agent, "Ocean");
+            AddPlayer(_p1Id, "Player 1", Role.Agent, "Ocean");
+            AddPlayer(_p2Id, "Player 2", Role.Insider, "Lake");
+            AddPlayer(_p3Id, "Player 3", Role.Agent, "Ocean");
             _state.CurrentWordPair = ["Ocean", "Lake"];
         }
 
-        private void AddPlayer(string id, string name, Role role, string? secretWord)
+        private void AddPlayer(Guid id, string name, Role role, string? secretWord)
         {
             _state.GamePlayers[id] = new CodewordPlayerState
             {
@@ -57,7 +69,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         public void OnEnter_SetsPhaseToReveal()
         {
             // Set up a tie (no elimination).
-            _state.LastElimination = new EliminationResult("", "", default, WasTie: true);
+            _state.LastElimination = new EliminationResult(Guid.Empty, "", default, WasTie: true);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
@@ -68,23 +80,23 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         public void OnEnter_CallsApplyCycleScoring()
         {
             // Set up a voter who voted for an Agent.
-            _state.GamePlayers["p2"].HasVoted = true;
-            _state.GamePlayers["p2"].VoteTargetId = "p0"; // Agent
-            _state.LastElimination = new EliminationResult("", "", default, WasTie: true);
+            _state.GamePlayers[_p2Id].HasVoted = true;
+            _state.GamePlayers[_p2Id].VoteTargetId = _p0Id; // Agent
+            _state.LastElimination = new EliminationResult(Guid.Empty, "", default, WasTie: true);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
 
             // p2 (Insider) survives round → +1 score. Note: only Agents lose points for voting for an Agent.
-            Assert.AreEqual(1, _state.GamePlayers["p2"].Score);
+            Assert.AreEqual(1, _state.GamePlayers[_p2Id].Score);
         }
 
         [TestMethod]
         public void OnEnter_NonInformantEliminated_ChecksWinConditions()
         {
             // Eliminate p2 (Insider) — leaving only 3 players alive, game continues.
-            _state.GamePlayers["p2"].IsEliminated = true;
-            _state.LastElimination = new EliminationResult("p2", "Player 2", Role.Insider, WasTie: false);
+            _state.GamePlayers[_p2Id].IsEliminated = true;
+            _state.LastElimination = new EliminationResult(_p2Id, "Player 2", Role.Insider, WasTie: false);
 
             var reveal = new RevealPhaseState();
             var result = reveal.OnEnter(_context);
@@ -98,10 +110,10 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         public void OnEnter_NonInformantEliminated_TwoRemaining_TransitionsToGameOver()
         {
             // Start with 3 players, eliminate one to get to 2.
-            _state.GamePlayers.TryRemove("p3", out _);
-            _state.TurnManager.TurnOrder.Remove("p3");
-            _state.GamePlayers["p2"].IsEliminated = true;
-            _state.LastElimination = new EliminationResult("p2", "Player 2", Role.Insider, WasTie: false);
+            _state.GamePlayers.TryRemove(_p3Id, out _);
+            _state.TurnManager.TurnOrder.Remove(_p3Id);
+            _state.GamePlayers[_p2Id].IsEliminated = true;
+            _state.LastElimination = new EliminationResult(_p2Id, "Player 2", Role.Insider, WasTie: false);
 
             var reveal = new RevealPhaseState();
             var result = reveal.OnEnter(_context);
@@ -114,9 +126,9 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         public void OnEnter_InformantEliminated_SetsAwaitingInformantGuess()
         {
             // Add Informant and eliminate them.
-            AddPlayer("p4", "Player 4", Role.Informant, null);
-            _state.GamePlayers["p4"].IsEliminated = true;
-            _state.LastElimination = new EliminationResult("p4", "Player 4", Role.Informant, WasTie: false);
+            AddPlayer(_p4Id, "Player 4", Role.Informant, null);
+            _state.GamePlayers[_p4Id].IsEliminated = true;
+            _state.LastElimination = new EliminationResult(_p4Id, "Player 4", Role.Informant, WasTie: false);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
@@ -127,14 +139,14 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void HandleCommand_InformantCorrectGuess_TransitionsToGameOver()
         {
-            AddPlayer("p4", "Player 4", Role.Informant, null);
-            _state.GamePlayers["p4"].IsEliminated = true;
-            _state.LastElimination = new EliminationResult("p4", "Player 4", Role.Informant, WasTie: false);
+            AddPlayer(_p4Id, "Player 4", Role.Informant, null);
+            _state.GamePlayers[_p4Id].IsEliminated = true;
+            _state.LastElimination = new EliminationResult(_p4Id, "Player 4", Role.Informant, WasTie: false);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
 
-            var result = reveal.HandleCommand(_context, new InformantGuessCommand("p4", "Ocean"));
+            var result = reveal.HandleCommand(_context, new InformantGuessCommand(_p4Id, "Ocean"));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<GameOverState>(result.Value);
             Assert.AreEqual(Role.Informant, _state.WinResult!.WinningTeam);
@@ -143,14 +155,14 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void HandleCommand_InformantWrongGuess_ContinuesGame()
         {
-            AddPlayer("p4", "Player 4", Role.Informant, null);
-            _state.GamePlayers["p4"].IsEliminated = true;
-            _state.LastElimination = new EliminationResult("p4", "Player 4", Role.Informant, WasTie: false);
+            AddPlayer(_p4Id, "Player 4", Role.Informant, null);
+            _state.GamePlayers[_p4Id].IsEliminated = true;
+            _state.LastElimination = new EliminationResult(_p4Id, "Player 4", Role.Informant, WasTie: false);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
 
-            var result = reveal.HandleCommand(_context, new InformantGuessCommand("p4", "Wrong"));
+            var result = reveal.HandleCommand(_context, new InformantGuessCommand(_p4Id, "Wrong"));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsNull(result.Value); // Game continues (null = stay in current state).
 
@@ -162,36 +174,36 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void HandleCommand_NonInformant_CannotGuess()
         {
-            AddPlayer("p4", "Player 4", Role.Informant, null);
-            _state.GamePlayers["p4"].IsEliminated = true;
-            _state.LastElimination = new EliminationResult("p4", "Player 4", Role.Informant, WasTie: false);
+            AddPlayer(_p4Id, "Player 4", Role.Informant, null);
+            _state.GamePlayers[_p4Id].IsEliminated = true;
+            _state.LastElimination = new EliminationResult(_p4Id, "Player 4", Role.Informant, WasTie: false);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
 
             // p0 is not the Informant.
-            var result = reveal.HandleCommand(_context, new InformantGuessCommand("p0", "Ocean"));
+            var result = reveal.HandleCommand(_context, new InformantGuessCommand(_p0Id, "Ocean"));
             Assert.IsFalse(result.IsSuccess);
         }
 
         [TestMethod]
         public void HandleCommand_GuessWhenNotAwaiting_Rejected()
         {
-            _state.LastElimination = new EliminationResult("", "", default, WasTie: true);
+            _state.LastElimination = new EliminationResult(Guid.Empty, "", default, WasTie: true);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
 
-            var result = reveal.HandleCommand(_context, new InformantGuessCommand("p0", "Ocean"));
+            var result = reveal.HandleCommand(_context, new InformantGuessCommand(_p0Id, "Ocean"));
             Assert.IsFalse(result.IsSuccess);
         }
 
         [TestMethod]
         public void Tick_AwaitingInformantGuess_TimeoutForfeit()
         {
-            AddPlayer("p4", "Player 4", Role.Informant, null);
-            _state.GamePlayers["p4"].IsEliminated = true;
-            _state.LastElimination = new EliminationResult("p4", "Player 4", Role.Informant, WasTie: false);
+            AddPlayer(_p4Id, "Player 4", Role.Informant, null);
+            _state.GamePlayers[_p4Id].IsEliminated = true;
+            _state.LastElimination = new EliminationResult(_p4Id, "Player 4", Role.Informant, WasTie: false);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
@@ -210,7 +222,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void Tick_NoInformantGuess_AutoAdvancesToCluePhase()
         {
-            _state.LastElimination = new EliminationResult("", "", default, WasTie: true);
+            _state.LastElimination = new EliminationResult(Guid.Empty, "", default, WasTie: true);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
@@ -225,8 +237,8 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         {
             // Non-tie elimination of a non-Informant where the game continues (3 alive)
             // routes through ContinueOrEndRound instead of straight back to CluePhase.
-            _state.GamePlayers["p2"].IsEliminated = true;
-            _state.LastElimination = new EliminationResult("p2", "Player 2", Role.Insider, WasTie: false);
+            _state.GamePlayers[_p2Id].IsEliminated = true;
+            _state.LastElimination = new EliminationResult(_p2Id, "Player 2", Role.Insider, WasTie: false);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
@@ -239,7 +251,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void Tick_BeforeTimeout_ReturnsNull()
         {
-            _state.LastElimination = new EliminationResult("", "", default, WasTie: true);
+            _state.LastElimination = new EliminationResult(Guid.Empty, "", default, WasTie: true);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
@@ -252,15 +264,15 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void HandleCommand_InformantGuessCaseInsensitive()
         {
-            AddPlayer("p4", "Player 4", Role.Informant, null);
-            _state.GamePlayers["p4"].IsEliminated = true;
-            _state.LastElimination = new EliminationResult("p4", "Player 4", Role.Informant, WasTie: false);
+            AddPlayer(_p4Id, "Player 4", Role.Informant, null);
+            _state.GamePlayers[_p4Id].IsEliminated = true;
+            _state.LastElimination = new EliminationResult(_p4Id, "Player 4", Role.Informant, WasTie: false);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
 
             // "ocean" vs "Ocean" - should be case insensitive.
-            var result = reveal.HandleCommand(_context, new InformantGuessCommand("p4", "ocean"));
+            var result = reveal.HandleCommand(_context, new InformantGuessCommand(_p4Id, "ocean"));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<GameOverState>(result.Value);
         }
@@ -270,15 +282,15 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         {
             // Remove p2 and p3 from game state, add p4 as Informant.
             // Remaining: p0 (Agent), p1 (Agent), p4 (Informant).
-            _state.GamePlayers.TryRemove("p2", out _);
-            _state.TurnManager.TurnOrder.Remove("p2");
-            _state.GamePlayers.TryRemove("p3", out _);
-            _state.TurnManager.TurnOrder.Remove("p3");
-            AddPlayer("p4", "Player 4", Role.Informant, null);
+            _state.GamePlayers.TryRemove(_p2Id, out _);
+            _state.TurnManager.TurnOrder.Remove(_p2Id);
+            _state.GamePlayers.TryRemove(_p3Id, out _);
+            _state.TurnManager.TurnOrder.Remove(_p3Id);
+            AddPlayer(_p4Id, "Player 4", Role.Informant, null);
 
             // p4 (Informant) is eliminated; p0 and p1 remain alive.
-            _state.GamePlayers["p4"].IsEliminated = true;
-            _state.LastElimination = new EliminationResult("p4", "Player 4", Role.Informant, WasTie: false);
+            _state.GamePlayers[_p4Id].IsEliminated = true;
+            _state.LastElimination = new EliminationResult(_p4Id, "Player 4", Role.Informant, WasTie: false);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
@@ -286,7 +298,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             Assert.IsTrue(_state.AwaitingInformantGuess);
 
             // Wrong guess — only 2 alive players (p0, p1) remain → game should end.
-            var result = reveal.HandleCommand(_context, new InformantGuessCommand("p4", "WrongWord"));
+            var result = reveal.HandleCommand(_context, new InformantGuessCommand(_p4Id, "WrongWord"));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<GameOverState>(result.Value);
         }
@@ -296,8 +308,8 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         {
             // 4 players: p0 (Agent), p1 (Agent), p2 (Insider, eliminated), p3 (Agent).
             // 3 alive after elimination — game should continue.
-            _state.GamePlayers["p2"].IsEliminated = true;
-            _state.LastElimination = new EliminationResult("p2", "Player 2", Role.Insider, WasTie: false);
+            _state.GamePlayers[_p2Id].IsEliminated = true;
+            _state.LastElimination = new EliminationResult(_p2Id, "Player 2", Role.Insider, WasTie: false);
 
             var reveal = new RevealPhaseState();
             var result = reveal.OnEnter(_context);
@@ -310,14 +322,14 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         public void Tick_AwaitingInformantGuess_Timeout_TwoRemaining_TransitionsToGameOver()
         {
             // Set up: 3 players total, Informant eliminated, 2 alive remain.
-            _state.GamePlayers.TryRemove("p2", out _);
-            _state.TurnManager.TurnOrder.Remove("p2");
-            _state.GamePlayers.TryRemove("p3", out _);
-            _state.TurnManager.TurnOrder.Remove("p3");
-            AddPlayer("p4", "Player 4", Role.Informant, null);
+            _state.GamePlayers.TryRemove(_p2Id, out _);
+            _state.TurnManager.TurnOrder.Remove(_p2Id);
+            _state.GamePlayers.TryRemove(_p3Id, out _);
+            _state.TurnManager.TurnOrder.Remove(_p3Id);
+            AddPlayer(_p4Id, "Player 4", Role.Informant, null);
 
-            _state.GamePlayers["p4"].IsEliminated = true;
-            _state.LastElimination = new EliminationResult("p4", "Player 4", Role.Informant, WasTie: false);
+            _state.GamePlayers[_p4Id].IsEliminated = true;
+            _state.LastElimination = new EliminationResult(_p4Id, "Player 4", Role.Informant, WasTie: false);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
@@ -334,16 +346,16 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         public void OnEnter_PerCycleScoringApplied_OnBothEliminationAndTie()
         {
             // Test that scoring is applied for a real elimination too.
-            _state.GamePlayers["p2"].HasVoted = true;
-            _state.GamePlayers["p2"].VoteTargetId = "p0"; // Agent
-            _state.GamePlayers["p3"].IsEliminated = true;
-            _state.LastElimination = new EliminationResult("p3", "Player 3", Role.Agent, WasTie: false);
+            _state.GamePlayers[_p2Id].HasVoted = true;
+            _state.GamePlayers[_p2Id].VoteTargetId = _p0Id; // Agent
+            _state.GamePlayers[_p3Id].IsEliminated = true;
+            _state.LastElimination = new EliminationResult(_p3Id, "Player 3", Role.Agent, WasTie: false);
 
             var reveal = new RevealPhaseState();
             reveal.OnEnter(_context);
 
             // p2 (Insider) survives the round since they weren't eliminated → +1 score.
-            Assert.AreEqual(1, _state.GamePlayers["p2"].Score);
+            Assert.AreEqual(1, _state.GamePlayers[_p2Id].Score);
         }
     }
 }

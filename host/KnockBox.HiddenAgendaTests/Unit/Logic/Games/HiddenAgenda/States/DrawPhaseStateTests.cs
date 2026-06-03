@@ -24,67 +24,70 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         private HiddenAgendaGameState _state = default!;
         private HiddenAgendaGameContext _context = default!;
 
+        private Guid[] _playerIds = default!;
+
         [TestInitialize]
         public void Setup()
         {
             _rng = new Mock<IRandomNumberService>();
             _rng.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
-            
+
             _logger = new Mock<ILogger>();
             _stateLogger = new Mock<ILogger<HiddenAgendaGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new HiddenAgendaGameState(host, _stateLogger.Object);
             _state.BoardGraph = BoardDefinitions.CreateGrandCircuit();
             _context = new HiddenAgendaGameContext(_state, _rng.Object, _logger.Object);
 
+            _playerIds = new Guid[4];
             for (int i = 0; i < 4; i++)
             {
-                var pid = $"p{i}";
-                _state.GamePlayers[pid] = new HiddenAgendaPlayerState
+                _playerIds[i] = Guid.NewGuid();
+                _state.GamePlayers[_playerIds[i]] = new HiddenAgendaPlayerState
                 {
-                    PlayerId = pid,
+                    PlayerId = _playerIds[i],
                     DisplayName = $"Player {i}",
                     CurrentSpaceId = 0
                 };
             }
-            _state.TurnManager.SetTurnOrder(["p0", "p1", "p2", "p3"]);
+            _state.TurnManager.SetTurnOrder(_playerIds);
         }
 
         [TestMethod]
         public void OnEnter_CurationSpot_DrawsThreeCards()
         {
-            _state.GamePlayers["p0"].CurrentSpaceId = 0; // Grand Hall Foyer (Curation)
+            _state.GamePlayers[_playerIds[0]].CurrentSpaceId = 0; // Grand Hall Foyer (Curation)
             var state = new DrawPhaseState();
             state.OnEnter(_context);
 
             Assert.IsNotNull(_state.DrawnCards);
             Assert.HasCount(3, _state.DrawnCards);
-            Assert.HasCount(1, _state.GamePlayers["p0"].CardDrawHistory);
+            Assert.HasCount(1, _state.GamePlayers[_playerIds[0]].CardDrawHistory);
         }
 
         [TestMethod]
         public void OnEnter_EventSpot_AutoTakesIfNoCard()
         {
-            _state.GamePlayers["p0"].CurrentSpaceId = 4; // Grand Hall Event (Event)
+            _state.GamePlayers[_playerIds[0]].CurrentSpaceId = 4; // Grand Hall Event (Event)
             var state = new DrawPhaseState();
             var result = state.OnEnter(_context);
 
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
-            Assert.IsNotNull(_state.GamePlayers["p0"].HeldEventCard);
+            Assert.IsNotNull(_state.GamePlayers[_playerIds[0]].HeldEventCard);
         }
 
         [TestMethod]
         public void SelectCurationCard_Valid_AppliesEffectsAndFinishesTurn()
         {
-            _state.GamePlayers["p0"].CurrentSpaceId = 0;
+            _state.GamePlayers[_playerIds[0]].CurrentSpaceId = 0;
             var state = new DrawPhaseState();
             state.OnEnter(_context);
 
             var card = _state.DrawnCards![0];
-            var result = state.HandleCommand(_context, new SelectCurationCardCommand("p0", 0));
-            
+            var result = state.HandleCommand(_context, new SelectCurationCardCommand(_playerIds[0], 0));
+
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
 
@@ -93,35 +96,35 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             {
                 Assert.AreEqual(effect.Delta, _state.CollectionProgress[effect.Collection]);
             }
-            
-            Assert.HasCount(1, _state.GamePlayers["p0"].CardPlayHistory);
+
+            Assert.HasCount(1, _state.GamePlayers[_playerIds[0]].CardPlayHistory);
             Assert.HasCount(1, _state.RoundPlayHistory);
         }
 
         [TestMethod]
         public void SelectTradeOption_Valid_AppliesSelectedOption()
         {
-            _state.GamePlayers["p0"].CurrentSpaceId = 0;
-            
+            _state.GamePlayers[_playerIds[0]].CurrentSpaceId = 0;
+
             // Inject a trade card
-            var tradeCard = new CurationCard(CurationCardType.Trade, "Trade", 
-                [new(CollectionType.RenaissanceMasters, 2)], 
+            var tradeCard = new CurationCard(CurationCardType.Trade, "Trade",
+                [new(CollectionType.RenaissanceMasters, 2)],
                 [new(CollectionType.ContemporaryShowcase, 2)]);
-            
+
             var state = new DrawPhaseState();
             state.OnEnter(_context);
             _state.DrawnCards![0] = tradeCard;
 
             // Select trade card
-            var result1 = state.HandleCommand(_context, new SelectCurationCardCommand("p0", 0));
+            var result1 = state.HandleCommand(_context, new SelectCurationCardCommand(_playerIds[0], 0));
             Assert.IsTrue(result1.IsSuccess);
             Assert.IsNull(result1.Value); // Waiting for trade option
 
             // Select alternate option
-            var result2 = state.HandleCommand(_context, new SelectTradeOptionCommand("p0", true));
+            var result2 = state.HandleCommand(_context, new SelectTradeOptionCommand(_playerIds[0], true));
             Assert.IsTrue(result2.IsSuccess);
             Assert.IsInstanceOfType<EventCardPhaseState>(result2.Value);
-            
+
             Assert.AreEqual(2, _state.CollectionProgress[CollectionType.ContemporaryShowcase]);
             Assert.IsFalse(_state.CollectionProgress.ContainsKey(CollectionType.RenaissanceMasters));
         }
@@ -130,7 +133,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         public void Tick_AutoSelectsFirstCardAfterTimeout()
         {
             _state.UpdateSettings(s => s with { EnableTimers = true });
-            _state.GamePlayers["p0"].CurrentSpaceId = 0;
+            _state.GamePlayers[_playerIds[0]].CurrentSpaceId = 0;
             var state = new DrawPhaseState();
             state.OnEnter(_context);
 
@@ -138,13 +141,13 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
 
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
-            Assert.HasCount(1, _state.GamePlayers["p0"].CardPlayHistory);
+            Assert.HasCount(1, _state.GamePlayers[_playerIds[0]].CardPlayHistory);
         }
 
         [TestMethod]
         public void Tick_TimersDisabled_DoesNotAutoAdvance()
         {
-            _state.GamePlayers["p0"].CurrentSpaceId = 0;
+            _state.GamePlayers[_playerIds[0]].CurrentSpaceId = 0;
             var state = new DrawPhaseState();
             state.OnEnter(_context);
 
@@ -157,12 +160,12 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         [TestMethod]
         public void CallVote_AnyPlayer_TransitionsToFinalGuess()
         {
-            _state.GamePlayers["p0"].CurrentSpaceId = 0;
+            _state.GamePlayers[_playerIds[0]].CurrentSpaceId = 0;
             var state = new DrawPhaseState();
             state.OnEnter(_context);
 
             // Non-current player calls vote
-            var result = state.HandleCommand(_context, new CallVoteCommand("p1"));
+            var result = state.HandleCommand(_context, new CallVoteCommand(_playerIds[1]));
 
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<FinalGuessState>(result.Value);

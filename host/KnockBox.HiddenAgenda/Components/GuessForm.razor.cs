@@ -9,9 +9,9 @@ namespace KnockBox.HiddenAgenda.Components
     {
         [Parameter, EditorRequired] public IReadOnlyList<SecretTask> TaskPool { get; set; } = default!;
         [Parameter, EditorRequired] public IReadOnlyList<HiddenAgendaPlayerState> Opponents { get; set; } = default!;
-        [Parameter] public Action<Dictionary<string, List<string>>>? OnSubmit { get; set; }
+        [Parameter] public Action<Dictionary<Guid, List<string>>>? OnSubmit { get; set; }
 
-        protected Dictionary<string, List<string>> Guesses { get; set; } = [];
+        protected Dictionary<Guid, List<string>> Guesses { get; set; } = [];
 
         protected override void OnInitialized()
         {

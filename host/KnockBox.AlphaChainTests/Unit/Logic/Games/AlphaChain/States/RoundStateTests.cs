@@ -23,10 +23,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         /// <summary>
         /// Starts a 2–N player game (host as display) with a stubbed dictionary and an
@@ -65,7 +65,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         }
 
         private static async Task<SubmitWordResult> SubmitAsync(
-            AlphaChainGameEngine engine, AlphaChainGameState state, string actor, string word)
+            AlphaChainGameEngine engine, AlphaChainGameState state, Guid actor, string word)
         {
             var result = await engine.SubmitWordAsync(actor, word, state);
             Assert.IsTrue(result.TryGetSuccess(out var outcome), "SubmitWordAsync unexpectedly failed.");
@@ -91,7 +91,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             var outcome = await SubmitAsync(engine, state, current, "   ");
 
@@ -103,7 +103,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             var outcome = await SubmitAsync(engine, state, current, "zzz");
 
@@ -117,10 +117,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             using var _ = state;
 
             // First word establishes RequiredStartLetter = 't'.
-            var first = state.TurnManager.CurrentPlayer!;
+            var first = state.TurnManager.CurrentPlayer!.Value;
             await SubmitAsync(engine, state, first, "cat");
 
-            var second = state.TurnManager.CurrentPlayer!;
+            var second = state.TurnManager.CurrentPlayer!.Value;
             var outcome = await SubmitAsync(engine, state, second, "dog"); // 'd' != 't'
 
             var broken = (SubmitWordResult.RejectedChainBroken)outcome;
@@ -133,13 +133,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
 
-            var first = state.TurnManager.CurrentPlayer!;
+            var first = state.TurnManager.CurrentPlayer!.Value;
             await SubmitAsync(engine, state, first, "cat");
 
             // Free the chain so the duplicate check (not the chain rule) is what fires.
             state.Execute(() => state.RequiredStartLetter = null);
 
-            var second = state.TurnManager.CurrentPlayer!;
+            var second = state.TurnManager.CurrentPlayer!.Value;
             var outcome = await SubmitAsync(engine, state, second, "CAT");
 
             Assert.IsInstanceOfType<SubmitWordResult.RejectedDuplicate>(outcome);
@@ -152,7 +152,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
@@ -167,7 +167,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'a');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
@@ -182,7 +182,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 't');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
@@ -198,7 +198,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var (engine, state) = await StartGameAsync(
                 new StubWordListService("cat"), playerCount: 3, survival: true, banned: 'z');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             engine.Tick(state.Context!, DateTimeOffset.UtcNow.AddMinutes(1));
 
@@ -212,7 +212,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             engine.Tick(state.Context!, DateTimeOffset.UtcNow.AddMinutes(1));
 
@@ -241,7 +241,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             // now < PhaseEndTime → nothing happens.
             engine.Tick(state.Context!, DateTimeOffset.UtcNow);
@@ -259,7 +259,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // the chain-clearing effect is independent of the Zero-Point Tax the word incurs.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 't');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
@@ -277,7 +277,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // but it still incurs the Zero-Point Tax.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'a');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             // No prior play → RequiredStartLetter is null (free choice).
             Assert.IsNull(state.RequiredStartLetter);

@@ -121,7 +121,7 @@ namespace KnockBox.Tracery.Tests.Unit
 
         private static TraceryGameState NewState()
         {
-            var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             return new TraceryGameState(host, NullLogger<TraceryGameState>.Instance);
         }
     }

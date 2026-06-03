@@ -1,3 +1,4 @@
+using System;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
 
@@ -64,8 +65,8 @@ public sealed class OperatorCard(CardOperator operatorValue = CardOperator.None)
 
     public override ValueResult<CardPlayResult> Play(CardPlayContext ctx)
     {
-        bool targetsOther = !string.IsNullOrEmpty(ctx.TargetPlayerId) && ctx.TargetPlayerId != ctx.ThisPlayer.UserId;
-        string opTargetId = targetsOther ? ctx.TargetPlayerId! : ctx.ThisPlayer.UserId;
+        bool targetsOther = ctx.TargetPlayerId != null && ctx.TargetPlayerId.Value != ctx.ThisPlayer.UserId;
+        Guid opTargetId = targetsOther ? ctx.TargetPlayerId!.Value : ctx.ThisPlayer.UserId;
 
         if (ctx.ActionBlocked && targetsOther)
             return ValueResult<CardPlayResult>.FromValue(CardPlayResult.Ok());

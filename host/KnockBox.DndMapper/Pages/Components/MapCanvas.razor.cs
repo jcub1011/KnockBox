@@ -21,7 +21,7 @@ namespace KnockBox.DndMapper.Pages.Components
         [Parameter, EditorRequired] public Map Map { get; set; } = default!;
         [Parameter] public string RoomCode { get; set; } = string.Empty;
         [Parameter] public bool IsHost { get; set; }
-        [Parameter] public string CurrentUserId { get; set; } = string.Empty;
+        [Parameter] public Guid CurrentUserId { get; set; }
 
         [Parameter] public Guid? SelectedImageId { get; set; }
         [Parameter] public EventCallback<Guid?> SelectedImageIdChanged { get; set; }

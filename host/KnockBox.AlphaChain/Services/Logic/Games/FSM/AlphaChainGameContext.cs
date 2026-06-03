@@ -70,6 +70,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
         public IFiniteStateMachine<AlphaChainGameContext, AlphaChainCommand> Fsm { get; set; } = null!;
 
         /// <summary>Shortcut to <see cref="AlphaChainGameState.GamePlayers"/>.</summary>
-        public ConcurrentDictionary<string, AlphaChainPlayerState> GamePlayers => State.GamePlayers;
+        public ConcurrentDictionary<Guid, AlphaChainPlayerState> GamePlayers => State.GamePlayers;
     }
 }

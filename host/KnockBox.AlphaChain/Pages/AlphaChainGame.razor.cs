@@ -66,7 +66,7 @@ namespace KnockBox.AlphaChain.Pages
         protected SubmitWordResult? LastResult { get; private set; }
 
         /// <summary>The local player's id, or null before user init.</summary>
-        protected string? CurrentUserId => UserService.CurrentUser?.Id;
+        protected Guid? CurrentUserId => UserService.CurrentUser?.Id;
 
         /// <summary>Whether it is the local player's turn (input is enabled only then).</summary>
         protected bool IsMyTurn =>
@@ -89,7 +89,7 @@ namespace KnockBox.AlphaChain.Pages
             get
             {
                 var id = GameState.TurnManager.CurrentPlayer;
-                if (id is not null && GameState.GamePlayers.TryGetValue(id, out var ps))
+                if (id is { } pid && GameState.GamePlayers.TryGetValue(pid, out var ps))
                     return ps.DisplayName;
                 return "—";
             }
@@ -186,11 +186,11 @@ namespace KnockBox.AlphaChain.Pages
         protected int LatestPlayKey => GameState.PlayLog.Count;
 
         // ── Leaderboard rank-change tracking (view-only, for the ▲/▼ indicator) ──
-        private List<string> _prevRankOrder = new();
-        private readonly Dictionary<string, int> _rankMovement = new();
+        private List<Guid> _prevRankOrder = new();
+        private readonly Dictionary<Guid, int> _rankMovement = new();
 
         /// <summary>Maps a player to a turn-order accent slot (1-based, wraps at 6).</summary>
-        protected int AccentSlot(string userId)
+        protected int AccentSlot(Guid userId)
         {
             int i = 0;
             foreach (var id in GameState.TurnManager.TurnOrder)
@@ -202,7 +202,7 @@ namespace KnockBox.AlphaChain.Pages
         }
 
         /// <summary>"▲" if the player moved up since the last reorder, "▼" if down, else "".</summary>
-        protected string RankArrow(string userId) =>
+        protected string RankArrow(Guid userId) =>
             _rankMovement.TryGetValue(userId, out var m) ? m < 0 ? "▲" : m > 0 ? "▼" : "" : "";
 
         // ── Intermission (M4) ───────────────────────────────────────────────
@@ -237,7 +237,7 @@ namespace KnockBox.AlphaChain.Pages
 
         /// <summary>Whether the local player is the resolved Sniper Ban picker.</summary>
         protected bool IsSniperBanPicker =>
-            CurrentUserId is not null && CurrentUserId == GameState.SniperBanUserId;
+            CurrentUserId is { } uid && uid == GameState.SniperBanUserId;
 
         /// <summary>Display name of the Sniper Ban picker, for the waiting message.</summary>
         protected string SniperBanPickerName =>
@@ -293,12 +293,12 @@ namespace KnockBox.AlphaChain.Pages
             MyPlayer?.EngineBay.Any(c => c is IInputMask) == true;
 
         /// <summary>Whether the local user is the room host (gates the debug "Grant Cards" button).</summary>
-        protected bool IsHost => CurrentUserId is not null && CurrentUserId == GameState.Host.Id;
+        protected bool IsHost => CurrentUserId is { } uid && uid == GameState.Host.Id;
 
         /// <summary>Opponents still in play, for the opponent bay summaries and Time Thief targeting.</summary>
         protected IReadOnlyList<AlphaChainPlayerState> Opponents =>
             GameState.GamePlayers.Values
-                .Where(p => p.UserId != CurrentUserId && !p.HasLeft)
+                .Where(p => p.UserId != CurrentUserId.GetValueOrDefault() && !p.HasLeft)
                 .OrderBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -490,8 +490,7 @@ namespace KnockBox.AlphaChain.Pages
         {
             if (IsSubmitting || !IsMyTurn) return;
 
-            var userId = CurrentUserId;
-            if (userId is null) return;
+            if (CurrentUserId is not { } userId) return;
 
             if (string.IsNullOrWhiteSpace(word)) return;
 

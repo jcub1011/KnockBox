@@ -15,7 +15,7 @@ namespace KnockBox.DndMapper.Pages.Components
     public partial class CharacterSheetPanel : DisposableComponent
     {
         [Parameter, EditorRequired] public DndMapperGameState State { get; set; } = default!;
-        [Parameter] public string CurrentUserId { get; set; } = string.Empty;
+        [Parameter] public Guid CurrentUserId { get; set; }
         [Parameter] public bool IsHost { get; set; }
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
@@ -520,7 +520,8 @@ namespace KnockBox.DndMapper.Pages.Components
         {
             if (UserService.CurrentUser is null) return;
             if (string.IsNullOrEmpty(raw)) return;
-            var result = Engine.AssignSheetToPlayerAsync(State, UserService.CurrentUser, sheet.Id, raw);
+            if (!Guid.TryParse(raw, out var newOwnerId)) return;
+            var result = Engine.AssignSheetToPlayerAsync(State, UserService.CurrentUser, sheet.Id, newOwnerId);
             if (result.TryGetFailure(out var err) && Toasts is not null)
             {
                 await Toasts.Push(err.PublicMessage, DndMapperToastTone.Danger);

@@ -27,13 +27,14 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<CardCounterGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new CardCounterGameState(host, _stateLoggerMock.Object);
             _context = new CardCounterGameContext(_state, _randomMock.Object, _loggerMock.Object);
         }
 
-        private PlayerState AddPlayer(string id, string name)
+        private PlayerState AddPlayer(string name)
         {
+            var id = Guid.NewGuid();
             var player = new PlayerState { PlayerId = id, DisplayName = name };
             _state.GamePlayers[id] = player;
             _state.TurnManager.TurnOrder.Add(id);
@@ -43,23 +44,23 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void Skim_SourceSelectsThenTargetAccepts_SwapsSelectedDigits()
         {
-            var source = AddPlayer("src", "Source");
-            var target = AddPlayer("tgt", "Target");
+            var source = AddPlayer("Source");
+            var target = AddPlayer("Target");
             _state.TurnManager.SetCurrentPlayerIndex(0);
 
             // source.Pot = [1, 2, 3], target.Pot = [4, 5, 6]
             source.Pot.AddRange([1, 2, 3]);
             target.Pot.AddRange([4, 5, 6]);
 
-            var fsmState = new SkimState("src", "tgt", new ActionCard(ActionType.Skim));
+            var fsmState = new SkimState(source.PlayerId, target.PlayerId, new ActionCard(ActionType.Skim));
             fsmState.OnEnter(_context);
 
             // Source selects index 1 ↔ target index 2 (2 ↔ 6)
-            var afterSelect = fsmState.HandleCommand(_context, new SkimSelectCommand("src", 1, 2));
+            var afterSelect = fsmState.HandleCommand(_context, new SkimSelectCommand(source.PlayerId, 1, 2));
             Assert.IsNull(afterSelect.Value, "Should not resolve yet; target hasn't accepted.");
 
             // Target accepts
-            var next = fsmState.HandleCommand(_context, new AcceptPendingCommand("tgt"));
+            var next = fsmState.HandleCommand(_context, new AcceptPendingCommand(target.PlayerId));
 
             Assert.IsNotNull(next.Value);
             Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
@@ -70,22 +71,22 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void Skim_TargetAcceptsThenSourceSelects_SwapsSelectedDigits()
         {
-            var source = AddPlayer("src", "Source");
-            var target = AddPlayer("tgt", "Target");
+            var source = AddPlayer("Source");
+            var target = AddPlayer("Target");
             _state.TurnManager.SetCurrentPlayerIndex(0);
 
             source.Pot.AddRange([7, 8]);
             target.Pot.AddRange([9, 10]);
 
-            var fsmState = new SkimState("src", "tgt", new ActionCard(ActionType.Skim));
+            var fsmState = new SkimState(source.PlayerId, target.PlayerId, new ActionCard(ActionType.Skim));
             fsmState.OnEnter(_context);
 
             // Target accepts first
-            var afterAccept = fsmState.HandleCommand(_context, new AcceptPendingCommand("tgt"));
+            var afterAccept = fsmState.HandleCommand(_context, new AcceptPendingCommand(target.PlayerId));
             Assert.IsNull(afterAccept.Value, "Should not resolve yet; source hasn't selected.");
 
             // Source selects index 0 ↔ target index 1 (7 ↔ 10)
-            var next = fsmState.HandleCommand(_context, new SkimSelectCommand("src", 0, 1));
+            var next = fsmState.HandleCommand(_context, new SkimSelectCommand(source.PlayerId, 0, 1));
 
             Assert.IsNotNull(next.Value);
             Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
@@ -96,17 +97,17 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void Skim_TargetBlocksWithCompd_NoSwapOccurs()
         {
-            var source = AddPlayer("src", "Source");
-            var target = AddPlayer("tgt", "Target");
+            var source = AddPlayer("Source");
+            var target = AddPlayer("Target");
             _state.TurnManager.SetCurrentPlayerIndex(0);
             source.Pot.AddRange([1, 2]);
             target.Pot.AddRange([3, 4]);
             target.ActionHand.Add(new ActionCard(ActionType.Compd));
 
-            var fsmState = new SkimState("src", "tgt", new ActionCard(ActionType.Skim));
+            var fsmState = new SkimState(source.PlayerId, target.PlayerId, new ActionCard(ActionType.Skim));
             fsmState.OnEnter(_context);
 
-            var next = fsmState.HandleCommand(_context, new PlayActionCardCommand("tgt", 0));
+            var next = fsmState.HandleCommand(_context, new PlayActionCardCommand(target.PlayerId, 0));
 
             Assert.IsNotNull(next.Value);
             Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
@@ -118,17 +119,17 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void Skim_TargetBlocksWithCompd_RecordsCompdAsLastPlayedAction()
         {
-            var source = AddPlayer("src", "Source");
-            var target = AddPlayer("tgt", "Target");
+            var source = AddPlayer("Source");
+            var target = AddPlayer("Target");
             _state.TurnManager.SetCurrentPlayerIndex(0);
             source.Pot.Add(1);
             target.Pot.Add(2);
             target.ActionHand.Add(new ActionCard(ActionType.Compd));
 
-            var fsmState = new SkimState("src", "tgt", new ActionCard(ActionType.Skim));
+            var fsmState = new SkimState(source.PlayerId, target.PlayerId, new ActionCard(ActionType.Skim));
             fsmState.OnEnter(_context);
 
-            fsmState.HandleCommand(_context, new PlayActionCardCommand("tgt", 0));
+            fsmState.HandleCommand(_context, new PlayActionCardCommand(target.PlayerId, 0));
 
             Assert.IsNotNull(_state.LastPlayedAction);
             Assert.AreEqual(ActionType.Compd, _state.LastPlayedAction.Action);
@@ -137,34 +138,34 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void Skim_OnEnter_SetsPendingReactionInfo()
         {
-            AddPlayer("src", "Source");
-            AddPlayer("tgt", "Target");
+            var source = AddPlayer("Source");
+            var target = AddPlayer("Target");
             _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var actionCard = new ActionCard(ActionType.Skim);
-            var fsmState = new SkimState("src", "tgt", actionCard);
+            var fsmState = new SkimState(source.PlayerId, target.PlayerId, actionCard);
             fsmState.OnEnter(_context);
 
             Assert.IsNotNull(_state.PendingReaction);
-            Assert.AreEqual("src", _state.PendingReaction.SourceId);
-            Assert.AreEqual("tgt", _state.PendingReaction.TargetId);
+            Assert.AreEqual(source.PlayerId, _state.PendingReaction.SourceId);
+            Assert.AreEqual(target.PlayerId, _state.PendingReaction.TargetId);
         }
 
         [TestMethod]
         public void Skim_OutOfRangeSourceIndex_DefaultsToLastDigit()
         {
-            var source = AddPlayer("src", "Source");
-            var target = AddPlayer("tgt", "Target");
+            var source = AddPlayer("Source");
+            var target = AddPlayer("Target");
             _state.TurnManager.SetCurrentPlayerIndex(0);
             source.Pot.AddRange([1, 2, 3]);
             target.Pot.AddRange([4, 5, 6]);
 
-            var fsmState = new SkimState("src", "tgt", new ActionCard(ActionType.Skim));
+            var fsmState = new SkimState(source.PlayerId, target.PlayerId, new ActionCard(ActionType.Skim));
             fsmState.OnEnter(_context);
 
             // Source selects (but with an out-of-range source index — should default to last)
-            fsmState.HandleCommand(_context, new SkimSelectCommand("src", 99, 0));
-            var next = fsmState.HandleCommand(_context, new AcceptPendingCommand("tgt"));
+            fsmState.HandleCommand(_context, new SkimSelectCommand(source.PlayerId, 99, 0));
+            var next = fsmState.HandleCommand(_context, new AcceptPendingCommand(target.PlayerId));
 
             Assert.IsNotNull(next.Value);
             // The out-of-range index defaults to last digit (2→index 2, value=3) swapping with target[0] (value=4)
@@ -175,16 +176,16 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void Skim_TargetSelectsBeforeSource_UpdatesPendingReactionDigitIndices()
         {
-            var source = AddPlayer("src", "Source");
-            var target = AddPlayer("tgt", "Target");
+            var source = AddPlayer("Source");
+            var target = AddPlayer("Target");
             _state.TurnManager.SetCurrentPlayerIndex(0);
             source.Pot.AddRange([1, 2]);
             target.Pot.AddRange([3, 4]);
 
-            var fsmState = new SkimState("src", "tgt", new ActionCard(ActionType.Skim));
+            var fsmState = new SkimState(source.PlayerId, target.PlayerId, new ActionCard(ActionType.Skim));
             fsmState.OnEnter(_context);
 
-            fsmState.HandleCommand(_context, new SkimSelectCommand("src", 0, 1));
+            fsmState.HandleCommand(_context, new SkimSelectCommand(source.PlayerId, 0, 1));
 
             // PendingReaction should now reflect the selected digit indices
             Assert.IsNotNull(_state.PendingReaction?.SourceDigitIndex);

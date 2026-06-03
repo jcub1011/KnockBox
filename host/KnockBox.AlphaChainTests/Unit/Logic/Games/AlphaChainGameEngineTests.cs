@@ -23,7 +23,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
             _engine = new AlphaChainGameEngine(
                 new StubWordListService(),
                 new FixedRandomNumberService(),
@@ -33,7 +33,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
                 _stateLoggerMock.Object);
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<AlphaChainGameState> CreateStateWithPlayersAsync(int count)
         {
@@ -151,7 +151,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
         public async Task AdvanceTurn_RotatesPlayerInTurnOrder()
         {
             using var state = await CreateStartedGameAsync(2);
-            var first = state.TurnManager.CurrentPlayer!;
+            var first = state.TurnManager.CurrentPlayer!.Value;
 
             var result = await _engine.AdvanceTurnAsync(first, state);
 
@@ -177,10 +177,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
             Assert.AreEqual(1, state.CurrentRound);
 
             // Two players → two advances complete one round (the second wraps the order).
-            await _engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!, state);
+            await _engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!.Value, state);
             Assert.AreEqual(1, state.CurrentRound, "Mid-round advance must not bump the round.");
 
-            await _engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!, state);
+            await _engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!.Value, state);
             Assert.AreEqual(2, state.CurrentRound, "Wrapping the turn order completes the round.");
             Assert.AreEqual(0, state.TurnManager.CurrentPlayerIndex);
         }
@@ -200,7 +200,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
             for (int i = 0; i < state.TurnManager.TurnOrder.Count * (lastScheduledRound + 1); i++)
             {
                 if (state.Phase == AlphaChainGamePhase.GameOver) break;
-                await _engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!, state);
+                await _engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!.Value, state);
             }
 
             Assert.AreEqual(AlphaChainGamePhase.GameOver, state.Phase);
@@ -214,7 +214,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
         public async Task PlayerLeaves_DuringTheirTurn_AdvancesAutomatically()
         {
             using var state = await CreateStartedGameAsync(3);
-            var leaving = state.TurnManager.CurrentPlayer!;
+            var leaving = state.TurnManager.CurrentPlayer!.Value;
 
             _engine.HandlePlayerLeft(UserFactory.Create("dummy", leaving), state);
 

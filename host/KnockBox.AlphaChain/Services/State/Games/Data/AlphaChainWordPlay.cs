@@ -17,7 +17,7 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
     /// </param>
     public record AlphaChainWordPlay(
         DateTimeOffset PlayedAt,
-        string UserId,
+        Guid UserId,
         string DisplayName,
         string Word,
         int Score,

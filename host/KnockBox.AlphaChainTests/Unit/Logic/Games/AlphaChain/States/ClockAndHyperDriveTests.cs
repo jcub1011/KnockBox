@@ -28,10 +28,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartGameAsync(
             StubWordListService words, int playerCount = 2, char? banned = null)
@@ -63,7 +63,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                 engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
         }
 
-        private static void GiveModifier(AlphaChainGameState state, string playerId, string cardId) =>
+        private static void GiveModifier(AlphaChainGameState state, Guid playerId, string cardId) =>
             state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
 
         // ── Clock effects (ComputeArmedShotClockSeconds) ────────────────────
@@ -73,7 +73,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "the-vault");
 
             // 12 × 0.9 = 10.8 → 11 (half-up).
@@ -85,7 +85,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "redline");
 
             // 12 × 0.8 = 9.6 → 10 (half-up).
@@ -97,7 +97,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "panic-button");
 
             // 12 × 0.5 = 6.
@@ -109,7 +109,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "redline");    // −20%
             GiveModifier(state, id, "the-vault");  // −10%
 
@@ -122,7 +122,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "panic-button"); // −50%
             GiveModifier(state, id, "redline");      // −20%
             GiveModifier(state, id, "the-vault");    // −10%
@@ -137,7 +137,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "heat-sink");
 
             // Heat Sink declares a +0.3 fractional clock effect, so 12 × (1 + 0.3) = 15.6 → 16.
@@ -149,7 +149,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "anchor-chain"); // fixed, unmodifiable 5s
             GiveModifier(state, id, "heat-sink");    // +5s … which the override ignores
             GiveModifier(state, id, "the-vault");    // −3s … also ignored
@@ -165,7 +165,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "hyper-drive");
 
             // Arm the clock to a known window, then submit 2s in (elapsed 2 < 3 threshold).
@@ -183,7 +183,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "hyper-drive");
 
             // Submit 10s in (elapsed 10 ≥ 3 threshold) → no latch.

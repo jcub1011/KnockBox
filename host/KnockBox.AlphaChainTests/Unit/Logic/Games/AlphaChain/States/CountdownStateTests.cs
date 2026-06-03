@@ -26,10 +26,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         /// <summary>Starts a tutorials-off game so the FSM opens directly on the pre-round countdown,
         /// with the countdown length pinned to <paramref name="countdownSeconds"/>.</summary>
@@ -103,7 +103,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartAtCountdownAsync(countdownSeconds: 5);
             using var _ = state;
-            var actor = state.TurnManager.CurrentPlayer!;
+            var actor = state.TurnManager.CurrentPlayer!.Value;
 
             var outcome = await engine.SubmitWordAsync(actor, "cat", state);
 

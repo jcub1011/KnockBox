@@ -31,7 +31,7 @@ namespace KnockBox.DndMapperTests.Helpers
                 engineLogger ?? NullLogger<DndMapperGameEngine>.Instance,
                 NullLogger<DndMapperGameState>.Instance,
                 rng);
-            var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             var stateResult = engine.CreateStateAsync(host).GetAwaiter().GetResult();
             Assert.IsTrue(stateResult.TryGetSuccess(out var abstractState), "CreateStateAsync failed.");
             return (engine, (DndMapperGameState)abstractState, host, rng);
@@ -39,7 +39,7 @@ namespace KnockBox.DndMapperTests.Helpers
 
         public static User RegisterPlayer(DndMapperGameState state, string? name = null)
         {
-            var player = UserFactory.Create(name ?? $"P{Guid.NewGuid().ToString()[..4]}", Guid.NewGuid().ToString());
+            var player = UserFactory.Create(name ?? $"P{Guid.NewGuid().ToString()[..4]}", Guid.NewGuid());
             var reg = state.RegisterPlayer(player);
             Assert.IsTrue(reg.TryGetSuccess(out _), $"RegisterPlayer failed: {reg}");
             return player;
@@ -47,7 +47,7 @@ namespace KnockBox.DndMapperTests.Helpers
 
         public static IDisposable RegisterPlayerWithToken(DndMapperGameState state, out User player, string? name = null)
         {
-            player = UserFactory.Create(name ?? $"P{Guid.NewGuid().ToString()[..4]}", Guid.NewGuid().ToString());
+            player = UserFactory.Create(name ?? $"P{Guid.NewGuid().ToString()[..4]}", Guid.NewGuid());
             var reg = state.RegisterPlayer(player);
             Assert.IsTrue(reg.TryGetSuccess(out var token), $"RegisterPlayer failed: {reg}");
             return token;

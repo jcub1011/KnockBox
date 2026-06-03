@@ -35,7 +35,7 @@
     [Parameter] public IReadOnlyList<EngineEffectEvent> Notices { get; set; } = [];
 
     /// <summary>The local player's id, so the overlay can emphasize hits against them.</summary>
-    [Parameter] public string? CurrentUserId { get; set; }
+    [Parameter] public Guid? CurrentUserId { get; set; }
 
     private string Headline(EngineEffectEvent n)
     {

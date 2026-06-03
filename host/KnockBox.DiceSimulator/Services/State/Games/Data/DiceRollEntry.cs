@@ -3,7 +3,7 @@ namespace KnockBox.DiceSimulator.Services.State.Games.Data
     public sealed record DiceRollEntry
     {
         public required Guid Id { get; init; }
-        public required string PlayerId { get; init; }
+        public required Guid PlayerId { get; init; }
         public required string PlayerName { get; init; }
         public required DiceType DiceType { get; init; }
         public required int DiceCount { get; init; }

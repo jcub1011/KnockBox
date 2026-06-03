@@ -16,9 +16,9 @@ namespace KnockBox.DndMapper.Helpers
     {
         public const string HostGold = "#FFD700";
 
-        public static string Resolve(DndMapperGameState state, string userId)
+        public static string Resolve(DndMapperGameState state, Guid userId)
         {
-            if (string.IsNullOrEmpty(userId)) return FallbackForHash(0);
+            if (userId == Guid.Empty) return FallbackForHash(0);
             if (state.Host.Id == userId) return HostGold;
 
             foreach (var map in state.Maps)
@@ -30,7 +30,7 @@ namespace KnockBox.DndMapper.Helpers
                 }
             }
 
-            var hash = (uint)StringComparer.Ordinal.GetHashCode(userId);
+            var hash = (uint)userId.GetHashCode();
             return FallbackForHash(hash);
         }
 

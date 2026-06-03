@@ -25,8 +25,7 @@ namespace KnockBox.DrawnToDress.Pages
         /// </summary>
         protected List<(ClothingType TypeId, Guid ConflictingItemId)> GetConflictsForCurrentPlayer()
         {
-            var myId = UserService.CurrentUser?.Id;
-            if (myId is null) return [];
+            if (UserService.CurrentUser is not { Id: var myId }) return [];
 
             var myOutfit = GameState.GamePlayers.GetValueOrDefault(myId)?.SubmittedOutfit;
             if (myOutfit is null) return [];
@@ -57,8 +56,7 @@ namespace KnockBox.DrawnToDress.Pages
         /// </summary>
         protected List<DrawnClothingItem> GetReplacementCandidates(ClothingType typeId, Guid conflictingItemId)
         {
-            var myId = UserService.CurrentUser?.Id;
-            if (myId is null) return [];
+            if (UserService.CurrentUser is not { Id: var myId }) return [];
 
             var player = GameState.GamePlayers.GetValueOrDefault(myId);
             if (player is null) return [];
@@ -105,8 +103,7 @@ namespace KnockBox.DrawnToDress.Pages
 
         protected bool IsPlayerResolved()
         {
-            var myId = UserService.CurrentUser?.Id;
-            if (myId is null) return false;
+            if (UserService.CurrentUser is not { Id: var myId }) return false;
             var player = GameState.GamePlayers.GetValueOrDefault(myId);
             return player?.IsReady ?? false;
         }

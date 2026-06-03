@@ -28,14 +28,14 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyOperatorCard_EmptyPot_IsNoOp()
         {
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
             var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
             foreach (var op in Enum.GetValues<Operator>())
             {
                 var player = new PlayerState
                 {
-                    PlayerId = "p1",
+                    PlayerId = Guid.NewGuid(),
                     DisplayName = "Player 1",
                     Balance = 42
                 };
@@ -50,9 +50,9 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void WaitingForReaction_CompdResponse_UpdatesLastPlayedActionToCompd()
         {
-            var host = UserFactory.Create("Host", "host-id");
-            var sourceUser = UserFactory.Create("Source", "source-id");
-            var targetUser = UserFactory.Create("Target", "target-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
+            var sourceUser = UserFactory.Create("Source", Guid.NewGuid());
+            var targetUser = UserFactory.Create("Target", Guid.NewGuid());
             using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
             var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
             var source = new PlayerState { PlayerId = sourceUser.Id, DisplayName = sourceUser.Name };
@@ -82,7 +82,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void RecordBurn_UsesBurnIconForDiscardTopEntry()
         {
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
             var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
 
@@ -99,11 +99,11 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         public void Burn_LastCardInShoe_TransitionsToRoundEndState()
         {
             // Arrange: one player, one card in the shoe, main deck empty
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
             var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
 
-            var player = new PlayerState { PlayerId = "p1", DisplayName = "Player 1" };
+            var player = new PlayerState { PlayerId = Guid.NewGuid(), DisplayName = "Player 1" };
             player.ActionHand.Add(new ActionCard(ActionType.Burn));
             state.GamePlayers[player.PlayerId] = player;
             state.TurnManager.TurnOrder.Add(player.PlayerId);
@@ -128,7 +128,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         public void Tilt_EvenDistribution_DistributesDigitsEvenly()
         {
             // Arrange: 3 players with pots that together have 6 digits (evenly divisible by 3)
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
 
             // Mock RNG to return deterministic shuffle (identity permutation: each call returns i for index i)
@@ -138,9 +138,9 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
 
-            var p1 = new PlayerState { PlayerId = "p1", DisplayName = "P1" };
-            var p2 = new PlayerState { PlayerId = "p2", DisplayName = "P2" };
-            var p3 = new PlayerState { PlayerId = "p3", DisplayName = "P3" };
+            var p1 = new PlayerState { PlayerId = Guid.NewGuid(), DisplayName = "P1" };
+            var p2 = new PlayerState { PlayerId = Guid.NewGuid(), DisplayName = "P2" };
+            var p3 = new PlayerState { PlayerId = Guid.NewGuid(), DisplayName = "P3" };
 
             p1.Pot.AddRange([1, 2]);
             p2.Pot.AddRange([3, 4]);
@@ -176,7 +176,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         {
             // Arrange: 3 players with 7 total digits (7 / 3 = 2 base, 1 extra)
             // The extra card should go to the player who played Tilt (p1 at index 0)
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
 
             // Use identity shuffle so results are predictable
@@ -186,9 +186,9 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
 
-            var p1 = new PlayerState { PlayerId = "p1", DisplayName = "P1" };
-            var p2 = new PlayerState { PlayerId = "p2", DisplayName = "P2" };
-            var p3 = new PlayerState { PlayerId = "p3", DisplayName = "P3" };
+            var p1 = new PlayerState { PlayerId = Guid.NewGuid(), DisplayName = "P1" };
+            var p2 = new PlayerState { PlayerId = Guid.NewGuid(), DisplayName = "P2" };
+            var p3 = new PlayerState { PlayerId = Guid.NewGuid(), DisplayName = "P3" };
 
             p1.Pot.AddRange([1, 2, 3]);
             p2.Pot.AddRange([4, 5]);
@@ -223,7 +223,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         {
             // Arrange: 3 players, 8 total digits (8 / 3 = 2 base, 2 extras)
             // Source player is p2 (index 1), so extras go to p2 then p3
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
 
             int shuffleCall = 0;
@@ -232,9 +232,9 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
 
-            var p1 = new PlayerState { PlayerId = "p1", DisplayName = "P1" };
-            var p2 = new PlayerState { PlayerId = "p2", DisplayName = "P2" };
-            var p3 = new PlayerState { PlayerId = "p3", DisplayName = "P3" };
+            var p1 = new PlayerState { PlayerId = Guid.NewGuid(), DisplayName = "P1" };
+            var p2 = new PlayerState { PlayerId = Guid.NewGuid(), DisplayName = "P2" };
+            var p3 = new PlayerState { PlayerId = Guid.NewGuid(), DisplayName = "P3" };
 
             p1.Pot.AddRange([1, 2]);
             p2.Pot.AddRange([3, 4, 5]);
@@ -268,14 +268,14 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         public void Tilt_AllEmptyPots_ResultsInAllEmptyPots()
         {
             // Arrange: all players have empty pots — Tilt should be a no-op
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), RandomType.Secure)).Returns(0);
 
             var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
 
-            var p1 = new PlayerState { PlayerId = "p1", DisplayName = "P1" };
-            var p2 = new PlayerState { PlayerId = "p2", DisplayName = "P2" };
+            var p1 = new PlayerState { PlayerId = Guid.NewGuid(), DisplayName = "P1" };
+            var p2 = new PlayerState { PlayerId = Guid.NewGuid(), DisplayName = "P2" };
 
             p1.ActionHand.Add(new ActionCard(ActionType.Tilt));
 
@@ -300,13 +300,13 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void Tilt_RecordsActionCardPlay()
         {
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), RandomType.Secure)).Returns(0);
 
             var context = new CardCounterGameContext(state, _randomMock.Object, _loggerMock.Object);
 
-            var p1 = new PlayerState { PlayerId = "p1", DisplayName = "P1" };
+            var p1 = new PlayerState { PlayerId = Guid.NewGuid(), DisplayName = "P1" };
             p1.Pot.AddRange([1, 2]);
             p1.ActionHand.Add(new ActionCard(ActionType.Tilt));
 
@@ -331,7 +331,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             // totalWeight = (actionTypeCount - 1) * 10 + 1  (Tilt weight=1, others weight=10).
             // Tilt is at enum index 8; the 8 cards before it each have weight 10, so Tilt
             // occupies the single roll slot equal to 8 * 10 = 80.
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             using var state = new CardCounterGameState(host, _stateLoggerMock.Object);
 
             int totalTypes = Enum.GetValues<ActionType>().Length; // includes Tilt

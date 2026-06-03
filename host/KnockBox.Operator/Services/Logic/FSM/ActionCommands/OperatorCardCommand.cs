@@ -17,17 +17,17 @@ public class OperatorCardCommand(
 
     public override bool RequiresReaction => GetReactionTargetIds().Any();
 
-    public override IEnumerable<string> GetReactionTargetIds()
+    public override IEnumerable<Guid> GetReactionTargetIds()
     {
-        if (string.IsNullOrEmpty(PlayCommand.TargetPlayerId)
-            || PlayCommand.TargetPlayerId == PlayCommand.PlayerId)
+        if (PlayCommand.TargetPlayerId == null
+            || PlayCommand.TargetPlayerId.Value == PlayCommand.PlayerId)
             return [];
 
-        if (Context.GamePlayers.TryGetValue(PlayCommand.TargetPlayerId, out var target)
+        if (Context.GamePlayers.TryGetValue(PlayCommand.TargetPlayerId.Value, out var target)
             && target.IsAudited)
             return [];
 
-        return [PlayCommand.TargetPlayerId];
+        return [PlayCommand.TargetPlayerId.Value];
     }
 
     public override void Execute()
@@ -52,7 +52,7 @@ public class OperatorCardCommand(
             && opPlayResult.Toggled
             && opPlayResult.OperatorTargetId != null)
         {
-            if (Context.GamePlayers.TryGetValue(opPlayResult.OperatorTargetId, out var opTarget))
+            if (Context.GamePlayers.TryGetValue(opPlayResult.OperatorTargetId.Value, out var opTarget))
             {
                 string targetNameLog = GetPlayerName(opTarget.UserId);
                 Context.State.ActionLog.Add(new ActionLogEntry(

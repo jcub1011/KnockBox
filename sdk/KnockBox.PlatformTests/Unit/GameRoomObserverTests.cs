@@ -74,7 +74,7 @@ public sealed class GameRoomObserverTests
     {
         public static KnockBox.Core.Services.State.Games.Shared.AbstractGameState MakeState()
         {
-            var host = KnockBox.Core.Services.State.Users.UserFactory.Create("H", Guid.NewGuid().ToString());
+            var host = KnockBox.Core.Services.State.Users.UserFactory.Create("H", Guid.NewGuid());
             return new StubState(host);
         }
 

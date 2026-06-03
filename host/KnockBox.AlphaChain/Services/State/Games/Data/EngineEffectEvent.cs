@@ -35,9 +35,9 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         ModifierId CardId,
         string CardName,
         EngineEffectClass Class,
-        string HolderUserId,
+        Guid HolderUserId,
         string HolderName,
-        string? TargetUserId,
+        Guid? TargetUserId,
         string? TargetName,
         string Reason,
         bool Negated = false);

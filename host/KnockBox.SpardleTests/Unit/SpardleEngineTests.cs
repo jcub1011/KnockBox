@@ -159,7 +159,7 @@ public class SpardleEngineTests
     {
         var (state, _) = await CreateStateAsync();
         state.CustomWordPool = ImmutableList.Create("apple");
-        var nonHost = UserFactory.Create("NotHost", "nothost-id");
+        var nonHost = UserFactory.Create("NotHost", Guid.NewGuid());
 
         var result = await _engine.StartAsync(nonHost, state);
 
@@ -312,8 +312,8 @@ public class SpardleEngineTests
     public async Task StartAsync_CapturesParticipantsSnapshot_SurvivesPlayerLeaving()
     {
         var (state, host) = await CreateStateAsync();
-        var p1 = UserFactory.Create("P1", Guid.NewGuid().ToString());
-        var p2 = UserFactory.Create("P2", Guid.NewGuid().ToString());
+        var p1 = UserFactory.Create("P1", Guid.NewGuid());
+        var p2 = UserFactory.Create("P2", Guid.NewGuid());
         var reg1 = state.RegisterPlayer(p1);
         var reg2 = state.RegisterPlayer(p2);
         Assert.IsTrue(reg1.TryGetSuccess(out var token1));
@@ -344,8 +344,8 @@ public class SpardleEngineTests
     public async Task PlayerLeaving_DoesNotBlockRoundEnd_WhenRemainingPlayersFinished()
     {
         var (state, host) = await CreateStateAsync();
-        var p1 = UserFactory.Create("P1", Guid.NewGuid().ToString());
-        var p2 = UserFactory.Create("P2", Guid.NewGuid().ToString());
+        var p1 = UserFactory.Create("P1", Guid.NewGuid());
+        var p2 = UserFactory.Create("P2", Guid.NewGuid());
         Assert.IsTrue(state.RegisterPlayer(p1).IsSuccess);
         Assert.IsTrue(state.RegisterPlayer(p2).TryGetSuccess(out var token2));
 
@@ -374,8 +374,8 @@ public class SpardleEngineTests
     public async Task PlayerLeaving_DoesNotEndRoundPrematurely_WhenRemainingPlayerStillPlaying()
     {
         var (state, host) = await CreateStateAsync();
-        var p1 = UserFactory.Create("P1", Guid.NewGuid().ToString());
-        var p2 = UserFactory.Create("P2", Guid.NewGuid().ToString());
+        var p1 = UserFactory.Create("P1", Guid.NewGuid());
+        var p2 = UserFactory.Create("P2", Guid.NewGuid());
         Assert.IsTrue(state.RegisterPlayer(p1).IsSuccess);
         Assert.IsTrue(state.RegisterPlayer(p2).TryGetSuccess(out var token2));
 
@@ -620,7 +620,7 @@ public class SpardleEngineTests
 
     private async Task<(SpardleState state, User host)> CreateStateAsync()
     {
-        var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
+        var host = UserFactory.Create("Host", Guid.NewGuid());
         var abstractResult = await _engine.CreateStateAsync(host);
         Assert.IsTrue(abstractResult.TryGetSuccess(out var abstractState));
         return ((SpardleState)abstractState, host);
@@ -632,7 +632,7 @@ public class SpardleEngineTests
         var players = new List<User>();
         for (int i = 0; i < playerCount; i++)
         {
-            var player = UserFactory.Create($"P{i + 1}", Guid.NewGuid().ToString());
+            var player = UserFactory.Create($"P{i + 1}", Guid.NewGuid());
             var reg = state.RegisterPlayer(player);
             Assert.IsTrue(reg.IsSuccess, $"RegisterPlayer failed: {reg}");
             players.Add(player);
@@ -1242,7 +1242,7 @@ public class SpardleEngineTests
     {
         var (state, _) = await CreateStateAsync();
         state.Phase = GamePhase.GameOver;
-        var nonHost = UserFactory.Create("NotHost", "nothost-id");
+        var nonHost = UserFactory.Create("NotHost", Guid.NewGuid());
 
         var result = _engine.ReturnToLobby(nonHost, state);
 

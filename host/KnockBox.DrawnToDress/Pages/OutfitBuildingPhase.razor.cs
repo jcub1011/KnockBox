@@ -69,11 +69,12 @@ namespace KnockBox.DrawnToDress.Pages
         }
 
         /// <summary>Returns the display name for an item's creator, falling back to a shortened ID.</summary>
-        protected string GetCreatorName(string creatorPlayerId)
+        protected string GetCreatorName(Guid creatorPlayerId)
         {
             if (GameState.GamePlayers.TryGetValue(creatorPlayerId, out var ps))
                 return ps.DisplayName;
-            return creatorPlayerId.Length > 8 ? creatorPlayerId[..8] : creatorPlayerId;
+            var s = creatorPlayerId.ToString();
+            return s.Length > 8 ? s[..8] : s;
         }
 
         /// <summary>Returns a tooltip title for a pool item.</summary>
@@ -167,7 +168,7 @@ namespace KnockBox.DrawnToDress.Pages
 
         // ── Helpers ───────────────────────────────────────────────────────────
 
-        private string CurrentPlayerId => UserService.CurrentUser?.Id ?? string.Empty;
+        private Guid CurrentPlayerId => UserService.CurrentUser?.Id ?? Guid.Empty;
 
         /// <summary>
         /// Sanitizes raw SVG inner markup for safe rendering via

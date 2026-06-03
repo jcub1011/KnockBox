@@ -29,10 +29,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartGameAsync(
             StubWordListService words, int playerCount, char banned)
@@ -59,10 +59,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                 engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
         }
 
-        private static void GiveModifier(AlphaChainGameState state, string playerId, string cardId) =>
+        private static void GiveModifier(AlphaChainGameState state, Guid playerId, string cardId) =>
             state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
 
-        private static void SetCardBan(AlphaChainGameState state, string playerId, string cardId, char letter) =>
+        private static void SetCardBan(AlphaChainGameState state, Guid playerId, string cardId, char letter) =>
             state.Execute(() => RoomStateProbe.SetCardBan(state, playerId, TestModifierCards.ToId(cardId), letter));
 
         // ── Tax Collector ───────────────────────────────────────────────────
@@ -73,7 +73,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // "cat" + Anchor → would-be 13 (3 + 10); banned 'a' taxes it. Tax Collector owner takes 50%.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var owner = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, submitter, "anchor");
@@ -94,7 +94,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // Toll Booth letter 't' is in "cat" → owner minted round(13 × 0.2) = 3; submitter keeps 13.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var owner = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, submitter, "anchor");
@@ -113,7 +113,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // Banned 'a' taxes "cat" to 0 → no earned points → no Smuggler mint even though 't' is used.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var owner = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, owner, "toll-booth");
@@ -133,7 +133,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // points (it is a utility slot, no salvage) but denies the opposing Tax Collector its cut.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var owner = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, submitter, "irs");
@@ -156,7 +156,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // cursed with a personal 'a' ban for their upcoming turn.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var next = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, submitter, "bait-and-switch");
@@ -176,7 +176,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // length 3 = 5.25 → 5 (half-up).
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
 
             GiveModifier(state, submitter, "roulette-wheel");
             SetCardBan(state, submitter, "roulette-wheel", 'q');
@@ -192,7 +192,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // Rolled personal ban 't' is in "cat" → Zero-Point Tax → score 0 despite the ×1.75.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
 
             GiveModifier(state, submitter, "roulette-wheel");
             SetCardBan(state, submitter, "roulette-wheel", 't');

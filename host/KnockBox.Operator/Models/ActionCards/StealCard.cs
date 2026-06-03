@@ -1,3 +1,4 @@
+using System;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
@@ -32,13 +33,13 @@ public sealed class StealCard() : ActionCard(CardAction.Steal), ITargetableCard
     {
         if (ctx.ActionBlocked || ctx.TargetPlayerId == null)
             return ValueResult<CardPlayResult>.FromValue(CardPlayResult.Ok());
-        if (ctx.GameContext.GamePlayers.TryGetValue(ctx.TargetPlayerId, out var target))
+        if (ctx.GameContext.GamePlayers.TryGetValue(ctx.TargetPlayerId.Value, out var target))
             target.IsBeingStolenFrom = true;
-        Resolve(ctx.GameContext, ctx.ThisPlayer.UserId, ctx.TargetPlayerId);
+        Resolve(ctx.GameContext, ctx.ThisPlayer.UserId, ctx.TargetPlayerId.Value);
         return ValueResult<CardPlayResult>.FromValue(CardPlayResult.Ok());
     }
 
-    public static void Resolve(OperatorGameContext context, string sourcePlayerId, string targetPlayerId)
+    public static void Resolve(OperatorGameContext context, Guid sourcePlayerId, Guid targetPlayerId)
     {
         if (context.GamePlayers.TryGetValue(sourcePlayerId, out var source) && context.GamePlayers.TryGetValue(targetPlayerId, out var target))
         {

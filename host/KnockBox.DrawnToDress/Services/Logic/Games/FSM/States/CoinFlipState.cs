@@ -136,11 +136,10 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             if (flip.Context == CoinFlipContext.CriterionTie)
             {
                 // Determine which entrant the caller represents.
-                string callerPlayerId = flip.CallerPlayerId;
                 var callerEntrantId = flip.EntrantAId;
                 var opponentEntrantId = flip.EntrantBId;
 
-                if (callerPlayerId == flip.EntrantBId.PlayerId)
+                if (flip.CallerPlayerId == flip.EntrantBId.PlayerId)
                 {
                     callerEntrantId = flip.EntrantBId;
                     opponentEntrantId = flip.EntrantAId;
@@ -156,7 +155,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             }
             else // FinalStandingsTie
             {
-                string winnerId = callerWins
+                Guid winnerId = callerWins
                     ? (flip.CallerPlayerId == flip.PlayerAId ? flip.PlayerAId : flip.PlayerBId)
                     : (flip.CallerPlayerId == flip.PlayerAId ? flip.PlayerBId : flip.PlayerAId);
                 flip.WinnerPlayerId = winnerId;
@@ -193,7 +192,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             var flip = GetCurrentFlip(context)!;
 
             // Randomly select a caller from the two affected players.
-            string playerA, playerB;
+            Guid playerA, playerB;
             if (flip.Context == CoinFlipContext.CriterionTie)
             {
                 playerA = flip.EntrantAId.PlayerId;

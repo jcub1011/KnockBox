@@ -56,7 +56,7 @@ namespace KnockBox.DndMapper.Helpers
             // dice-animation tracker is supplied, also hide rolls whose 3D
             // dice are still tumbling on this circuit, mirroring RollLogPanel.
             IEnumerable<RollResult> rollSource = RollLogVisibilityFilter.VisibleTo(
-                state.RollLog, viewerUserId: string.Empty, viewerIsHost: false,
+                state.RollLog, viewerUserId: Guid.Empty, viewerIsHost: false,
                 state.Settings.RollsVisibleToPlayers);
             if (animationTracker is not null)
             {

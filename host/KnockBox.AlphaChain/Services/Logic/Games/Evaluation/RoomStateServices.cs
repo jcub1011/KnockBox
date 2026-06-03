@@ -100,7 +100,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
 
     internal sealed class ShieldService : IShieldService, IRoomStateService
     {
-        private readonly Dictionary<string, double> _multiplier = new(StringComparer.Ordinal);
+        private readonly Dictionary<Guid, double> _multiplier = new();
 
         public double GetMultiplier(AlphaChainPlayerState player) => _multiplier.GetValueOrDefault(player.UserId, 1.0);
         public void Decay(AlphaChainPlayerState player, double step)
@@ -114,7 +114,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
 
     internal sealed class HyperDriveService : IHyperDriveService, IRoomStateService
     {
-        private readonly HashSet<string> _latched = new(StringComparer.Ordinal);
+        private readonly HashSet<Guid> _latched = new();
 
         public bool IsLatched(AlphaChainPlayerState player) => _latched.Contains(player.UserId);
         public void Latch(AlphaChainPlayerState player) => _latched.Add(player.UserId);
@@ -125,7 +125,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
 
     internal sealed class PrismTurnGuard : IPrismTurnGuard, IRoomStateService
     {
-        private readonly HashSet<string> _usedThisTurn = new(StringComparer.Ordinal);
+        private readonly HashSet<Guid> _usedThisTurn = new();
 
         public bool TryConsume(AlphaChainPlayerState player) => _usedThisTurn.Add(player.UserId);
         public bool HasConsumed(AlphaChainPlayerState player) => _usedThisTurn.Contains(player.UserId);
@@ -136,7 +136,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
 
     internal sealed class CardBanService : ICardBanService, IRoomStateService
     {
-        private readonly Dictionary<string, Dictionary<ModifierId, char>> _bans = new(StringComparer.Ordinal);
+        private readonly Dictionary<Guid, Dictionary<ModifierId, char>> _bans = new();
 
         public void Roll(AlphaChainPlayerState player, ModifierId card, char letter)
         {
@@ -157,7 +157,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
 
     internal sealed class TimePenaltyService : ITimePenaltyService, IRoomStateService
     {
-        private readonly Dictionary<string, int> _queued = new(StringComparer.Ordinal);
+        private readonly Dictionary<Guid, int> _queued = new();
 
         public void Queue(AlphaChainPlayerState victim, int seconds)
         {
@@ -178,7 +178,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
 
     internal sealed class HijackBanService : IHijackBanService, IRoomStateService
     {
-        private readonly Dictionary<string, char> _ban = new(StringComparer.Ordinal);
+        private readonly Dictionary<Guid, char> _ban = new();
 
         public bool Curse(AlphaChainPlayerState victim, char letter)
         {
@@ -197,7 +197,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
 
     internal sealed class DoubleLetterTracker : IDoubleLetterTracker, IRoomStateService
     {
-        private readonly HashSet<string> _played = new(StringComparer.Ordinal);
+        private readonly HashSet<Guid> _played = new();
 
         public void Mark(AlphaChainPlayerState player) => _played.Add(player.UserId);
         public bool HasPlayed(AlphaChainPlayerState player) => _played.Contains(player.UserId);

@@ -8,8 +8,8 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
 
     public sealed record RollResult(
         Guid Id,
-        string RollerUserId,
-        string? ForcedByUserId,
+        Guid RollerUserId,
+        Guid? ForcedByUserId,
         IReadOnlyList<DieRoll> Rolls,
         int Total,
         RollMode Mode,

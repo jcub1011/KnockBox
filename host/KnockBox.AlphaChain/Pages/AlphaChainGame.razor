@@ -136,7 +136,7 @@
 
                 @* ── Turn spotlight ── *@
                 <div class="ac-turnflag @(IsMyTurn ? "ac-turnflag-me" : "")"
-                     style="--accent: var(--ac-p@(AccentSlot(GameState.TurnManager.CurrentPlayer ?? string.Empty)))">
+                     style="--accent: var(--ac-p@(AccentSlot(GameState.TurnManager.CurrentPlayer ?? Guid.Empty)))">
                     @if (IsMyTurn)
                     {
                         <span class="ac-turnflag-text">YOUR TURN</span>

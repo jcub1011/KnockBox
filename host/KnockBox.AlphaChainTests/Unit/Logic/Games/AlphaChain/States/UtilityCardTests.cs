@@ -29,10 +29,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartGameAsync(
             StubWordListService words, int playerCount = 2, char? banned = null)
@@ -62,10 +62,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                 engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
         }
 
-        private static void GiveModifier(AlphaChainGameState state, string playerId, string cardId) =>
+        private static void GiveModifier(AlphaChainGameState state, Guid playerId, string cardId) =>
             state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
 
-        private static void SetCardBan(AlphaChainGameState state, string playerId, string cardId, char letter) =>
+        private static void SetCardBan(AlphaChainGameState state, Guid playerId, string cardId, char letter) =>
             state.Execute(() => RoomStateProbe.SetCardBan(state, playerId, TestModifierCards.ToId(cardId), letter));
 
         // ── Own card-bans tax the owner's word ───────────────────────────────
@@ -77,7 +77,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // word to 0 despite the Roulette ×1.75.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
 
             GiveModifier(state, submitter, "roulette-wheel");
             SetCardBan(state, submitter, "roulette-wheel", 't');
@@ -95,7 +95,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             state.Execute(() => state.RequiredStartLetter = 'q'); // "cat" would normally break the chain
 
             GiveModifier(state, submitter, "wildcard");
@@ -110,7 +110,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             state.Execute(() => state.RequiredStartLetter = 'q');
 
             var outcome = await engine.SubmitWordAsync(submitter, "cat", state);
@@ -125,7 +125,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, submitter, "prism");
 
             // Clock about to expire; an invalid word would normally just let it run down.
@@ -157,7 +157,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // count as vowels too, so vowels=3 > consonants=2 and Vowel Surge fires: length 3 → ×3 = 9.
             var (engine, state) = await StartGameAsync(new StubWordListService("yew"), banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
 
             GiveModifier(state, submitter, "catalyst");
             GiveModifier(state, submitter, "vowel-surge");
@@ -175,7 +175,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // multiplier does not fire and the word just scores its length.
             var (engine, state) = await StartGameAsync(new StubWordListService("yew"), banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
 
             GiveModifier(state, submitter, "vowel-surge");
 

@@ -39,7 +39,7 @@
     private const int TopCount = 5;
 
     [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
-    [Parameter, EditorRequired] public string CurrentUserId { get; set; } = default!;
+    [Parameter, EditorRequired] public Guid CurrentUserId { get; set; }
 
     private SpardleState? _subscribedState;
     private IDisposable? _stateSubscription;

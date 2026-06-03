@@ -28,7 +28,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _randomMock = new Mock<IRandomNumberService>();
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.Parse("00000000-0000-0000-0000-000000000001"));
             _engine = new DrawnToDressGameEngine(
                 _engineLoggerMock.Object,
                 _stateLoggerMock.Object,
@@ -40,8 +40,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             await _engine.StartAsync(_host, state);
-            state.GamePlayers["pA"] = new() { PlayerId = "pA", DisplayName = "Player A" };
-            state.GamePlayers["pB"] = new() { PlayerId = "pB", DisplayName = "Player B" };
+            state.GamePlayers[Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")] = new() { PlayerId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), DisplayName = "Player A" };
+            state.GamePlayers[Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")] = new() { PlayerId = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), DisplayName = "Player B" };
             state.VotingRounds.Add(new() { RoundNumber = 1 });
             return (state, state.Context!);
         }
@@ -74,8 +74,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = matchupId,
                     CriterionId = "creativity",
-                    EntrantAId = new EntrantId("pA", 1),
-                    EntrantBId = new EntrantId("pB", 1),
+                    EntrantAId = new EntrantId(Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), 1),
+                    EntrantBId = new EntrantId(Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), 1),
                 }
             ];
 
@@ -83,7 +83,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             Assert.IsInstanceOfType<CoinFlipState>(context.Fsm.CurrentState);
             var flip = state.PendingCoinFlipQueue[0];
-            Assert.IsTrue(flip.CallerPlayerId == "pA" || flip.CallerPlayerId == "pB",
+            Assert.IsTrue(flip.CallerPlayerId == Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA") || flip.CallerPlayerId == Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"),
                 "Caller must be one of the two affected players.");
         }
 
@@ -96,8 +96,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 new PendingCoinFlipEntry
                 {
                     Context = CoinFlipContext.FinalStandingsTie,
-                    PlayerAId = "pA",
-                    PlayerBId = "pB",
+                    PlayerAId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"),
+                    PlayerBId = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"),
                 }
             ];
 
@@ -105,7 +105,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             Assert.IsInstanceOfType<CoinFlipState>(context.Fsm.CurrentState);
             var flip = state.PendingCoinFlipQueue[0];
-            Assert.IsTrue(flip.CallerPlayerId == "pA" || flip.CallerPlayerId == "pB",
+            Assert.IsTrue(flip.CallerPlayerId == Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA") || flip.CallerPlayerId == Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"),
                 "Caller must be one of the two tied players.");
         }
 
@@ -123,8 +123,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = matchupId,
                     CriterionId = "creativity",
-                    EntrantAId = new EntrantId("pA", 1),
-                    EntrantBId = new EntrantId("pB", 1),
+                    EntrantAId = new EntrantId(Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), 1),
+                    EntrantBId = new EntrantId(Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), 1),
                 }
             ];
 
@@ -136,7 +136,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // Single flip resolved → chains to return state.
             Assert.IsInstanceOfType<VotingRoundResultsState>(context.Fsm.CurrentState);
             Assert.IsTrue(state.PendingCoinFlipQueue[0].IsResolved);
-            Assert.IsTrue(!string.IsNullOrEmpty(state.PendingCoinFlipQueue[0].WinnerPlayerId));
+            Assert.IsTrue(state.PendingCoinFlipQueue[0].WinnerPlayerId != Guid.Empty);
         }
 
         // ── CoinFlipCallCommand from non-caller is rejected ─────────────────
@@ -152,14 +152,14 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "creativity",
-                    EntrantAId = new EntrantId("pA", 1),
-                    EntrantBId = new EntrantId("pB", 1),
+                    EntrantAId = new EntrantId(Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), 1),
+                    EntrantBId = new EntrantId(Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), 1),
                 }
             ];
 
             context.Fsm.TransitionTo(context, new CoinFlipState(new VotingRoundResultsState()));
             var caller = state.PendingCoinFlipQueue[0].CallerPlayerId;
-            var nonCaller = caller == "pA" ? "pB" : "pA";
+            var nonCaller = caller == Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA") ? Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB") : Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA");
 
             _engine.ProcessCommand(context, new CoinFlipCallCommand(nonCaller, true));
 
@@ -181,8 +181,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "creativity",
-                    EntrantAId = new EntrantId("pA", 1),
-                    EntrantBId = new EntrantId("pB", 1),
+                    EntrantAId = new EntrantId(Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), 1),
+                    EntrantBId = new EntrantId(Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), 1),
                 }
             ];
 
@@ -212,8 +212,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "creativity",
-                    EntrantAId = new EntrantId("pA", 1),
-                    EntrantBId = new EntrantId("pB", 1),
+                    EntrantAId = new EntrantId(Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), 1),
+                    EntrantBId = new EntrantId(Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), 1),
                 }
             ];
 
@@ -239,24 +239,24 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "creativity",
-                    EntrantAId = new EntrantId("pA", 1),
-                    EntrantBId = new EntrantId("pB", 1),
+                    EntrantAId = new EntrantId(Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), 1),
+                    EntrantBId = new EntrantId(Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), 1),
                 },
                 new PendingCoinFlipEntry
                 {
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "theme_match",
-                    EntrantAId = new EntrantId("pA", 1),
-                    EntrantBId = new EntrantId("pB", 1),
+                    EntrantAId = new EntrantId(Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), 1),
+                    EntrantBId = new EntrantId(Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), 1),
                 },
                 new PendingCoinFlipEntry
                 {
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "overall_look",
-                    EntrantAId = new EntrantId("pA", 1),
-                    EntrantBId = new EntrantId("pB", 1),
+                    EntrantAId = new EntrantId(Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), 1),
+                    EntrantBId = new EntrantId(Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), 1),
                 },
             ];
 
@@ -297,8 +297,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = matchupId,
                     CriterionId = "creativity",
-                    EntrantAId = new EntrantId("pA", 1),
-                    EntrantBId = new EntrantId("pB", 1),
+                    EntrantAId = new EntrantId(Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), 1),
+                    EntrantBId = new EntrantId(Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), 1),
                 }
             ];
 
@@ -310,7 +310,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var result = state.CriterionCoinFlipResults[0];
             Assert.AreEqual(matchupId, result.MatchupId);
             Assert.AreEqual("creativity", result.CriterionId);
-            Assert.IsTrue(result.WinnerEntrantId == new EntrantId("pA", 1) || result.WinnerEntrantId == new EntrantId("pB", 1));
+            Assert.IsTrue(result.WinnerEntrantId == new EntrantId(Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), 1) || result.WinnerEntrantId == new EntrantId(Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), 1));
         }
 
         // ── Final standings flip results ────────────────────────────────────
@@ -324,8 +324,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                 new PendingCoinFlipEntry
                 {
                     Context = CoinFlipContext.FinalStandingsTie,
-                    PlayerAId = "pA",
-                    PlayerBId = "pB",
+                    PlayerAId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"),
+                    PlayerBId = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"),
                 }
             ];
 
@@ -336,7 +336,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             Assert.IsInstanceOfType<FinalResultsDisplayState>(context.Fsm.CurrentState);
             var flip = state.PendingCoinFlipQueue[0];
             Assert.IsTrue(flip.IsResolved);
-            Assert.IsTrue(flip.WinnerPlayerId == "pA" || flip.WinnerPlayerId == "pB");
+            Assert.IsTrue(flip.WinnerPlayerId == Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA") || flip.WinnerPlayerId == Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"));
         }
 
         // ── Pause / Abandon ─────────────────────────────────────────────────
@@ -352,13 +352,13 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
                     Context = CoinFlipContext.CriterionTie,
                     MatchupId = Guid.NewGuid(),
                     CriterionId = "creativity",
-                    EntrantAId = new EntrantId("pA", 1),
-                    EntrantBId = new EntrantId("pB", 1),
+                    EntrantAId = new EntrantId(Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), 1),
+                    EntrantBId = new EntrantId(Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), 1),
                 }
             ];
 
             context.Fsm.TransitionTo(context, new CoinFlipState(new VotingRoundResultsState()));
-            _engine.ProcessCommand(context, new PauseGameCommand("host1"));
+            _engine.ProcessCommand(context, new PauseGameCommand(Guid.Parse("00000000-0000-0000-0000-000000000001")));
 
             Assert.IsInstanceOfType<PausedState>(context.Fsm.CurrentState);
         }

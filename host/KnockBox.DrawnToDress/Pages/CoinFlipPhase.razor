@@ -3,11 +3,11 @@
 @using KnockBox.Core.Services.State.Users
 
 @{
-    string? myId = UserService.CurrentUser?.Id;
+    var myId = UserService.CurrentUser?.Id;
     var queue = GameState.PendingCoinFlipQueue;
     int index = GameState.CurrentCoinFlipIndex;
     var currentFlip = index >= 0 && index < queue.Count ? queue[index] : null;
-    bool isCaller = currentFlip?.CallerPlayerId == myId;
+    bool isCaller = currentFlip is not null && myId.HasValue && currentFlip.CallerPlayerId == myId.Value;
 }
 
 <div class="dtd-coinflip">
@@ -55,8 +55,8 @@
                 }
                 else
                 {
-                    nameA = GameState.GamePlayers.GetValueOrDefault(currentFlip.PlayerAId)?.DisplayName ?? currentFlip.PlayerAId;
-                    nameB = GameState.GamePlayers.GetValueOrDefault(currentFlip.PlayerBId)?.DisplayName ?? currentFlip.PlayerBId;
+                    nameA = GameState.GamePlayers.GetValueOrDefault(currentFlip.PlayerAId)?.DisplayName ?? currentFlip.PlayerAId.ToString();
+                    nameB = GameState.GamePlayers.GetValueOrDefault(currentFlip.PlayerBId)?.DisplayName ?? currentFlip.PlayerBId.ToString();
                 }
             }
             <div class="dtd-coinflip-player">@nameA</div>
@@ -86,7 +86,7 @@
                     }
                     else
                     {
-                        winnerName = GameState.GamePlayers.GetValueOrDefault(currentFlip.WinnerPlayerId)?.DisplayName ?? currentFlip.WinnerPlayerId;
+                        winnerName = GameState.GamePlayers.GetValueOrDefault(currentFlip.WinnerPlayerId)?.DisplayName ?? currentFlip.WinnerPlayerId.ToString();
                     }
                 }
                 <p class="dtd-coinflip-winner">@winnerName wins!</p>

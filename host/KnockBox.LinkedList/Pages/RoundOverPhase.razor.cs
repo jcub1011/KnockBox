@@ -55,6 +55,7 @@ namespace KnockBox.LinkedList.Pages
             get
             {
                 var id = LinkedListGameEngine.NextAuditorId(GameState);
+                if (id == Guid.Empty) return "—";
                 return GameState.GamePlayers.TryGetValue(id, out var ps) ? ps.DisplayName : "—";
             }
         }

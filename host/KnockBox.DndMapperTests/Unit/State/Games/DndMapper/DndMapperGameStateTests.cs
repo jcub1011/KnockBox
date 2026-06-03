@@ -15,7 +15,7 @@ namespace KnockBox.DndMapper.Tests.Unit.State
         public void Setup()
         {
             _loggerMock = new Mock<ILogger<DndMapperGameState>>();
-            _host = UserFactory.Create("HostUser", "host-id");
+            _host = UserFactory.Create("HostUser", Guid.NewGuid());
         }
 
         [TestMethod]

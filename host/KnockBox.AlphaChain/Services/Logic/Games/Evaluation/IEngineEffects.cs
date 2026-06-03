@@ -34,13 +34,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
 
         /// <summary>The next active player after <paramref name="fromUserId"/> in turn order (skipping
         /// eliminated/left seats), without mutating the turn manager. Null when no other active player exists.</summary>
-        AlphaChainPlayerState? PeekNextActivePlayer(string fromUserId);
+        AlphaChainPlayerState? PeekNextActivePlayer(Guid fromUserId);
 
         /// <summary>Active players (not eliminated/left) in turn order — deterministic iteration for fan-out effects.</summary>
         IEnumerable<AlphaChainPlayerState> OrderedActivePlayers();
 
         /// <summary>The id of the round's marked leader (for the Bounty Hunter), or null.</summary>
-        string? RoundLeaderUserId { get; }
+        Guid? RoundLeaderUserId { get; }
 
         /// <summary>Records an engine-effect notice for the UI to animate.</summary>
         void AddNotice(EngineEffectEvent notice);

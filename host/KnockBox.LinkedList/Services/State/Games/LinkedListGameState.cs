@@ -23,7 +23,7 @@ namespace KnockBox.LinkedList.Services.State.Games
         public void SetPhase(LinkedListGamePhase phase) => Phase = phase;
 
         /// <summary>All player states, keyed by player id.</summary>
-        public ConcurrentDictionary<string, LinkedListPlayerState> GamePlayers { get; } = new();
+        public ConcurrentDictionary<Guid, LinkedListPlayerState> GamePlayers { get; } = new();
 
         // ── Per-group round data (§8.2) ──────────────────────────────────────
         //
@@ -42,10 +42,10 @@ namespace KnockBox.LinkedList.Services.State.Games
 
         /// <summary>The group the given player belongs to. Throws if the player isn't in
         /// any group — call <see cref="TryGroupOf"/> when membership is uncertain.</summary>
-        public ChainState GroupOf(string playerId) => Groups.First(g => g.MemberIds.Contains(playerId));
+        public ChainState GroupOf(Guid playerId) => Groups.First(g => g.MemberIds.Contains(playerId));
 
         /// <summary>The group the given player belongs to, or <c>null</c> if none.</summary>
-        public ChainState? TryGroupOf(string playerId) => Groups.FirstOrDefault(g => g.MemberIds.Contains(playerId));
+        public ChainState? TryGroupOf(Guid playerId) => Groups.FirstOrDefault(g => g.MemberIds.Contains(playerId));
 
         /// <summary>The group with the given id, or <c>null</c> if none.</summary>
         public ChainState? GroupById(string? groupId) =>
@@ -56,7 +56,7 @@ namespace KnockBox.LinkedList.Services.State.Games
         /// <summary>Pending team assignment chosen in the lobby for Groups mode: each
         /// inner list is one group's member ids. Read by the engine at start. Empty for
         /// Collective (the engine builds a single all-players group regardless).</summary>
-        public List<List<string>> GroupAssignments { get; set; } = [];
+        public List<List<Guid>> GroupAssignments { get; set; } = [];
 
         // ── Audit queue (staggered/batch auditing, §8.2) ─────────────────────
         //
@@ -83,7 +83,7 @@ namespace KnockBox.LinkedList.Services.State.Games
         /// id in a stable order set once at match start; <see cref="AuditorRotationIndex"/>
         /// indexes into it. Per-group submitter rotation lives on each
         /// <see cref="ChainState.TurnManager"/>, not here.</summary>
-        public List<string> ParticipantOrder { get; } = [];
+        public List<Guid> ParticipantOrder { get; } = [];
 
         // ── Single-chain accessors (Collective / PrimaryGroup back-compat) ────
         //
@@ -175,7 +175,7 @@ namespace KnockBox.LinkedList.Services.State.Games
 
         /// <summary>The current Auditor's player id. Derived from
         /// <see cref="AuditorRotationIndex"/> by the engine on each rotation.</summary>
-        public string AuditorPlayerId { get; set; } = "";
+        public Guid AuditorPlayerId { get; set; }
 
         /// <summary>Index into <see cref="ParticipantOrder"/> identifying the current
         /// Auditor. Advanced by one (with wrap) each round so the role rotates and
@@ -235,7 +235,7 @@ namespace KnockBox.LinkedList.Services.State.Games
         /// <summary>Member player ids. For Collective this is every participant; for
         /// Groups it's the team. The Auditor is skipped within the rotation when it's
         /// their turn to audit (they're never the active submitter).</summary>
-        public List<string> MemberIds { get; } = [];
+        public List<Guid> MemberIds { get; } = [];
 
         /// <summary>Submitter rotation within this group.</summary>
         public TurnManager TurnManager { get; } = new();
@@ -332,17 +332,17 @@ namespace KnockBox.LinkedList.Services.State.Games
     #region Records
 
     /// <summary>An accepted link in the chain (<c>FromWord</c> → <c>ToWord</c>).</summary>
-    public sealed record ChainLink(string FromWord, string ToWord, string PlayerId, string PlayerName, bool IsLoop);
+    public sealed record ChainLink(string FromWord, string ToWord, Guid PlayerId, string PlayerName, bool IsLoop);
 
     /// <summary>A rejected attempt by the Auditor.</summary>
-    public sealed record RejectionInfo(string PlayerId, string AttemptedWord);
+    public sealed record RejectionInfo(Guid PlayerId, string AttemptedWord);
 
     /// <summary>A player's proposed next word (the first word is the carried word).</summary>
-    public sealed record Submission(string PlayerId, string ProposedWord);
+    public sealed record Submission(Guid PlayerId, string ProposedWord);
 
     /// <summary>A fun end-of-match award (§10): a title, the winning player, and a
     /// short detail line explaining why they earned it.</summary>
-    public sealed record Superlative(string Title, string Emoji, string PlayerId, string PlayerName, string Detail);
+    public sealed record Superlative(string Title, string Emoji, Guid PlayerId, string PlayerName, string Detail);
 
     /// <summary>
     /// Immutable snapshot of a finished round's score, computed once on entering
@@ -369,7 +369,7 @@ namespace KnockBox.LinkedList.Services.State.Games
 
     public sealed class LinkedListPlayerState
     {
-        public required string PlayerId { get; init; }
+        public required Guid PlayerId { get; init; }
         public required string DisplayName { get; init; }
 
         /// <summary>Id of the group this player competes with (Groups mode), or empty for

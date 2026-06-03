@@ -14,7 +14,7 @@ namespace KnockBox.DndMapper.Pages.Components
     public partial class RollHistoryModal : DisposableComponent
     {
         [Parameter, EditorRequired] public DndMapperGameState State { get; set; } = default!;
-        [Parameter] public string CurrentUserId { get; set; } = string.Empty;
+        [Parameter] public Guid CurrentUserId { get; set; }
         [Parameter] public bool IsHost { get; set; }
         [Parameter] public EventCallback OnClose { get; set; }
 

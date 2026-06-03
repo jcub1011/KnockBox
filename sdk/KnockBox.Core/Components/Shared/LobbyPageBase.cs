@@ -48,7 +48,7 @@ namespace KnockBox.Core.Components.Shared
             if (!GameSessionService.TryGetCurrentSession(out var session))
             {
                 Logger.LogWarning("User [{userId}] attempted to enter room [{code}] without a session set.",
-                    UserService.CurrentUser?.Id ?? "Unknown", ObfuscatedRoomCode);
+                    UserService.CurrentUser?.Id.ToString() ?? "Unknown", ObfuscatedRoomCode);
                 ReturnToHome();
                 return;
             }
@@ -57,7 +57,7 @@ namespace KnockBox.Core.Components.Shared
                 || roomCode.Trim() != ObfuscatedRoomCode)
             {
                 Logger.LogError("User [{userId}] attempted to enter room [{code}] but their session registration uri [{uri}] does not match.",
-                    UserService.CurrentUser?.Id ?? "Unknown", ObfuscatedRoomCode, session.LobbyRegistration.Uri);
+                    UserService.CurrentUser?.Id.ToString() ?? "Unknown", ObfuscatedRoomCode, session.LobbyRegistration.Uri);
                 ReturnToHome();
                 return;
             }
@@ -65,7 +65,7 @@ namespace KnockBox.Core.Components.Shared
             if (session.LobbyRegistration.State is not TGameState gameState)
             {
                 Logger.LogError("Game state for user [{userId}] is not of type {Type}.",
-                    UserService.CurrentUser?.Id ?? "Unknown", typeof(TGameState).Name);
+                    UserService.CurrentUser?.Id.ToString() ?? "Unknown", typeof(TGameState).Name);
                 ReturnToHome();
                 return;
             }

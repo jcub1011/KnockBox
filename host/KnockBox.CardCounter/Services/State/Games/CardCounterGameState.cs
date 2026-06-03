@@ -45,17 +45,17 @@ namespace KnockBox.CardCounter.Services.State.Games
         /// <summary>
         /// Gets the id of the current player in the turn order.
         /// </summary>
-        public string? CurrentPlayer => TurnManager.CurrentPlayer;
+        public Guid? CurrentPlayer => TurnManager.CurrentPlayer;
 
         /// <summary>
         /// Gets the player state of the current player in the turn order. Null when the current player does not have a state defined.
         /// </summary>
-        public PlayerState? CurrentPlayerState => CurrentPlayer != null && GamePlayers.TryGetValue(CurrentPlayer, out var state) ? state : null;
+        public PlayerState? CurrentPlayerState => CurrentPlayer is { } cp && GamePlayers.TryGetValue(cp, out var state) ? state : null;
 
         /// <summary>
         /// All player states, keyed by player ID.
         /// </summary>
-        public ConcurrentDictionary<string, PlayerState> GamePlayers { get; } = new();
+        public ConcurrentDictionary<Guid, PlayerState> GamePlayers { get; } = new();
 
         /// <summary>
         /// Current shoe index (incremented each time a new shoe is dealt).
@@ -88,7 +88,7 @@ namespace KnockBox.CardCounter.Services.State.Games
         /// <summary>
         /// Tracks the Feeling Lucky chain: bottom entry is the originator.
         /// </summary>
-        public readonly Stack<string> ForceDrawStack = new();
+        public readonly Stack<Guid> ForceDrawStack = new();
 
         /// <summary>
         /// Information about the most recently played action card (for all-player notification).
@@ -104,7 +104,7 @@ namespace KnockBox.CardCounter.Services.State.Games
         /// <summary>
         /// Set during a Feeling Lucky chain to indicate which player must respond.
         /// </summary>
-        public string? FeelingLuckyTargetId { get; set; }
+        public Guid? FeelingLuckyTargetId { get; set; }
 
         /// <summary>
         /// The most recently drawn shoe card, shown to all players as the latest draw event.
@@ -141,7 +141,7 @@ namespace KnockBox.CardCounter.Services.State.Games
         /// if that player's balance is negative, or a Subtract operator otherwise.
         /// Cleared as soon as the next card is drawn.
         /// </summary>
-        public string? HedgeYourBetPlayerId { get; set; }
+        public Guid? HedgeYourBetPlayerId { get; set; }
 
         /// <summary>
         /// Host-configurable match rules. Always replaced atomically via UpdateSettings;
@@ -221,17 +221,17 @@ namespace KnockBox.CardCounter.Services.State.Games
 
     /// <summary>Information about the most recently played action card, shown to all players.</summary>
     public record LastPlayedActionInfo(
-        string PlayerId,
+        Guid PlayerId,
         string PlayerName,
         ActionType Action,
-        string? TargetId,
+        Guid? TargetId,
         string? TargetName);
 
     /// <summary>Information about a pending blockable reaction (Skim, TurnTheTable, Launder).</summary>
     public record PendingReactionInfo(
-        string SourceId,
+        Guid SourceId,
         string SourceName,
-        string TargetId,
+        Guid TargetId,
         ActionCard PlayedCard,
         int? SourceDigitIndex = null,
         int? TargetDigitIndex = null,
@@ -241,10 +241,10 @@ namespace KnockBox.CardCounter.Services.State.Games
     /// Information about the most recently drawn shoe card, shown to all players as an overlay.
     /// </summary>
     public record LastDrawnCardInfo(
-        string DrawerId,
+        Guid DrawerId,
         string DrawerName,
         BaseCard Card,
-        string? RedirectTargetId = null,
+        Guid? RedirectTargetId = null,
         string? RedirectTargetName = null);
 
     /// <summary>A single entry in the visible discard pile history.</summary>
@@ -259,7 +259,7 @@ namespace KnockBox.CardCounter.Services.State.Games
     /// Used to show the affected player an overlay with before/after balance.
     /// </summary>
     public record OperatorResultInfo(
-        string PlayerId,
+        Guid PlayerId,
         string PlayerName,
         Operator Op,
         double BalanceBefore,
@@ -270,7 +270,7 @@ namespace KnockBox.CardCounter.Services.State.Games
     /// Used to show the affected player a toast with the previous and new operator.
     /// </summary>
     public record OperatorChangeInfo(
-        string PlayerId,
+        Guid PlayerId,
         string PlayerName,
         Operator? PreviousOperator,
         Operator NewOperator);

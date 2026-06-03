@@ -37,7 +37,7 @@ namespace KnockBox.AlphaChain.Services.State.Games
         public void SetPhase(AlphaChainGamePhase phase) => Phase = phase;
 
         /// <summary>All player states, keyed by <c>User.Id</c>.</summary>
-        public ConcurrentDictionary<string, AlphaChainPlayerState> GamePlayers { get; } = new();
+        public ConcurrentDictionary<Guid, AlphaChainPlayerState> GamePlayers { get; } = new();
 
         /// <summary>Manages turn order and the active player.</summary>
         public TurnManager TurnManager { get; } = new();
@@ -82,14 +82,14 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// player's current bay order (<c>Submitted = false</c>) when Optimization begins;
         /// applied to the live bays only when the sub-phase ends.
         /// </summary>
-        public Dictionary<string, OptimizationSubmission> OptimizationSubmissions { get; } = new(StringComparer.Ordinal);
+        public Dictionary<Guid, OptimizationSubmission> OptimizationSubmissions { get; } = new();
 
         /// <summary>
         /// The player resolved to pick the next era's banned letter (lowest-score active
         /// player; ties broken by earliest turn-order index). Resolved when the Sniper Ban
         /// sub-phase begins; null outside it.
         /// </summary>
-        public string? SniperBanUserId { get; set; }
+        public Guid? SniperBanUserId { get; set; }
 
         /// <summary>
         /// Every word played this match, used for O(1) duplicate rejection. Case-insensitive
@@ -148,7 +148,7 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// earliest turn order), or null before the first mark. The Bounty Hunter docks this player
         /// if they submit a too-short word on their turn this round. Re-snapshotted each round wrap.
         /// </summary>
-        public string? RoundLeaderUserId { get; set; }
+        public Guid? RoundLeaderUserId { get; set; }
 
         // ── Engine-effect notice channel (off-submission automated effects) ───
 

@@ -12,7 +12,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         public Guid MatchupId { get; set; }
 
         /// <summary>The player ID of the player who triggered the tie-break request.</summary>
-        public string RequestingPlayerId { get; set; } = string.Empty;
+        public Guid RequestingPlayerId { get; set; }
 
         /// <summary>UTC timestamp when the request was created.</summary>
         public DateTimeOffset RequestedAt { get; set; } = DateTimeOffset.UtcNow;
@@ -25,7 +25,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         Guid RequestId,
         Guid MatchupId,
         bool IsHeads,
-        string WinnerPlayerId);
+        Guid WinnerPlayerId);
 
     /// <summary>
     /// Records which entrant won a coin flip for a specific tied criterion within a matchup.
@@ -76,15 +76,15 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         // ── Final standings tie fields ───────────────────────────────────────
 
         /// <summary>Player A in the standings tie (for <see cref="CoinFlipContext.FinalStandingsTie"/>).</summary>
-        public string PlayerAId { get; set; } = string.Empty;
+        public Guid PlayerAId { get; set; }
 
         /// <summary>Player B in the standings tie (for <see cref="CoinFlipContext.FinalStandingsTie"/>).</summary>
-        public string PlayerBId { get; set; } = string.Empty;
+        public Guid PlayerBId { get; set; }
 
         // ── Caller / result tracking ─────────────────────────────────────────
 
         /// <summary>The player ID selected to call the coin flip.</summary>
-        public string CallerPlayerId { get; set; } = string.Empty;
+        public Guid CallerPlayerId { get; set; }
 
         /// <summary>Whether the caller chose heads (<see langword="true"/>) or tails (<see langword="false"/>).</summary>
         public bool CallerChoseHeads { get; set; }
@@ -93,7 +93,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         public bool ResultIsHeads { get; set; }
 
         /// <summary>The player ID of the winner of this flip (always an actual player ID).</summary>
-        public string WinnerPlayerId { get; set; } = string.Empty;
+        public Guid WinnerPlayerId { get; set; }
 
         /// <summary>
         /// The entrant ID of the winner (for <see cref="CoinFlipContext.CriterionTie"/>).

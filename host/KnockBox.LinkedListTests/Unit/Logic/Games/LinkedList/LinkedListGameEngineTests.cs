@@ -26,7 +26,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             _stateLoggerMock = new Mock<ILogger<LinkedListGameState>>();
             _wordSource = new WordSource(new FakeWordListService());
             _rng = new SequentialRng(0);
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
 
             _engine = new LinkedListGameEngine(
                 _wordSource,
@@ -41,7 +41,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             var state = (LinkedListGameState)result.Value!;
             for (int i = 0; i < playerCount; i++)
             {
-                state.RegisterPlayer(UserFactory.Create($"P{i}", $"p{i}"));
+                state.RegisterPlayer(UserFactory.Create($"P{i}", Guid.NewGuid()));
             }
             return state;
         }
@@ -80,7 +80,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             Assert.IsFalse(string.IsNullOrEmpty(state.StartWord));
             Assert.IsFalse(string.IsNullOrEmpty(state.DestinationWord));
             Assert.AreEqual(state.StartWord, state.CarriedWord);
-            Assert.IsFalse(string.IsNullOrEmpty(state.AuditorPlayerId));
+            Assert.AreNotEqual(Guid.Empty, state.AuditorPlayerId);
         }
 
         [TestMethod]
@@ -181,7 +181,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
         }
 
         private static User SubmitterOf(LinkedListGameState state)
-            => UserFactory.Create("Submitter", state.TurnManager.CurrentPlayer!);
+            => UserFactory.Create("Submitter", state.TurnManager.CurrentPlayer!.Value);
 
         private static User AuditorOf(LinkedListGameState state)
             => UserFactory.Create("Auditor", state.AuditorPlayerId);
@@ -694,7 +694,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
 
             Assert.IsTrue(_engine.EndMatch(state).IsSuccess);
 
-            var expected = string.CompareOrdinal(pA.PlayerId, pC.PlayerId) <= 0 ? pA.PlayerId : pC.PlayerId;
+            var expected = pA.PlayerId.CompareTo(pC.PlayerId) <= 0 ? pA.PlayerId : pC.PlayerId;
             Assert.AreEqual(expected, state.Superlatives.First(s => s.Title == "Most Rejected").PlayerId);
         }
 
@@ -714,7 +714,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             var state = await CreateWithPlayersAsync(total);
             var ids = state.Participants.Select(p => p.User.Id).ToList();
 
-            var teams = new List<List<string>>();
+            var teams = new List<List<Guid>>();
             for (int i = 0; i < groupCount; i++)
                 teams.Add(ids.Skip(i * perGroup).Take(perGroup).ToList());
 
@@ -736,13 +736,13 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
         }
 
         private static User SubmitterOfGroup(ChainState g)
-            => UserFactory.Create("Submitter", g.TurnManager.CurrentPlayer!);
+            => UserFactory.Create("Submitter", g.TurnManager.CurrentPlayer!.Value);
 
         private static void SeedChain(ChainState g, int count)
         {
             g.Chain.Clear();
             for (int i = 0; i < count; i++)
-                g.Chain.Add(new ChainLink($"W{i}", $"W{i + 1}", "pid", "P", false));
+                g.Chain.Add(new ChainLink($"W{i}", $"W{i + 1}", Guid.NewGuid(), "P", false));
         }
 
         [TestMethod]
@@ -959,13 +959,18 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
         [TestMethod]
         public void AutoBalanceGroups_RoundRobinsPlayers()
         {
-            var teams = LinkedListGameEngine.AutoBalanceGroups(["a", "b", "c", "d", "e"], 2);
+            var p1 = Guid.NewGuid();
+            var p2 = Guid.NewGuid();
+            var p3 = Guid.NewGuid();
+            var p4 = Guid.NewGuid();
+            var p5 = Guid.NewGuid();
+            var teams = LinkedListGameEngine.AutoBalanceGroups([p1, p2, p3, p4, p5], 2);
 
             Assert.AreEqual(2, teams.Count);
-            Assert.AreEqual(3, teams[0].Count); // a, c, e
-            Assert.AreEqual(2, teams[1].Count); // b, d
-            CollectionAssert.AreEqual(new[] { "a", "c", "e" }, teams[0]);
-            CollectionAssert.AreEqual(new[] { "b", "d" }, teams[1]);
+            Assert.AreEqual(3, teams[0].Count); // p1, p3, p5
+            Assert.AreEqual(2, teams[1].Count); // p2, p4
+            CollectionAssert.AreEqual(new[] { p1, p3, p5 }, teams[0]);
+            CollectionAssert.AreEqual(new[] { p2, p4 }, teams[1]);
         }
 
         // ── ReturnToLobby ─────────────────────────────────────────────────────
@@ -976,7 +981,7 @@ namespace KnockBox.LinkedList.Tests.Unit.Logic
             var state = await CreateWithPlayersAsync(3);
             await _engine.StartAsync(_host, state);
             state.SetPhase(LinkedListGamePhase.GameOver);
-            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+            var nonHost = UserFactory.Create("NotHost", Guid.NewGuid());
 
             var result = _engine.ReturnToLobby(nonHost, state);
 

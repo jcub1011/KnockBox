@@ -8,6 +8,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
     /// </summary>
     /// <param name="ActorUserId">The id of the player choosing the letter.</param>
     /// <param name="Letter">The chosen banned letter (case-insensitive; normalized lower-case).</param>
-    public record SelectSniperBanCommand(string ActorUserId, char Letter)
+    public record SelectSniperBanCommand(Guid ActorUserId, char Letter)
         : AlphaChainCommand(ActorUserId);
 }

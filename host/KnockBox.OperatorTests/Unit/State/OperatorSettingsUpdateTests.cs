@@ -14,7 +14,7 @@ namespace KnockBox.Operator.Tests.Unit.State
         [TestInitialize]
         public void Setup()
         {
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new OperatorGameState(host, NullLogger<OperatorGameState>.Instance);
         }
 

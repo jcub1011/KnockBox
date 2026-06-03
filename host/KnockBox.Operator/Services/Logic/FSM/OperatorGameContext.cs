@@ -1,3 +1,4 @@
+using System;
 using KnockBox.Tooling.Collections;
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.State;
@@ -14,7 +15,7 @@ public class OperatorGameContext(OperatorGameState state, IRandomNumberService r
     public OperatorGameState State { get; } = state;
     public IRandomNumberService Rng { get; } = rng;
 
-    public ConcurrentDictionary<string, OperatorPlayerState> GamePlayers => State.GamePlayers;
+    public ConcurrentDictionary<Guid, OperatorPlayerState> GamePlayers => State.GamePlayers;
 
     public IFiniteStateMachine<OperatorGameContext, OperatorCommand> Fsm { get; set; } = null!;
 

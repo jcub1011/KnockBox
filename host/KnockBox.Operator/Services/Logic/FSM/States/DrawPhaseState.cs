@@ -15,7 +15,7 @@ public class DrawPhaseState : IOperatorGameState
 
         // Auto-draw for current player: up to 3 cards, max hand size 5
         var playerId = context.State.TurnManager.CurrentPlayer;
-        if (playerId != null && context.GamePlayers.TryGetValue(playerId, out var pState))
+        if (playerId != null && context.GamePlayers.TryGetValue(playerId.Value, out var pState))
         {
             int cardsNeeded = Math.Min(context.State.Settings.MaxDrawPerTurn, context.State.Settings.MaxHandSize - pState.Hand.Count);
             context.DealCards(pState, cardsNeeded);
@@ -46,7 +46,7 @@ public class DrawPhaseState : IOperatorGameState
         context.State.TurnCount++;
 
         var newPlayerId = context.State.TurnManager.CurrentPlayer;
-        if (newPlayerId != null && context.GamePlayers.TryGetValue(newPlayerId, out var newPState))
+        if (newPlayerId != null && context.GamePlayers.TryGetValue(newPlayerId.Value, out var newPState))
         {
             newPState.HasPlayedCardThisTurn = false;
         }

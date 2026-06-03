@@ -4,12 +4,12 @@
 
 @{
     bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
-    string? myId = UserService.CurrentUser?.Id;
+    var myId = UserService.CurrentUser?.Id;
     bool themeSelected = GameState.CurrentTheme is not null;
     int submittedCount = GameState.PlayerThemeSubmissions.Count;
     int totalPlayers = GameState.GamePlayers.Count;
-    bool hasVoted = myId is not null && GameState.ThemeVotes.ContainsKey(myId);
-    bool hasSubmittedTheme = myId is not null && GameState.PlayerThemeSubmissions.ContainsKey(myId);
+    bool hasVoted = myId.HasValue && GameState.ThemeVotes.ContainsKey(myId.Value);
+    bool hasSubmittedTheme = myId.HasValue && GameState.PlayerThemeSubmissions.ContainsKey(myId.Value);
 }
 
 <div class="dtd-theme-selection">

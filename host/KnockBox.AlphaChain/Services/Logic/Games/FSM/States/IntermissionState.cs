@@ -196,7 +196,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 return new ResultError("It's not time to pick the banned letter.",
                     $"SelectSniperBanCommand outside SniperBan (phase {state.IntermissionPhase}) from [{cmd.ActorUserId}].");
 
-            if (cmd.ActorUserId != state.SniperBanUserId)
+            if (cmd.ActorUserId != state.SniperBanUserId.GetValueOrDefault())
                 return new ResultError("Only the last-place player picks the banned letter.",
                     $"Non-picker [{cmd.ActorUserId}] tried to pick (picker is [{state.SniperBanUserId}]).");
 
@@ -316,7 +316,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.SubPhaseEndTime = now.AddSeconds(state.Settings.SniperBanSeconds);
 
             context.Logger.LogDebug("Alpha Chain Intermission → SniperBan (picker [{picker}]).",
-                state.SniperBanUserId ?? "—");
+                state.SniperBanUserId.HasValue ? state.SniperBanUserId.Value.ToString() : "—");
         }
 
         /// <summary>
@@ -353,11 +353,11 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         }
 
         /// <summary>Lowest-score active player; ties broken by earliest turn-order index. Null if none active.</summary>
-        private static string? ResolveSniperBanPicker(AlphaChainGameState state)
+        private static Guid? ResolveSniperBanPicker(AlphaChainGameState state)
             => ActivePlayers(state)
                 .OrderBy(p => p.Score)
                 .ThenBy(p => TurnIndex(state, p.UserId))
-                .Select(p => p.UserId)
+                .Select(p => (Guid?)p.UserId)
                 .FirstOrDefault();
 
         // ── Completion ───────────────────────────────────────────────────────
@@ -441,7 +441,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             => state.OptimizationSubmissions.Count > 0
                && state.OptimizationSubmissions.Values.All(s => s.Submitted);
 
-        private static int TurnIndex(AlphaChainGameState state, string userId)
+        private static int TurnIndex(AlphaChainGameState state, Guid userId)
         {
             int idx = state.TurnManager.TurnOrder.IndexOf(userId);
             return idx < 0 ? int.MaxValue : idx;

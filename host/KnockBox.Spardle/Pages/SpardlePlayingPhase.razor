@@ -43,7 +43,7 @@
     <main class="spd-play-main">
         <section class="spd-play-board">
             <SpardleGrid State="State"
-                         CurrentUserId="@(UserService.CurrentUser?.Id ?? string.Empty)"
+                         CurrentUserId="@(UserService.CurrentUser?.Id ?? Guid.Empty)"
                          CurrentGuess="@CurrentGuess"
                          InvalidGuess="InvalidGuess"
                          HighContrast="HighContrast" />
@@ -54,7 +54,7 @@
         </section>
 
         <aside class="spd-play-leaderboard-slot">
-            <SpardleOpponentsPanel State="State" CurrentUserId="@(UserService.CurrentUser?.Id ?? string.Empty)" />
+            <SpardleOpponentsPanel State="State" CurrentUserId="@(UserService.CurrentUser?.Id ?? Guid.Empty)" />
         </aside>
     </main>
 

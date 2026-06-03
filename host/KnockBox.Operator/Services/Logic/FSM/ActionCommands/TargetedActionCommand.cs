@@ -17,18 +17,18 @@ public class TargetedActionCommand(
 
     public override bool RequiresReaction => GetReactionTargetIds().Any();
 
-    public override IEnumerable<string> GetReactionTargetIds()
+    public override IEnumerable<Guid> GetReactionTargetIds()
     {
-        if (string.IsNullOrEmpty(PlayCommand.TargetPlayerId) || PlayCommand.TargetPlayerId == PlayCommand.PlayerId)
+        if (PlayCommand.TargetPlayerId == null || PlayCommand.TargetPlayerId.Value == PlayCommand.PlayerId)
             return [];
 
         if (_actionCard.IsOperatorOnlyAction)
         {
-            if (Context.GamePlayers.TryGetValue(PlayCommand.TargetPlayerId, out var target) && target.IsAudited)
+            if (Context.GamePlayers.TryGetValue(PlayCommand.TargetPlayerId.Value, out var target) && target.IsAudited)
                 return [];
         }
 
-        return [PlayCommand.TargetPlayerId];
+        return [PlayCommand.TargetPlayerId.Value];
     }
 
     public override void Execute()

@@ -26,10 +26,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartGameAsync(
             int playerCount, bool survival)
@@ -62,7 +62,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
         {
             var (engine, state) = await StartGameAsync(playerCount: 3, survival: false);
             using var _ = state;
-            var leaving = state.TurnManager.CurrentPlayer!;
+            var leaving = state.TurnManager.CurrentPlayer!.Value;
 
             engine.HandlePlayerLeft(UserFactory.Create("dummy", leaving), state);
 
@@ -77,7 +77,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
         {
             var (engine, state) = await StartGameAsync(playerCount: 3, survival: true);
             using var _ = state;
-            var leaving = state.TurnManager.CurrentPlayer!;
+            var leaving = state.TurnManager.CurrentPlayer!.Value;
 
             engine.HandlePlayerLeft(UserFactory.Create("dummy", leaving), state);
 
@@ -108,7 +108,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
         {
             var (engine, state) = await StartGameAsync(playerCount: 2, survival: true);
             using var _ = state;
-            var leaving = state.TurnManager.CurrentPlayer!;
+            var leaving = state.TurnManager.CurrentPlayer!.Value;
 
             engine.HandlePlayerLeft(UserFactory.Create("dummy", leaving), state);
 
@@ -193,8 +193,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
             Assert.AreEqual(IntermissionSubPhase.SniperBan, state.IntermissionPhase);
 
             // The resolved last-place picker leaves while holding the ban.
-            var picker = state.SniperBanUserId!;
-            Assert.IsNotNull(picker);
+            Assert.IsNotNull(state.SniperBanUserId);
+            var picker = state.SniperBanUserId!.Value;
             engine.HandlePlayerLeft(UserFactory.Create("dummy", picker), state);
             Assert.IsTrue(state.GamePlayers[picker].HasLeft);
 

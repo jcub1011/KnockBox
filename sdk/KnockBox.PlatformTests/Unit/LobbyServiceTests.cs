@@ -27,7 +27,7 @@ public sealed class LobbyServiceTests
     {
         var service = Build();
 
-        var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
+        var host = UserFactory.Create("Host", Guid.NewGuid());
         var result = await service.CreateLobbyAsync(host, Route);
         Assert.IsTrue(result.TryGetSuccess(out var created));
 
@@ -40,7 +40,7 @@ public sealed class LobbyServiceTests
     {
         var service = Build();
 
-        var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
+        var host = UserFactory.Create("Host", Guid.NewGuid());
         var createResult = await service.CreateLobbyAsync(host, Route);
         Assert.IsTrue(createResult.TryGetSuccess(out var created));
 
@@ -56,7 +56,7 @@ public sealed class LobbyServiceTests
     {
         var service = Build();
 
-        var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
+        var host = UserFactory.Create("Host", Guid.NewGuid());
         var createResult = await service.CreateLobbyAsync(host, Route);
         Assert.IsTrue(createResult.TryGetSuccess(out var created));
 

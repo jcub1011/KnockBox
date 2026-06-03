@@ -107,8 +107,8 @@ namespace KnockBox.Tracery.Services.State.Games
         // Player tracking. Writes are owned by TraceryGameEngine and only ever happen inside
         // Execute/ExecuteAsync. Render-thread callers read via TryGetPlayerState — they must
         // never invoke CreatePlayerState, which would mutate the dictionary unlocked.
-        private readonly ConcurrentDictionary<string, TraceryPlayerState> _playerStates = new();
-        public IReadOnlyDictionary<string, TraceryPlayerState> PlayerStates => _playerStates;
+        private readonly ConcurrentDictionary<Guid, TraceryPlayerState> _playerStates = new();
+        public IReadOnlyDictionary<Guid, TraceryPlayerState> PlayerStates => _playerStates;
 
         // True when the host plays alongside everyone else; false when the host is a
         // display-only observer (set at StartAsync time based on whether any other players
@@ -142,7 +142,7 @@ namespace KnockBox.Tracery.Services.State.Games
         /// <paramref name="userId"/>. Mutates <see cref="PlayerStates"/>; callers MUST be
         /// inside <c>Execute</c>/<c>ExecuteAsync</c>.
         /// </summary>
-        internal TraceryPlayerState CreatePlayerState(string userId)
+        internal TraceryPlayerState CreatePlayerState(Guid userId)
         {
             if (!_playerStates.TryGetValue(userId, out var state))
             {
@@ -156,7 +156,7 @@ namespace KnockBox.Tracery.Services.State.Games
         /// Read-only lookup for render-thread callers. Returns false when no entry exists
         /// (e.g., an observing host, or a spectator who joined mid-round).
         /// </summary>
-        public bool TryGetPlayerState(string userId, out TraceryPlayerState state)
+        public bool TryGetPlayerState(Guid userId, out TraceryPlayerState state)
             => _playerStates.TryGetValue(userId, out state!);
 
         /// <summary>

@@ -47,7 +47,7 @@ namespace KnockBox.LinkedList.Services.Logic.Games
                 // Global Auditor-rotation order over all participants (§6). Per-group
                 // submitter rotations live on each ChainState.
                 gameState.ParticipantOrder.Clear();
-                gameState.ParticipantOrder.AddRange(participantIds);
+                gameState.ParticipantOrder.AddRange(participantIds); // List<Guid>
 
                 // Words: honor host-chosen values from the lobby, else pick two random words.
                 if (string.IsNullOrWhiteSpace(gameState.StartWord) || string.IsNullOrWhiteSpace(gameState.DestinationWord))
@@ -89,13 +89,13 @@ namespace KnockBox.LinkedList.Services.Logic.Games
 
                 // Assign the first Auditor: the host-chosen id if valid, else the first
                 // participant who isn't a group's opening submitter.
-                bool hostChoiceValid = !string.IsNullOrEmpty(gameState.AuditorPlayerId)
+                bool hostChoiceValid = gameState.AuditorPlayerId != Guid.Empty
                     && participantIds.Contains(gameState.AuditorPlayerId);
                 if (!hostChoiceValid)
                 {
                     var openingSubmitter = groups[0].TurnManager.CurrentPlayer;
                     gameState.AuditorPlayerId =
-                        participantIds.FirstOrDefault(id => id != openingSubmitter) ?? "";
+                        participantIds.FirstOrDefault(id => id != openingSubmitter);
                 }
 
                 // Seed the rotation index from the chosen Auditor so the next round's
@@ -164,7 +164,7 @@ namespace KnockBox.LinkedList.Services.Logic.Games
             state.AuditQueue.Clear();
             state.StartWord = "";
             state.DestinationWord = "";
-            state.AuditorPlayerId = "";
+            state.AuditorPlayerId = Guid.Empty;
             state.AuditorRotationIndex = 0;
             state.RoundNumber = 0;
             state.LastRoundResult = null;
@@ -176,7 +176,7 @@ namespace KnockBox.LinkedList.Services.Logic.Games
         // ── Group construction (§8.2) ────────────────────────────────────────
 
         /// <summary>The single all-players chain for Collective play.</summary>
-        private static List<ChainState> BuildCollectiveGroup(IReadOnlyList<string> participantIds)
+        private static List<ChainState> BuildCollectiveGroup(IReadOnlyList<Guid> participantIds)
         {
             var g = new ChainState { GroupId = "all", GroupName = "Everyone" };
             g.MemberIds.AddRange(participantIds);
@@ -190,15 +190,15 @@ namespace KnockBox.LinkedList.Services.Logic.Games
         /// is assigned. Returns <c>(null, error)</c> on a validation failure.
         /// </summary>
         private static (List<ChainState>? groups, string? error) BuildGroups(
-            List<List<string>> assignments, IReadOnlyList<string> participantIds)
+            List<List<Guid>> assignments, IReadOnlyList<Guid> participantIds)
         {
-            var valid = new HashSet<string>(participantIds);
-            var seen = new HashSet<string>();
-            var teams = new List<List<string>>();
+            var valid = new HashSet<Guid>(participantIds);
+            var seen = new HashSet<Guid>();
+            var teams = new List<List<Guid>>();
 
             foreach (var team in assignments)
             {
-                var members = new List<string>();
+                var members = new List<Guid>();
                 foreach (var id in team)
                 {
                     if (!valid.Contains(id) || !seen.Add(id)) continue; // drop unknowns / dupes
@@ -230,10 +230,10 @@ namespace KnockBox.LinkedList.Services.Logic.Games
         /// teams. Used by the lobby's auto-balance button and as the engine's fallback
         /// when Groups mode starts without an explicit assignment.
         /// </summary>
-        public static List<List<string>> AutoBalanceGroups(IReadOnlyList<string> playerIds, int groupCount)
+        public static List<List<Guid>> AutoBalanceGroups(IReadOnlyList<Guid> playerIds, int groupCount)
         {
             if (groupCount < 1) groupCount = 1;
-            var teams = new List<List<string>>();
+            var teams = new List<List<Guid>>();
             for (int i = 0; i < groupCount; i++) teams.Add([]);
             for (int i = 0; i < playerIds.Count; i++) teams[i % groupCount].Add(playerIds[i]);
             return teams;
@@ -699,12 +699,12 @@ namespace KnockBox.LinkedList.Services.Logic.Games
         // ── Match flow (§10): rotation, end-of-match ─────────────────────────
 
         /// <summary>The id of the Auditor for the <em>next</em> round, given the current
-        /// rotation — used by the RoundOver screen to announce who's up. Returns empty
-        /// if the participant order isn't set.</summary>
-        public static string NextAuditorId(LinkedListGameState state)
+        /// rotation — used by the RoundOver screen to announce who's up. Returns
+        /// <see cref="Guid.Empty"/> if the participant order isn't set.</summary>
+        public static Guid NextAuditorId(LinkedListGameState state)
         {
             int count = state.ParticipantOrder.Count;
-            if (count == 0) return "";
+            if (count == 0) return Guid.Empty;
             return state.ParticipantOrder[(state.AuditorRotationIndex + 1) % count];
         }
 
@@ -808,7 +808,7 @@ namespace KnockBox.LinkedList.Services.Logic.Games
         private static IReadOnlyList<Superlative> ComputeSuperlatives(LinkedListGameState state)
         {
             var players = state.GamePlayers.Values
-                .OrderBy(p => p.PlayerId, StringComparer.Ordinal)
+                .OrderBy(p => p.PlayerId)
                 .ToList();
             if (players.Count == 0) return [];
 

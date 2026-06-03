@@ -26,7 +26,7 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
     /// </param>
     public sealed record ScoreReplay(
         int Sequence,
-        string UserId,
+        Guid UserId,
         string DisplayName,
         ScoreBreakdown Breakdown,
         int TaxBounty = 0,

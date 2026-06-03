@@ -32,15 +32,15 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic.States
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<HiddenAgendaGameState>>();
             
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.Parse("00000000-0000-0000-0000-000000000001"));
             _state = new HiddenAgendaGameState(host, _stateLoggerMock.Object);
             _state.BoardGraph = BoardDefinitions.CreateGrandCircuit();
             
             _context = new HiddenAgendaGameContext(_state, _rngMock.Object, _loggerMock.Object);
             _stateLogic = new MatchOverState();
 
-            _state.GamePlayers["p1"] = new HiddenAgendaPlayerState { PlayerId = "p1", CumulativeScore = 20 };
-            _state.GamePlayers["p2"] = new HiddenAgendaPlayerState { PlayerId = "p2", CumulativeScore = 25 };
+            _state.GamePlayers[Guid.Parse("11111111-1111-1111-1111-111111111111")] = new HiddenAgendaPlayerState { PlayerId = Guid.Parse("11111111-1111-1111-1111-111111111111"), CumulativeScore = 20 };
+            _state.GamePlayers[Guid.Parse("22222222-2222-2222-2222-222222222222")] = new HiddenAgendaPlayerState { PlayerId = Guid.Parse("22222222-2222-2222-2222-222222222222"), CumulativeScore = 25 };
         }
 
         [TestMethod]
@@ -48,7 +48,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic.States
         {
             _stateLogic.OnEnter(_context);
             
-            Assert.AreEqual("p2", _state.MatchWinner);
+            Assert.AreEqual(Guid.Parse("22222222-2222-2222-2222-222222222222"), _state.MatchWinner);
             Assert.AreEqual(GamePhase.MatchOver, _state.Phase);
         }
 [TestMethod]
@@ -57,7 +57,7 @@ public void ReturnToLobby_HostOnly_SetsLobbyPhase()
     _stateLogic.OnEnter(_context);
 
     // Non-host
-    var res1 = _stateLogic.HandleCommand(_context, new ReturnToLobbyCommand("other"));
+    var res1 = _stateLogic.HandleCommand(_context, new ReturnToLobbyCommand(Guid.NewGuid()));
     Assert.IsNotNull(res1.Error);
 
     // Host — HandleCommand calls SetJoinable, which debug-asserts the execute
@@ -65,7 +65,7 @@ public void ReturnToLobby_HostOnly_SetsLobbyPhase()
     // state.Execute(() => fsm.HandleCommand(...)); mirror that here.
     _state.Execute(() =>
     {
-        var res2 = _stateLogic.HandleCommand(_context, new ReturnToLobbyCommand("host1"));
+        var res2 = _stateLogic.HandleCommand(_context, new ReturnToLobbyCommand(Guid.Parse("00000000-0000-0000-0000-000000000001")));
         Assert.IsNull(res2.Value);
     });
     Assert.AreEqual(GamePhase.Lobby, _state.Phase);
@@ -77,10 +77,10 @@ public void PlayAgain_HostOnly_ResetsMatch()
     _stateLogic.OnEnter(_context);
 
     // Host
-    var result = _stateLogic.HandleCommand(_context, new PlayAgainCommand("host1"));
+    var result = _stateLogic.HandleCommand(_context, new PlayAgainCommand(Guid.Parse("00000000-0000-0000-0000-000000000001")));
     Assert.IsInstanceOfType(result.Value, typeof(RoundSetupState));
     Assert.AreEqual(0, _state.CurrentRound);
-    Assert.AreEqual(0, _state.GamePlayers["p1"].CumulativeScore);
+    Assert.AreEqual(0, _state.GamePlayers[Guid.Parse("11111111-1111-1111-1111-111111111111")].CumulativeScore);
     Assert.IsNull(_state.MatchWinner);
 }
 }

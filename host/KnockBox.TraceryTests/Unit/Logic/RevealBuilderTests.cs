@@ -26,7 +26,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
         {
             var findable = Findable("trace", "cat");
             var round = ScoreRound(1, Default,
-                ("Alice", "a", new[] { "trace", "cat" }));
+                ("Alice", Guid.NewGuid(), new[] { "trace", "cat" }));
 
             var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
@@ -43,8 +43,8 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
         {
             var findable = Findable("trace", "cat");
             var round = ScoreRound(1, Default,
-                ("Bob", "b", new[] { "trace" }),
-                ("Alice", "a", new[] { "trace", "cat" }));
+                ("Bob", Guid.NewGuid(), new[] { "trace" }),
+                ("Alice", Guid.NewGuid(), new[] { "trace", "cat" }));
 
             var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
@@ -60,8 +60,8 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             // so the alphabetical tie-break selects "table".
             var findable = Findable("table", "trace");
             var round = ScoreRound(1, Default,
-                ("Alice", "a", new[] { "table" }),
-                ("Bob", "b", new[] { "trace" }));
+                ("Alice", Guid.NewGuid(), new[] { "table" }),
+                ("Bob", Guid.NewGuid(), new[] { "trace" }));
 
             var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
@@ -76,8 +76,8 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             // quartz unique: (6 + 3 + 10) × 1.5 = 29; table shared: 6. quartz wins.
             var findable = Findable("quartz", "table");
             var round = ScoreRound(1, Default,
-                ("Alice", "a", new[] { "quartz", "table" }),
-                ("Bob", "b", new[] { "table" }));
+                ("Alice", Guid.NewGuid(), new[] { "quartz", "table" }),
+                ("Bob", Guid.NewGuid(), new[] { "table" }));
 
             var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
@@ -102,7 +102,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             var findable = new TracerySolver(trie).Solve(grid, minWordLength: 3);
 
             // Alice banks two of the eight findable words; the rest are "nobody found".
-            var round = ScoreRound(1, Default, ("Alice", "a", new[] { "cab", "car" }));
+            var round = ScoreRound(1, Default, ("Alice", Guid.NewGuid(), new[] { "cab", "car" }));
 
             var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
@@ -123,7 +123,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
         public void RarestLetters_SurfacesHighestValueLetters_FromBankedWords()
         {
             var findable = Findable("quartz", "milky");
-            var round = ScoreRound(1, Default, ("Alice", "a", new[] { "quartz", "milky" }));
+            var round = ScoreRound(1, Default, ("Alice", Guid.NewGuid(), new[] { "quartz", "milky" }));
 
             var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
@@ -139,7 +139,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
         {
             var settings = Default with { RareLetterBonusEnabled = false };
             var findable = Findable("quartz");
-            var round = ScoreRound(1, settings, ("Alice", "a", new[] { "quartz" }));
+            var round = ScoreRound(1, settings, ("Alice", Guid.NewGuid(), new[] { "quartz" }));
 
             var reveal = RevealBuilder.Build(findable, findable, round, settings);
 
@@ -153,7 +153,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
         {
             // trace: (5+1)×1.5 = 9; cat: (3+0)×1.5 = 4.5 → 5. Sum = 14.
             var findable = Findable("trace", "cat");
-            var round = ScoreRound(1, Default, ("Alice", "a", new[] { "cat" }));
+            var round = ScoreRound(1, Default, ("Alice", Guid.NewGuid(), new[] { "cat" }));
 
             var reveal = RevealBuilder.Build(findable, findable, round, Default);
 
@@ -165,7 +165,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
         {
             var settings = Default with { ShowTheoreticalMax = false };
             var findable = Findable("trace", "cat");
-            var round = ScoreRound(1, settings, ("Alice", "a", new[] { "cat" }));
+            var round = ScoreRound(1, settings, ("Alice", Guid.NewGuid(), new[] { "cat" }));
 
             var reveal = RevealBuilder.Build(findable, findable, round, settings);
 
@@ -182,9 +182,9 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
                 RoundNumber = 2,
                 Outcomes =
                 [
-                    Outcome("a", "Alice", points: 5, cumulative: 10),
-                    Outcome("b", "Bob", points: 5, cumulative: 25),
-                    Outcome("c", "Cara", points: 2, cumulative: 25),
+                    Outcome(Guid.NewGuid(), "Alice", points: 5, cumulative: 10),
+                    Outcome(Guid.NewGuid(), "Bob", points: 5, cumulative: 25),
+                    Outcome(Guid.NewGuid(), "Cara", points: 2, cumulative: 25),
                 ]
             };
 
@@ -208,7 +208,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             var round = new RoundResult
             {
                 RoundNumber = 1,
-                Outcomes = [Outcome("a", "Alice", points: 0, cumulative: 0)]
+                Outcomes = [Outcome(Guid.NewGuid(), "Alice", points: 0, cumulative: 0)]
             };
 
             var reveal = RevealBuilder.Build(findable, findable, round, Default);
@@ -230,7 +230,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             // contains an obscure word "quartz" a player could still bank. Nobody banks anything.
             var boardSet = Findable("cat", "table");
             var validationSet = Findable("cat", "table", "quartz");
-            var round = ScoreRound(1, Default, ("Alice", "a", System.Array.Empty<string>()));
+            var round = ScoreRound(1, Default, ("Alice", Guid.NewGuid(), System.Array.Empty<string>()));
 
             var reveal = RevealBuilder.Build(validationSet, boardSet, round, Default);
 
@@ -264,7 +264,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
         // points (single-round scenarios), which is all the beats under test read.
         private static RoundResult ScoreRound(
             int round, TracerySettings settings,
-            params (string Name, string Id, string[] Words)[] players)
+            params (string Name, Guid Id, string[] Words)[] players)
         {
             var counts = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (var p in players)
@@ -290,7 +290,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
             return new RoundResult { RoundNumber = round, Outcomes = outcomes };
         }
 
-        private static TraceryPlayerRoundOutcome Outcome(string id, string name, int points, int cumulative)
+        private static TraceryPlayerRoundOutcome Outcome(Guid id, string name, int points, int cumulative)
             => new()
             {
                 UserId = id,

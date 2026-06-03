@@ -31,7 +31,7 @@ namespace KnockBox.AlphaChain.Tests.Integration
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
         [TestMethod]
@@ -52,7 +52,7 @@ namespace KnockBox.AlphaChain.Tests.Integration
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
             using var _ = state;
             for (int i = 0; i < playerCount; i++)
-                state.RegisterPlayer(UserFactory.Create($"Player{i}", $"p{i}-id"));
+                state.RegisterPlayer(UserFactory.Create($"Player{i}", Guid.NewGuid()));
 
             // Tutorials off — this drives raw gameplay end-to-end; the tutorial phases are covered
             // by dedicated unit tests.
@@ -91,7 +91,7 @@ namespace KnockBox.AlphaChain.Tests.Integration
                 }
 
                 // RoundState: the active player answers immediately (no timeout).
-                var actor = state.TurnManager.CurrentPlayer!;
+                var actor = state.TurnManager.CurrentPlayer!.Value;
                 var word = NextWord(state.RequiredStartLetter, state.BannedLetter, ref counter);
 
                 var outcome = await engine.SubmitWordAsync(actor, word, state);

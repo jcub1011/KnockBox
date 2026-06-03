@@ -14,7 +14,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.State.Games.HiddenAgenda
         [TestInitialize]
         public void Setup()
         {
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new HiddenAgendaGameState(host, NullLogger<HiddenAgendaGameState>.Instance);
         }
 

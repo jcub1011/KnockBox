@@ -32,16 +32,16 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic.States
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<HiddenAgendaGameState>>();
             
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.Parse("00000000-0000-0000-0000-000000000001"));
             _state = new HiddenAgendaGameState(host, _stateLoggerMock.Object);
             _state.BoardGraph = BoardDefinitions.CreateGrandCircuit();
             
             _context = new HiddenAgendaGameContext(_state, _rngMock.Object, _loggerMock.Object);
             _stateLogic = new FinalGuessState();
 
-            _state.GamePlayers["p1"] = new HiddenAgendaPlayerState { PlayerId = "p1", HasSubmittedGuess = true };
-            _state.GamePlayers["p2"] = new HiddenAgendaPlayerState { PlayerId = "p2", HasSubmittedGuess = false };
-            _state.GamePlayers["p3"] = new HiddenAgendaPlayerState { PlayerId = "p3", HasSubmittedGuess = false };
+            _state.GamePlayers[Guid.Parse("11111111-1111-1111-1111-111111111111")] = new HiddenAgendaPlayerState { PlayerId = Guid.Parse("11111111-1111-1111-1111-111111111111"), HasSubmittedGuess = true };
+            _state.GamePlayers[Guid.Parse("22222222-2222-2222-2222-222222222222")] = new HiddenAgendaPlayerState { PlayerId = Guid.Parse("22222222-2222-2222-2222-222222222222"), HasSubmittedGuess = false };
+            _state.GamePlayers[Guid.Parse("33333333-3333-3333-3333-333333333333")] = new HiddenAgendaPlayerState { PlayerId = Guid.Parse("33333333-3333-3333-3333-333333333333"), HasSubmittedGuess = false };
         }
 
         [TestMethod]
@@ -68,21 +68,21 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic.States
         {
             _stateLogic.OnEnter(_context);
             _state.CurrentTaskPool = TaskPool.AllTasks.Take(30).ToList();
-            var guesses = new Dictionary<string, List<string>>
+            var guesses = new Dictionary<Guid, List<string>>
             {
-                { "p1", _state.CurrentTaskPool.Take(3).Select(t => t.Id).ToList() },
-                { "p3", _state.CurrentTaskPool.Skip(3).Take(3).Select(t => t.Id).ToList() }
+                { Guid.Parse("11111111-1111-1111-1111-111111111111"), _state.CurrentTaskPool.Take(3).Select(t => t.Id).ToList() },
+                { Guid.Parse("33333333-3333-3333-3333-333333333333"), _state.CurrentTaskPool.Skip(3).Take(3).Select(t => t.Id).ToList() }
             };
 
             // p2 submits
-            var res1 = _stateLogic.HandleCommand(_context, new SubmitFinalGuessCommand("p2", guesses));
+            var res1 = _stateLogic.HandleCommand(_context, new SubmitFinalGuessCommand(Guid.Parse("22222222-2222-2222-2222-222222222222"), guesses));
             Assert.IsNull(res1.Value);
-            Assert.IsTrue(_state.GamePlayers["p2"].HasSubmittedGuess);
+            Assert.IsTrue(_state.GamePlayers[Guid.Parse("22222222-2222-2222-2222-222222222222")].HasSubmittedGuess);
 
             // p3 skips
-            var res2 = _stateLogic.HandleCommand(_context, new SkipFinalGuessCommand("p3"));
+            var res2 = _stateLogic.HandleCommand(_context, new SkipFinalGuessCommand(Guid.Parse("33333333-3333-3333-3333-333333333333")));
             Assert.IsInstanceOfType(res2.Value, typeof(RevealState));
-            Assert.IsTrue(_state.GamePlayers["p3"].HasSubmittedGuess);
+            Assert.IsTrue(_state.GamePlayers[Guid.Parse("33333333-3333-3333-3333-333333333333")].HasSubmittedGuess);
         }
 
         [TestMethod]
@@ -93,8 +93,8 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic.States
             var result = _stateLogic.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
 
             Assert.IsInstanceOfType(result.Value, typeof(RevealState));
-            Assert.IsTrue(_state.GamePlayers["p2"].HasSubmittedGuess);
-            Assert.IsTrue(_state.GamePlayers["p3"].HasSubmittedGuess);
+            Assert.IsTrue(_state.GamePlayers[Guid.Parse("22222222-2222-2222-2222-222222222222")].HasSubmittedGuess);
+            Assert.IsTrue(_state.GamePlayers[Guid.Parse("33333333-3333-3333-3333-333333333333")].HasSubmittedGuess);
         }
 
         [TestMethod]

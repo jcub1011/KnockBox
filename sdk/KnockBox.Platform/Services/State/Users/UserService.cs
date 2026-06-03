@@ -21,7 +21,7 @@ namespace KnockBox.Services.State.Users
         public async Task<Result> InitializeCurrentUserAsync(CancellationToken ct = default)
         {
             string name = "Not Set";
-            string id = Guid.CreateVersion7().ToString();
+            Guid id = Guid.CreateVersion7();
             Result result = Result.Success;
             try
             {
@@ -46,7 +46,7 @@ namespace KnockBox.Services.State.Users
 
                 if (tokenResult.TryGetSuccess(out var token))
                 {
-                    id = token.Token;
+                    id = Guid.TryParse(token.Token, out var parsed) ? parsed : Guid.CreateVersion7();
                     logger.LogDebug("Initialized user id to [{id}].", id);
                 }
                 else

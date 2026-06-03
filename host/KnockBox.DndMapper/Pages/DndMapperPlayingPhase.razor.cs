@@ -22,7 +22,7 @@ namespace KnockBox.DndMapper.Pages
         [Parameter, EditorRequired] public DndMapperGameState State { get; set; } = default!;
         [Parameter] public string RoomCode { get; set; } = string.Empty;
         [Parameter] public bool IsHost { get; set; }
-        [Parameter] public string CurrentUserId { get; set; } = string.Empty;
+        [Parameter] public Guid CurrentUserId { get; set; }
 
         [Inject] protected IJSRuntime JSRuntime { get; set; } = default!;
         [Inject] protected ILogger<DndMapperPlayingPhase> Logger { get; set; } = default!;

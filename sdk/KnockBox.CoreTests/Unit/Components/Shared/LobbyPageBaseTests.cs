@@ -158,7 +158,7 @@ public sealed class LobbyPageBaseTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private static User MakeUser(string name = "Player") => new(name, Guid.NewGuid().ToString());
+    private static User MakeUser(string name = "Player") => new(name, Guid.NewGuid());
 
     private static LobbyRegistration MakeLobby(AbstractGameState state, string? obfuscatedCode = null)
     {

@@ -36,7 +36,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             _engineLoggerMock = new Mock<ILogger<CodewordGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<CodewordGameState>>();
 
-            _host = UserFactory.Create("Host", "host-id");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
 
             _engine = new CodewordGameEngine(
                 _randomMock.Object,
@@ -44,7 +44,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
                 _stateLoggerMock.Object);
         }
 
-        private User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<CodewordGameState> CreateStartedGameAsync(int playerCount = 5)
         {
@@ -67,14 +67,14 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             Assert.AreEqual(CodewordGamePhase.CluePhase, state.Phase);
 
             // Identify the current clue giver.
-            string currentClueGiverId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
+            Guid currentClueGiverId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
 
             // Remove the current clue giver.
             _engine.HandlePlayerLeft(UserFactory.Create("dummy", currentClueGiverId), state);
 
             // Game should still be in CluePhase (re-entered) and the index should point to an alive player.
             Assert.AreEqual(CodewordGamePhase.CluePhase, state.Phase);
-            string newClueGiverId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
+            Guid newClueGiverId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
             var newPlayer = context.GetPlayer(newClueGiverId);
             Assert.IsNotNull(newPlayer);
             Assert.IsFalse(newPlayer.IsEliminated);
@@ -96,7 +96,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             string[] clues = ["wave", "splash", "tide", "fish", "coral"];
             for (int i = 0; i < alivePlayers.Count; i++)
             {
-                string currentPlayerId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
+                Guid currentPlayerId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
                 _engine.SubmitClue(UserFactory.Create("dummy", currentPlayerId), state, clues[i]);
             }
 
@@ -105,8 +105,8 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
 
             // Have a player select a vote target (inline voting in discussion phase).
             alivePlayers = context.GetAlivePlayers();
-            string leavingPlayerId = alivePlayers[0].PlayerId;
-            string voterId = alivePlayers[1].PlayerId;
+            Guid leavingPlayerId = alivePlayers[0].PlayerId;
+            Guid voterId = alivePlayers[1].PlayerId;
 
             // Cast a vote for the player who will leave (select target, don't lock in).
             _engine.CastVote(UserFactory.Create("dummy", voterId), state, leavingPlayerId);
@@ -154,10 +154,11 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         {
             using var state = await CreateStartedGameAsync(4);
 
-            // Remove all players.
-            for (int i = 0; i < 4; i++)
+            // Remove all players using their actual registered IDs.
+            var playerIds = state.TurnManager.TurnOrder.ToList();
+            foreach (var id in playerIds)
             {
-                _engine.HandlePlayerLeft(MakePlayer(i), state);
+                _engine.HandlePlayerLeft(UserFactory.Create("dummy", id), state);
             }
 
             Assert.AreEqual(CodewordGamePhase.GameOver, state.Phase);
@@ -180,7 +181,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             string[] clues = ["wave", "splash"];
             for (int i = 0; i < 2; i++)
             {
-                string currentPlayerId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
+                Guid currentPlayerId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
                 _engine.SubmitClue(UserFactory.Create("dummy", currentPlayerId), state, clues[i]);
             }
 
@@ -192,7 +193,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             Assert.HasCount(2, submittedIds, "Expected 2 players to have submitted.");
 
             // The next player in the turn order (the active clue giver) leaves.
-            string activeClueGiverId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
+            Guid activeClueGiverId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
             _engine.HandlePlayerLeft(UserFactory.Create("dummy", activeClueGiverId), state);
 
             // Phase must still be CluePhase (not Setup, not Reveal).
@@ -224,12 +225,12 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             string[] clues = ["wave", "splash", "tide", "fish"];
             for (int i = 0; i < 4; i++)
             {
-                string currentPlayerId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
+                Guid currentPlayerId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
                 _engine.SubmitClue(UserFactory.Create("dummy", currentPlayerId), state, clues[i]);
             }
 
             // The 5th player is now the active clue-giver. They leave.
-            string activeClueGiverId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
+            Guid activeClueGiverId = state.TurnManager.TurnOrder[state.TurnManager.CurrentPlayerIndex];
             _engine.HandlePlayerLeft(UserFactory.Create("dummy", activeClueGiverId), state);
 
             // No eligible un-submitted alive player remains → advance to Discussion.
@@ -246,7 +247,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             state.SetPhase(CodewordGamePhase.Discussion);
 
             int aliveCountBefore = context.GetAlivePlayerCount();
-            string leavingPlayerId = state.TurnManager.TurnOrder[0];
+            Guid leavingPlayerId = state.TurnManager.TurnOrder[0];
 
             _engine.HandlePlayerLeft(UserFactory.Create("dummy", leavingPlayerId), state);
 
@@ -266,12 +267,12 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             Assert.AreEqual(3, state.EndGameVoteStatus.RequiredVotes);
 
             // p0 votes end (1 of 3 — not majority).
-            string p0Id = state.TurnManager.TurnOrder[0];
+            Guid p0Id = state.TurnManager.TurnOrder[0];
             _engine.VoteContinueOrEndRound(UserFactory.Create("dummy", p0Id), state, voteToEnd: true);
             Assert.HasCount(1, state.EndGameVoteStatus.VotedToEnd);
 
             // p1 leaves without voting.
-            string p1Id = state.TurnManager.TurnOrder[1];
+            Guid p1Id = state.TurnManager.TurnOrder[1];
             _engine.HandlePlayerLeft(UserFactory.Create("dummy", p1Id), state);
 
             // 3 alive remaining → required = (3/2)+1 = 2. VotedToEnd = {p0} (1) < 2,
@@ -290,9 +291,9 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             _engine.Tick(context, DateTimeOffset.UtcNow.AddSeconds(10));
             context.Fsm.TransitionTo(context, new ContinueOrEndRoundPhaseState());
 
-            string p0Id = state.TurnManager.TurnOrder[0];
-            string p1Id = state.TurnManager.TurnOrder[1];
-            string p2Id = state.TurnManager.TurnOrder[2];
+            Guid p0Id = state.TurnManager.TurnOrder[0];
+            Guid p1Id = state.TurnManager.TurnOrder[1];
+            Guid p2Id = state.TurnManager.TurnOrder[2];
 
             // p0 + p1 vote end (2 of 3 — not majority yet).
             _engine.VoteContinueOrEndRound(UserFactory.Create("dummy", p0Id), state, voteToEnd: true);
@@ -316,10 +317,10 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             _engine.Tick(context, DateTimeOffset.UtcNow.AddSeconds(10));
             context.Fsm.TransitionTo(context, new ContinueOrEndRoundPhaseState());
 
-            string p0Id = state.TurnManager.TurnOrder[0];
-            string p1Id = state.TurnManager.TurnOrder[1];
-            string p2Id = state.TurnManager.TurnOrder[2];
-            string p3Id = state.TurnManager.TurnOrder[3];
+            Guid p0Id = state.TurnManager.TurnOrder[0];
+            Guid p1Id = state.TurnManager.TurnOrder[1];
+            Guid p2Id = state.TurnManager.TurnOrder[2];
+            Guid p3Id = state.TurnManager.TurnOrder[3];
 
             // p0, p1, p2 vote continue. p3 hasn't voted.
             _engine.VoteContinueOrEndRound(UserFactory.Create("dummy", p0Id), state, voteToEnd: false);

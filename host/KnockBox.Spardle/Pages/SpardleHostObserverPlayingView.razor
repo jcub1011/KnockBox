@@ -32,7 +32,7 @@
         var accents = new[] { "spd-obs-a", "spd-obs-b", "spd-obs-c", "spd-obs-d" };
         int accentIdx = 0;
 
-        var visiblePlayerIds = new HashSet<string>(State.Players.Select(p => p.User.Id));
+        var visiblePlayerIds = new HashSet<Guid>(State.Players.Select(p => p.User.Id));
         var rankedEntries = SpardleOpponentsRanking.ComputeRanked(State)
             .Where(r => visiblePlayerIds.Contains(r.User.Id))
             .ToList();

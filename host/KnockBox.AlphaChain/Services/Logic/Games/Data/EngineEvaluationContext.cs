@@ -103,7 +103,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         }
 
         /// <summary>The turn-order index of <paramref name="userId"/>, or -1 when not present.</summary>
-        public int GetPlayerIndex(string userId)
+        public int GetPlayerIndex(Guid userId)
         {
             int index = 0;
             foreach (var player in Players)
@@ -129,7 +129,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
     /// <param name="EarnedScore">The points the submitter actually kept (0 when taxed, unless salvaged).</param>
     /// <param name="OffendingLetter">The banned letter the word used (when taxed), else null.</param>
     public sealed record WordResolution(
-        string SubmitterUserId,
+        Guid SubmitterUserId,
         string Word,
         bool Taxed,
         int WouldBeScore,

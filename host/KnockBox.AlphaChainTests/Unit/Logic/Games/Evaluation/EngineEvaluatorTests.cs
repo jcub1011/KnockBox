@@ -36,7 +36,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
             double remaining = 0, double shotClock = 12, char? banned = null,
             AlphaChainPlayerState? player = null, IServiceProvider? services = null)
         {
-            player ??= new AlphaChainPlayerState { UserId = "p0" };
+            player ??= new AlphaChainPlayerState { UserId = Guid.NewGuid() };
             return new EngineEvaluationContext(
                 word,
                 banned is { } b ? new[] { b } : Array.Empty<char>(),
@@ -348,7 +348,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
             foreach (var id in ModifierCardFactory.AllDealableIds)
                 foreach (var word in new[] { "cat", "bridge", "elephants", "aerie" })
                 {
-                    var player = new AlphaChainPlayerState { UserId = "p0" };
+                    var player = new AlphaChainPlayerState { UserId = Guid.NewGuid() };
                     int score = _eval.Calculate(Ctx(word, [Card(id)], remaining: 5, shotClock: 12, banned: 'a', player: player, services: Services(shield: 1.0)));
                     Assert.IsTrue(score >= 0 && score <= ModifierMath.MaxWordScore,
                         $"Card [{id}] on '{word}' produced out-of-range score {score}.");

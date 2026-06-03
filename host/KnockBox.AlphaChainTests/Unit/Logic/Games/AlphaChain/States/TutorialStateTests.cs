@@ -30,10 +30,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartGameAsync(
             IWordListService words, int playerCount, Action<AlphaChainGameState>? configure = null)
@@ -205,7 +205,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                 }
                 else
                 {
-                    var actor = state.TurnManager.CurrentPlayer!;
+                    var actor = state.TurnManager.CurrentPlayer!.Value;
                     var word = NextWord(state.RequiredStartLetter, state.BannedLetter, ref counter);
                     var outcome = await engine.SubmitWordAsync(actor, word, state);
                     Assert.IsTrue(outcome.IsSuccess, $"submission '{word}' failed");

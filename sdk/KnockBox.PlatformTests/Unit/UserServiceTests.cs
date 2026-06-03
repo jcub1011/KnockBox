@@ -20,15 +20,15 @@ public sealed class UserServiceTests
     [TestMethod]
     public void User_Constructor_IsInternal()
     {
-        // The (string, string) ctor must exist but be non-public so external
+        // The (string, Guid) ctor must exist but be non-public so external
         // callers can't bypass IUserService to mint arbitrary User instances.
         var ctor = typeof(User).GetConstructor(
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
             binder: null,
-            types: [typeof(string), typeof(string)],
+            types: [typeof(string), typeof(Guid)],
             modifiers: null);
 
-        Assert.IsNotNull(ctor, "User(string, string) ctor must exist.");
+        Assert.IsNotNull(ctor, "User(string, Guid) ctor must exist.");
         Assert.IsFalse(ctor.IsPublic, "User ctor must not be public.");
         Assert.IsTrue(ctor.IsAssembly, "User ctor must be internal (assembly).");
     }
@@ -53,19 +53,20 @@ public sealed class UserServiceTests
     [TestMethod]
     public void UserFactory_Create_BuildsUserWithSuppliedValues()
     {
-        var user = UserFactory.Create("Alice", "alice-id");
+        var id = Guid.NewGuid();
+        var user = UserFactory.Create("Alice", id);
         Assert.AreEqual("Alice", user.Name);
-        Assert.AreEqual("alice-id", user.Id);
+        Assert.AreEqual(id, user.Id);
     }
 
     [TestMethod]
     public void UserFactory_Create_TrimsAndCapsName()
     {
         // Mirrors SetCurrentUserName: trim whitespace, cap at 12 chars.
-        var trimmed = UserFactory.Create("   Bob   ", "id1");
+        var trimmed = UserFactory.Create("   Bob   ", Guid.NewGuid());
         Assert.AreEqual("Bob", trimmed.Name);
 
-        var capped = UserFactory.Create("ThisNameIsWayTooLong", "id2");
+        var capped = UserFactory.Create("ThisNameIsWayTooLong", Guid.NewGuid());
         Assert.AreEqual("ThisNameIsWa", capped.Name);
         Assert.AreEqual(12, capped.Name.Length);
     }
@@ -73,7 +74,7 @@ public sealed class UserServiceTests
     [TestMethod]
     public void UserFactory_CreateUnchecked_LeavesNameAsIs()
     {
-        var user = UserFactory.CreateUnchecked("   ThisNameIsWayTooLong   ", "id");
+        var user = UserFactory.CreateUnchecked("   ThisNameIsWayTooLong   ", Guid.NewGuid());
         Assert.AreEqual("   ThisNameIsWayTooLong   ", user.Name);
     }
 

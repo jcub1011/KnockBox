@@ -18,7 +18,7 @@ public class OperatorGameEngineReturnToLobbyTests
     [TestInitialize]
     public void Setup()
     {
-        _host = UserFactory.Create("Host", "host1");
+        _host = UserFactory.Create("Host", Guid.NewGuid());
         _engine = new OperatorGameEngine(
             NullLogger<OperatorGameEngine>.Instance,
             NullLogger<OperatorGameState>.Instance,
@@ -29,8 +29,8 @@ public class OperatorGameEngineReturnToLobbyTests
     {
         var result = await _engine.CreateStateAsync(_host);
         var state = (OperatorGameState)result.Value!;
-        state.RegisterPlayer(UserFactory.Create("P1", "p1"));
-        state.RegisterPlayer(UserFactory.Create("P2", "p2"));
+        state.RegisterPlayer(UserFactory.Create("P1", Guid.NewGuid()));
+        state.RegisterPlayer(UserFactory.Create("P2", Guid.NewGuid()));
         await _engine.StartAsync(_host, state);
         return state;
     }
@@ -40,7 +40,7 @@ public class OperatorGameEngineReturnToLobbyTests
     {
         var state = await CreateStartedGameAsync();
         state.Phase = OperatorGamePhase.GameOver;
-        var nonHost = UserFactory.Create("NotHost", "nothost-id");
+        var nonHost = UserFactory.Create("NotHost", Guid.NewGuid());
 
         var result = _engine.ReturnToLobby(nonHost, state);
 

@@ -5,11 +5,11 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
     public sealed record CharacterSheet
     {
         public Guid Id { get; init; }
-        public string? OwnerUserId { get; init; }
+        public Guid? OwnerUserId { get; init; }
         // Set when a player leaves mid-session and their sheet is orphaned —
         // mirrors Token.RepresentsUserId so the UI can show "originally played by …"
         // until the host reassigns the character to another player.
-        public string? RepresentsUserId { get; init; }
+        public Guid? RepresentsUserId { get; init; }
         public string CharacterName { get; init; } = string.Empty;
         public ImmutableDictionary<string, AttributeValue> Values { get; init; }
             = ImmutableDictionary<string, AttributeValue>.Empty;

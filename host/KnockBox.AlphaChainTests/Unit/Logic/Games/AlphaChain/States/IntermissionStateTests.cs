@@ -29,10 +29,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         /// <summary>
         /// Starts a host-as-display game with <paramref name="playerCount"/> players and a fixed RNG
@@ -278,7 +278,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             EnterIntermission(state);
             AdvanceToSniperBan(engine, state);
 
-            var picker = state.SniperBanUserId!;
+            var picker = state.SniperBanUserId!.Value;
             var result = await engine.SelectSniperBanAsync(picker, 'q', state);
 
             Assert.IsTrue(result.IsSuccess);
@@ -298,7 +298,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             AdvanceToSniperBan(engine, state);
 
             // Give the picker a Roulette Wheel before the era completes, so it's in the final bay.
-            var picker = state.SniperBanUserId!;
+            var picker = state.SniperBanUserId!.Value;
             state.Execute(() => state.GamePlayers[picker].EngineBay.Add(TestModifierCards.Create("roulette-wheel")));
 
             await engine.SelectSniperBanAsync(picker, 'q', state); // era advances → RollPersonalBans
@@ -316,7 +316,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             EnterIntermission(state);
             AdvanceToSniperBan(engine, state);
 
-            var picker = state.SniperBanUserId!;
+            var picker = state.SniperBanUserId!.Value;
             state.Execute(() =>
             {
                 RoomStateProbe.LatchHyperDrive(state, picker);
@@ -359,7 +359,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             AdvanceToSniperBan(engine, state);
 
             // Picker keeps a decayed mirror into the next era; nothing deals them a replacement.
-            var picker = state.SniperBanUserId!;
+            var picker = state.SniperBanUserId!.Value;
             state.Execute(() =>
             {
                 state.GamePlayers[picker].EngineBay.Add(TestModifierCards.Create("titanium-mirror"));
@@ -425,7 +425,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             EnterIntermission(state);
             AdvanceToSniperBan(engine, state);
 
-            var picker = state.SniperBanUserId!;
+            var picker = state.SniperBanUserId!.Value;
             var result = await engine.SelectSniperBanAsync(picker, 'b', state); // consonant, illegal
 
             Assert.IsTrue(result.IsFailure);
@@ -636,7 +636,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                 }
                 else
                 {
-                    engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!, state).GetAwaiter().GetResult();
+                    engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!.Value, state).GetAwaiter().GetResult();
                 }
             }
 

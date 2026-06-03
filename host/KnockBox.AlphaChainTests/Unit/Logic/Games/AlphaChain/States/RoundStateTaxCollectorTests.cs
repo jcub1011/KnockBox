@@ -30,10 +30,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         // Starts a game on a fixed dictionary with the banned letter set. "anchor" adds a flat
         // +6, so an "anchor"-only bay makes the taxed word's would-be score easy to reason about.
@@ -63,10 +63,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                 engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
         }
 
-        private static void GiveModifier(AlphaChainGameState state, string playerId, string cardId) =>
+        private static void GiveModifier(AlphaChainGameState state, Guid playerId, string cardId) =>
             state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
 
-        private static void GiveTaxCollector(AlphaChainGameState state, string playerId) =>
+        private static void GiveTaxCollector(AlphaChainGameState state, Guid playerId) =>
             GiveModifier(state, playerId, TestModifierCards.TaxCollectorId);
 
         [TestMethod]
@@ -76,7 +76,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // (length 3 + 10) = 13; the owner should collect round(13 × 0.5) = 7 (half-up).
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var owner = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, submitter, "anchor");
@@ -108,7 +108,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // do not pay themselves.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
 
             GiveModifier(state, submitter, "anchor");
             GiveTaxCollector(state, submitter);
@@ -131,7 +131,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // "cat" with banned 'z' is not taxed → no bounty regardless of owners.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var owner = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, submitter, "anchor");
@@ -150,7 +150,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 3, banned: 'a');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var owner1 = state.TurnManager.TurnOrder[1];
             var owner2 = state.TurnManager.TurnOrder[2];
 

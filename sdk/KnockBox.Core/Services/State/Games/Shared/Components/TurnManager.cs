@@ -9,7 +9,7 @@ namespace KnockBox.Core.Services.State.Games.Shared.Components;
 public class TurnManager
 {
     /// <summary>Player ids in turn order. Usually set once at game start.</summary>
-    public List<string> TurnOrder { get; } = [];
+    public List<Guid> TurnOrder { get; } = [];
 
     /// <summary>Index into <see cref="TurnOrder"/> pointing at the active player.</summary>
     public int CurrentPlayerIndex { get; private set; }
@@ -18,13 +18,13 @@ public class TurnManager
     /// The player id whose turn it currently is, or <c>null</c> if the turn
     /// order has not been set yet.
     /// </summary>
-    public string? CurrentPlayer => TurnOrder.Count > 0 ? TurnOrder[CurrentPlayerIndex] : null;
+    public Guid? CurrentPlayer => TurnOrder.Count > 0 ? TurnOrder[CurrentPlayerIndex] : null;
 
     /// <summary>
     /// Replaces the turn order with <paramref name="playerIds"/> and resets the
     /// current-player index to zero.
     /// </summary>
-    public void SetTurnOrder(IEnumerable<string> playerIds)
+    public void SetTurnOrder(IEnumerable<Guid> playerIds)
     {
         TurnOrder.Clear();
         TurnOrder.AddRange(playerIds);

@@ -83,7 +83,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             }
 
             // 1. Only the active player may submit.
-            if (cmd.ActorUserId != turnManager.CurrentPlayer)
+            if (cmd.ActorUserId != turnManager.CurrentPlayer.GetValueOrDefault())
             {
                 context.LastSubmitResult = new SubmitWordResult.RejectedNotYourTurn();
                 return null;
@@ -243,15 +243,17 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             int bounty = services.EraTaxBounty;
             var effects = services.Notices.ToList();
 
+            string displayName = player?.DisplayName ?? cmd.ActorUserId.ToString();
+
             // Log the accepted play for the UI feed.
             state.PlayLog.Add(new AlphaChainWordPlay(
-                DateTimeOffset.UtcNow, cmd.ActorUserId, player?.DisplayName ?? cmd.ActorUserId,
+                DateTimeOffset.UtcNow, cmd.ActorUserId, displayName,
                 word, score, taxed, bounty));
 
             // Publish the scoring trace + any fired effects so every client plays the replay strip.
             state.ScoreReplaySequence++;
             state.LatestScoreReplay = new ScoreReplay(
-                state.ScoreReplaySequence, cmd.ActorUserId, player?.DisplayName ?? cmd.ActorUserId,
+                state.ScoreReplaySequence, cmd.ActorUserId, displayName,
                 breakdown, bounty, collectors, effects);
             if (effects.Count > 0)
             {
@@ -345,9 +347,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
         /// <summary>Fires the turn-start boundary for the now-active player, so every room state service
         /// re-arms its per-turn state (The Prism's once-per-turn refill guard).</summary>
-        private static void BeginTurnFor(AlphaChainGameContext context, string? userId)
+        private static void BeginTurnFor(AlphaChainGameContext context, Guid? userId)
         {
-            if (userId is not null && context.State.GamePlayers.TryGetValue(userId, out var player))
+            if (userId is { } id && context.State.GamePlayers.TryGetValue(id, out var player))
                 context.EvaluationServices.FireTurnStarted(player);
         }
 
@@ -357,7 +359,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         {
             var turnManager = context.State.TurnManager;
 
-            if (cmd.ActorUserId != turnManager.CurrentPlayer)
+            if (cmd.ActorUserId != turnManager.CurrentPlayer.GetValueOrDefault())
                 return new ResultError("It is not your turn.",
                     $"Player [{cmd.ActorUserId}] tried to advance but the active player is [{turnManager.CurrentPlayer}].");
 
@@ -386,7 +388,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 return null;
 
             var current = state.TurnManager.CurrentPlayer;
-            state.GamePlayers.TryGetValue(current ?? string.Empty, out var player);
+            state.GamePlayers.TryGetValue(current.GetValueOrDefault(), out var player);
 
             if (state.Settings.SurvivalMode)
             {
@@ -472,7 +474,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             var current = state.TurnManager.CurrentPlayer;
             if (current is null) return;
 
-            if (state.GamePlayers.TryGetValue(current, out var player))
+            if (state.GamePlayers.TryGetValue(current.Value, out var player))
             {
                 int seconds = context.EvaluationServices.Get<ITimePenaltyService>()?.ConsumeFor(player) ?? 0;
                 if (seconds > 0)
@@ -493,7 +495,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 if (id is null)
                     return wrapped;
 
-                if (state.GamePlayers.TryGetValue(id, out var ps) && !ps.IsEliminated && !ps.HasLeft)
+                if (state.GamePlayers.TryGetValue(id.Value, out var ps) && !ps.IsEliminated && !ps.HasLeft)
                     return wrapped;
             }
 

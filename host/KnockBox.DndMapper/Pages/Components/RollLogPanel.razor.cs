@@ -24,7 +24,7 @@ namespace KnockBox.DndMapper.Pages.Components
 
         [Parameter, EditorRequired] public DndMapperGameState State { get; set; } = default!;
         [Parameter, EditorRequired] public DiceRollerConfig Config { get; set; } = default!;
-        [Parameter] public string CurrentUserId { get; set; } = string.Empty;
+        [Parameter] public Guid CurrentUserId { get; set; }
         [Parameter] public bool IsHost { get; set; }
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;

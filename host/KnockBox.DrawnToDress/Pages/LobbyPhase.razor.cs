@@ -98,9 +98,9 @@ namespace KnockBox.DrawnToDress.Pages
             PersistSettings();
         }
 
-        protected void KickPlayer(string userId)
+        protected void KickPlayer(Guid userId)
         {
-            if (string.IsNullOrWhiteSpace(userId)) return;
+            if (userId == Guid.Empty) return;
             if (GameState.Host.Id != UserService.CurrentUser?.Id)
             {
                 Logger.LogWarning("Cannot kick: current user is not the host.");

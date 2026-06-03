@@ -24,7 +24,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         public ILogger Logger { get; } = logger;
         public IFiniteStateMachine<HiddenAgendaGameContext, HiddenAgendaCommand> Fsm { get; set; } = null!;
 
-        public ConcurrentDictionary<string, HiddenAgendaPlayerState> GamePlayers => State.GamePlayers;
+        public ConcurrentDictionary<Guid, HiddenAgendaPlayerState> GamePlayers => State.GamePlayers;
         public BoardGraph Board => State.BoardGraph;
         public Dictionary<CollectionType, int> CollectionProgress => State.CollectionProgress;
 
@@ -46,7 +46,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
             }
         }
 
-        public void DrawTasksForPlayer(string playerId)
+        public void DrawTasksForPlayer(Guid playerId)
         {
             if (!GamePlayers.TryGetValue(playerId, out var playerState)) return;
 
@@ -156,7 +156,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         /// </summary>
         public RoundResult ScoreRound()
         {
-            var playerResults = new Dictionary<string, PlayerRoundResult>();
+            var playerResults = new Dictionary<Guid, PlayerRoundResult>();
 
             foreach (var player in GamePlayers.Values)
             {
@@ -208,7 +208,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         /// <summary>
         /// Extracts guess validation into a shared helper usable by both GuessPhaseState and FinalGuessState.
         /// </summary>
-        public string? ValidateGuessSubmission(string playerId, Dictionary<string, List<string>> guesses)
+        public string? ValidateGuessSubmission(Guid playerId, Dictionary<Guid, List<string>> guesses)
         {
             var opponents = GamePlayers.Keys.Where(id => id != playerId).ToHashSet();
 
@@ -240,7 +240,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         /// Remove if all negative, Trade if mixed) and snapshots current collection progress
         /// for R4/R5 task evaluation.
         /// </summary>
-        public void RecordCardPlay(string playerId, CurationCard card, int selectedIndex,
+        public void RecordCardPlay(Guid playerId, CurationCard card, int selectedIndex,
             IReadOnlyList<CurationCard> allDrawn, IReadOnlyList<CollectionEffect> appliedEffects)
         {
             var player = GamePlayers[playerId];
@@ -281,7 +281,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         /// <summary>
         /// Evaluates whether a specific task was completed by a player this round.
         /// </summary>
-        public bool EvaluateTaskCompletion(string playerId, SecretTask task)
+        public bool EvaluateTaskCompletion(Guid playerId, SecretTask task)
         {
             return task.Id switch
             {
@@ -321,7 +321,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Devotion: count turns where player's card play added progress to specified collection
-        private bool EvaluateDevotionCollection(string playerId, CollectionType collection, int threshold)
+        private bool EvaluateDevotionCollection(Guid playerId, CollectionType collection, int threshold)
         {
             var player = GamePlayers[playerId];
             int count = player.CardPlayHistory
@@ -334,7 +334,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Devotion (wing): count turns affecting any collection in the specified wing
-        private bool EvaluateDevotionWing(string playerId, Wing wing, int threshold)
+        private bool EvaluateDevotionWing(Guid playerId, Wing wing, int threshold)
         {
             var wingCollections = CollectionDefinitions.All
                 .Where(c => c.PrimaryWing == wing)
@@ -350,7 +350,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Neglect: verify player never played Acquire on specified collection
-        private bool EvaluateNeglectCollection(string playerId, CollectionType collection)
+        private bool EvaluateNeglectCollection(Guid playerId, CollectionType collection)
         {
             var player = GamePlayers[playerId];
             return !player.CardPlayHistory.Any(r =>
@@ -359,21 +359,21 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Neglect (wing): verify player never entered specified wing
-        private bool EvaluateNeglectWing(string playerId, Wing wing)
+        private bool EvaluateNeglectWing(Guid playerId, Wing wing)
         {
             var player = GamePlayers[playerId];
             return !player.MovementHistory.Any(m => m.Wing == wing);
         }
 
         // Neglect (card type): verify player never played specified card type
-        private bool EvaluateNeglectCardType(string playerId, CurationCardType type)
+        private bool EvaluateNeglectCardType(Guid playerId, CurationCardType type)
         {
             var player = GamePlayers[playerId];
             return !player.CardPlayHistory.Any(r => r.CardType == type);
         }
 
         // Style Y1: Remove card on >= N turns
-        private bool EvaluateStyleRemoveCount(string playerId, int threshold)
+        private bool EvaluateStyleRemoveCount(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
             int count = player.CardPlayHistory
@@ -385,7 +385,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Style Y2: cards affecting >= N different collections
-        private bool EvaluateStyleCollectionVariety(string playerId, int threshold)
+        private bool EvaluateStyleCollectionVariety(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
             var distinct = player.CardPlayHistory
@@ -396,7 +396,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Style Y3: same collection >= N turns in a row
-        private bool EvaluateStyleConsecutiveCollection(string playerId, int threshold)
+        private bool EvaluateStyleConsecutiveCollection(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
             var ordered = player.CardPlayHistory.OrderBy(r => r.TurnNumber).ToList();
@@ -431,7 +431,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Style Y4: alternate Acquire/Remove for >= N consecutive turns
-        private bool EvaluateStyleAlternating(string playerId, int threshold)
+        private bool EvaluateStyleAlternating(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
             var ordered = player.CardPlayHistory
@@ -462,7 +462,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Style Y5: play the highest-value card in hand >= N turns
-        private bool EvaluateStyleHighestValue(string playerId, int threshold)
+        private bool EvaluateStyleHighestValue(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
             int count = 0;
@@ -497,7 +497,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Style Y6: visit an Event Spot >= N times
-        private bool EvaluateStyleEventSpotVisits(string playerId, int threshold)
+        private bool EvaluateStyleEventSpotVisits(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
             int count = player.MovementHistory
@@ -507,7 +507,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Movement M1: visit all 4 wings
-        private bool EvaluateMovementAllWings(string playerId)
+        private bool EvaluateMovementAllWings(Guid playerId)
         {
             var player = GamePlayers[playerId];
             var visited = player.MovementHistory
@@ -519,7 +519,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Movement M2: >= N turns in same wing
-        private bool EvaluateMovementCamping(string playerId, int threshold)
+        private bool EvaluateMovementCamping(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
             return player.MovementHistory
@@ -529,7 +529,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Movement M3: same spot as another player >= N times
-        private bool EvaluateMovementSameSpot(string playerId, int threshold)
+        private bool EvaluateMovementSameSpot(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
             int count = 0;
@@ -557,7 +557,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Movement M4: full distance on >= N consecutive turns
-        private bool EvaluateMovementFullDistance(string playerId, int threshold)
+        private bool EvaluateMovementFullDistance(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
             var ordered = player.MovementHistory.OrderBy(m => m.TurnNumber).ToList();
@@ -596,7 +596,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Movement M5: change wings every turn for >= N consecutive turns
-        private bool EvaluateMovementWingHopping(string playerId, int threshold)
+        private bool EvaluateMovementWingHopping(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
             var ordered = player.MovementHistory.OrderBy(m => m.TurnNumber).ToList();
@@ -620,7 +620,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Movement M6: return to same spot >= N times
-        private bool EvaluateMovementRevisit(string playerId, int threshold)
+        private bool EvaluateMovementRevisit(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
             return player.MovementHistory
@@ -629,7 +629,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Rivalry R1: Acquire after another's Remove on same collection, >= N times
-        private bool EvaluateRivalryRescue(string playerId, int threshold)
+        private bool EvaluateRivalryRescue(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
             int count = 0;
@@ -653,13 +653,13 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Rivalry R2: same collection as player immediately before you, >= N turns
-        private bool EvaluateRivalryEcho(string playerId, int threshold)
+        private bool EvaluateRivalryEcho(Guid playerId, int threshold)
         {
             var turnOrder = State.TurnManager.TurnOrder;
             int myIndex = turnOrder.IndexOf(playerId);
             if (myIndex == -1) return false;
             int prevIndex = (myIndex - 1 + turnOrder.Count) % turnOrder.Count;
-            string prevPlayerId = turnOrder[prevIndex];
+            Guid prevPlayerId = turnOrder[prevIndex];
 
             int count = 0;
             var myTurns = State.RoundPlayHistory
@@ -684,13 +684,13 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Rivalry R3: never affect same collection as player immediately before you, >= N consecutive turns
-        private bool EvaluateRivalryAvoid(string playerId, int threshold)
+        private bool EvaluateRivalryAvoid(Guid playerId, int threshold)
         {
             var turnOrder = State.TurnManager.TurnOrder;
             int myIndex = turnOrder.IndexOf(playerId);
             if (myIndex == -1) return false;
             int prevIndex = (myIndex - 1 + turnOrder.Count) % turnOrder.Count;
-            string prevPlayerId = turnOrder[prevIndex];
+            Guid prevPlayerId = turnOrder[prevIndex];
 
             var myTurns = State.RoundPlayHistory
                 .Where(r => r.PlayerId == playerId && r.CardPlay != null)
@@ -725,7 +725,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Rivalry R4: play Remove on highest-progress collection >= N times
-        private bool EvaluateRivalryTopRemove(string playerId, int threshold)
+        private bool EvaluateRivalryTopRemove(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
             int count = 0;
@@ -744,7 +744,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Rivalry R5: play Acquire on lowest-progress collection >= N times
-        private bool EvaluateRivalryBottomAcquire(string playerId, int threshold)
+        private bool EvaluateRivalryBottomAcquire(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
             int count = 0;
@@ -763,11 +763,11 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         }
 
         // Rivalry R6: same wing as randomly assigned target player >= N turns
-        private bool EvaluateRivalryShadow(string playerId, int threshold)
+        private bool EvaluateRivalryShadow(Guid playerId, int threshold)
         {
             var player = GamePlayers[playerId];
-            if (player.RivalryTargetPlayerId == null) return false;
-            if (!GamePlayers.TryGetValue(player.RivalryTargetPlayerId, out var target)) return false;
+            if (player.RivalryTargetPlayerId is not { } rivalId) return false;
+            if (!GamePlayers.TryGetValue(rivalId, out var target)) return false;
 
             int count = 0;
             var myMoves = State.RoundPlayHistory.Where(r => r.PlayerId == playerId).ToList();

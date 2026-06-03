@@ -114,11 +114,11 @@ namespace KnockBox.Codeword.Pages
             await InvokeAsync(StateHasChanged);
         }
 
-        protected void KickPlayer(string userId)
+        protected void KickPlayer(Guid userId)
         {
-            if (string.IsNullOrWhiteSpace(userId))
+            if (userId == Guid.Empty)
             {
-                Logger.LogWarning("Cannot kick player: user ID is null or empty.");
+                Logger.LogWarning("Cannot kick player: user ID is empty.");
                 return;
             }
 

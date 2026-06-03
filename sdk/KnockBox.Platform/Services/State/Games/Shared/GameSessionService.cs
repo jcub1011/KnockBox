@@ -31,7 +31,7 @@ namespace KnockBox.Services.State.Games.Shared
         private readonly Lock _lock = new();
         private IDisposable? _lifecycleToken;
         private GameSessionState? _sessionState;
-        private string? _currentUserId;
+        private Guid? _currentUserId;
 
         /// <summary>
         /// Lazily resolves the <see cref="GameSessionState"/> cached for the current user
@@ -86,7 +86,7 @@ namespace KnockBox.Services.State.Games.Shared
 
             logger.LogInformation(
                 "User [{userId}] left session [{sessionId}].",
-                userService.CurrentUser?.Id ?? "Unknown",
+                userService.CurrentUser?.Id.ToString() ?? "Unknown",
                 previousSession?.LobbyRegistration.Uri ?? "none");
 
             try
@@ -115,7 +115,7 @@ namespace KnockBox.Services.State.Games.Shared
 
             logger.LogInformation(
                 "User [{userId}] entered session [{sessionId}].",
-                session.User.Id ?? "Unknown",
+                session.User.Id,
                 session.LobbyRegistration.Uri);
 
             try

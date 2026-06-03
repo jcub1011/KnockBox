@@ -25,21 +25,27 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic.States
         private HiddenAgendaGameContext _context = default!;
         private RoundOverState _stateLogic = default!;
 
+        private Guid _hostId = default!;
+        private Guid _p1Id = default!;
+
         [TestInitialize]
         public void Setup()
         {
+            _hostId = Guid.NewGuid();
+            _p1Id = Guid.NewGuid();
+
             _rngMock = new Mock<IRandomNumberService>();
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<HiddenAgendaGameState>>();
-            
-            var host = UserFactory.Create("Host", "host1");
+
+            var host = UserFactory.Create("Host", _hostId);
             _state = new HiddenAgendaGameState(host, _stateLoggerMock.Object);
             _state.BoardGraph = BoardDefinitions.CreateGrandCircuit();
-            
+
             _context = new HiddenAgendaGameContext(_state, _rngMock.Object, _loggerMock.Object);
             _stateLogic = new RoundOverState();
 
-            _state.GamePlayers["p1"] = new HiddenAgendaPlayerState { PlayerId = "p1", RoundScore = 10, CumulativeScore = 5 };
+            _state.GamePlayers[_p1Id] = new HiddenAgendaPlayerState { PlayerId = _p1Id, RoundScore = 10, CumulativeScore = 5 };
             _state.UpdateSettings(s => s with { TotalRounds = 3 });
             _state.CurrentRound = 1;
         }
@@ -48,32 +54,33 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic.States
         public void OnEnter_AccumulatesScores()
         {
             _stateLogic.OnEnter(_context);
-            
-            Assert.AreEqual(15, _state.GamePlayers["p1"].CumulativeScore);
+
+            Assert.AreEqual(15, _state.GamePlayers[_p1Id].CumulativeScore);
             Assert.AreEqual(GamePhase.RoundOver, _state.Phase);
         }
-[TestMethod]
-public void StartNextRound_HostOnly_TransitionsToSetup()
-{
-    _stateLogic.OnEnter(_context);
 
-    // Non-host
-    var res1 = _stateLogic.HandleCommand(_context, new StartNextRoundCommand("other"));
-    Assert.IsNotNull(res1.Error);
+        [TestMethod]
+        public void StartNextRound_HostOnly_TransitionsToSetup()
+        {
+            _stateLogic.OnEnter(_context);
 
-    // Host
-    var res2 = _stateLogic.HandleCommand(_context, new StartNextRoundCommand("host1"));
-    Assert.IsInstanceOfType(res2.Value, typeof(RoundSetupState));
-}
+            // Non-host
+            var res1 = _stateLogic.HandleCommand(_context, new StartNextRoundCommand(Guid.NewGuid()));
+            Assert.IsNotNull(res1.Error);
 
-[TestMethod]
-public void StartNextRound_AfterFinalRound_TransitionsToMatchOver()
-{
-    _state.CurrentRound = 3;
-    _stateLogic.OnEnter(_context);
+            // Host
+            var res2 = _stateLogic.HandleCommand(_context, new StartNextRoundCommand(_hostId));
+            Assert.IsInstanceOfType(res2.Value, typeof(RoundSetupState));
+        }
 
-    var result = _stateLogic.HandleCommand(_context, new StartNextRoundCommand("host1"));
-    Assert.IsInstanceOfType(result.Value, typeof(MatchOverState));
-}
-}
+        [TestMethod]
+        public void StartNextRound_AfterFinalRound_TransitionsToMatchOver()
+        {
+            _state.CurrentRound = 3;
+            _stateLogic.OnEnter(_context);
+
+            var result = _stateLogic.HandleCommand(_context, new StartNextRoundCommand(_hostId));
+            Assert.IsInstanceOfType(result.Value, typeof(MatchOverState));
+        }
+    }
 }

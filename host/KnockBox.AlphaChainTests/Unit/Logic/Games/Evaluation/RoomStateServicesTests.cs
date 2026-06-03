@@ -18,12 +18,12 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
     {
         private static AlphaChainEvaluationServices NewContainer()
         {
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             var state = new AlphaChainGameState(host, NullLogger<AlphaChainGameState>.Instance);
             return new AlphaChainEvaluationServices(state, new FixedRandomNumberService(), new ModifierCardFactory());
         }
 
-        private static AlphaChainPlayerState Player(string id) => new() { UserId = id };
+        private static AlphaChainPlayerState Player(string id) => new() { UserId = Guid.NewGuid() };
 
         // ── Container wiring ────────────────────────────────────────────────────
 

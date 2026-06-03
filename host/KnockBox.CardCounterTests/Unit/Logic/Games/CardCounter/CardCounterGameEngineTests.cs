@@ -34,8 +34,8 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             _engineLoggerMock = new Mock<ILogger<CardCounterGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<CardCounterGameState>>();
 
-            _host = UserFactory.Create("Host", "host-id");
-            _player1 = UserFactory.Create("Player1", "p1-id");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
+            _player1 = UserFactory.Create("Player1", Guid.NewGuid());
 
             _engine = new CardCounterGameEngine(
                 _randomMock.Object,
@@ -102,7 +102,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             using var state = (CardCounterGameState)stateResult.Value!;
             state.RegisterPlayer(_player1);
 
-            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+            var nonHost = UserFactory.Create("NotHost", Guid.NewGuid());
             var result = await _engine.StartAsync(nonHost, state);
 
             Assert.IsTrue(result.IsFailure);
@@ -230,7 +230,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public async Task StartAsync_ActiveOperatorMode_MultiplePlayersAllGetBalanceTen()
         {
-            var player2 = UserFactory.Create("Player2", "p2-id");
+            var player2 = UserFactory.Create("Player2", Guid.NewGuid());
             using var state = await CreateStartedActiveOperatorGameAsync(_player1, player2);
 
             Assert.HasCount(2, state.GamePlayers);
@@ -356,7 +356,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             using var state = (CardCounterGameState)stateResult.Value!;
             state.RegisterPlayer(_player1);
 
-            var result = _engine.NotMyMoneySelectTarget(_player1, state, "target-id");
+            var result = _engine.NotMyMoneySelectTarget(_player1, state, Guid.NewGuid());
 
             Assert.IsTrue(result.IsFailure);
         }
@@ -404,7 +404,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             using var state = await CreateStartedGameAsync(_player1);
             state.SetPhase(GamePhase.GameOver);
 
-            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+            var nonHost = UserFactory.Create("NotHost", Guid.NewGuid());
             var result = _engine.ReturnToLobby(nonHost, state);
 
             Assert.IsTrue(result.IsFailure, "Non-host should not be able to return to the lobby.");
@@ -482,7 +482,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         public async Task ReturnToLobby_AfterGameOver_ClearsLastPlayedAction()
         {
             using var state = await CreateStartedGameAsync(_player1);
-            state.LastPlayedAction = new LastPlayedActionInfo("p1", "P1", ActionType.Burn, null, null);
+            state.LastPlayedAction = new LastPlayedActionInfo(Guid.NewGuid(), "P1", ActionType.Burn, null, null);
             state.SetPhase(GamePhase.GameOver);
 
             _engine.ReturnToLobby(_host, state);

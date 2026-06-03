@@ -30,7 +30,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             // These lifecycle tests don't build the dictionary trie, so a bare mock
             // word service is enough — GetSolver/GetGenerator are exercised separately.
             _wordListServiceMock = new Mock<IWordListService>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
             // A real RNG (not an empty SequentialRng): EnterPlaying now draws letters during
             // board generation. With the bare mock word service the trie is empty, so Generate
             // fails gracefully to the empty-board branch — exactly what these phase/lifecycle
@@ -119,7 +119,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         public async Task StartAsync_NonHost_ReturnsError()
         {
             var state = await CreateStateAsync();
-            var stranger = UserFactory.Create("Stranger", "stranger1");
+            var stranger = UserFactory.Create("Stranger", Guid.NewGuid());
 
             var result = await _engine.StartAsync(stranger, state);
 
@@ -413,7 +413,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         public async Task SkipReveal_NonHost_ReturnsError_AndStaysInReveal()
         {
             var state = await DriveIntoReveal();
-            var stranger = UserFactory.Create("Other", "other1");
+            var stranger = UserFactory.Create("Other", Guid.NewGuid());
 
             var result = _engine.SkipReveal(state, stranger);
 
@@ -474,8 +474,8 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         {
             var state = await CreateStateAsync();
             // Two players join → host observes. Keep p1's registration token so we can drop it.
-            var p1 = UserFactory.Create("P1", "p1");
-            var p2 = UserFactory.Create("P2", "p2");
+            var p1 = UserFactory.Create("P1", Guid.NewGuid());
+            var p2 = UserFactory.Create("P2", Guid.NewGuid());
             var p1Token = state.RegisterPlayer(p1);
             Assert.IsTrue(p1Token.TryGetSuccess(out var p1Registration));
             Assert.IsTrue(state.RegisterPlayer(p2).IsSuccess);
@@ -553,7 +553,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             var players = new List<User>();
             for (int i = 0; i < count; i++)
             {
-                var player = UserFactory.Create($"P{i + 1}", Guid.NewGuid().ToString());
+                var player = UserFactory.Create($"P{i + 1}", Guid.NewGuid());
                 Assert.IsTrue(state.RegisterPlayer(player).IsSuccess);
                 players.Add(player);
             }
@@ -569,7 +569,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             RegisterPlayers(state, 2);
             await _engine.StartAsync(_host, state);
             state.Execute(() => _engine.EnterFinalStandings(state));
-            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+            var nonHost = UserFactory.Create("NotHost", Guid.NewGuid());
 
             var result = _engine.ReturnToLobby(nonHost, state);
 

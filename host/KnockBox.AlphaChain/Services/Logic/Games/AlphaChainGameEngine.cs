@@ -169,19 +169,19 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
         }
 
         /// <summary>Convenience wrapper for the UI: advances the active player's turn.</summary>
-        public Task<Result> AdvanceTurnAsync(string actorUserId, AlphaChainGameState state)
+        public Task<Result> AdvanceTurnAsync(Guid actorUserId, AlphaChainGameState state)
             => ProcessCommandAsync(state, new AdvanceTurnCommand(actorUserId));
 
         /// <summary>Convenience wrapper for the UI: commits an Engine Bay ordering during Intermission Optimization.</summary>
-        public Task<Result> SubmitOptimizationAsync(string actorUserId, IReadOnlyList<string> modifierBayIds, AlphaChainGameState state)
+        public Task<Result> SubmitOptimizationAsync(Guid actorUserId, IReadOnlyList<string> modifierBayIds, AlphaChainGameState state)
             => ProcessCommandAsync(state, new SubmitOptimizationCommand(actorUserId, modifierBayIds));
 
         /// <summary>Convenience wrapper for the UI: the last-place player picks the next era's banned letter.</summary>
-        public Task<Result> SelectSniperBanAsync(string actorUserId, char letter, AlphaChainGameState state)
+        public Task<Result> SelectSniperBanAsync(Guid actorUserId, char letter, AlphaChainGameState state)
             => ProcessCommandAsync(state, new SelectSniperBanCommand(actorUserId, letter));
 
         /// <summary>Convenience wrapper for the UI: the host skips the currently-showing tutorial.</summary>
-        public Task<Result> SkipTutorialAsync(string actorUserId, AlphaChainGameState state)
+        public Task<Result> SkipTutorialAsync(Guid actorUserId, AlphaChainGameState state)
             => ProcessCommandAsync(state, new SkipTutorialCommand(actorUserId));
 
         /// <summary>
@@ -191,7 +191,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
         /// it on the context; this reads it back out after the dispatch completes.
         /// </summary>
         public async Task<ValueResult<SubmitWordResult>> SubmitWordAsync(
-            string actorUserId, string wordRaw, AlphaChainGameState state, DateTimeOffset? now = null)
+            Guid actorUserId, string wordRaw, AlphaChainGameState state, DateTimeOffset? now = null)
         {
             if (state.Context is null)
                 return ValueResult<SubmitWordResult>.FromError("The game has not been started yet.");
@@ -266,7 +266,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
                 }
 
                 // If the departing player held the turn, advance past them.
-                if (state.TurnManager.CurrentPlayer == user.Id)
+                if (state.TurnManager.CurrentPlayer.GetValueOrDefault() == user.Id)
                     state.TurnManager.NextTurn();
 
                 // End the match when no one is left to play: an empty field ends it in any mode

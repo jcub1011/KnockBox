@@ -10,7 +10,7 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
     public class AlphaChainPlayerState
     {
         /// <summary>The player's authoritative <c>User.Id</c>.</summary>
-        public string UserId { get; set; } = string.Empty;
+        public Guid UserId { get; set; } = Guid.Empty;
 
         /// <summary>Per-lobby display name (may differ from <c>User.Name</c> after disambiguation).</summary>
         public string DisplayName { get; set; } = string.Empty;

@@ -260,7 +260,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
 
         private static DndMapperGameState MakeState()
         {
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             return new DndMapperGameState(host, NullLogger<DndMapperGameState>.Instance);
         }
     }

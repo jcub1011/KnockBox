@@ -84,7 +84,7 @@ namespace KnockBox.Tracery.Models
     /// <summary>One player's line on the standings beat.</summary>
     public sealed record StandingRow
     {
-        public string UserId { get; init; } = string.Empty;
+        public Guid UserId { get; init; }
         public string DisplayName { get; init; } = string.Empty;
         public int RoundPoints { get; init; }
         public int CumulativeScore { get; init; }

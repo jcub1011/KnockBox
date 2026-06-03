@@ -6,7 +6,7 @@ namespace KnockBox.CardCounter.Services.State.Games.Data
     public class PlayerState
     {
         /// <summary>Unique player identifier.</summary>
-        public string PlayerId { get; set; } = string.Empty;
+        public Guid PlayerId { get; set; } = Guid.Empty;
 
         /// <summary>Human-readable display name.</summary>
         public string DisplayName { get; set; } = string.Empty;

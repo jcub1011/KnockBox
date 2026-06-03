@@ -122,7 +122,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
     /// </summary>
     internal sealed class EngineEffects(AlphaChainGameState state, AlphaChainEvaluationServices owner) : IEngineEffects
     {
-        public string? RoundLeaderUserId => state.RoundLeaderUserId;
+        public Guid? RoundLeaderUserId => state.RoundLeaderUserId;
 
         public void AddNotice(EngineEffectEvent notice) => owner.Notices.Add(notice);
 
@@ -134,7 +134,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
                 .Where(p => !p.IsEliminated && !p.HasLeft)
                 .OrderBy(p => TurnIndex(p.UserId));
 
-        public AlphaChainPlayerState? PeekNextActivePlayer(string fromUserId)
+        public AlphaChainPlayerState? PeekNextActivePlayer(Guid fromUserId)
         {
             var order = state.TurnManager.TurnOrder;
             int start = order.IndexOf(fromUserId);
@@ -220,7 +220,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
             => new(mirror.GetId(), mirror.GetName(), EngineEffectClass.Special,
                 holder.UserId, holder.DisplayName, target.UserId, target.DisplayName, reason, Negated: true);
 
-        private int TurnIndex(string userId)
+        private int TurnIndex(Guid userId)
         {
             int idx = state.TurnManager.TurnOrder.IndexOf(userId);
             return idx < 0 ? int.MaxValue : idx;

@@ -77,7 +77,7 @@ namespace KnockBox.LinkedList.Pages
 
         // ── Group assignment (Groups mode, §8.2) ─────────────────────────────
 
-        protected IReadOnlyList<string> ParticipantIds =>
+        protected IReadOnlyList<Guid> ParticipantIds =>
             [.. GameState.Participants.Select(p => p.User.Id)];
 
         /// <summary>The number of teams; at least 2 in Groups mode.</summary>
@@ -103,7 +103,7 @@ namespace KnockBox.LinkedList.Pages
             => PersistAssignments(LinkedListGameEngine.AutoBalanceGroups(ParticipantIds, GroupCount));
 
         /// <summary>Reassigns a player to a different team, keeping the team count fixed.</summary>
-        protected void AssignPlayerToGroup(string playerId, int groupIndex)
+        protected void AssignPlayerToGroup(Guid playerId, int groupIndex)
         {
             var teams = ReconcileTeams();
             foreach (var t in teams) t.Remove(playerId);
@@ -114,7 +114,7 @@ namespace KnockBox.LinkedList.Pages
 
         protected static string GroupLabel(int index) => $"Group {(char)('A' + index)}";
 
-        protected string DisplayNameOf(string playerId)
+        protected string DisplayNameOf(Guid playerId)
         {
             var entry = GameState.Participants.FirstOrDefault(e => e.User.Id == playerId);
             return entry.User is not null ? entry.DisplayName : "Player";
@@ -132,7 +132,7 @@ namespace KnockBox.LinkedList.Pages
             return ValidateTeams(teams);
         }
 
-        private static (bool Ok, string? Message) ValidateTeams(List<List<string>> teams)
+        private static (bool Ok, string? Message) ValidateTeams(List<List<Guid>> teams)
         {
             if (teams.Count < 2) return (false, "Need at least 2 groups.");
             if (teams.Any(t => t.Count < 2)) return (false, "Each group needs at least 2 players.");
@@ -142,11 +142,11 @@ namespace KnockBox.LinkedList.Pages
         /// <summary>Pure (no-persist) view of the teams, reconciled against the current
         /// roster: members who left are dropped and players with no team join the
         /// smallest one. Safe to call during render.</summary>
-        protected List<List<string>> ReconcileTeams()
+        protected List<List<Guid>> ReconcileTeams()
         {
             var ids = ParticipantIds.ToHashSet();
             var teams = GameState.GroupAssignments.Count > 0
-                ? GameState.GroupAssignments.Select(t => new List<string>(t)).ToList()
+                ? GameState.GroupAssignments.Select(t => new List<Guid>(t)).ToList()
                 : LinkedListGameEngine.AutoBalanceGroups(ParticipantIds, 2);
 
             foreach (var t in teams) t.RemoveAll(id => !ids.Contains(id));
@@ -161,7 +161,7 @@ namespace KnockBox.LinkedList.Pages
             return teams;
         }
 
-        private void PersistAssignments(List<List<string>> teams)
+        private void PersistAssignments(List<List<Guid>> teams)
             => SetState(() => GameState.GroupAssignments = teams);
 
         protected int RejectionCap
@@ -210,8 +210,8 @@ namespace KnockBox.LinkedList.Pages
 
         protected string AuditorPlayerId
         {
-            get => GameState.AuditorPlayerId;
-            set => SetState(() => GameState.AuditorPlayerId = value ?? "");
+            get => GameState.AuditorPlayerId == Guid.Empty ? "" : GameState.AuditorPlayerId.ToString();
+            set => SetState(() => GameState.AuditorPlayerId = Guid.TryParse(value, out var g) ? g : Guid.Empty);
         }
 
         /// <summary>Restores every host-configurable rule to its out-of-the-box value by
@@ -239,9 +239,9 @@ namespace KnockBox.LinkedList.Pages
                 Logger.LogError("Failed to update Linked List lobby state: {Error}", error.PublicMessage);
         }
 
-        protected void KickPlayer(string userId)
+        protected void KickPlayer(Guid userId)
         {
-            if (!IsHost || string.IsNullOrWhiteSpace(userId) || userId == GameState.Host.Id) return;
+            if (!IsHost || userId == Guid.Empty || userId == GameState.Host.Id) return;
 
             var player = GameState.Players.FirstOrDefault(e => e.User.Id == userId);
             if (player.User is null) return;

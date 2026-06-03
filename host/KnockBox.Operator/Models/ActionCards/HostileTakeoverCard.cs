@@ -1,3 +1,4 @@
+using System;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
@@ -34,11 +35,11 @@ public sealed class HostileTakeoverCard() : ActionCard(CardAction.HostileTakeove
     {
         if (ctx.ActionBlocked || ctx.TargetPlayerId == null)
             return ValueResult<CardPlayResult>.FromValue(CardPlayResult.Ok());
-        Resolve(ctx.GameContext, ctx.ThisPlayer.UserId, ctx.TargetPlayerId);
+        Resolve(ctx.GameContext, ctx.ThisPlayer.UserId, ctx.TargetPlayerId.Value);
         return ValueResult<CardPlayResult>.FromValue(CardPlayResult.Ok());
     }
 
-    public static void Resolve(OperatorGameContext context, string sourcePlayerId, string targetPlayerId)
+    public static void Resolve(OperatorGameContext context, Guid sourcePlayerId, Guid targetPlayerId)
     {
         if (context.GamePlayers.TryGetValue(sourcePlayerId, out var source) && context.GamePlayers.TryGetValue(targetPlayerId, out var target))
         {

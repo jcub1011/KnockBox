@@ -20,5 +20,5 @@ public interface IPlayerTrackedGameState<TPlayerState>
     /// <c>PlayerUnregistered</c> fires on the owning
     /// <see cref="AbstractGameState"/>.
     /// </summary>
-    ConcurrentDictionary<string, TPlayerState> GamePlayers { get; }
+    ConcurrentDictionary<Guid, TPlayerState> GamePlayers { get; }
 }

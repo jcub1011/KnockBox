@@ -16,7 +16,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
         /// — the same deterministic ordering as <c>ResolveSniperBanPicker</c>/<c>GameOverState</c>.
         /// Eliminated/left players are excluded. The lowest rank equals the active player count.
         /// </summary>
-        public static Dictionary<string, int> RankByScore(AlphaChainGameState state)
+        public static Dictionary<Guid, int> RankByScore(AlphaChainGameState state)
         {
             var active = state.GamePlayers.Values
                 .Where(p => !p.IsEliminated && !p.HasLeft)
@@ -24,7 +24,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
                 .ThenBy(p => TurnIndex(state, p.UserId))
                 .ToList();
 
-            var ranks = new Dictionary<string, int>(StringComparer.Ordinal);
+            var ranks = new Dictionary<Guid, int>();
             for (int i = 0; i < active.Count; i++)
                 ranks[active[i].UserId] = i + 1;
             return ranks;
@@ -35,7 +35,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
         /// order), or null when no player is active. Snapshotted into
         /// <see cref="AlphaChainGameState.RoundLeaderUserId"/> at each round start for the Bounty Hunter.
         /// </summary>
-        public static string? LeaderUserId(AlphaChainGameState state)
+        public static Guid? LeaderUserId(AlphaChainGameState state)
         {
             AlphaChainPlayerState? leader = null;
             foreach (var p in state.GamePlayers.Values)
@@ -49,7 +49,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
             return leader?.UserId;
         }
 
-        private static int TurnIndex(AlphaChainGameState state, string userId)
+        private static int TurnIndex(AlphaChainGameState state, Guid userId)
         {
             int idx = state.TurnManager.TurnOrder.IndexOf(userId);
             return idx < 0 ? int.MaxValue : idx;

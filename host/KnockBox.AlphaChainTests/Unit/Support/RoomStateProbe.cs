@@ -17,12 +17,12 @@ namespace KnockBox.AlphaChain.Tests.Unit.Support
             => state.Context!.EvaluationServices.Get<T>()
                ?? throw new InvalidOperationException($"Room service {typeof(T).Name} is not registered.");
 
-        private static AlphaChainPlayerState Player(AlphaChainGameState state, string userId) => state.GamePlayers[userId];
+        private static AlphaChainPlayerState Player(AlphaChainGameState state, Guid userId) => state.GamePlayers[userId];
 
-        public static double ShieldMultiplier(AlphaChainGameState state, string userId)
+        public static double ShieldMultiplier(AlphaChainGameState state, Guid userId)
             => Service<IShieldService>(state).GetMultiplier(Player(state, userId));
 
-        public static void SetShieldMultiplier(AlphaChainGameState state, string userId, double value)
+        public static void SetShieldMultiplier(AlphaChainGameState state, Guid userId, double value)
         {
             // Seed via the service: GrantFresh to 1.0, then decay down to the requested value.
             var shield = Service<IShieldService>(state);
@@ -32,34 +32,34 @@ namespace KnockBox.AlphaChain.Tests.Unit.Support
                 shield.Decay(player, 1.0 - value);
         }
 
-        public static bool HyperDriveActive(AlphaChainGameState state, string userId)
+        public static bool HyperDriveActive(AlphaChainGameState state, Guid userId)
             => Service<IHyperDriveService>(state).IsLatched(Player(state, userId));
 
-        public static void LatchHyperDrive(AlphaChainGameState state, string userId)
+        public static void LatchHyperDrive(AlphaChainGameState state, Guid userId)
             => Service<IHyperDriveService>(state).Latch(Player(state, userId));
 
-        public static bool PrismUsedThisTurn(AlphaChainGameState state, string userId)
+        public static bool PrismUsedThisTurn(AlphaChainGameState state, Guid userId)
             => Service<IPrismTurnGuard>(state).HasConsumed(Player(state, userId));
 
-        public static int QueuedTimePenalty(AlphaChainGameState state, string userId)
+        public static int QueuedTimePenalty(AlphaChainGameState state, Guid userId)
             => Service<ITimePenaltyService>(state).Peek(Player(state, userId));
 
-        public static char? PersonalBannedLetter(AlphaChainGameState state, string userId)
+        public static char? PersonalBannedLetter(AlphaChainGameState state, Guid userId)
             => Service<IHijackBanService>(state).Peek(Player(state, userId));
 
-        public static void MarkDoubleLetterPlayed(AlphaChainGameState state, string userId)
+        public static void MarkDoubleLetterPlayed(AlphaChainGameState state, Guid userId)
             => Service<IDoubleLetterTracker>(state).Mark(Player(state, userId));
 
-        public static bool PlayedDoubleLetterWordThisEra(AlphaChainGameState state, string userId)
+        public static bool PlayedDoubleLetterWordThisEra(AlphaChainGameState state, Guid userId)
             => Service<IDoubleLetterTracker>(state).HasPlayed(Player(state, userId));
 
-        public static char? CardBan(AlphaChainGameState state, string userId, ModifierId card)
+        public static char? CardBan(AlphaChainGameState state, Guid userId, ModifierId card)
             => Service<ICardBanService>(state).BanFor(Player(state, userId), card);
 
-        public static void SetCardBan(AlphaChainGameState state, string userId, ModifierId card, char letter)
+        public static void SetCardBan(AlphaChainGameState state, Guid userId, ModifierId card, char letter)
             => Service<ICardBanService>(state).Roll(Player(state, userId), card, letter);
 
-        public static IReadOnlyCollection<char> CardBans(AlphaChainGameState state, string userId)
+        public static IReadOnlyCollection<char> CardBans(AlphaChainGameState state, Guid userId)
             => Service<ICardBanService>(state).BansFor(Player(state, userId));
     }
 }
