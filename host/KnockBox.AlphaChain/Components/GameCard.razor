@@ -47,17 +47,28 @@ else
 {
     <div class="@RootClass" style="@CardColorStyle" title="@SmallTooltip">
         <span class="gc-watermark" aria-hidden="true"><CardIcon Card="@Card" /></span>
-        <span class="gc-icon"><CardIcon Card="@Card" /></span>
-        <div class="gc-chips">
-            @if (!string.IsNullOrEmpty(MagnitudeText))
-            {
-                <span class="gc-chip @MagnitudeChipClass">@MagnitudeText</span>
-            }
-            @if (!string.IsNullOrEmpty(LiveBadge))
-            {
-                <span class="gc-livebadge">@LiveBadge</span>
-            }
+        <div class="gc-small-top">
+            <span class="gc-icon"><CardIcon Card="@Card" /></span>
+            <div class="gc-chips">
+                @if (!string.IsNullOrEmpty(MagnitudeText))
+                {
+                    <span class="gc-chip @MagnitudeChipClass">@MagnitudeText</span>
+                }
+                @if (!string.IsNullOrEmpty(LiveBadge))
+                {
+                    <span class="gc-livebadge">@LiveBadge</span>
+                }
+            </div>
         </div>
+        @if (!string.IsNullOrEmpty(Name))
+        {
+            @* Title in an SVG whose viewBox is sized (roughly) to the text, scaled uniformly to the
+               card width via preserveAspectRatio — so long names shrink to fit instead of truncating,
+               without stretching the glyphs. *@
+            <svg class="gc-name-fit" viewBox="0 0 @NameViewWidth 130" preserveAspectRatio="xMidYMid meet" role="img" aria-label="@Name">
+                <text x="@(NameViewWidth / 2)" y="96" text-anchor="middle" font-size="100">@Name</text>
+            </svg>
+        }
     </div>
 }
 
@@ -103,6 +114,31 @@ else
         $"gc-card gc-{SizeClass} gc-{CategoryClass}{StateClasses}";
 
     private string SizeClass => Size == CardSize.Large ? "large" : "small";
+
+    /// <summary>Approximate width (in the title SVG's 100-unit em) of the small-card name, used as the
+    /// SVG viewBox width so <c>preserveAspectRatio</c> scales the text uniformly to fit the card. Summed
+    /// from rough per-glyph advances (wide M/W, narrow i/l/t/spaces) plus padding so glyphs never clip.</summary>
+    private int NameViewWidth
+    {
+        get
+        {
+            double units = 0;
+            foreach (char c in Name)
+            {
+                char l = char.ToLowerInvariant(c);
+                units += c switch
+                {
+                    'm' or 'w' => 92,
+                    'M' or 'W' => 104,
+                    _ when "iljtf.,'!| ".IndexOf(l) >= 0 => 32,
+                    _ when char.IsUpper(c) => 72,
+                    _ when char.IsDigit(c) => 60,
+                    _ => 56,
+                };
+            }
+            return (int)Math.Ceiling(units) + 16;
+        }
+    }
 
     /// <summary>The card's identity color, exposed as the <c>--gc-card-color</c> variable that fills the
     /// icon swatch, the magnitude chip, the faint icon watermark, and (faintly) the background. Picked by

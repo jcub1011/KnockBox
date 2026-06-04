@@ -143,7 +143,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override string GetName() => "Speedracer";
         public override string GetDescription()
             => "When your word is longer than 6 letters, you get a multiplier (1 / ([remaining time] / [total time])). Capped at half your letter count.";
-        public override string? GetMagnitudeLabel() => "≤×(ltr/2)";
+        public override string? GetMagnitudeLabel() => "≤ × (ltr/2)";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetEffectiveLetterCount(context) > 6;
@@ -171,8 +171,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override string? GetMagnitudeLabel() => "+3 / ltr";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
-            => context.WordHistory.IsEmpty
-                || this.GetEffectiveLetterCount(context) >= context.WordHistory[^1].Length;
+            => context.SubmissionHistory.IsEmpty
+                || this.GetEffectiveLetterCount(context) >= context.SubmissionHistory[^1].Word.Length;
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
             => 3.0 * self.GetEffectiveLetterCount(context);

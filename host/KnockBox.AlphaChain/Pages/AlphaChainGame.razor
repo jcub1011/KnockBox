@@ -13,6 +13,7 @@
     @if (GameState.Phase == AlphaChainGamePhase.GameOver)
     {
         <GameOverPanel Results="GameState.Results" />
+        <SubmissionHistoryPanel Submissions="GameState.SubmissionHistory" />
         @if (IsHost)
         {
             <div class="ac-results-actions">

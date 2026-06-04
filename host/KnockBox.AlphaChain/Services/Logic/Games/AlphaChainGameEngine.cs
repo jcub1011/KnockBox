@@ -4,6 +4,7 @@ using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM.States;
 using KnockBox.AlphaChain.Services.State.Games;
+using KnockBox.AlphaChain.Services.State.Games.Data;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
@@ -79,8 +80,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
             state.TurnManager.TurnOrder.Clear();
             state.OptimizationSubmissions.Clear();
             state.PlayedWords.Clear();
-            state.PlayLog.Clear();
-            state.WordHistory = System.Collections.Immutable.ImmutableList<string>.Empty;
+            state.SubmissionHistory = System.Collections.Immutable.ImmutableList<AlphaChainSubmission>.Empty;
             state.CurrentRound = 0;
             state.CurrentEra = 0;
             state.IntermissionPhase = default;

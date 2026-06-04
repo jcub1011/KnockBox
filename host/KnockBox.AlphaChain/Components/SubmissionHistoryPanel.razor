@@ -1,0 +1,101 @@
+@using KnockBox.AlphaChain.Services.State.Games.Data
+@using KnockBox.AlphaChain.Services.Logic.Scoring
+@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
+
+@* Post-game word history: every accepted submission with its score, submitter, and the engine
+   (Engine Bay scoring trace) that produced it — so players can review which engine designs
+   worked. Virtualized because a long match accumulates many words. Three sort orders; defaults
+   to highest-scoring first. The engine strip mirrors ScoreReplayStrip statically (no animation). *@
+
+<section class="ac-hist">
+    <header class="ac-hist-head">
+        <h3 class="ac-hist-title">Word History</h3>
+        <div class="ac-hist-sort" role="group" aria-label="Sort word history">
+            <button type="button" class="ac-hist-sortbtn @(_sort == SortOrder.HighestScore ? "ac-hist-sortbtn-on" : "")"
+                    @onclick="() => SetSort(SortOrder.HighestScore)">Highest</button>
+            <button type="button" class="ac-hist-sortbtn @(_sort == SortOrder.OldestFirst ? "ac-hist-sortbtn-on" : "")"
+                    @onclick="() => SetSort(SortOrder.OldestFirst)">Oldest</button>
+            <button type="button" class="ac-hist-sortbtn @(_sort == SortOrder.NewestFirst ? "ac-hist-sortbtn-on" : "")"
+                    @onclick="() => SetSort(SortOrder.NewestFirst)">Newest</button>
+        </div>
+    </header>
+
+    @if (_sorted.Count == 0)
+    {
+        <p class="ac-hist-empty">No words were submitted.</p>
+    }
+    else
+    {
+        <div class="ac-hist-list">
+            <Virtualize Items="_sorted" Context="s" ItemSize="150">
+                <div class="ac-hist-row">
+                    <div class="ac-hist-row-main">
+                        <span class="ac-hist-word">@s.Word.ToUpperInvariant()</span>
+                        <span class="ac-hist-by">@s.DisplayName</span>
+                        <span class="ac-hist-score @(s.ZeroPointTax ? "ac-hist-score-taxed" : "")">
+                            @(s.ZeroPointTax ? "tax" : "+" + s.Score)
+                        </span>
+                    </div>
+
+                    @if (s.Engine is { } engine)
+                    {
+                        <div class="ac-hist-engine">
+                            <span class="ac-hist-marker ac-hist-seed">
+                                <span class="ac-hist-marker-op">len</span>
+                                <span class="ac-hist-marker-run">@engine.Seed</span>
+                            </span>
+                            @foreach (var step in engine.Steps)
+                            {
+                                <div class="ac-hist-card">
+                                    <GameCard Size="CardSize.Small"
+                                              Card="step.CardId"
+                                              Name="@step.Name"
+                                              Kind="step.Kind"
+                                              MagnitudeText="@(step.Triggered ? step.ValueText : "—")"
+                                              LiveBadge="@step.RunningScore.ToString()"
+                                              Dim="!step.Triggered" />
+                                </div>
+                            }
+                            <span class="ac-hist-marker ac-hist-final @(engine.Taxed ? "ac-hist-taxed" : "")">
+                                <span class="ac-hist-marker-op">@(engine.Taxed ? "tax" : "score")</span>
+                                <span class="ac-hist-marker-run">@(engine.Taxed ? "0" : $"+{engine.FinalScore}")</span>
+                            </span>
+                        </div>
+                    }
+                </div>
+            </Virtualize>
+        </div>
+    }
+</section>
+
+@code {
+    private enum SortOrder { HighestScore, OldestFirst, NewestFirst }
+
+    /// <summary>The match's full submission history (chronological, oldest → newest).</summary>
+    [Parameter] public IReadOnlyList<AlphaChainSubmission> Submissions { get; set; } = [];
+
+    private SortOrder _sort = SortOrder.HighestScore;
+    private List<AlphaChainSubmission> _sorted = [];
+
+    protected override void OnParametersSet() => Resort();
+
+    private void SetSort(SortOrder order)
+    {
+        if (_sort == order)
+            return;
+        _sort = order;
+        Resort();
+    }
+
+    // Pair each entry with its chronological index so ties (and the time-based orders) stay stable.
+    private void Resort()
+    {
+        var indexed = Submissions.Select((s, i) => (s, i));
+        _sorted = _sort switch
+        {
+            SortOrder.OldestFirst => indexed.OrderBy(x => x.i).Select(x => x.s).ToList(),
+            SortOrder.NewestFirst => indexed.OrderByDescending(x => x.i).Select(x => x.s).ToList(),
+            _ => indexed.OrderByDescending(x => x.s.Score).ThenBy(x => x.i).Select(x => x.s).ToList(),
+        };
+    }
+}

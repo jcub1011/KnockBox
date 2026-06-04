@@ -90,7 +90,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.AreEqual(7, state.GamePlayers[owner].Score, "Owner collects half the would-be 13.");
 
             // The play feed records the bounty that was paid.
-            Assert.AreEqual(7, state.PlayLog[^1].TaxBounty);
+            Assert.AreEqual(7, state.SubmissionHistory[^1].TaxBounty);
+
+            // The submission persists its engine (scoring trace) so the post-game history can render it.
+            var persisted = state.SubmissionHistory[^1];
+            Assert.IsNotNull(persisted.Engine);
+            Assert.AreEqual(persisted.Word, persisted.Engine.Word);
+            Assert.AreEqual(persisted.Score, persisted.Engine.FinalScore);
 
             // The score replay surfaces who stole the points (and how much) so the strip can list them.
             var replay = state.LatestScoreReplay!;
@@ -118,7 +124,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(result);
 
             Assert.AreEqual(0, state.GamePlayers[submitter].Score);
-            Assert.AreEqual(0, state.PlayLog[^1].TaxBounty);
+            Assert.AreEqual(0, state.SubmissionHistory[^1].TaxBounty);
 
             // No one collected, so the replay reports no steal.
             Assert.IsFalse(state.LatestScoreReplay!.HasSteal);
@@ -142,7 +148,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.IsInstanceOfType<SubmitWordResult.Accepted>(result);
 
             Assert.AreEqual(0, state.GamePlayers[owner].Score, "No tax → no bounty.");
-            Assert.AreEqual(0, state.PlayLog[^1].TaxBounty);
+            Assert.AreEqual(0, state.SubmissionHistory[^1].TaxBounty);
         }
 
         [TestMethod]

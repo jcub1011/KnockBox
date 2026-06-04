@@ -282,8 +282,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         {
             char start = context.Word[0];
             int count = 0;
-            foreach (var word in context.WordHistory)
-                if (word.Contains(start))
+            foreach (var submission in context.SubmissionHistory)
+                if (submission.Word.Contains(start))
                     count++;
             return count;
         }

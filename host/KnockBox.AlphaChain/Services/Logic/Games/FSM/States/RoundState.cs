@@ -121,7 +121,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 Bay = player?.EngineBay ?? [],
                 Services = services,
                 PlayerIndex = playerIndex,
-                WordHistory = state.WordHistory,
+                SubmissionHistory = state.SubmissionHistory,
                 ShotClockDuration = state.Settings.ShotClockSeconds,
                 ModifiedShotClockDuration = player is null
                     ? state.Settings.ShotClockSeconds
@@ -239,7 +239,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                         Bay = other.EngineBay,
                         Services = services,
                         PlayerIndex = oidx,
-                        WordHistory = state.WordHistory,
+                        SubmissionHistory = state.SubmissionHistory,
                         Resolution = resolution,
                     };
                     foreach (var card in other.EngineBay)
@@ -262,12 +262,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             string displayName = player?.DisplayName ?? cmd.ActorUserId.ToString();
 
-            // Log the accepted play for the UI feed, and append to the word-history snapshot the next
-            // submission's context reads (this word was excluded from the context built above).
-            state.PlayLog.Add(new AlphaChainWordPlay(
+            // Append the accepted submission to the match history. This single list backs the UI feed,
+            // the game-over totals, and the prior-words snapshot the next submission's context reads
+            // (this word was excluded from the context built above, which snapshotted before this append).
+            state.SubmissionHistory = state.SubmissionHistory.Add(new AlphaChainSubmission(
                 DateTimeOffset.UtcNow, cmd.ActorUserId, displayName,
-                word, score, taxed, bounty));
-            state.WordHistory = state.WordHistory.Add(word);
+                word, score, taxed, bounty, breakdown));
 
             // Publish the scoring trace + any fired effects so every client plays the replay strip.
             state.ScoreReplaySequence++;

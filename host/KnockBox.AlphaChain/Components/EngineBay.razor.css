@@ -60,7 +60,7 @@
     justify-content: center;
     box-sizing: border-box;
     width: 7rem;
-    height: 4rem;
+    height: 5.4rem;
     border: 1px dashed var(--ac-border, rgba(255, 255, 255, 0.08));
     border-radius: 0.6rem;
     color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));

@@ -162,14 +162,14 @@ namespace KnockBox.AlphaChain.Pages
                 .ToList();
 
         /// <summary>The play feed, newest first.</summary>
-        protected IReadOnlyList<AlphaChainWordPlay> PlayFeed =>
-            GameState.PlayLog.AsEnumerable().Reverse().ToList();
+        protected IReadOnlyList<AlphaChainSubmission> PlayFeed =>
+            GameState.SubmissionHistory.AsEnumerable().Reverse().ToList();
 
         /// <summary>Most recent accepted words, oldest→newest, for the chain trail.</summary>
-        protected IReadOnlyList<AlphaChainWordPlay> ChainTrail =>
-            GameState.PlayLog.Count <= 7
-                ? GameState.PlayLog
-                : GameState.PlayLog.Skip(GameState.PlayLog.Count - 7).ToList();
+        protected IReadOnlyList<AlphaChainSubmission> ChainTrail =>
+            GameState.SubmissionHistory.Count <= 7
+                ? GameState.SubmissionHistory
+                : GameState.SubmissionHistory.Skip(GameState.SubmissionHistory.Count - 7).ToList();
 
         /// <summary>The latest accepted word's score replay, shown once in a fixed spot below the
         /// submit box for every player (the strip's subtitle names the submitter). Null when there
@@ -179,11 +179,11 @@ namespace KnockBox.AlphaChain.Pages
             GameState.LatestScoreReplay is { HasAnimation: true } replay ? replay : null;
 
         /// <summary>The newest accepted play, used to flash a score-pop on the leaderboard.</summary>
-        protected AlphaChainWordPlay? LatestPlay =>
-            GameState.PlayLog.Count > 0 ? GameState.PlayLog[^1] : null;
+        protected AlphaChainSubmission? LatestPlay =>
+            GameState.SubmissionHistory.Count > 0 ? GameState.SubmissionHistory[^1] : null;
 
         /// <summary>Changes whenever a new word lands, so the score-pop @key remounts and re-animates.</summary>
-        protected int LatestPlayKey => GameState.PlayLog.Count;
+        protected int LatestPlayKey => GameState.SubmissionHistory.Count;
 
         // ── Leaderboard rank-change tracking (view-only, for the ▲/▼ indicator) ──
         private List<Guid> _prevRankOrder = new();

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
+using KnockBox.AlphaChain.Services.Logic.Scoring;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 
 namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
@@ -49,7 +50,11 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
                 PlayerIndex = 0,
                 RemainingShotClockDuration = remaining,
                 ShotClockDuration = shotClock,
-                WordHistory = wordHistory?.ToImmutableList() ?? ImmutableList<string>.Empty,
+                SubmissionHistory = wordHistory is null
+                    ? ImmutableList<AlphaChainSubmission>.Empty
+                    : wordHistory.Select(w => new AlphaChainSubmission(
+                        default, default, "", w, 0, false, 0,
+                        new ScoreBreakdown(w, w.Length, [], 0, false, 0))).ToImmutableList(),
             };
         }
 

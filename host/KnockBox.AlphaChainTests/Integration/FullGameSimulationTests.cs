@@ -117,7 +117,7 @@ namespace KnockBox.AlphaChain.Tests.Integration
 
             var results = state.Results!;
             Assert.AreEqual(playerCount, results.Rankings.Count, "Every player should appear in the standings.");
-            Assert.AreEqual(state.PlayLog.Count, results.TotalWordsPlayed);
+            Assert.AreEqual(state.SubmissionHistory.Count, results.TotalWordsPlayed);
 
             // ── Winner genuinely holds the top score (non-survival mode). ──
             int topScore = state.GamePlayers.Values.Max(p => p.Score);

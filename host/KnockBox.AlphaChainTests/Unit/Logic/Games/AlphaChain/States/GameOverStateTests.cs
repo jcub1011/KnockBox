@@ -129,10 +129,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var first = state.TurnManager.TurnOrder[0];
             state.Execute(() =>
             {
-                state.PlayLog.Add(new KnockBox.AlphaChain.Services.State.Games.Data.AlphaChainWordPlay(
-                    DateTimeOffset.UtcNow, first, "Player0", "cat", 3, false));
-                state.PlayLog.Add(new KnockBox.AlphaChain.Services.State.Games.Data.AlphaChainWordPlay(
-                    DateTimeOffset.UtcNow, first, "Player0", "tap", 3, false));
+                state.SubmissionHistory = state.SubmissionHistory
+                    .Add(new KnockBox.AlphaChain.Services.State.Games.Data.AlphaChainSubmission(
+                        DateTimeOffset.UtcNow, first, "Player0", "cat", 3, false, 0,
+                        new KnockBox.AlphaChain.Services.Logic.Scoring.ScoreBreakdown("cat", 3, [], 3, false, 3)))
+                    .Add(new KnockBox.AlphaChain.Services.State.Games.Data.AlphaChainSubmission(
+                        DateTimeOffset.UtcNow, first, "Player0", "tap", 3, false, 0,
+                        new KnockBox.AlphaChain.Services.Logic.Scoring.ScoreBreakdown("tap", 3, [], 3, false, 3)));
             });
 
             EnterGameOver(state);

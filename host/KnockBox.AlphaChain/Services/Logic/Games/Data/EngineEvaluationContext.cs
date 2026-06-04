@@ -76,14 +76,15 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         public WordResolution? Resolution { get; init; }
 
         /// <summary>
-        /// Every word accepted this match before the current submission, in chronological order
-        /// (lower-case, any player), excluding the word being evaluated. Read by history-aware cards
-        /// (The Blueprint compares the previous word's length; Scavenger counts a starting letter
-        /// across all prior words). Empty for ad-hoc/display contexts that don't snapshot the match
-        /// feed. An <see cref="ImmutableList{T}"/> so the long, frequently-appended match feed shares
-        /// structure cheaply.
+        /// Every submission accepted this match before the current one, in chronological order
+        /// (any player), excluding the word being evaluated. Read by history-aware cards via each
+        /// entry's <see cref="AlphaChainSubmission.Word"/> (The Blueprint compares the previous
+        /// word's length; Scavenger counts a starting letter across all prior words). Empty for
+        /// ad-hoc/display contexts that don't snapshot the match feed. An
+        /// <see cref="ImmutableList{T}"/> so the long, frequently-appended match feed shares
+        /// structure cheaply (passed by reference, no projection).
         /// </summary>
-        public ImmutableList<string> WordHistory { get; init; } = ImmutableList<string>.Empty;
+        public ImmutableList<AlphaChainSubmission> SubmissionHistory { get; init; } = ImmutableList<AlphaChainSubmission>.Empty;
 
         /// <summary>
         /// The ordered Engine Bay for the player at <paramref name="playerIndex"/>. For the current

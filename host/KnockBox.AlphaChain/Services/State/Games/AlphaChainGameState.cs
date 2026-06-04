@@ -94,21 +94,21 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// <summary>
         /// Every word played this match, used for O(1) duplicate rejection. Case-insensitive
         /// (words are normalized to lower-case before insertion, but the comparer keeps the
-        /// check robust). Order is not preserved here — <see cref="PlayLog"/> backs the UI feed.
+        /// check robust). Order is not preserved here — <see cref="SubmissionHistory"/> backs the UI feed.
         /// </summary>
         public HashSet<string> PlayedWords { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Chronological log of accepted plays, backing the UI's submitted-words feed.</summary>
-        public List<AlphaChainWordPlay> PlayLog { get; } = new();
-
         /// <summary>
-        /// Every accepted word this match (lower-case, chronological), maintained incrementally so the
-        /// evaluation context can be handed a cheap immutable snapshot of the prior-words feed without
-        /// rebuilding it from <see cref="PlayLog"/> each submission. Appended after a play is credited;
-        /// snapshotting it before the append naturally excludes the current word.
+        /// The match's single chronological record of accepted submissions — the one source of truth
+        /// for the mid-game play feed, the game-over totals, the post-game history screen, and the
+        /// prior-words snapshot handed to scoring. An <see cref="System.Collections.Immutable.ImmutableList{T}"/>
+        /// so the long, frequently-appended feed shares structure cheaply and the evaluation context can
+        /// be handed a stable snapshot: appended after a play is credited, so snapshotting it before the
+        /// append naturally excludes the current word. Each entry carries its
+        /// <see cref="Data.AlphaChainSubmission.Engine"/> scoring trace.
         /// </summary>
-        public System.Collections.Immutable.ImmutableList<string> WordHistory { get; set; } =
-            System.Collections.Immutable.ImmutableList<string>.Empty;
+        public System.Collections.Immutable.ImmutableList<AlphaChainSubmission> SubmissionHistory { get; set; } =
+            System.Collections.Immutable.ImmutableList<AlphaChainSubmission>.Empty;
 
         /// <summary>
         /// The most recent accepted word's scoring trace, for the center-stage score-replay
