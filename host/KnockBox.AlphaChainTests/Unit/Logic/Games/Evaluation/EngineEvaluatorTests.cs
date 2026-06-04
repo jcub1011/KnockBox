@@ -117,6 +117,23 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         public void CapsAtMaxWordScore()
             => Assert.AreEqual(ModifierMath.MaxWordScore, _eval.Calculate(Ctx("cat", [Mult(100_000)])));
 
+        [TestMethod]
+        public void MultiplicativeOverCap_ThenAdditive_FinalStillClamped()
+            // The multiplier blows past the cap; a later additive cannot push the final score above it.
+            => Assert.AreEqual(ModifierMath.MaxWordScore,
+                _eval.Calculate(Ctx("cat", [Mult(100_000), Additive(50)])));
+
+        [TestMethod]
+        public void Steps_RunningScore_ClampedAtEachStep()
+        {
+            // The per-step running total in the score-replay trace is clamped, not just the final value.
+            var breakdown = _eval.CalculateSteps(Ctx("cat", [Mult(100_000)]), taxed: false);
+
+            Assert.AreEqual(ModifierMath.MaxWordScore, breakdown.Steps[0].RunningScore);
+            Assert.AreEqual(ModifierMath.MaxWordScore, breakdown.FinalBeforeTax);
+            Assert.AreEqual(ModifierMath.MaxWordScore, breakdown.FinalScore);
+        }
+
         // ── Representative library cards ────────────────────────────────────
 
         [TestMethod]

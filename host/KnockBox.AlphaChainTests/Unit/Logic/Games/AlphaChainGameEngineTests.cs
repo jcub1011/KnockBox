@@ -283,5 +283,100 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
             Assert.IsEmpty(state.TurnManager.TurnOrder);
             Assert.IsNull(state.Results);
         }
+
+        // ── Start guards ──────────────────────────────────────────────────────
+        // CanStartAsync gates on Participants.Length (host counts when HostPlays) AND IsJoinable,
+        // and StartAsyncCore refuses an invalid config before building any FSM context.
+
+        [TestMethod]
+        public async Task CanStartAsync_BelowMinPlayers_ReturnsFalse()
+        {
+            // One joiner, host not playing → a single participant, below the 2-player minimum.
+            using var state = await CreateStateWithPlayersAsync(1);
+
+            Assert.IsFalse(await _engine.CanStartAsync(state));
+        }
+
+        [TestMethod]
+        public async Task CanStartAsync_AtMinPlayers_ReturnsTrue()
+        {
+            using var state = await CreateStateWithPlayersAsync(2);
+
+            Assert.IsTrue(await _engine.CanStartAsync(state));
+        }
+
+        [TestMethod]
+        public async Task CanStartAsync_AtMaxPlayers_ReturnsTrue()
+        {
+            using var state = await CreateStateWithPlayersAsync(8);
+
+            Assert.IsTrue(await _engine.CanStartAsync(state));
+        }
+
+        [TestMethod]
+        public async Task CanStartAsync_AboveMaxPlayers_ReturnsFalse()
+        {
+            using var state = await CreateStateWithPlayersAsync(9);
+
+            Assert.IsFalse(await _engine.CanStartAsync(state));
+        }
+
+        [TestMethod]
+        public async Task CanStartAsync_HostPlays_CountsHostAsParticipant()
+        {
+            // A single joiner is below the minimum on its own…
+            using var state = await CreateStateWithPlayersAsync(1);
+            Assert.IsFalse(await _engine.CanStartAsync(state));
+
+            // …but flipping HostPlays reflects the host into Participants, reaching the 2-player floor.
+            state.UpdateSettings(s => s with { HostPlays = true });
+            Assert.IsTrue(await _engine.CanStartAsync(state));
+        }
+
+        [TestMethod]
+        public async Task CanStartAsync_WhenAlreadyStarted_ReturnsFalse()
+        {
+            // A started game has a valid participant count but is no longer joinable.
+            using var state = await CreateStartedGameAsync(2);
+
+            Assert.IsFalse(state.IsJoinable);
+            Assert.IsFalse(await _engine.CanStartAsync(state));
+        }
+
+        [TestMethod]
+        public async Task StartAsync_WithInvalidSettings_ReturnsFailureAndDoesNotStart()
+        {
+            using var state = await CreateStateWithPlayersAsync(2);
+            // EraCount = 0 is rejected by AlphaChainSettings.Validate; StartAsyncCore must refuse it.
+            state.UpdateSettings(s => s with { EraCount = 0 });
+
+            var result = await _engine.StartAsync(_host, state);
+
+            Assert.IsTrue(result.IsFailure);
+            Assert.IsTrue(state.IsJoinable, "A refused start must leave the lobby open.");
+            Assert.IsNull(state.Context, "No FSM context should be built for an illegal config.");
+            Assert.AreEqual(AlphaChainGamePhase.Setup, state.Phase);
+        }
+
+        [TestMethod]
+        public async Task AdvanceTurnAsync_BeforeStart_ReturnsFailure()
+        {
+            // No game started → no context → the command gateway refuses rather than NRE-ing.
+            using var state = await CreateStateWithPlayersAsync(2);
+
+            var result = await _engine.AdvanceTurnAsync(_host.Id, state);
+
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task SubmitWordAsync_BeforeStart_ReturnsFailure()
+        {
+            using var state = await CreateStateWithPlayersAsync(2);
+
+            var result = await _engine.SubmitWordAsync(_host.Id, "cat", state);
+
+            Assert.IsTrue(result.IsFailure);
+        }
     }
 }
