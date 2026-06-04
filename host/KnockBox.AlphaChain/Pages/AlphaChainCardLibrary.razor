@@ -1,5 +1,6 @@
 @page "/room/alpha-chain/card-library"
 
+@using System.Collections.Immutable
 @using KnockBox.AlphaChain.Services.Logic.Games.Data
 @using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 @using KnockBox.AlphaChain.Services.Logic.Games.Evaluation
@@ -75,7 +76,7 @@
                             var info = _cardsById[_bay[index]];
                             <div class="ac-bench-slot">
                                 <GameCard Name="@info.Name" Description="@info.Description" Card="@info.Id"
-                                          Kind="@info.Kind" Size="CardSize.Small" MagnitudeText="@info.Magnitude" />
+                                          Kind="@info.Kind" Size="CardSize.Small" Chips="@info.Chips" />
                                 <div class="ac-bench-slot-ops">
                                     <button type="button" title="Move left" disabled="@(index == 0)"
                                             @onclick="() => MoveCard(index, -1)">◀</button>
@@ -140,14 +141,14 @@
                         <button type="button" class="ac-cardbtn" title="Click to flip"
                                 @onclick="() => ToggleFlip(card.Id)">
                             <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Kind="@card.Kind"
-                                      Size="CardSize.Large" MagnitudeText="@card.Magnitude"
+                                      Size="CardSize.Large" Chips="@card.Chips"
                                       Flipped="@_flipped.Contains(card.Id)" />
                         </button>
                     }
                     else
                     {
                         <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Kind="@card.Kind"
-                                  Size="CardSize.Small" MagnitudeText="@card.Magnitude" />
+                                  Size="CardSize.Small" Chips="@card.Chips" />
                     }
                     <button type="button" class="ac-palette-add" @onclick="() => AddCard(card.Id)">＋ Add</button>
                 </div>
@@ -158,7 +159,7 @@
 
 @code {
     /// <summary>Display projection of a card: everything GameCard needs, resolved once at init.</summary>
-    private sealed record CardInfo(ModifierId Id, string Name, string Description, ModifierType Kind, string? Magnitude);
+    private sealed record CardInfo(ModifierId Id, string Name, string Description, ModifierType Kind, ImmutableArray<CardChip> Chips);
 
     private List<CardInfo> Cards { get; set; } = [];
 
@@ -242,8 +243,8 @@
         Cards = ModifierCardFactory.AllDealableIds
             .Select(id => CardFactory.CreateCard(context, id))
             .Select(card => new CardInfo(
-                card.GetId(), card.GetName(), card.GetDescription(), card.GetModifierType(context),
-                card.GetMagnitudeLabel()))
+                card.GetId(), card.GetName(), card.GetDescription(context), card.GetModifierType(),
+                card.GetChips(context)))
             .ToList();
 
         _cardsById = Cards.ToDictionary(c => c.Id);

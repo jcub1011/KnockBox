@@ -297,38 +297,12 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* Type chip — outlined in the accent, signalling additive vs multiplicative. */
-.gc-chip-type {
-    color: var(--gc-accent);
-    background: color-mix(in srgb, var(--gc-accent) 14%, transparent);
-    border: 1px solid color-mix(in srgb, var(--gc-accent) 55%, transparent);
-}
-
-/* Magnitude chip — solid in the card's identity color, the headline number. */
-.gc-chip-mag {
-    color: #07101e;
-    background: var(--gc-card-color, var(--gc-accent));
-}
-
-/* Effect chip — neutral violet for scoring-inert cards (no misleading multiplier). */
-.gc-chip-effect {
-    color: var(--ac-violet, #b97bff);
-    background: color-mix(in srgb, var(--ac-violet, #b97bff) 18%, transparent);
-    border: 1px solid color-mix(in srgb, var(--ac-violet, #b97bff) 55%, transparent);
-}
-
-/* Live per-player status (e.g. Titanium Mirror's "×0.7"). */
-.gc-livebadge {
-    padding: 0.05rem 0.35rem;
-    border-radius: 0.3rem;
-    font-family: var(--font-mono, monospace);
-    font-size: 0.6rem;
-    font-weight: 800;
-    line-height: 1.2;
-    white-space: nowrap;
-    color: var(--ac-cyan, #00e5ff);
-    background: color-mix(in srgb, var(--ac-cyan, #00e5ff) 16%, transparent);
-    font-variant-numeric: tabular-nums;
+/* Every chip renders uniformly in its own color (--chip): tinted fill + outline, the color
+   carrying the meaning (accent = type, identity = magnitude, violet = effect, cyan = live). */
+.gc-chip {
+    color: var(--chip, var(--gc-accent));
+    background: color-mix(in srgb, var(--chip, var(--gc-accent)) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--chip, var(--gc-accent)) 55%, transparent);
 }
 
 /* ── States ──────────────────────────────────────────────────────────── */

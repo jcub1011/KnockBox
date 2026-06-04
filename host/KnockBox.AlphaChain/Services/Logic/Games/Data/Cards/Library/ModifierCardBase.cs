@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 
 namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
@@ -34,43 +35,45 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public abstract ModifierId GetId();
         public abstract string GetName();
-        public abstract string GetDescription();
-        public virtual string GetDescription(EngineEvaluationContext context) => GetDescription();
+        public abstract string GetDescription(EngineEvaluationContext context);
 
         /// <summary>Additive by default; <see cref="MultiplicativeCardBase"/> flips this.</summary>
-        public virtual ModifierType GetModifierType(EngineEvaluationContext context) => ModifierType.Additive;
+        public virtual ModifierType GetModifierType() => ModifierType.Additive;
 
-        /// <summary>No chip by default; a card overrides this to surface its magnitude (or "FX").</summary>
-        public virtual string? GetMagnitudeLabel() => null;
+        /// <summary>No magnitude chip by default; a card overrides this to surface its magnitude (or "FX").</summary>
+        protected virtual string? MagnitudeLabel => null;
+
+        /// <summary>A magnitude chip when <see cref="MagnitudeLabel"/> is set (colored by add/multiply),
+        /// else none. A card with live per-player status overrides this to append its own chip(s).</summary>
+        public virtual ImmutableArray<CardChip> GetChips(EngineEvaluationContext context)
+            => MagnitudeLabel is { } label ? [CardChips.Magnitude(label)] : [];
 
         public virtual bool CheckIfTriggered(EngineEvaluationContext context) => true;
 
         /// <summary>The addend (additive cards) or factor (multiplicative cards) this card contributes
         /// when triggered. Defaults to the additive/multiplicative identity.</summary>
         protected virtual double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
-            => GetModifierType(context) == ModifierType.Additive ? 0.0 : 1.0;
+            => GetModifierType() == ModifierType.Additive ? 0.0 : 1.0;
 
         public virtual EngineEvaluationContext ExecuteModifier(EngineEvaluationContext context, IModifierCard self)
-            => ModifierMath.Apply(context, GetModifierType(context), GetMagnitude(context, self));
+            => ModifierMath.Apply(context, GetModifierType(), GetMagnitude(context, self));
 
         public virtual EngineEvaluationContext OnEraStart(EngineEvaluationContext context, IModifierCard self) => context;
         public virtual EngineEvaluationContext OnWordAccepted(EngineEvaluationContext context, IModifierCard self) => context;
         public virtual EngineEvaluationContext OnTurnEnded(EngineEvaluationContext context, IModifierCard self) => context;
         public virtual EngineEvaluationContext OnOpponentWordResolved(EngineEvaluationContext context, IModifierCard self) => context;
         public virtual EngineEvaluationContext OnValidationFailed(EngineEvaluationContext context, IModifierCard self) => context;
-
-        public virtual string? GetBayBadge(EngineEvaluationContext context) => null;
     }
 
     /// <summary>A class-based card that adds to the score.</summary>
     public abstract class AdditiveCardBase : ModifierCardBase
     {
-        public sealed override ModifierType GetModifierType(EngineEvaluationContext context) => ModifierType.Additive;
+        public sealed override ModifierType GetModifierType() => ModifierType.Additive;
     }
 
     /// <summary>A class-based card that multiplies the score (its factor is scaled by Hyper-Drive automatically).</summary>
     public abstract class MultiplicativeCardBase : ModifierCardBase
     {
-        public sealed override ModifierType GetModifierType(EngineEvaluationContext context) => ModifierType.Multiplier;
+        public sealed override ModifierType GetModifierType() => ModifierType.Multiplier;
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 
 namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
@@ -29,13 +30,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public string GetName() => Name;
 
-        public string GetDescription() => Description;
-
         public string GetDescription(EngineEvaluationContext context) => Description;
 
-        public ModifierType GetModifierType(EngineEvaluationContext context) => ModifierType;
+        public ModifierType GetModifierType() => ModifierType;
 
-        public string? GetMagnitudeLabel() => MagnitudeLabel;
+        public ImmutableArray<CardChip> GetChips(EngineEvaluationContext context)
+            => MagnitudeLabel is { } label ? [CardChips.Magnitude(label)] : [];
 
         public bool CheckIfTriggered(EngineEvaluationContext context) => TriggerChecker.Invoke(context);
 

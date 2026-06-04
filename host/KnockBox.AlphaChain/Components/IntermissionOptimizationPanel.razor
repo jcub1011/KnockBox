@@ -55,9 +55,9 @@
                         @ondragend="() => _dragIndex = null"
                         @onclick="() => ToggleFlip(card.GetId())"
                         @onkeydown="e => OnKeyDown(e, index)">
-                    <GameCard Name="@card.GetName()" Description="@card.GetDescription()" Card="@card.GetId()"
-                              Kind="card.GetModifierType(default)"
-                              Size="CardSize.Large" MagnitudeText="@card.GetMagnitudeLabel()"
+                    <GameCard Name="@card.GetName()" Description="@card.GetDescription(default)" Card="@card.GetId()"
+                              Kind="card.GetModifierType()"
+                              Size="CardSize.Large" Chips="@card.GetChips(default)"
                               Flipped="@_flipped.Contains(card.GetId())"
                               Dragging="@(_dragIndex == index)" New="@isNew" />
                 </button>
@@ -80,8 +80,8 @@
                         title="Put back"
                         @onclick="() => Restore(card.GetId())">
                     <GameCard Name="@card.GetName()" Card="@card.GetId()"
-                              Kind="card.GetModifierType(default)"
-                              Size="CardSize.Small" MagnitudeText="@card.GetMagnitudeLabel()"
+                              Kind="card.GetModifierType()"
+                              Size="CardSize.Small" Chips="@card.GetChips(default)"
                               Dim="true" />
                 </button>
             }

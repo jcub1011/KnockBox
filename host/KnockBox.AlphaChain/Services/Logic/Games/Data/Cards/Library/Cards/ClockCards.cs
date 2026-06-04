@@ -7,8 +7,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.TheVault;
         public override string GetName() => "The Vault";
-        public override string GetDescription() => "×1.5 on every word, but shortens your shot clock by 10% while equipped.";
-        public override string? GetMagnitudeLabel() => "×1.5";
+        public override string GetDescription(EngineEvaluationContext context) => "×1.5 on every word, but shortens your shot clock by 10% while equipped.";
+        protected override string? MagnitudeLabel => "×1.5";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.5;
 
         public double FractionDelta => -0.10;
@@ -20,8 +20,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.Redline;
         public override string GetName() => "Redline";
-        public override string GetDescription() => "×2 on every word, but shortens your shot clock by 20% while equipped.";
-        public override string? GetMagnitudeLabel() => "×2";
+        public override string GetDescription(EngineEvaluationContext context) => "×2 on every word, but shortens your shot clock by 20% while equipped.";
+        protected override string? MagnitudeLabel => "×2";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 2.0;
 
         public double FractionDelta => -0.20;
@@ -36,9 +36,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.PanicButton;
         public override string GetName() => "Panic Button";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Halves your shot clock. ×1.35 normally — but ×2.7 if you submit before the final 2 seconds.";
-        public override string? GetMagnitudeLabel() => "×1.35 – 2.7";
+        protected override string? MagnitudeLabel => "×1.35 – 2.7";
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
             => context.RemainingShotClockDuration >= DangerZoneSeconds ? 2.7 : 1.35;
@@ -52,8 +52,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.HeatSink;
         public override string GetName() => "The Heat Sink";
-        public override string GetDescription() => "Grants 0 points but lengthens your shot clock by 30%.";
-        public override string? GetMagnitudeLabel() => "FX";
+        public override string GetDescription(EngineEvaluationContext context) => "Grants 0 points but lengthens your shot clock by 30%.";
+        protected override string? MagnitudeLabel => "FX";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 
         public double FractionDelta => 0.3;
@@ -68,9 +68,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.AnchorChain;
         public override string GetName() => "The Anchor Chain";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Locks your shot clock to a strict, unmodifiable 5 seconds for the era. In exchange: ×(0.5 per letter) of your word.";
-        public override string? GetMagnitudeLabel() => "×0.5 / ltr";
+        protected override string? MagnitudeLabel => "×0.5 / ltr";
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 0.5 * context.Word.Length;
 
@@ -98,9 +98,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.HyperDrive;
         public override string GetName() => "Hyper-Drive";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Caps your shot clock at 5s. When your word is longer than 6 letters, ×1.5 to your score so far (this slot and everything to its left).";
-        public override string? GetMagnitudeLabel() => "×1.5";
+        protected override string? MagnitudeLabel => "×1.5";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetEffectiveLetterCount(context) > LengthThreshold;
@@ -122,9 +122,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.SlowBurn;
         public override string GetName() => "Slow Burn";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Lengthens your shot clock by 20%, but words shorter than 6 letters are illegal — they take the Zero-Point Tax.";
-        public override string? GetMagnitudeLabel() => "FX";
+        protected override string? MagnitudeLabel => "FX";
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 

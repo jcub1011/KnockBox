@@ -7,8 +7,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.VowelSurge;
         public override string GetName() => "Vowel Surge";
-        public override string GetDescription() => "×3 when your word has more vowels than consonants.";
-        public override string? GetMagnitudeLabel() => "×3";
+        public override string GetDescription(EngineEvaluationContext context) => "×3 when your word has more vowels than consonants.";
+        protected override string? MagnitudeLabel => "×3";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetVowelIndicies(context).Count() > this.GetConsonantIndicies(context).Count();
@@ -21,8 +21,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.GutturalRoar;
         public override string GetName() => "Guttural Roar";
-        public override string GetDescription() => "×1.5 when your word's only vowels are 'A' or 'E'.";
-        public override string? GetMagnitudeLabel() => "×1.5";
+        public override string GetDescription(EngineEvaluationContext context) => "×1.5 when your word's only vowels are 'A' or 'E'.";
+        protected override string? MagnitudeLabel => "×1.5";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetVowelIndicies(context).All(i => context.Word[i] is 'a' or 'e');
@@ -35,9 +35,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.PerfectLink;
         public override string GetName() => "Perfect Link";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "×1.5 when your word ends in a vowel — hand the next player an easy letter, pad your own score.";
-        public override string? GetMagnitudeLabel() => "×1.5";
+        protected override string? MagnitudeLabel => "×1.5";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => context.Word.Length > 0 && this.GetVowelIndicies(context).Contains(context.Word.Length - 1);
@@ -58,9 +58,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.Catalyst;
         public override string GetName() => "The Catalyst";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Grants 0 points. For every card placed after it, the letters Y, W and H count as both a vowel AND a consonant.";
-        public override string? GetMagnitudeLabel() => "FX";
+        protected override string? MagnitudeLabel => "FX";
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 
@@ -77,9 +77,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.Vanilla;
         public override string GetName() => "Vanilla";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Adds +1 for every letter in your word. +2 if the word is 7+ characters.";
-        public override string? GetMagnitudeLabel() => "+1-2 / ltr";
+        protected override string? MagnitudeLabel => "+1-2 / ltr";
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
         {
@@ -93,8 +93,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.BrickLayer;
         public override string GetName() => "Brick Layer";
-        public override string GetDescription() => "Adds +1 per letter when your word is 6 letters or longer.";
-        public override string? GetMagnitudeLabel() => "+1 / ltr";
+        public override string GetDescription(EngineEvaluationContext context) => "Adds +1 per letter when your word is 6 letters or longer.";
+        protected override string? MagnitudeLabel => "+1 / ltr";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetEffectiveLetterCount(context) >= 6;
@@ -108,8 +108,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.TheArchitect;
         public override string GetName() => "The Architect";
-        public override string GetDescription() => "×3 when your word is 8 letters or longer.";
-        public override string? GetMagnitudeLabel() => "×3";
+        public override string GetDescription(EngineEvaluationContext context) => "×3 when your word is 8 letters or longer.";
+        protected override string? MagnitudeLabel => "×3";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetEffectiveLetterCount(context) >= 8;
@@ -122,9 +122,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.Sesquipedalian;
         public override string GetName() => "Sesquipedalian";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "×5 when your word is 10 letters or longer. Clamped to the max word score.";
-        public override string? GetMagnitudeLabel() => "×5";
+        protected override string? MagnitudeLabel => "×5";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetEffectiveLetterCount(context) >= 10;
@@ -141,9 +141,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.Speedracer;
         public override string GetName() => "Speedracer";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "When your word is longer than 6 letters, you get a multiplier (1 / ([remaining time] / [total time])). Capped at half your letter count.";
-        public override string? GetMagnitudeLabel() => "≤ × (ltr/2)";
+        protected override string? MagnitudeLabel => "≤ × (ltr/2)";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetEffectiveLetterCount(context) > 6;
@@ -166,9 +166,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.TheBlueprint;
         public override string GetName() => "The Blueprint";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Adds +3 per letter when your word is at least as long as the previously submitted word.";
-        public override string? GetMagnitudeLabel() => "+3 / ltr";
+        protected override string? MagnitudeLabel => "+3 / ltr";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => context.SubmissionHistory.IsEmpty
@@ -189,9 +189,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.TryHard;
         public override string GetName() => "Try Hard";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "×1.1 at 7 letters, +0.1 for each letter beyond that (8 letters ×1.2, 9 letters ×1.3, …).";
-        public override string? GetMagnitudeLabel() => "×1.1+";
+        protected override string? MagnitudeLabel => "×1.1+";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetEffectiveLetterCount(context) > BaseLength;
@@ -212,9 +212,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.Forgery;
         public override string GetName() => "Forgery";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Grants 0 points. Every card placed after it treats your word as having double the letters (length-based cards only).";
-        public override string? GetMagnitudeLabel() => "FX";
+        protected override string? MagnitudeLabel => "FX";
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 

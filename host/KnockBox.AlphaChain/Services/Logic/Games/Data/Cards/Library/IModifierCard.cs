@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Immutable;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 
@@ -79,21 +80,21 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         /// <summary>The card's display name.</summary>
         string GetName();
 
-        /// <summary>The card's static rules text, for display outside an evaluation (bay/optimization UI).</summary>
-        string GetDescription();
+        /// <summary>The card's rules text, given a (possibly empty) evaluation context so a card may
+        /// vary its wording live; most cards ignore the context and return static text.</summary>
+        string GetDescription(EngineEvaluationContext context);
 
-        /// <summary>The card's rules text given a live evaluation context. Defaults to <see cref="GetDescription()"/>.</summary>
-        string GetDescription(EngineEvaluationContext context) => GetDescription();
-
-        /// <summary>Whether the card adds or multiplies for this context (UI glyph/tinting only).</summary>
-        ModifierType GetModifierType(EngineEvaluationContext context);
+        /// <summary>Whether the card adds or multiplies (UI glyph/tinting only). A fixed per-card trait.</summary>
+        ModifierType GetModifierType();
 
         /// <summary>
-        /// A short, glanceable magnitude label for the card's chip (e.g. "+10", "×0.5–2", "≤×2"), or
-        /// <c>"FX"</c> for a scoring-inert card whose power is a side effect. Null hides the chip.
-        /// Display-only — the authoritative magnitude lives in <see cref="ExecuteModifier"/>.
+        /// The card's glanceable chips for the bay/library UI, in display order: a magnitude chip
+        /// (e.g. "+10", "×0.5–2", or "FX" for a scoring-inert card), colored by add/multiply, plus any
+        /// live per-player status read from <paramref name="context"/> (e.g. the Titanium Mirror's
+        /// shield). Empty by default. Display-only — the authoritative magnitude lives in
+        /// <see cref="ExecuteModifier"/>.
         /// </summary>
-        string? GetMagnitudeLabel() => null;
+        ImmutableArray<CardChip> GetChips(EngineEvaluationContext context) => [];
 
         /// <summary>Whether the card contributes for the current word. Unconditional cards return true.</summary>
         bool CheckIfTriggered(EngineEvaluationContext context);
@@ -126,13 +127,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         /// <summary>Fired on the owner when their submission fails validation (a typo) — The Prism refills the clock.</summary>
         EngineEvaluationContext OnValidationFailed(EngineEvaluationContext context, IModifierCard self) => context;
-
-        /// <summary>
-        /// An optional live status glyph (e.g. The Titanium Mirror's "×0.7") for this card in the Engine
-        /// Bay UI, read from the owner's room-state services via <paramref name="context"/>; null for the
-        /// default operator. Lets a card surface its own per-player state with no UI special-casing.
-        /// </summary>
-        string? GetBayBadge(EngineEvaluationContext context) => null;
     }
 
     // ── Card-contributed room state services ────────────────────────────────────

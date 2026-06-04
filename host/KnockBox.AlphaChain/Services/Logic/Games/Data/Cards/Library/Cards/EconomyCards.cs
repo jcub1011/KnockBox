@@ -11,9 +11,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.TaxCollector;
         public override string GetName() => "Tax Collector";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "When an opponent plays a banned-letter word, collect half the points it would have scored.";
-        public override string? GetMagnitudeLabel() => "FX";
+        protected override string? MagnitudeLabel => "FX";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
 
@@ -44,9 +44,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.TollBooth;
         public override string GetName() => "The Toll Booth";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Each era, rolls you a personal banned letter (Zero-Point Tax if you use it). Toll: bank 20% of any opponent's score when their word uses that letter.";
-        public override string? GetMagnitudeLabel() => "FX";
+        protected override string? MagnitudeLabel => "FX";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
 
@@ -85,9 +85,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.RouletteWheel;
         public override string GetName() => "The Roulette Wheel";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Each era, rolls you a personal banned letter (Zero-Point Tax if you use it). Reward: ×1.75 on every word you keep clean.";
-        public override string? GetMagnitudeLabel() => "×1.75";
+        protected override string? MagnitudeLabel => "×1.75";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.75;
 
         public override EngineEvaluationContext OnEraStart(EngineEvaluationContext context, IModifierCard self)
@@ -113,9 +113,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.BountyHunter;
         public override string GetName() => "The Bounty Hunter";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Grants 0 points. Marks the leader each round — if they play a word shorter than 6 letters, they lose 15 points.";
-        public override string? GetMagnitudeLabel() => "FX";
+        protected override string? MagnitudeLabel => "FX";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 
         public override EngineEvaluationContext OnOpponentWordResolved(EngineEvaluationContext context, IModifierCard self)
@@ -144,9 +144,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.FlakCannon;
         public override string GetName() => "Flak Cannon";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Grants 0 points. Takes 2 seconds off the next shot clock of every player scoring higher than you.";
-        public override string? GetMagnitudeLabel() => "FX";
+        protected override string? MagnitudeLabel => "FX";
 
         public override EngineEvaluationContext OnTurnEnded(EngineEvaluationContext context, IModifierCard self)
         {
@@ -172,9 +172,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.BaitAndSwitch;
         public override string GetName() => "Bait & Switch";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "When your word is hit by the Zero-Point Tax, curse the next player with that exact banned letter for their next turn.";
-        public override string? GetMagnitudeLabel() => "FX";
+        protected override string? MagnitudeLabel => "FX";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
 
@@ -207,9 +207,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.ChronoSyphon;
         public override string GetName() => "Chrono Syphon";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Grants 0 points. Banks +1 for every whole second left on an opponent's shot clock when they submit.";
-        public override string? GetMagnitudeLabel() => "FX";
+        protected override string? MagnitudeLabel => "FX";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
 
@@ -235,9 +235,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.TaxWriteOff;
         public override string GetName() => "Tax Write-Off";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "When your word is hit by the Zero-Point Tax, score its first letter through your engine as a clean submission and add that on top.";
-        public override string? GetMagnitudeLabel() => "FX";
+        protected override string? MagnitudeLabel => "FX";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
 
@@ -259,8 +259,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.BoosterPack;
         public override string GetName() => "Booster Pack";
-        public override string GetDescription() => "Adds +2 for every card placed to the right of this one.";
-        public override string? GetMagnitudeLabel() => "+2 / card→";
+        public override string GetDescription(EngineEvaluationContext context) => "Adds +2 for every card placed to the right of this one.";
+        protected override string? MagnitudeLabel => "+2 / card→";
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
             => PerCard * Math.Max(0, context.Bay.Count - context.ModifierCardIndex - 1);
@@ -272,9 +272,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.Scavenger;
         public override string GetName() => "Scavenger";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Adds +1 for every previously submitted word that contains your word's starting letter.";
-        public override string? GetMagnitudeLabel() => "+1 / find";
+        protected override string? MagnitudeLabel => "+1 / find";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context) => context.Word.Length > 0;
 

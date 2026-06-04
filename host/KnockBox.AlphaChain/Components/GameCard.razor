@@ -1,3 +1,4 @@
+@using System.Collections.Immutable
 @using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
 @* The uniform card renderer, in two fixed-dimension sizes so cards always line up:
@@ -19,10 +20,9 @@
                 <div class="gc-head">
                     <span class="gc-icon"><CardIcon Card="@Card" /></span>
                     <div class="gc-chips">
-                        <span class="gc-chip gc-chip-type">@TypeLabel</span>
-                        @if (!string.IsNullOrEmpty(MagnitudeText))
+                        @foreach (var chip in Chips)
                         {
-                            <span class="gc-chip @MagnitudeChipClass">@MagnitudeText</span>
+                            <span class="gc-chip" style="--chip:@chip.Color">@chip.Label</span>
                         }
                     </div>
                 </div>
@@ -50,13 +50,9 @@ else
         <div class="gc-small-top">
             <span class="gc-icon"><CardIcon Card="@Card" /></span>
             <div class="gc-chips">
-                @if (!string.IsNullOrEmpty(MagnitudeText))
+                @foreach (var chip in Chips)
                 {
-                    <span class="gc-chip @MagnitudeChipClass">@MagnitudeText</span>
-                }
-                @if (!string.IsNullOrEmpty(LiveBadge))
-                {
-                    <span class="gc-livebadge">@LiveBadge</span>
+                    <span class="gc-chip" style="--chip:@chip.Color">@chip.Label</span>
                 }
             </div>
         </div>
@@ -82,14 +78,11 @@ else
     /// <summary>The card whose glyph to show, resolved by <see cref="CardIcon"/>.</summary>
     [Parameter] public ModifierId Card { get; set; }
 
-    /// <summary>Modifier type (additive/multiplicative), driving the accent tint + type chip.</summary>
+    /// <summary>Modifier type (additive/multiplicative), driving the accent tint + border.</summary>
     [Parameter] public ModifierType? Kind { get; set; }
 
-    /// <summary>The card's glanceable magnitude chip (e.g. "+10", "×0.5–2", "FX"); null hides it.</summary>
-    [Parameter] public string? MagnitudeText { get; set; }
-
-    /// <summary>A live per-player status glyph for the Small card (e.g. the Titanium Mirror's "×0.7").</summary>
-    [Parameter] public string? LiveBadge { get; set; }
+    /// <summary>The card's glanceable chips (type, magnitude, any live status), in display order.</summary>
+    [Parameter] public ImmutableArray<CardChip> Chips { get; set; } = [];
 
     /// <summary>Which fixed footprint to render.</summary>
     [Parameter] public CardSize Size { get; set; } = CardSize.Small;
@@ -196,13 +189,6 @@ else
     /// <summary>additive / multiplicative — selects the accent variable.</summary>
     private string CategoryClass =>
         Kind == ModifierType.Multiplier ? "multiplicative" : "additive";
-
-    /// <summary>The type chip text (additive vs multiplicative).</summary>
-    private string TypeLabel => Kind == ModifierType.Multiplier ? "MULT" : "ADD";
-
-    /// <summary>An "FX" magnitude reads as a neutral effect chip, not a scoring multiplier.</summary>
-    private string MagnitudeChipClass =>
-        string.Equals(MagnitudeText, "FX", StringComparison.Ordinal) ? "gc-chip-effect" : "gc-chip-mag";
 
     private string StateClasses =>
         (Flipped ? " gc-flipped" : "")

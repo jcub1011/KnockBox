@@ -37,7 +37,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
                 ctx = ctx with { ModifierCardIndex = i };
 
                 bool triggered = card.CheckIfTriggered(ctx);
-                var type = card.GetModifierType(ctx);
+                var type = card.GetModifierType();
                 string valueText = "—";
 
                 if (triggered)

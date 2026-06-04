@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games.Data;
@@ -9,9 +10,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.Blindfold;
         public override string GetName() => "The Blindfold";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Hides your own word-input box while you type — no peeking at typos. Reward: ×1.8 on every valid word.";
-        public override string? GetMagnitudeLabel() => "×1.8";
+        protected override string? MagnitudeLabel => "×1.8";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.8;
 
         public bool HidesOwnInput(EngineEvaluationContext context) => true;
@@ -22,9 +23,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.Wildcard;
         public override string GetName() => "The Wildcard";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Grants 0 points. Your words ignore the Succession rule — they need not begin with the last letter of the previous word.";
-        public override string? GetMagnitudeLabel() => "FX";
+        protected override string? MagnitudeLabel => "FX";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 
         public bool IgnoresSuccession(EngineEvaluationContext context) => true;
@@ -38,9 +39,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.IrsAgent;
         public override string GetName() => "The IRS Agent";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Grants 0 points. When YOUR word is hit by the Zero-Point Tax, no opponent's Tax Collector collects a thing.";
-        public override string? GetMagnitudeLabel() => "FX";
+        protected override string? MagnitudeLabel => "FX";
 
         // Inert in the scoring pipeline; its effect is the tax override below.
         public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
@@ -58,9 +59,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     {
         public override ModifierId GetId() => ModifierId.Prism;
         public override string GetName() => "The Prism";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Grants 0 points. If your word is a typo or fails validation, your shot clock resets to full — once per turn — instead of ticking away.";
-        public override string? GetMagnitudeLabel() => "FX";
+        protected override string? MagnitudeLabel => "FX";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 
         public override EngineEvaluationContext OnValidationFailed(EngineEvaluationContext context, IModifierCard self)
@@ -89,9 +90,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override ModifierId GetId() => ModifierId.TitaniumMirror;
         public override string GetName() => "The Titanium Mirror";
-        public override string GetDescription()
+        public override string GetDescription(EngineEvaluationContext context)
             => "Passive ×1.0. Automatically blocks and reflects incoming attacks (time shaves, point drains, letter hijacks) back at their source — but loses 0.1× per block, carrying its decay across eras until discarded.";
-        public override string? GetMagnitudeLabel() => "shield";
+        protected override string? MagnitudeLabel => "shield";
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
             => Multiplier(context);
@@ -102,13 +103,16 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             return true;
         }
 
-        /// <summary>Surfaces the live shield factor (e.g. "×0.7") on the bay card so the player can see
-        /// how far the mirror has decayed.</summary>
-        public override string? GetBayBadge(EngineEvaluationContext context)
+        /// <summary>Appends the live shield factor (e.g. "×0.7") to the base chips so the player can see
+        /// how far the mirror has decayed; absent outside a live context where the owner can't be resolved.</summary>
+        public override ImmutableArray<CardChip> GetChips(EngineEvaluationContext context)
         {
+            var chips = base.GetChips(context);
             var owner = context.GetPlayer(context.PlayerIndex);
             var shield = context.Service<IShieldService>();
-            return owner is not null && shield is not null ? $"×{shield.GetMultiplier(owner):0.0}" : null;
+            return owner is not null && shield is not null
+                ? chips.Add(new CardChip($"×{shield.GetMultiplier(owner):0.0}", CardChips.Live))
+                : chips;
         }
 
         public IEnumerable<RoomServiceDescriptor> GetRoomServices()
