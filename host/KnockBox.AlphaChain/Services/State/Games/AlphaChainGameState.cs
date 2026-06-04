@@ -102,6 +102,15 @@ namespace KnockBox.AlphaChain.Services.State.Games
         public List<AlphaChainWordPlay> PlayLog { get; } = new();
 
         /// <summary>
+        /// Every accepted word this match (lower-case, chronological), maintained incrementally so the
+        /// evaluation context can be handed a cheap immutable snapshot of the prior-words feed without
+        /// rebuilding it from <see cref="PlayLog"/> each submission. Appended after a play is credited;
+        /// snapshotting it before the append naturally excludes the current word.
+        /// </summary>
+        public System.Collections.Immutable.ImmutableList<string> WordHistory { get; set; } =
+            System.Collections.Immutable.ImmutableList<string>.Empty;
+
+        /// <summary>
         /// The most recent accepted word's scoring trace, for the center-stage score-replay
         /// animation every client plays. Null before the first play. Set inside the execute
         /// lock in <c>RoundState</c>; the change notification (fired after unlock) drives the
@@ -183,22 +192,22 @@ namespace KnockBox.AlphaChain.Services.State.Games
         }
 
         /// <summary>
-        /// The shot-clock length to arm for <paramref name="player"/>: the configured base (or the
-        /// Hyper-Drive override when latched), then every <see cref="ClockEffect"/> in their Engine
-        /// Bay folded in (fractions first, then flat seconds), floored at
-        /// <see cref="MinShotClockSeconds"/>. Pure function of the player's bay + match settings.
+        /// The shot-clock length to arm for <paramref name="player"/>: the configured base, then every
+        /// <see cref="IShotClockModifier"/> in their Engine Bay folded in (fractions first, then flat
+        /// seconds), then any <see cref="IShotClockCap"/> applied (Hyper-Drive lowers a longer clock to
+        /// its cap but never raises a shorter one), floored at <see cref="MinShotClockSeconds"/>. Pure
+        /// function of the player's bay + match settings.
         /// <para>
-        /// The Anchor Chain's <see cref="ClockOverride"/> short-circuits all of that: it pins the
+        /// The Anchor Chain's <see cref="IShotClockOverride"/> short-circuits all of that: it pins the
         /// clock to a strict, unmodifiable length (the smallest override if several are equipped),
-        /// ignoring every <see cref="ClockEffect"/> and the Hyper-Drive override alike.
+        /// ignoring every clock effect and cap alike.
         /// </para>
         /// </summary>
         public int ComputeArmedShotClockSeconds(AlphaChainPlayerState player)
         {
             // A single-player context so the clock capabilities can read this owner via
-            // ctx.GetPlayer(PlayerIndex) and resolve room state services (e.g. Hyper-Drive's latch,
-            // which now lives in IHyperDriveService). Services is null only outside a started game,
-            // where this is never called.
+            // ctx.GetPlayer(PlayerIndex) and resolve room state services. Services is null only outside
+            // a started game, where this is never called.
             var ctx = new EngineEvaluationContext(string.Empty, Array.Empty<char>(), new[] { player })
             {
                 Bay = player.EngineBay,
@@ -218,6 +227,11 @@ namespace KnockBox.AlphaChain.Services.State.Games
             seconds = seconds * (1 + fraction) + flat;
 
             int armed = (int)Math.Round(seconds, MidpointRounding.AwayFromZero);
+
+            // A shot-clock cap (Hyper-Drive's 5s) lowers a longer clock but never raises a shorter one.
+            if (bay.ShotClockCapSeconds(ctx) is { } cap)
+                armed = Math.Min(armed, cap);
+
             return Math.Max(MinShotClockSeconds, armed);
         }
 

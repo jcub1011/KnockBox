@@ -80,6 +80,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
             state.OptimizationSubmissions.Clear();
             state.PlayedWords.Clear();
             state.PlayLog.Clear();
+            state.WordHistory = System.Collections.Immutable.ImmutableList<string>.Empty;
             state.CurrentRound = 0;
             state.CurrentEra = 0;
             state.IntermissionPhase = default;

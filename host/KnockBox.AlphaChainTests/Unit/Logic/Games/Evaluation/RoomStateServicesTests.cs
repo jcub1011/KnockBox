@@ -34,7 +34,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
 
             // Card-contributed state services exist room-wide (the catalogue union).
             Assert.IsNotNull(services.Get<IShieldService>());
-            Assert.IsNotNull(services.Get<IHyperDriveService>());
             Assert.IsNotNull(services.Get<IPrismTurnGuard>());
             Assert.IsNotNull(services.Get<ICardBanService>());
             Assert.IsNotNull(services.Get<ITimePenaltyService>());
@@ -54,7 +53,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
 
             services.Get<IShieldService>()!.GrantFresh(p);
             services.Get<IShieldService>()!.Decay(p, 0.4);
-            services.Get<IHyperDriveService>()!.Latch(p);
             services.Get<ITimePenaltyService>()!.Queue(p, 5);
             services.Get<IHijackBanService>()!.Curse(p, 'x');
             services.Get<ICardBanService>()!.Roll(p, ModifierId.TollBooth, 'q');
@@ -63,7 +61,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
             services.Reset();
 
             Assert.AreEqual(1.0, services.Get<IShieldService>()!.GetMultiplier(p), "Shield resets to default 1.0.");
-            Assert.IsFalse(services.Get<IHyperDriveService>()!.IsLatched(p));
             Assert.AreEqual(0, services.Get<ITimePenaltyService>()!.Peek(p));
             Assert.IsNull(services.Get<IHijackBanService>()!.Peek(p));
             Assert.IsNull(services.Get<ICardBanService>()!.BanFor(p, ModifierId.TollBooth));
@@ -92,24 +89,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
 
             shield.GrantFresh(a);
             Assert.AreEqual(1.0, shield.GetMultiplier(a), 1e-9, "GrantFresh resets a replacement mirror to 1.0.");
-        }
-
-        // ── Hyper-Drive ─────────────────────────────────────────────────────────
-
-        [TestMethod]
-        public void HyperDrive_LatchPersists_UntilEraStartClearsIt_PerPlayer()
-        {
-            var hd = (IHyperDriveService)NewContainer().Get<IHyperDriveService>()!;
-            var a = Player("a");
-            var b = Player("b");
-
-            Assert.IsFalse(hd.IsLatched(a));
-            hd.Latch(a);
-            Assert.IsTrue(hd.IsLatched(a), "Latch persists within the era.");
-            Assert.IsFalse(hd.IsLatched(b), "Latch is per-player.");
-
-            ((IRoomStateService)hd).OnEraStarted(a);
-            Assert.IsFalse(hd.IsLatched(a), "Era start clears the latch.");
         }
 
         // ── Prism turn guard ────────────────────────────────────────────────────

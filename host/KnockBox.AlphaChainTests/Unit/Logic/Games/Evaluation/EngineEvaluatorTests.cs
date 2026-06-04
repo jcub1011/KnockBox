@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
@@ -34,7 +35,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         private static EngineEvaluationContext Ctx(
             string word, IReadOnlyList<IModifierCard> bay,
             double remaining = 0, double shotClock = 12, char? banned = null,
-            AlphaChainPlayerState? player = null, IServiceProvider? services = null)
+            AlphaChainPlayerState? player = null, IServiceProvider? services = null,
+            IEnumerable<string>? wordHistory = null)
         {
             player ??= new AlphaChainPlayerState { UserId = Guid.NewGuid() };
             return new EngineEvaluationContext(
@@ -47,20 +49,20 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
                 PlayerIndex = 0,
                 RemainingShotClockDuration = remaining,
                 ShotClockDuration = shotClock,
+                WordHistory = wordHistory?.ToImmutableList() ?? ImmutableList<string>.Empty,
             };
         }
 
         // A stub room-state provider: card state now lives in services, so the evaluator tests inject
-        // fixed shield / Hyper-Drive readings instead of setting fields on the player.
-        private static IServiceProvider Services(double? shield = null, bool hyperDriveLatched = false)
-            => new StubServices(shield, hyperDriveLatched);
+        // a fixed shield reading instead of setting fields on the player.
+        private static IServiceProvider Services(double? shield = null)
+            => new StubServices(shield);
 
-        private sealed class StubServices(double? shield, bool hyperDriveLatched) : IServiceProvider
+        private sealed class StubServices(double? shield) : IServiceProvider
         {
             public object? GetService(Type serviceType)
             {
                 if (serviceType == typeof(IShieldService) && shield is { } s) return new FixedShield(s);
-                if (serviceType == typeof(IHyperDriveService)) return new FixedHyperDrive(hyperDriveLatched);
                 return null;
             }
         }
@@ -70,12 +72,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
             public double GetMultiplier(AlphaChainPlayerState player) => multiplier;
             public void Decay(AlphaChainPlayerState player, double step) { }
             public void GrantFresh(AlphaChainPlayerState player) { }
-        }
-
-        private sealed class FixedHyperDrive(bool latched) : IHyperDriveService
-        {
-            public bool IsLatched(AlphaChainPlayerState player) => latched;
-            public void Latch(AlphaChainPlayerState player) { }
         }
 
         // ── Core pipeline parity ────────────────────────────────────────────
@@ -134,7 +130,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         [TestMethod]
         public void Architect_MultipliesWhenEightOrLonger()
         {
-            Assert.AreEqual(18, _eval.Calculate(Ctx("elephants", [Card(ModifierId.TheArchitect)])));
+            Assert.AreEqual(27, _eval.Calculate(Ctx("elephants", [Card(ModifierId.TheArchitect)]))); // 9 × 3
             Assert.AreEqual(3, _eval.Calculate(Ctx("cat", [Card(ModifierId.TheArchitect)])));
         }
 
@@ -146,14 +142,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         }
 
         [TestMethod]
-        public void Speedracer_ScalesInverselyWithRemainingFraction()
+        public void Speedracer_ScalesInverselyWithRemainingFraction_CappedAtHalfLength()
         {
-            // "bridge"(6) > 4. half the clock left → 1/0.5 = ×2 → 12.
-            Assert.AreEqual(12, _eval.Calculate(Ctx("bridge", [Card(ModifierId.Speedracer)], remaining: 6, shotClock: 12)));
-            // full clock left → 1/1 = ×1 → 6.
-            Assert.AreEqual(6, _eval.Calculate(Ctx("bridge", [Card(ModifierId.Speedracer)], remaining: 12, shotClock: 12)));
-            // length ≤ 4 → skipped.
-            Assert.AreEqual(3, _eval.Calculate(Ctx("cat", [Card(ModifierId.Speedracer)], remaining: 1, shotClock: 12)));
+            // "elephants"(9) > 6. half the clock left → 1/0.5 = ×2 → 18. (cap = 9/2 = 4, not hit)
+            Assert.AreEqual(18, _eval.Calculate(Ctx("elephants", [Card(ModifierId.Speedracer)], remaining: 6, shotClock: 12)));
+            // 1s of 12 left → 1/(1/12) = ×12, capped at 9/2 = ×4 → 36.
+            Assert.AreEqual(36, _eval.Calculate(Ctx("elephants", [Card(ModifierId.Speedracer)], remaining: 1, shotClock: 12)));
+            // length ≤ 6 → skipped.
+            Assert.AreEqual(6, _eval.Calculate(Ctx("bridge", [Card(ModifierId.Speedracer)], remaining: 1, shotClock: 12)));
         }
 
         [TestMethod]
@@ -163,7 +159,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         [TestMethod]
         public void Sesquipedalian_TriplesWhenTenOrLonger()
         {
-            Assert.AreEqual(33, _eval.Calculate(Ctx("exceedingly", [Card(ModifierId.Sesquipedalian)])));
+            Assert.AreEqual(55, _eval.Calculate(Ctx("exceedingly", [Card(ModifierId.Sesquipedalian)]))); // 11 × 5
             Assert.AreEqual(9, _eval.Calculate(Ctx("elephants", [Card(ModifierId.Sesquipedalian)])));
         }
 
@@ -256,20 +252,22 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
             Assert.AreEqual(3, _eval.Calculate(Ctx("bridge", [Card(ModifierId.TitaniumMirror)], services: Services(shield: 0.5))));
         }
 
-        // ── Hyper-Drive multiplier scale (seeded from the bay) ──────────────
+        // ── Hyper-Drive: positional ×1.5 on a word longer than 6, only for cards to its right ──
 
         [TestMethod]
-        public void HyperDrive_WhenLatched_DoublesEveryMultiplicativeFactor()
+        public void HyperDrive_BoostsOnlyCardsPlacedAfterIt_WhenWordOverSix()
         {
-            // scale 2 turns a ×3 into ×6; Hyper-Drive itself is inert in the pipeline.
-            Assert.AreEqual(4 * 6, _eval.Calculate(Ctx("cats", [Card(ModifierId.HyperDrive), Mult(3)], services: Services(hyperDriveLatched: true))));
+            // "elephant" (8 > 6): Hyper-Drive folds ×1.5 at its slot, so only the later +10 compounds.
+            // [HyperDrive, +10]: (8 × 1.5) + 10 = 22.
+            Assert.AreEqual(22, _eval.Calculate(Ctx("elephant", [Card(ModifierId.HyperDrive), Additive(10)])));
+            // [+10, HyperDrive]: (8 + 10) × 1.5 = 27 — the additive is to the LEFT, so it is boosted.
+            Assert.AreEqual(27, _eval.Calculate(Ctx("elephant", [Additive(10), Card(ModifierId.HyperDrive)])));
         }
 
         [TestMethod]
-        public void HyperDrive_WhenNotLatched_LeavesMultipliersAlone()
-        {
-            Assert.AreEqual(4 * 3, _eval.Calculate(Ctx("cats", [Card(ModifierId.HyperDrive), Mult(3)], services: Services(hyperDriveLatched: false))));
-        }
+        public void HyperDrive_DoesNotTrigger_WhenWordSixOrShorter()
+            // "bridge" (6, not > 6): Hyper-Drive skips, the later ×3 multiplies the bare length → 18.
+            => Assert.AreEqual(18, _eval.Calculate(Ctx("bridge", [Card(ModifierId.HyperDrive), Mult(3)])));
 
         // ── The Catalyst: capability-interface idiom, now position-dependent ──
 
@@ -303,6 +301,64 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
             // Y/W/H stay consonants either way, so Consonant Crunch is identical. "why" → 3 consonants → +6 → 9.
             Assert.AreEqual(9, _eval.Calculate(Ctx("why", [Card(ModifierId.ConsonantCrunch)])));
             Assert.AreEqual(9, _eval.Calculate(Ctx("why", [Card(ModifierId.Catalyst), Card(ModifierId.ConsonantCrunch)])));
+        }
+
+        // ── New scoring cards ───────────────────────────────────────────────
+
+        [TestMethod]
+        public void Blueprint_AddsThreePerLetter_WhenAtLeastAsLongAsPreviousWord()
+        {
+            // No prior word → always pays out. "cat"(3): 3 + 3×3 = 12.
+            Assert.AreEqual(12, _eval.Calculate(Ctx("cat", [Card(ModifierId.TheBlueprint)])));
+            // Previous word longer (8) → 3 < 8 → skip → bare length 3.
+            Assert.AreEqual(3, _eval.Calculate(Ctx("cat", [Card(ModifierId.TheBlueprint)], wordHistory: new[] { "elephant" })));
+            // Previous word shorter (3), current 6 → fires → 6 + 3×6 = 24.
+            Assert.AreEqual(24, _eval.Calculate(Ctx("bridge", [Card(ModifierId.TheBlueprint)], wordHistory: new[] { "cat" })));
+        }
+
+        [TestMethod]
+        public void TryHard_AddsTenthPerLetterBeyondSix()
+        {
+            Assert.AreEqual(6, _eval.Calculate(Ctx("bridge", [Card(ModifierId.TryHard)])));      // 6 → no trigger
+            Assert.AreEqual(8, _eval.Calculate(Ctx("bridges", [Card(ModifierId.TryHard)])));     // 7 → ×1.1 → 7.7 → 8
+            Assert.AreEqual(10, _eval.Calculate(Ctx("elephant", [Card(ModifierId.TryHard)])));   // 8 → ×1.2 → 9.6 → 10
+        }
+
+        [TestMethod]
+        public void Forgery_DoublesPerceivedLength_ForLaterLengthCardsOnly()
+        {
+            // [Forgery, Vanilla] "cat": seed stays the real 3; Vanilla perceives 6 → +6 → 9.
+            Assert.AreEqual(9, _eval.Calculate(Ctx("cat", [Card(ModifierId.Forgery), Card(ModifierId.Vanilla)])));
+            // [Forgery, Architect] "moss"(4): perceived 8 ≥ 8 → ×3 → 4 × 3 = 12.
+            Assert.AreEqual(12, _eval.Calculate(Ctx("moss", [Card(ModifierId.Forgery), Card(ModifierId.TheArchitect)])));
+        }
+
+        [TestMethod]
+        public void Forgery_LeavesPerCharacterCardsAndEarlierCardsUntouched()
+        {
+            // Consonant Crunch reads actual characters → "cat" has 2 consonants → +4 → 7, with or without Forgery.
+            Assert.AreEqual(7, _eval.Calculate(Ctx("cat", [Card(ModifierId.ConsonantCrunch)])));
+            Assert.AreEqual(7, _eval.Calculate(Ctx("cat", [Card(ModifierId.Forgery), Card(ModifierId.ConsonantCrunch)])));
+            // Vanilla placed BEFORE Forgery perceives the real 3 → +3 → 6.
+            Assert.AreEqual(6, _eval.Calculate(Ctx("cat", [Card(ModifierId.Vanilla), Card(ModifierId.Forgery)])));
+        }
+
+        [TestMethod]
+        public void BoosterPack_AddsTwoPerCardToItsRight()
+        {
+            // Alone → no cards to the right → +0 → bare length 3.
+            Assert.AreEqual(3, _eval.Calculate(Ctx("cat", [Card(ModifierId.BoosterPack)])));
+            // Two cards to the right → +4 → 3 + 4 = 7 (the two additives contribute 0).
+            Assert.AreEqual(7, _eval.Calculate(Ctx("cat", [Card(ModifierId.BoosterPack), Additive(0), Additive(0)])));
+        }
+
+        [TestMethod]
+        public void Scavenger_AddsOnePerPriorWordContainingTheStartingLetter()
+        {
+            // "can" starts with 'c'; prior words "cat" and "car" contain 'c' (not "dog") → +2 → 3 + 2 = 5.
+            Assert.AreEqual(5, _eval.Calculate(Ctx("can", [Card(ModifierId.Scavenger)], wordHistory: new[] { "cat", "dog", "car" })));
+            // No history → +0 → bare length 3.
+            Assert.AreEqual(3, _eval.Calculate(Ctx("can", [Card(ModifierId.Scavenger)])));
         }
 
         // ── CalculateSteps (score-replay trace) ─────────────────────────────

@@ -1,5 +1,4 @@
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
-using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 
 namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 {
@@ -79,57 +78,60 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     }
 
     /// <summary>
-    /// Hyper-Drive: inert in the scoring pipeline (it never folds), but a fast accepted submission
-    /// latches an era-scoped overdrive on the owner — a short base clock plus doubled multipliers for
-    /// every other card. The latch is read by <see cref="IBaseShotClockProvider"/> (clock) and
-    /// <see cref="IMultiplierScaleProvider"/> (scale) while active.
+    /// Hyper-Drive: passively caps the owner's shot clock at 5s (it only lowers a longer clock, never
+    /// raises a shorter one), and — when the word is longer than 6 letters — applies a ×1.5 to every
+    /// card placed after it. Because the multiplier folds at this card's own bay position, only the
+    /// later (right-hand) cards' contributions compound on the boosted running total. Per-word: the
+    /// ×1.5 applies the turn it triggers, not for the era. The length trigger reads the
+    /// Forgery-perceived letter count.
     /// </summary>
-    public sealed class HyperDriveCard : MultiplicativeCardBase, IBaseShotClockProvider, IMultiplierScaleProvider, IContributesRoomServices
+    public sealed class HyperDriveCard : MultiplicativeCardBase, IShotClockCap
     {
-        /// <summary>Submit faster than this (elapsed seconds) to latch the overdrive.</summary>
-        public const double ThresholdSeconds = 4;
+        /// <summary>The maximum armed clock this card caps the owner to.</summary>
+        public const int CapSeconds = 5;
 
-        /// <summary>The base shot clock the overdrive imposes while latched.</summary>
-        public const int OverdriveClockSeconds = 5;
+        /// <summary>The word must be longer than this (perceived) length to fire the multiplier.</summary>
+        public const int LengthThreshold = 6;
 
-        /// <summary>The multiplier scale applied to every multiplicative card while latched.</summary>
-        public const double OverdriveScale = 2.0;
+        /// <summary>The multiplier applied to later cards when triggered.</summary>
+        public const double Factor = 1.5;
 
         public override ModifierId GetId() => ModifierId.HyperDrive;
         public override string GetName() => "Hyper-Drive";
         public override string GetDescription()
-            => "Submit in under 4 seconds to overdrive: your shot clock drops to 5s for the rest of the era, but every multiplier you own is doubled.";
+            => "Caps your shot clock at 5s. When your word is longer than 6 letters, ×1.5 to every card placed after this one.";
+        public override string? GetMagnitudeLabel() => "×1.5";
+
+        public override bool CheckIfTriggered(EngineEvaluationContext context)
+            => this.GetEffectiveLetterCount(context) > LengthThreshold;
+
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => Factor;
+
+        public int GetShotClockCapSeconds(EngineEvaluationContext context) => CapSeconds;
+    }
+
+    /// <summary>
+    /// Slow Burn: lengthens the shot clock by 20%, but forbids words shorter than 6 letters — a too-short
+    /// word is illegal and takes the Zero-Point Tax (scores 0, still siphonable) exactly like a banned
+    /// letter. The length floor reads the Forgery-perceived letter count. Inert in the scoring fold.
+    /// </summary>
+    public sealed class SlowBurnCard : MultiplicativeCardBase, IShotClockModifier, IWordLegalityRule
+    {
+        /// <summary>The shortest legal word length; anything shorter is taxed.</summary>
+        public const int MinLength = 6;
+
+        public override ModifierId GetId() => ModifierId.SlowBurn;
+        public override string GetName() => "Slow Burn";
+        public override string GetDescription()
+            => "Lengthens your shot clock by 20%, but words shorter than 6 letters are illegal — they take the Zero-Point Tax.";
         public override string? GetMagnitudeLabel() => "FX";
 
-        // Inert in the pipeline — its power is the era latch, not a per-word fold.
-        public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 
-        public override EngineEvaluationContext OnWordAccepted(EngineEvaluationContext context, IModifierCard self)
-        {
-            var owner = context.GetPlayer(context.PlayerIndex);
-            var overdrive = context.Service<IHyperDriveService>();
-            if (owner is not null && overdrive is not null && !overdrive.IsLatched(owner))
-            {
-                double elapsed = context.ModifiedShotClockDuration - context.RemainingShotClockDuration;
-                if (elapsed < ThresholdSeconds)
-                    overdrive.Latch(owner);
-            }
-            return context;
-        }
+        public double FractionDelta => 0.20;
+        public int FlatDelta => 0;
 
-        public int? GetBaseShotClockSeconds(EngineEvaluationContext context)
-            => IsLatched(context) ? OverdriveClockSeconds : null;
-
-        public double GetMultiplierScale(EngineEvaluationContext context)
-            => IsLatched(context) ? OverdriveScale : 1.0;
-
-        public IEnumerable<RoomServiceDescriptor> GetRoomServices()
-            => [new(typeof(IHyperDriveService), static _ => new HyperDriveService())];
-
-        private static bool IsLatched(EngineEvaluationContext context)
-        {
-            var owner = context.GetPlayer(context.PlayerIndex);
-            return owner is not null && context.Service<IHyperDriveService>()?.IsLatched(owner) == true;
-        }
+        public bool IsIllegal(EngineEvaluationContext context)
+            => this.GetEffectiveLetterCount(context) < MinLength;
     }
 }

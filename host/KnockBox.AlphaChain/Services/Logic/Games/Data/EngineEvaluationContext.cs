@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 
@@ -75,6 +76,16 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         public WordResolution? Resolution { get; init; }
 
         /// <summary>
+        /// Every word accepted this match before the current submission, in chronological order
+        /// (lower-case, any player), excluding the word being evaluated. Read by history-aware cards
+        /// (The Blueprint compares the previous word's length; Scavenger counts a starting letter
+        /// across all prior words). Empty for ad-hoc/display contexts that don't snapshot the match
+        /// feed. An <see cref="ImmutableList{T}"/> so the long, frequently-appended match feed shares
+        /// structure cheaply.
+        /// </summary>
+        public ImmutableList<string> WordHistory { get; init; } = ImmutableList<string>.Empty;
+
+        /// <summary>
         /// The ordered Engine Bay for the player at <paramref name="playerIndex"/>. For the current
         /// player this is <see cref="Bay"/>; for others it reads their live bay. Returns empty when the
         /// index is out of range.
@@ -139,5 +150,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         /// <summary>When true (the submitter holds an <see cref="Cards.Library.IOwnTaxPolicy"/> that
         /// suppresses bounties), no opponent's era-tax siphon collects from this taxed word.</summary>
         public bool SiphonSuppressed { get; init; }
+
+        /// <summary>Whole seconds left on the submitter's shot clock when they submitted. Read by
+        /// Chrono Syphon (awards the owner a point per second remaining in opponents' submissions).</summary>
+        public int RemainingSeconds { get; init; }
     }
 }

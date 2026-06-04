@@ -121,6 +121,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 Bay = player?.EngineBay ?? [],
                 Services = services,
                 PlayerIndex = playerIndex,
+                WordHistory = state.WordHistory,
                 ShotClockDuration = state.Settings.ShotClockSeconds,
                 ModifiedShotClockDuration = player is null
                     ? state.Settings.ShotClockSeconds
@@ -159,7 +160,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             bool faraday = player is not null && evalCtx.Bay.ImmuneToOwnCardBans(evalCtx);
             bool taxed =
                 ContainsAny(word, state.BannedLetter, hijackBan)
-                || (!faraday && ContainsAnyOf(word, cardBans));
+                || (!faraday && ContainsAnyOf(word, cardBans))
+                // A card-driven legality rule (Slow Burn's 6-letter floor) taxes the word like a ban.
+                || (player is not null && evalCtx.Bay.ViolatesLegalityRule(evalCtx));
 
             // 8. Scoring pipeline (sequential, left → right over the bay).
             var breakdown = context.Evaluator.CalculateSteps(evalCtx, taxed);
@@ -174,6 +177,18 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 suppressBounty = ownTax.SuppressesSiphonBounty;
                 if (score > 0)
                     breakdown = breakdown with { FinalScore = score };
+            }
+
+            // 8d. Tax Write-Off: on the owner's own taxed word, salvage by scoring the first letter
+            //     clean and adding it on top (the original word still scores 0 and stays siphonable).
+            if (taxed && player is not null && evalCtx.Bay.TaxWriteOffPolicy() is { } writeOff)
+            {
+                int bonus = writeOff.GetWriteOffBonus(evalCtx, context.Evaluator);
+                if (bonus > 0)
+                {
+                    score += bonus;
+                    breakdown = breakdown with { FinalScore = score };
+                }
             }
 
             // The banned letter the word used, captured before the personal ban is consumed.
@@ -199,11 +214,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             var resolution = new WordResolution(cmd.ActorUserId, word, taxed, baseScore, score, offendingLetter)
             {
                 SiphonSuppressed = suppressBounty,
+                RemainingSeconds = (int)remaining,
             };
 
             if (player is not null)
             {
-                // 11a. OnWordAccepted — Hyper-Drive latches the era overdrive on a fast submission.
+                // 11a. OnWordAccepted — the owner's post-credit reactions, each routed through their cards.
                 foreach (var card in player.EngineBay)
                     evalCtx = card.OnWordAccepted(evalCtx, card);
 
@@ -223,6 +239,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                         Bay = other.EngineBay,
                         Services = services,
                         PlayerIndex = oidx,
+                        WordHistory = state.WordHistory,
                         Resolution = resolution,
                     };
                     foreach (var card in other.EngineBay)
@@ -245,10 +262,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             string displayName = player?.DisplayName ?? cmd.ActorUserId.ToString();
 
-            // Log the accepted play for the UI feed.
+            // Log the accepted play for the UI feed, and append to the word-history snapshot the next
+            // submission's context reads (this word was excluded from the context built above).
             state.PlayLog.Add(new AlphaChainWordPlay(
                 DateTimeOffset.UtcNow, cmd.ActorUserId, displayName,
                 word, score, taxed, bounty));
+            state.WordHistory = state.WordHistory.Add(word);
 
             // Publish the scoring trace + any fired effects so every client plays the replay strip.
             state.ScoreReplaySequence++;

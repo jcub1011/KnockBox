@@ -48,6 +48,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Support
             ["prism"] = ModifierId.Prism,
             ["wildcard"] = ModifierId.Wildcard,
             ["catalyst"] = ModifierId.Catalyst,
+            ["the-blueprint"] = ModifierId.TheBlueprint,
+            ["slow-burn"] = ModifierId.SlowBurn,
+            ["try-hard"] = ModifierId.TryHard,
+            ["chrono-syphon"] = ModifierId.ChronoSyphon,
+            ["forgery"] = ModifierId.Forgery,
+            ["tax-write-off"] = ModifierId.TaxWriteOff,
+            ["booster-pack"] = ModifierId.BoosterPack,
+            ["scavenger"] = ModifierId.Scavenger,
         };
 
         /// <summary>Maps a legacy string id to its <see cref="ModifierId"/>.</summary>

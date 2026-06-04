@@ -50,10 +50,6 @@
                     <input type="checkbox" @bind="_taxed" />
                     <span>Zero-Point Tax</span>
                 </label>
-                <label class="ac-toggle">
-                    <input type="checkbox" @bind="_hyperDriveLatched" />
-                    <span>Hyper-Drive latched (×2 mult.)</span>
-                </label>
                 <button type="button" class="ac-run" @onclick="Run">Run</button>
             </div>
 
@@ -182,7 +178,6 @@
     private double _totalClock = 30;
     private double _remainingClock = 15;
     private bool _taxed;
-    private bool _hyperDriveLatched;
 
     /// <summary>The most recent scored result, or null before the first Run.</summary>
     private ScoreBreakdown? _result;
@@ -220,7 +215,7 @@
         var displayContext = new EngineEvaluationContext(string.Empty, [], []);
         var bay = _bay.Select(id => CardFactory.CreateCard(displayContext, id)).ToList();
 
-        // A single owner so the Hyper-Drive latch check (GetPlayer(PlayerIndex)) has a non-null player.
+        // A single owner so capability walks that read GetPlayer(PlayerIndex) have a non-null player.
         var owner = new AlphaChainPlayerState { UserId = Guid.Empty, DisplayName = "Bench" };
         var players = new List<AlphaChainPlayerState> { owner };
 
@@ -233,8 +228,6 @@
             ShotClockDuration = _totalClock,
             ModifiedShotClockDuration = _totalClock,
             RemainingShotClockDuration = _remainingClock,
-            // Only matters when a Hyper-Drive card is in the bay (it reads IHyperDriveService for its scale).
-            Services = _hyperDriveLatched ? LatchedHyperDriveServices.Instance : null,
         };
 
         _result = Evaluator.CalculateSteps(context, _taxed);
@@ -254,25 +247,5 @@
             .ToList();
 
         _cardsById = Cards.ToDictionary(c => c.Id);
-    }
-
-    /// <summary>
-    /// Minimal plugin-internal <see cref="IServiceProvider"/> that reports Hyper-Drive as latched,
-    /// so the bench can preview the overdrive (×2 to every multiplier) without spinning up the real
-    /// room services. Only the Hyper-Drive scale walk reads <see cref="IHyperDriveService"/>.
-    /// </summary>
-    private sealed class LatchedHyperDriveServices : IServiceProvider
-    {
-        public static readonly LatchedHyperDriveServices Instance = new();
-        private readonly IHyperDriveService _hyperDrive = new AlwaysLatched();
-
-        public object? GetService(Type serviceType)
-            => serviceType == typeof(IHyperDriveService) ? _hyperDrive : null;
-
-        private sealed class AlwaysLatched : IHyperDriveService
-        {
-            public bool IsLatched(AlphaChainPlayerState player) => true;
-            public void Latch(AlphaChainPlayerState player) { }
-        }
     }
 }

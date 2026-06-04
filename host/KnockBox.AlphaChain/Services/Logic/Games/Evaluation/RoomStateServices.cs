@@ -24,16 +24,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
         void GrantFresh(AlphaChainPlayerState player);
     }
 
-    /// <summary>Hyper-Drive's era latch (short clock + doubled multipliers once it fires).</summary>
-    public interface IHyperDriveService
-    {
-        /// <summary>Whether the owner's overdrive is latched this era.</summary>
-        bool IsLatched(AlphaChainPlayerState player);
-
-        /// <summary>Latches the owner's overdrive for the rest of the era.</summary>
-        void Latch(AlphaChainPlayerState player);
-    }
-
     /// <summary>The Prism's once-per-turn refill gate.</summary>
     public interface IPrismTurnGuard
     {
@@ -110,17 +100,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
         // The shield deliberately persists across eras (no OnEraStarted); GrantFresh on a fresh deal
         // is its only reset short of back-to-lobby.
         public void Reset() => _multiplier.Clear();
-    }
-
-    internal sealed class HyperDriveService : IHyperDriveService, IRoomStateService
-    {
-        private readonly HashSet<Guid> _latched = new();
-
-        public bool IsLatched(AlphaChainPlayerState player) => _latched.Contains(player.UserId);
-        public void Latch(AlphaChainPlayerState player) => _latched.Add(player.UserId);
-
-        public void OnEraStarted(AlphaChainPlayerState player) => _latched.Remove(player.UserId);
-        public void Reset() => _latched.Clear();
     }
 
     internal sealed class PrismTurnGuard : IPrismTurnGuard, IRoomStateService

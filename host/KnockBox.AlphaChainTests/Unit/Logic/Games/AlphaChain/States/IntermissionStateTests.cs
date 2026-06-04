@@ -317,15 +317,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             AdvanceToSniperBan(engine, state);
 
             var picker = state.SniperBanUserId!.Value;
-            state.Execute(() =>
-            {
-                RoomStateProbe.LatchHyperDrive(state, picker);
-                RoomStateProbe.MarkDoubleLetterPlayed(state, picker);
-            });
+            state.Execute(() => RoomStateProbe.MarkDoubleLetterPlayed(state, picker));
 
             await engine.SelectSniperBanAsync(picker, 'q', state);
 
-            Assert.IsFalse(RoomStateProbe.HyperDriveActive(state, picker), "Hyper-Drive latch clears across an era.");
             Assert.IsFalse(RoomStateProbe.PlayedDoubleLetterWordThisEra(state, picker), "Double-letter flag resets each era.");
             // The Titanium Mirror's decayed multiplier is intentionally NOT era-scoped — see
             // Mirror_DecayPersistsAcrossEras_WhenKept and Mirror_ResetsToOne_WhenFreshShieldDealt.

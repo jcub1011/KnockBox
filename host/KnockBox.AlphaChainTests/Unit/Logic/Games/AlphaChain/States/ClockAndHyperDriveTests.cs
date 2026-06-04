@@ -12,9 +12,9 @@ using Moq;
 namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 {
     /// <summary>
-    /// Exercises the glass-cannon clock cards (Vault, Redline, Panic Button) via
-    /// <see cref="AlphaChainGameState.ComputeArmedShotClockSeconds"/>, and the Hyper-Drive
-    /// era-scoped latch via the real submit path with a deterministic submission timestamp.
+    /// Exercises the glass-cannon clock cards (Vault, Redline, Panic Button, Heat Sink, Anchor Chain)
+    /// and Hyper-Drive's passive 5s shot-clock cap via
+    /// <see cref="AlphaChainGameState.ComputeArmedShotClockSeconds"/>.
     /// </summary>
     [TestClass]
     public class ClockAndHyperDriveTests
@@ -158,40 +158,58 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                 "The Anchor Chain pins the clock to a strict, unmodifiable 5 seconds.");
         }
 
-        // ── Hyper-Drive latch (submit path) ─────────────────────────────────
+        // ── Hyper-Drive shot-clock cap (ComputeArmedShotClockSeconds) ───────
 
         [TestMethod]
-        public async Task HyperDrive_LatchesWhenSubmittingFast()
+        public async Task HyperDrive_CapsClockAtFive()
         {
-            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
             var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "hyper-drive");
 
-            // Arm the clock to a known window, then submit 2s in (elapsed 2 < 3 threshold).
-            var armAt = DateTimeOffset.UtcNow;
-            state.Execute(() => state.PhaseEndTime = armAt.AddSeconds(12));
-            await engine.SubmitWordAsync(id, "cat", state, armAt.AddSeconds(2));
-
-            Assert.IsTrue(RoomStateProbe.HyperDriveActive(state, id), "Fast submit should latch Hyper-Drive.");
-            // Once latched, the owner's clock is overridden to the rule's 5s.
+            // Base 12 capped down to the rule's 5s.
             Assert.AreEqual(5, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
         }
 
         [TestMethod]
-        public async Task HyperDrive_DoesNotLatchWhenSubmittingSlow()
+        public async Task HyperDrive_CapLowersEvenALengthenedClock()
         {
-            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
             var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "hyper-drive");
+            GiveModifier(state, id, "heat-sink"); // +30% → 12 × 1.3 = 15.6 → 16, then capped to 5.
 
-            // Submit 10s in (elapsed 10 ≥ 3 threshold) → no latch.
-            var armAt = DateTimeOffset.UtcNow;
-            state.Execute(() => state.PhaseEndTime = armAt.AddSeconds(12));
-            await engine.SubmitWordAsync(id, "cat", state, armAt.AddSeconds(10));
+            Assert.AreEqual(5, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+        }
 
-            Assert.IsFalse(RoomStateProbe.HyperDriveActive(state, id), "Slow submit must not latch Hyper-Drive.");
+        [TestMethod]
+        public async Task HyperDrive_CapNeverRaisesAShorterClock()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
+            using var _ = state;
+            var id = state.TurnManager.CurrentPlayer!.Value;
+            GiveModifier(state, id, "hyper-drive");
+            GiveModifier(state, id, "panic-button"); // −50%
+            GiveModifier(state, id, "redline");      // −20%
+            GiveModifier(state, id, "the-vault");    // −10%
+
+            // 12 × 0.2 = 2.4 → 2, the 5s cap does NOT raise it, then floored to the 3s minimum.
+            Assert.AreEqual(AlphaChainGameState.MinShotClockSeconds,
+                state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+        }
+
+        [TestMethod]
+        public async Task AnchorChain_OverrideWins_AndIsNotCappedByHyperDrive()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
+            using var _ = state;
+            var id = state.TurnManager.CurrentPlayer!.Value;
+            GiveModifier(state, id, "anchor-chain"); // pins to a strict, unmodifiable 5s
+            GiveModifier(state, id, "hyper-drive");   // cap is ignored by the override path
+
+            Assert.AreEqual(5, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
         }
     }
 }

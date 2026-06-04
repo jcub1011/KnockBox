@@ -200,4 +200,92 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public IEnumerable<RoomServiceDescriptor> GetRoomServices()
             => [new(typeof(IHijackBanService), static _ => new HijackBanService())];
     }
+
+    /// <summary>Chrono Syphon — inert in scoring; banks a point for every second left on an opponent's
+    /// clock when they submit.</summary>
+    public sealed class ChronoSyphonCard : MultiplicativeCardBase
+    {
+        public override ModifierId GetId() => ModifierId.ChronoSyphon;
+        public override string GetName() => "Chrono Syphon";
+        public override string GetDescription()
+            => "Grants 0 points. Banks +1 for every whole second left on an opponent's shot clock when they submit.";
+        public override string? GetMagnitudeLabel() => "FX";
+
+        public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
+
+        public override EngineEvaluationContext OnOpponentWordResolved(EngineEvaluationContext context, IModifierCard self)
+        {
+            var res = context.Resolution;
+            if (res is null || res.RemainingSeconds <= 0)
+                return context;
+
+            var owner = context.GetPlayer(context.PlayerIndex);
+            if (owner is null || owner.UserId == res.SubmitterUserId)
+                return context;
+
+            int amount = ModifierMath.ClampScore(res.RemainingSeconds);
+            if (amount > 0) owner.Score += amount;
+            return context;
+        }
+    }
+
+    /// <summary>Tax Write-Off — inert in scoring; salvages a self-taxed word by scoring its first letter
+    /// clean and adding it on top.</summary>
+    public sealed class TaxWriteOffCard : MultiplicativeCardBase, ITaxWriteOffPolicy
+    {
+        public override ModifierId GetId() => ModifierId.TaxWriteOff;
+        public override string GetName() => "Tax Write-Off";
+        public override string GetDescription()
+            => "When your word is hit by the Zero-Point Tax, score its first letter through your engine as a clean submission and add that on top.";
+        public override string? GetMagnitudeLabel() => "FX";
+
+        public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
+
+        public int GetWriteOffBonus(EngineEvaluationContext context, IEngineEvaluator evaluator)
+        {
+            if (context.Word.Length == 0) return 0;
+            // Re-score just the first letter as an untaxed submission through the full bay. This card is
+            // inert (CheckIfTriggered is false), so the re-entry never recurses through this policy.
+            var sub = context with { Word = context.Word[..1] };
+            return evaluator.Calculate(sub);
+        }
+    }
+
+    /// <summary>Booster Pack — +2 for every card placed to the right of it in the bay.</summary>
+    public sealed class BoosterPackCard : AdditiveCardBase
+    {
+        /// <summary>Points granted per card to the right.</summary>
+        public const int PerCard = 2;
+
+        public override ModifierId GetId() => ModifierId.BoosterPack;
+        public override string GetName() => "Booster Pack";
+        public override string GetDescription() => "Adds +2 for every card placed to the right of this one.";
+        public override string? GetMagnitudeLabel() => "+2 / card→";
+
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
+            => PerCard * Math.Max(0, context.Bay.Count - context.ModifierCardIndex - 1);
+    }
+
+    /// <summary>Scavenger — +1 for every previously submitted word this match that contains your word's
+    /// starting letter.</summary>
+    public sealed class ScavengerCard : AdditiveCardBase
+    {
+        public override ModifierId GetId() => ModifierId.Scavenger;
+        public override string GetName() => "Scavenger";
+        public override string GetDescription()
+            => "Adds +1 for every previously submitted word that contains your word's starting letter.";
+        public override string? GetMagnitudeLabel() => "+1 / find";
+
+        public override bool CheckIfTriggered(EngineEvaluationContext context) => context.Word.Length > 0;
+
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
+        {
+            char start = context.Word[0];
+            int count = 0;
+            foreach (var word in context.WordHistory)
+                if (word.Contains(start))
+                    count++;
+            return count;
+        }
+    }
 }

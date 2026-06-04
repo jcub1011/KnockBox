@@ -53,6 +53,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         Prism,
         Wildcard,
         Catalyst,
+        TheBlueprint,
+        SlowBurn,
+        TryHard,
+        ChronoSyphon,
+        Forgery,
+        TaxWriteOff,
+        BoosterPack,
+        Scavenger,
     }
 
     /// <summary>
@@ -183,6 +191,43 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         bool IsVowel(char character);
     }
 
+    /// <summary>Inflates the letter count perceived by cards evaluated after this one (Forgery doubles
+    /// it). Affects length conditionals and per-letter magnitudes via
+    /// <see cref="ModifierCapabilityExtensions.GetEffectiveLetterCount"/>; the evaluator's base
+    /// word-length seed is untouched.</summary>
+    public interface ILetterCountModifier
+    {
+        /// <summary>The factor applied to the real letter count for later cards (e.g. 2 doubles it).</summary>
+        int LetterCountMultiplier { get; }
+    }
+
+    /// <summary>Caps the owner's armed shot clock at a maximum length (Hyper-Drive's 5s). Applied after
+    /// the base + per-owner clock effects, so it lowers a longer clock but never raises a shorter one.
+    /// The smallest cap among the bay wins.</summary>
+    public interface IShotClockCap
+    {
+        /// <summary>The maximum armed clock in seconds this card imposes.</summary>
+        int GetShotClockCapSeconds(EngineEvaluationContext context);
+    }
+
+    /// <summary>Marks the current word illegal so the Zero-Point Tax applies, on a rule beyond the
+    /// banned letters (Slow Burn forbids words shorter than 6 letters). Any card whose rule fires taxes
+    /// the word.</summary>
+    public interface IWordLegalityRule
+    {
+        /// <summary>Whether the current word violates this card's legality rule.</summary>
+        bool IsIllegal(EngineEvaluationContext context);
+    }
+
+    /// <summary>Salvages the owner's own Zero-Point-Taxed word (Tax Write-Off): re-scores the word's
+    /// first letter through the bay as a fresh, untaxed submission and adds the result on top of the
+    /// taxed score.</summary>
+    public interface ITaxWriteOffPolicy
+    {
+        /// <summary>The bonus to add to the owner's taxed score, scored from the first letter.</summary>
+        int GetWriteOffBonus(EngineEvaluationContext context, Evaluation.IEngineEvaluator evaluator);
+    }
+
     /// <summary>Pins the owner's shot clock to a fixed, unmodifiable length for the era (The Anchor
     /// Chain; Hyper-Drive while latched). The smallest override among the bay wins.</summary>
     public interface IShotClockOverride
@@ -308,6 +353,50 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             for (int i = 0; i < context.Word.Length; i++)
                 if (vowelChecker.Invoke(context.Word[i]))
                     yield return i;
+        }
+
+        /// <summary>The word's letter count as perceived by <paramref name="currentCard"/>, multiplied by
+        /// every <see cref="ILetterCountModifier"/> placed strictly before it in the bay (Forgery doubles
+        /// it). A card never Forgery-perceives itself. Cards read this instead of <c>context.Word.Length</c>
+        /// for length conditionals and per-letter magnitudes so a preceding Forgery flows through.</summary>
+        public static int GetEffectiveLetterCount(this IModifierCard currentCard, EngineEvaluationContext context)
+        {
+            int multiplier = 1;
+            foreach (var card in context.GetModifierCards(context.PlayerIndex))
+            {
+                if (card == currentCard) break;
+                if (card is ILetterCountModifier m) multiplier *= m.LetterCountMultiplier;
+            }
+            return context.Word.Length * multiplier;
+        }
+
+        /// <summary>The smallest shot-clock cap among the bay (Hyper-Drive), or null when none is active.</summary>
+        public static int? ShotClockCapSeconds(this IReadOnlyList<IModifierCard> bay, EngineEvaluationContext context)
+        {
+            int? cap = null;
+            foreach (var card in bay)
+                if (card is IShotClockCap c && c.GetShotClockCapSeconds(context) is var s
+                    && (cap is null || s < cap))
+                    cap = s;
+            return cap;
+        }
+
+        /// <summary>Whether any card's legality rule marks the current word illegal (Slow Burn's length floor).</summary>
+        public static bool ViolatesLegalityRule(this IReadOnlyList<IModifierCard> bay, EngineEvaluationContext context)
+        {
+            foreach (var card in bay)
+                if (card is IWordLegalityRule r && r.IsIllegal(context))
+                    return true;
+            return false;
+        }
+
+        /// <summary>The first <see cref="ITaxWriteOffPolicy"/> in the bay (Tax Write-Off), or null.</summary>
+        public static ITaxWriteOffPolicy? TaxWriteOffPolicy(this IReadOnlyList<IModifierCard> bay)
+        {
+            foreach (var card in bay)
+                if (card is ITaxWriteOffPolicy p)
+                    return p;
+            return null;
         }
 
         /// <summary>The product of every <see cref="IMultiplierScaleProvider"/>'s active scale in the bay (1.0 when none).</summary>

@@ -7,9 +7,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Support
 {
     /// <summary>
     /// Reads/writes the room-scoped card-state services for a started game, so tests can probe state
-    /// that used to live on <see cref="AlphaChainPlayerState"/> (shield multiplier, Hyper-Drive latch,
-    /// queued time penalty, hijack ban, era-rolled card bans, the double-letter fact) after the
-    /// migration to card-contributed services.
+    /// that used to live on <see cref="AlphaChainPlayerState"/> (shield multiplier, queued time penalty,
+    /// hijack ban, era-rolled card bans, the double-letter fact) after the migration to card-contributed
+    /// services.
     /// </summary>
     internal static class RoomStateProbe
     {
@@ -31,12 +31,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Support
             if (value < 1.0)
                 shield.Decay(player, 1.0 - value);
         }
-
-        public static bool HyperDriveActive(AlphaChainGameState state, Guid userId)
-            => Service<IHyperDriveService>(state).IsLatched(Player(state, userId));
-
-        public static void LatchHyperDrive(AlphaChainGameState state, Guid userId)
-            => Service<IHyperDriveService>(state).Latch(Player(state, userId));
 
         public static bool PrismUsedThisTurn(AlphaChainGameState state, Guid userId)
             => Service<IPrismTurnGuard>(state).HasConsumed(Player(state, userId));

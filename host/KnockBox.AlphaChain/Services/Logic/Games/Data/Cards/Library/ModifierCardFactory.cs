@@ -21,11 +21,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
                     ModifierType.Additive, Always,
                     static (_, _) => 10.0, "+10"),
 
-                ModifierId.Vanilla => new CommonModifier(
-                    ModifierId.Vanilla, "Vanilla",
-                    "Adds +1 for every letter in your word. +2 if the word is 7+ characters.",
-                    ModifierType.Additive, Always,
-                    static (ctx, _) => ctx.Word.Length < 7 ? ctx.Word.Length : ctx.Word.Length * 2, "+1-2 / ltr"),
+                ModifierId.Vanilla => new VanillaCard(),
 
                 ModifierId.ConsonantCrunch => new CommonModifier(
                     ModifierId.ConsonantCrunch, "Consonant Crunch",
@@ -39,26 +35,11 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
                     ModifierType.Additive, Always,
                     static (ctx, self) => ctx.Word.Length < 7 ? 3.0 * self.GetVowelIndicies(ctx).Count() : 4.0 * self.GetVowelIndicies(ctx).Count(), "+3-4 / vowel"),
 
-                ModifierId.TheArchitect => new CommonModifier(
-                    ModifierId.TheArchitect, "The Architect",
-                    "×3 when your word is 8 letters or longer.",
-                    ModifierType.Multiplier,
-                    static ctx => ctx.Word.Length >= 8,
-                    static (_, _) => 3.0, "×3"),
+                ModifierId.TheArchitect => new TheArchitectCard(),
 
-                ModifierId.BrickLayer => new CommonModifier(
-                    ModifierId.BrickLayer, "Brick Layer",
-                    "Adds +1 per letter when your word is 6 letters or longer.",
-                    ModifierType.Additive,
-                    static ctx => ctx.Word.Length >= 6,
-                    static (ctx, _) => ctx.Word.Length, "+1 / ltr"),
+                ModifierId.BrickLayer => new BrickLayerCard(),
 
-                ModifierId.Speedracer => new CommonModifier(
-                    ModifierId.Speedracer, "Speedracer",
-                    "When your word is longer than 6 letters, you get a multiplier (1 / ([remaining time] / [total time])). Max of 2x.",
-                    ModifierType.Multiplier,
-                    static ctx => ctx.Word.Length > 6,
-                    static (ctx, _) => Math.Min(1.0 / (ctx.RemainingShotClockDuration / ctx.ShotClockDuration), 2.0), "≤×2"),
+                ModifierId.Speedracer => new SpeedracerCard(),
 
                 ModifierId.LetterHoarder => new CommonModifier(
                     ModifierId.LetterHoarder, "Letter Hoarder",
@@ -66,12 +47,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
                     ModifierType.Additive, Always,
                     static (ctx, _) => ctx.Word.Distinct().Count(), "+1 / uniq"),
 
-                ModifierId.Sesquipedalian => new CommonModifier(
-                    ModifierId.Sesquipedalian, "Sesquipedalian",
-                    "×5 when your word is 10 letters or longer. Clamped to the max word score.",
-                    ModifierType.Multiplier,
-                    static ctx => ctx.Word.Length >= 10,
-                    static (_, _) => 5.0, "×5"),
+                ModifierId.Sesquipedalian => new SesquipedalianCard(),
 
                 ModifierId.HighRoller => new CommonModifier(
                     ModifierId.HighRoller, "High Roller",
@@ -92,6 +68,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
                 ModifierId.GutturalRoar => new GutturalRoarCard(),
                 ModifierId.PerfectLink => new PerfectLinkCard(),
                 ModifierId.Catalyst => new CatalystCard(),
+                ModifierId.TheBlueprint => new TheBlueprintCard(),
+                ModifierId.TryHard => new TryHardCard(),
+                ModifierId.Forgery => new ForgeryCard(),
 
                 // ── Clock cards ──────────────────────────────────────────────────
                 ModifierId.TheVault => new TheVaultCard(),
@@ -100,6 +79,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
                 ModifierId.HeatSink => new HeatSinkCard(),
                 ModifierId.AnchorChain => new AnchorChainCard(),
                 ModifierId.HyperDrive => new HyperDriveCard(),
+                ModifierId.SlowBurn => new SlowBurnCard(),
 
                 // ── Utility / policy cards ───────────────────────────────────────
                 ModifierId.Blindfold => new BlindfoldCard(),
@@ -115,6 +95,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
                 ModifierId.BountyHunter => new BountyHunterCard(),
                 ModifierId.FlakCannon => new FlakCannonCard(),
                 ModifierId.BaitAndSwitch => new BaitAndSwitchCard(),
+                ModifierId.ChronoSyphon => new ChronoSyphonCard(),
+                ModifierId.TaxWriteOff => new TaxWriteOffCard(),
+                ModifierId.BoosterPack => new BoosterPackCard(),
+                ModifierId.Scavenger => new ScavengerCard(),
 
                 _ => new CommonModifier(
                     ModifierId.Unknown, "Unknown", "Unknown",
