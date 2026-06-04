@@ -103,7 +103,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         protected override string? MagnitudeLabel => "×1.5";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
-            => this.GetEffectiveLetterCount(context) > LengthThreshold;
+            => this.ResolveWordLength(context) > LengthThreshold;
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => Factor * GetMagnification(context);
 
@@ -132,6 +132,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public int FlatDelta => 0;
 
         public bool IsIllegal(EngineEvaluationContext context)
-            => this.GetEffectiveLetterCount(context) < MinLength;
+            => this.ResolveWordLength(context) < MinLength;
     }
 }

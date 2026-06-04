@@ -180,8 +180,10 @@ Some multiplicative cards read **turn context** rather than just the word: Speed
 scale with the seconds left on the shot clock at submit time, and **Hyper-Drive** caps the owner's
 armed clock at 5 s (an `IShotClockCap`) while folding a positional ×1.5 in the scoring pipeline.
 **Forgery** is a meta factor of a different kind: an `ILetterCountModifier` that doubles the letter
-count *perceived* by every length-based card placed after it (via `GetEffectiveLetterCount`), without
-touching the evaluator's word-length seed.
+count *perceived* by every length-based card placed after it (via `ResolveWordLength`), without
+touching the evaluator's word-length seed. Each modifier owns its own length math — including how a
+magnification applied to it scales the effect — and stacks by asking the helper for the count before
+it, rather than the helper applying a fixed multiplier.
 
 **Magnifying Glass** is a neighbor amplifier, expressed through a per-evaluation `IEffectMagnifier`
 registry derived from the bay. A glass *pushes* a ×1.5 magnification under the

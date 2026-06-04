@@ -194,14 +194,16 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         bool IsVowel(char character);
     }
 
-    /// <summary>Inflates the letter count perceived by cards evaluated after this one (Forgery doubles
-    /// it). Affects length conditionals and per-letter magnitudes via
-    /// <see cref="ModifierCapabilityExtensions.GetEffectiveLetterCount"/>; the evaluator's base
-    /// word-length seed is untouched.</summary>
+    /// <summary>Resolves the letter count perceived by cards evaluated after this one (Forgery doubles
+    /// it). The card owns how its effect — and any magnification applied to it — folds into the length;
+    /// to stack on earlier modifiers it calls <see cref="ModifierCapabilityExtensions.ResolveWordLength"/>
+    /// for the current effective count and applies its own modifier on top. Affects length conditionals
+    /// and per-letter magnitudes; the evaluator's base word-length seed is untouched.</summary>
     public interface ILetterCountModifier
     {
-        /// <summary>The factor applied to the real letter count for later cards (e.g. 2 doubles it).</summary>
-        int LetterCountMultiplier { get; }
+        /// <summary>The length <paramref name="word"/> should be perceived as by cards placed after this
+        /// one, given <paramref name="context"/> (including any magnification applied to this card).</summary>
+        int ResolveWordLength(EngineEvaluationContext context, string word);
     }
 
     /// <summary>Caps the owner's armed shot clock at a maximum length (Hyper-Drive's 5s). Applied after
@@ -358,22 +360,24 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
                     yield return i;
         }
 
-        /// <summary>The word's letter count as perceived by <paramref name="currentCard"/>, multiplied by
-        /// every <see cref="ILetterCountModifier"/> placed strictly before it in the bay (Forgery doubles
-        /// it). A card never Forgery-perceives itself. Cards read this instead of <c>context.Word.Length</c>
-        /// for length conditionals and per-letter magnitudes so a preceding Forgery flows through.</summary>
-        public static int GetEffectiveLetterCount(this IModifierCard currentCard, EngineEvaluationContext context)
+        /// <summary>The word's letter count as perceived by <paramref name="currentCard"/>: the resolution
+        /// of the most recent <see cref="ILetterCountModifier"/> placed strictly before it in the bay
+        /// (Forgery doubles it), or the real <c>context.Word.Length</c> when none precedes it. A card never
+        /// Forgery-perceives itself. Each modifier owns its own math (including magnification) and stacks by
+        /// calling back into this helper for the count before it. Cards read this instead of
+        /// <c>context.Word.Length</c> for length conditionals and per-letter magnitudes so a preceding
+        /// Forgery flows through.</summary>
+        public static int ResolveWordLength(this IModifierCard currentCard, EngineEvaluationContext context)
         {
-            double factor = 1.0;
+            ILetterCountModifier? mostRecent = null;
             foreach (var card in context.GetModifierCards(context.PlayerIndex))
             {
+                // Stop at the current card BEFORE considering it as a candidate: delegating to currentCard
+                // itself would recurse forever (a modifier's own ResolveWordLength calls back into this helper).
                 if (card == currentCard) break;
-                // A Magnifying Glass immediately before this Forgery magnifies its perceived-length
-                // factor directly (×2 → ×3), per the card's own decision on how its effect scales.
-                if (card is ILetterCountModifier m)
-                    factor *= m.LetterCountMultiplier * (context.EffectMagnifier?.GetMagnification(card) ?? 1.0);
+                if (card is ILetterCountModifier m) mostRecent = m;
             }
-            return (int)Math.Round(context.Word.Length * factor, MidpointRounding.AwayFromZero);
+            return mostRecent?.ResolveWordLength(context, context.Word) ?? context.Word.Length;
         }
 
         /// <summary>The smallest shot-clock cap among the bay (Hyper-Drive), or null when none is active.</summary>

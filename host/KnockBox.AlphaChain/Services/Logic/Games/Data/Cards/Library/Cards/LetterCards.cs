@@ -68,7 +68,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     }
 
     // ── Length-scoring cards ────────────────────────────────────────────────────
-    // These read the Forgery-perceived letter count (GetEffectiveLetterCount) rather than
+    // These read the Forgery-perceived letter count (ResolveWordLength) rather than
     // context.Word.Length, so a Forgery placed before them doubles what they perceive. They are
     // classes (not CommonModifier) because their triggers need the bay-walking `self` argument.
 
@@ -83,7 +83,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
         {
-            int letters = self.GetEffectiveLetterCount(context);
+            int letters = self.ResolveWordLength(context);
             return (letters < 7 ? letters : letters * 2) * GetMagnification(context);
         }
     }
@@ -97,10 +97,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         protected override string? MagnitudeLabel => "+1 / ltr";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
-            => this.GetEffectiveLetterCount(context) >= 6;
+            => this.ResolveWordLength(context) >= 6;
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
-            => self.GetEffectiveLetterCount(context) * GetMagnification(context);
+            => self.ResolveWordLength(context) * GetMagnification(context);
     }
 
     /// <summary>×3 when the word is 8 letters or longer.</summary>
@@ -112,7 +112,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         protected override string? MagnitudeLabel => "×3";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
-            => this.GetEffectiveLetterCount(context) >= 8;
+            => this.ResolveWordLength(context) >= 8;
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 3.0 * GetMagnification(context);
     }
@@ -127,7 +127,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         protected override string? MagnitudeLabel => "×5";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
-            => this.GetEffectiveLetterCount(context) >= 10;
+            => this.ResolveWordLength(context) >= 10;
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 5.0 * GetMagnification(context);
     }
@@ -146,11 +146,11 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         protected override string? MagnitudeLabel => "≤ × (ltr/2)";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
-            => this.GetEffectiveLetterCount(context) > 6;
+            => this.ResolveWordLength(context) > 6;
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
         {
-            int cap = self.GetEffectiveLetterCount(context) / 2;
+            int cap = self.ResolveWordLength(context) / 2;
             double factor = context.RemainingShotClockDuration <= 0
                 ? cap
                 : Math.Min(1.0 / (context.RemainingShotClockDuration / context.ShotClockDuration), cap);
@@ -173,10 +173,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => context.SubmissionHistory.IsEmpty
-                || this.GetEffectiveLetterCount(context) >= context.SubmissionHistory[^1].Word.Length;
+                || this.ResolveWordLength(context) >= context.SubmissionHistory[^1].Word.Length;
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
-            => 3.0 * self.GetEffectiveLetterCount(context) * GetMagnification(context);
+            => 3.0 * self.ResolveWordLength(context) * GetMagnification(context);
     }
 
     /// <summary>
@@ -195,16 +195,16 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         protected override string? MagnitudeLabel => "×1.1+";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
-            => this.GetEffectiveLetterCount(context) > BaseLength;
+            => this.ResolveWordLength(context) > BaseLength;
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
-            => (1.0 + 0.1 * (self.GetEffectiveLetterCount(context) - BaseLength)) * GetMagnification(context);
+            => (1.0 + 0.1 * (self.ResolveWordLength(context) - BaseLength)) * GetMagnification(context);
     }
 
     /// <summary>
     /// Forgery: a 0-point utility (×1.0) that makes every card placed after it perceive double the
     /// word's letter count — flowing into their length conditionals and per-letter magnitudes via
-    /// <see cref="ModifierCapabilityExtensions.GetEffectiveLetterCount"/>. The evaluator's base
+    /// <see cref="ModifierCapabilityExtensions.ResolveWordLength"/>. The evaluator's base
     /// word-length seed is untouched, and per-character cards (Consonant Crunch, Vocal Vowels, Vowel
     /// Surge, Guttural Roar, Letter Hoarder, Perfect Link, Double Down) read actual characters and are
     /// unaffected.
@@ -219,6 +219,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 
-        public int LetterCountMultiplier => 2;
+        /// <summary>Forgery owns its perceived-length math: take the effective count before it (stacking on
+        /// any earlier Forgery via the helper), double it, and fold in any magnification a Magnifying Glass
+        /// on its immediate left applies (×2 → ×3). The <paramref name="word"/> argument is unused — the
+        /// stacked base comes from the helper, not the raw string.</summary>
+        public int ResolveWordLength(EngineEvaluationContext context, string word)
+            => (int)Math.Round(
+                ModifierCapabilityExtensions.ResolveWordLength(this, context) * 2 * GetMagnification(context),
+                MidpointRounding.AwayFromZero);
     }
 }
