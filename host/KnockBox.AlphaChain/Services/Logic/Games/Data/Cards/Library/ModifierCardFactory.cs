@@ -23,29 +23,28 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
                 ModifierId.Vanilla => new CommonModifier(
                     ModifierId.Vanilla, "Vanilla",
-                    "Adds +1 for every letter in your word.",
+                    "Adds +1 for every letter in your word. +2 if the word is 7+ characters.",
                     ModifierType.Additive, Always,
-                    static (ctx, _) => ctx.Word.Length, "+1 / ltr"),
+                    static (ctx, _) => ctx.Word.Length < 7 ? ctx.Word.Length : ctx.Word.Length * 2, "+1-2 / ltr"),
 
                 ModifierId.ConsonantCrunch => new CommonModifier(
                     ModifierId.ConsonantCrunch, "Consonant Crunch",
-                    "Adds +2 for every consonant in your word.",
+                    "Adds +2 for every consonant in your word. +3 if the word is 7+ characters.",
                     ModifierType.Additive, Always,
-                    static (ctx, self) => 2.0 * self.GetConsonantIndicies(ctx).Count(), "+2 / cons"),
+                    static (ctx, self) => ctx.Word.Length < 7 ? 2.0 * self.GetConsonantIndicies(ctx).Count() : 3.0 * self.GetConsonantIndicies(ctx).Count(), "+2-3 / cons"),
 
                 ModifierId.VocalVowels => new CommonModifier(
                     ModifierId.VocalVowels, "Vocal Vowels",
-                    "Adds +3 for every vowel in your word.",
+                    "Adds +3 for every vowel in your word. +4 if the word is 7+ characters.",
                     ModifierType.Additive, Always,
-                    // Counts vowels (the legacy card counted consonants — a bug, fixed here to match its name/description).
-                    static (ctx, self) => 3.0 * self.GetVowelIndicies(ctx).Count(), "+3 / vowel"),
+                    static (ctx, self) => ctx.Word.Length < 7 ? 3.0 * self.GetVowelIndicies(ctx).Count() : 4.0 * self.GetVowelIndicies(ctx).Count(), "+3-4 / vowel"),
 
                 ModifierId.TheArchitect => new CommonModifier(
                     ModifierId.TheArchitect, "The Architect",
-                    "×2 when your word is 8 letters or longer.",
+                    "×3 when your word is 8 letters or longer.",
                     ModifierType.Multiplier,
                     static ctx => ctx.Word.Length >= 8,
-                    static (_, _) => 2.0, "×2"),
+                    static (_, _) => 3.0, "×3"),
 
                 ModifierId.BrickLayer => new CommonModifier(
                     ModifierId.BrickLayer, "Brick Layer",
@@ -56,9 +55,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
                 ModifierId.Speedracer => new CommonModifier(
                     ModifierId.Speedracer, "Speedracer",
-                    "When your word is longer than 4 letters, you get a multiplier (1 / ([remaining time] / [total time])). Max of 2x.",
+                    "When your word is longer than 6 letters, you get a multiplier (1 / ([remaining time] / [total time])). Max of 2x.",
                     ModifierType.Multiplier,
-                    static ctx => ctx.Word.Length > 4,
+                    static ctx => ctx.Word.Length > 6,
                     static (ctx, _) => Math.Min(1.0 / (ctx.RemainingShotClockDuration / ctx.ShotClockDuration), 2.0), "≤×2"),
 
                 ModifierId.LetterHoarder => new CommonModifier(
@@ -69,10 +68,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
                 ModifierId.Sesquipedalian => new CommonModifier(
                     ModifierId.Sesquipedalian, "Sesquipedalian",
-                    "×3 when your word is 10 letters or longer. Clamped to the max word score.",
+                    "×5 when your word is 10 letters or longer. Clamped to the max word score.",
                     ModifierType.Multiplier,
                     static ctx => ctx.Word.Length >= 10,
-                    static (_, _) => 3.0, "×3"),
+                    static (_, _) => 5.0, "×5"),
 
                 ModifierId.HighRoller => new CommonModifier(
                     ModifierId.HighRoller, "High Roller",

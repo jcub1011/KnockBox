@@ -87,7 +87,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     public sealed class HyperDriveCard : MultiplicativeCardBase, IBaseShotClockProvider, IMultiplierScaleProvider, IContributesRoomServices
     {
         /// <summary>Submit faster than this (elapsed seconds) to latch the overdrive.</summary>
-        public const double ThresholdSeconds = 3;
+        public const double ThresholdSeconds = 4;
 
         /// <summary>The base shot clock the overdrive imposes while latched.</summary>
         public const int OverdriveClockSeconds = 5;
@@ -98,7 +98,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override ModifierId GetId() => ModifierId.HyperDrive;
         public override string GetName() => "Hyper-Drive";
         public override string GetDescription()
-            => "Submit in under 3 seconds to overdrive: your shot clock drops to 5s for the rest of the era, but every multiplier you own is doubled.";
+            => "Submit in under 4 seconds to overdrive: your shot clock drops to 5s for the rest of the era, but every multiplier you own is doubled.";
         public override string? GetMagnitudeLabel() => "FX";
 
         // Inert in the pipeline — its power is the era latch, not a per-word fold.
