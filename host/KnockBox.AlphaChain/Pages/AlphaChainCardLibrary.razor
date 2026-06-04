@@ -2,14 +2,20 @@
 
 @using KnockBox.AlphaChain.Services.Logic.Games.Data
 @using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
+@using KnockBox.AlphaChain.Services.Logic.Games.Evaluation
+@using KnockBox.AlphaChain.Services.Logic.Scoring
+@using KnockBox.AlphaChain.Services.State.Games.Data
 @inject IModifierCardFactory CardFactory
+@inject IEngineEvaluator Evaluator
 
-@* Hidden card-library easter egg. A literal route, so it outranks the lobby's
-   "/room/alpha-chain/{ObfuscatedRoomCode}" param route and never needs a session. Lays out every
-   dealable card with GameCard — the same renderer the game uses — so it's an exact preview of each
-   card's icon, name, description, and additive/multiplicative tint. Not linked from anywhere. *@
+@* Hidden card-balancing test bench. A literal route, so it outranks the lobby's
+   "/room/alpha-chain/{ObfuscatedRoomCode}" param route and never needs a session. Build an Engine
+   Bay from the card palette, type a word, set the shot-clock / tax / Hyper-Drive knobs, and Run it
+   through the real scoring pipeline (IEngineEvaluator.CalculateSteps) to read the per-card
+   breakdown and final score. Lets cards be balanced in isolation and in combination.
+   Not linked from anywhere. *@
 
-<PageTitle>Alpha Chain · Card Library</PageTitle>
+<PageTitle>Alpha Chain · Card Bench</PageTitle>
 
 <HeadContent>
     <link href="_content/KnockBox.AlphaChain/css/alpha-chain-theme.css" rel="stylesheet" />
@@ -21,30 +27,134 @@
     <div class="ac-library">
         <header class="ac-library-head">
             <span class="ac-library-brand">ALPHA CHAIN</span>
-            <span class="ac-library-tagline">Card Library · @Cards.Count cards</span>
+            <span class="ac-library-tagline">Card Bench · @Cards.Count cards</span>
+        </header>
+
+        @* ── Test bench: controls, the bay under test, and the scored result ──────────── *@
+        <section class="ac-bench">
+            <div class="ac-bench-controls">
+                <label class="ac-field ac-field-word">
+                    <span class="ac-field-label">Word</span>
+                    <input type="text" class="ac-input" @bind="_word" @bind:event="oninput"
+                           placeholder="type a word…" />
+                </label>
+                <label class="ac-field">
+                    <span class="ac-field-label">Shot clock (s)</span>
+                    <input type="number" class="ac-input ac-input-num" min="1" step="1" @bind="_totalClock" />
+                </label>
+                <label class="ac-field">
+                    <span class="ac-field-label">Remaining (s)</span>
+                    <input type="number" class="ac-input ac-input-num" min="0" step="1" @bind="_remainingClock" />
+                </label>
+                <label class="ac-toggle">
+                    <input type="checkbox" @bind="_taxed" />
+                    <span>Zero-Point Tax</span>
+                </label>
+                <label class="ac-toggle">
+                    <input type="checkbox" @bind="_hyperDriveLatched" />
+                    <span>Hyper-Drive latched (×2 mult.)</span>
+                </label>
+                <button type="button" class="ac-run" @onclick="Run">Run</button>
+            </div>
+
+            <div class="ac-bench-bay">
+                <div class="ac-bench-bay-head">
+                    <span class="ac-bench-bay-title">Engine Bay · pipeline order →</span>
+                    @if (_bay.Count > 0)
+                    {
+                        <button type="button" class="ac-bench-clear" @onclick="ClearBay">Clear</button>
+                    }
+                </div>
+
+                @if (_bay.Count == 0)
+                {
+                    <p class="ac-bench-empty">Add cards from the palette below to build a bay.</p>
+                }
+                else
+                {
+                    <div class="ac-bench-slots">
+                        @for (int i = 0; i < _bay.Count; i++)
+                        {
+                            var index = i;
+                            var info = _cardsById[_bay[index]];
+                            <div class="ac-bench-slot">
+                                <GameCard Name="@info.Name" Description="@info.Description" Card="@info.Id"
+                                          Kind="@info.Kind" Size="CardSize.Small" MagnitudeText="@info.Magnitude" />
+                                <div class="ac-bench-slot-ops">
+                                    <button type="button" title="Move left" disabled="@(index == 0)"
+                                            @onclick="() => MoveCard(index, -1)">◀</button>
+                                    <button type="button" title="Remove"
+                                            @onclick="() => RemoveCard(index)">✕</button>
+                                    <button type="button" title="Move right" disabled="@(index == _bay.Count - 1)"
+                                            @onclick="() => MoveCard(index, 1)">▶</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (_result is { } result)
+            {
+                <div class="ac-bench-result">
+                    <div class="ac-breakdown">
+                        <span class="ac-breakdown-word">@(string.IsNullOrEmpty(result.Word) ? "∅" : result.Word.ToUpperInvariant())</span>
+                        <span class="ac-bd-step ac-bd-seed">
+                            <span class="ac-bd-op">len</span>
+                            <span class="ac-bd-run">@result.Seed</span>
+                        </span>
+                        @foreach (var step in result.Steps)
+                        {
+                            var kindClass = step.Triggered
+                                ? (step.Kind == ModifierType.Additive ? "ac-bd-add" : "ac-bd-mul")
+                                : "ac-bd-skip";
+                            <span class="ac-bd-step @kindClass">
+                                <span class="ac-bd-icon"><CardIcon Card="@step.CardId" /></span>
+                                <span class="ac-bd-op">@(step.Triggered ? step.ValueText : "—")</span>
+                                <span class="ac-bd-run">@step.RunningScore</span>
+                            </span>
+                        }
+                        <span class="ac-bd-step ac-bd-final @(result.Taxed ? "ac-bd-taxed" : "")">
+                            <span class="ac-bd-op">@(result.Taxed ? "tax" : "score")</span>
+                            <span class="ac-bd-run">@(result.Taxed ? "0" : $"+{result.FinalScore}")</span>
+                        </span>
+                    </div>
+                    @if (result.Taxed && result.FinalBeforeTax != result.FinalScore)
+                    {
+                        <p class="ac-bench-note">Would have scored @result.FinalBeforeTax before the Zero-Point Tax.</p>
+                    }
+                </div>
+            }
+        </section>
+
+        @* ── Palette: every dealable card; click "Add" to drop it into the bay. ───────── *@
+        <div class="ac-library-toolbar">
+            <span class="ac-library-tagline">Palette</span>
             <button type="button" class="ac-library-size" @onclick="ToggleSize">
                 @(_size == CardSize.Large ? "Show small cards" : "Show large cards")
             </button>
-        </header>
+        </div>
 
         <div class="ac-library-grid @(_size == CardSize.Small ? "ac-library-grid-small" : "")">
             @foreach (var card in Cards)
             {
-                @if (_size == CardSize.Large)
-                {
-                    <button type="button" class="ac-cardbtn"
-                            title="Click to flip"
-                            @onclick="() => ToggleFlip(card.Id)">
+                <div class="ac-palette-item">
+                    @if (_size == CardSize.Large)
+                    {
+                        <button type="button" class="ac-cardbtn" title="Click to flip"
+                                @onclick="() => ToggleFlip(card.Id)">
+                            <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Kind="@card.Kind"
+                                      Size="CardSize.Large" MagnitudeText="@card.Magnitude"
+                                      Flipped="@_flipped.Contains(card.Id)" />
+                        </button>
+                    }
+                    else
+                    {
                         <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Kind="@card.Kind"
-                                  Size="CardSize.Large" MagnitudeText="@card.Magnitude"
-                                  Flipped="@_flipped.Contains(card.Id)" />
-                    </button>
-                }
-                else
-                {
-                    <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Kind="@card.Kind"
-                              Size="CardSize.Small" MagnitudeText="@card.Magnitude" />
-                }
+                                  Size="CardSize.Small" MagnitudeText="@card.Magnitude" />
+                    }
+                    <button type="button" class="ac-palette-add" @onclick="() => AddCard(card.Id)">＋ Add</button>
+                </div>
             }
         </div>
     </div>
@@ -55,20 +165,79 @@
     private sealed record CardInfo(ModifierId Id, string Name, string Description, ModifierType Kind, string? Magnitude);
 
     private List<CardInfo> Cards { get; set; } = [];
+
+    /// <summary>Card presentation keyed by id, so the bay can render a chosen card without re-resolving it.</summary>
+    private Dictionary<ModifierId, CardInfo> _cardsById = new();
+
     private readonly HashSet<ModifierId> _flipped = new();
 
-    /// <summary>Which variant the grid previews — Large (flippable) by default.</summary>
+    /// <summary>Which variant the palette previews — Large (flippable) by default.</summary>
     private CardSize _size = CardSize.Large;
 
-    /// <summary>Switches the whole grid between the Large and Small card previews.</summary>
+    // ── Test-bench state ──────────────────────────────────────────────────────
+    /// <summary>The ordered Engine Bay under test (left → right is pipeline order).</summary>
+    private readonly List<ModifierId> _bay = new();
+
+    private string _word = "";
+    private double _totalClock = 30;
+    private double _remainingClock = 15;
+    private bool _taxed;
+    private bool _hyperDriveLatched;
+
+    /// <summary>The most recent scored result, or null before the first Run.</summary>
+    private ScoreBreakdown? _result;
+
+    /// <summary>Switches the palette between the Large and Small card previews.</summary>
     private void ToggleSize()
         => _size = _size == CardSize.Large ? CardSize.Small : CardSize.Large;
 
-    /// <summary>Flips a card to read its description, or back to its identity.</summary>
+    /// <summary>Flips a palette card to read its description, or back to its identity.</summary>
     private void ToggleFlip(ModifierId id)
     {
         if (!_flipped.Remove(id))
             _flipped.Add(id);
+    }
+
+    private void AddCard(ModifierId id) => _bay.Add(id);
+
+    private void RemoveCard(int index) => _bay.RemoveAt(index);
+
+    private void ClearBay() => _bay.Clear();
+
+    /// <summary>Shifts the card at <paramref name="index"/> one slot left (-1) or right (+1).</summary>
+    private void MoveCard(int index, int delta)
+    {
+        int target = index + delta;
+        if (target < 0 || target >= _bay.Count)
+            return;
+        (_bay[index], _bay[target]) = (_bay[target], _bay[index]);
+    }
+
+    /// <summary>Builds the live bay + evaluation context from the current knobs and scores the word.</summary>
+    private void Run()
+    {
+        // A display context is enough to construct cards — they never dereference it at creation.
+        var displayContext = new EngineEvaluationContext(string.Empty, [], []);
+        var bay = _bay.Select(id => CardFactory.CreateCard(displayContext, id)).ToList();
+
+        // A single owner so the Hyper-Drive latch check (GetPlayer(PlayerIndex)) has a non-null player.
+        var owner = new AlphaChainPlayerState { UserId = Guid.Empty, DisplayName = "Bench" };
+        var players = new List<AlphaChainPlayerState> { owner };
+
+        var word = (_word ?? string.Empty).Trim().ToLowerInvariant();
+
+        var context = new EngineEvaluationContext(word, [], players)
+        {
+            Bay = bay,
+            PlayerIndex = 0,
+            ShotClockDuration = _totalClock,
+            ModifiedShotClockDuration = _totalClock,
+            RemainingShotClockDuration = _remainingClock,
+            // Only matters when a Hyper-Drive card is in the bay (it reads IHyperDriveService for its scale).
+            Services = _hyperDriveLatched ? LatchedHyperDriveServices.Instance : null,
+        };
+
+        _result = Evaluator.CalculateSteps(context, _taxed);
     }
 
     protected override void OnInitialized()
@@ -83,5 +252,27 @@
                 card.GetId(), card.GetName(), card.GetDescription(), card.GetModifierType(context),
                 card.GetMagnitudeLabel()))
             .ToList();
+
+        _cardsById = Cards.ToDictionary(c => c.Id);
+    }
+
+    /// <summary>
+    /// Minimal plugin-internal <see cref="IServiceProvider"/> that reports Hyper-Drive as latched,
+    /// so the bench can preview the overdrive (×2 to every multiplier) without spinning up the real
+    /// room services. Only the Hyper-Drive scale walk reads <see cref="IHyperDriveService"/>.
+    /// </summary>
+    private sealed class LatchedHyperDriveServices : IServiceProvider
+    {
+        public static readonly LatchedHyperDriveServices Instance = new();
+        private readonly IHyperDriveService _hyperDrive = new AlwaysLatched();
+
+        public object? GetService(Type serviceType)
+            => serviceType == typeof(IHyperDriveService) ? _hyperDrive : null;
+
+        private sealed class AlwaysLatched : IHyperDriveService
+        {
+            public bool IsLatched(AlphaChainPlayerState player) => true;
+            public void Latch(AlphaChainPlayerState player) { }
+        }
     }
 }
