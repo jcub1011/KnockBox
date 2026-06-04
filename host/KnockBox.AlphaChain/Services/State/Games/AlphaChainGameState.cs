@@ -210,11 +210,9 @@ namespace KnockBox.AlphaChain.Services.State.Games
             // a started game, where this is never called.
             var ctx = new EngineEvaluationContext(string.Empty, Array.Empty<char>(), new[] { player })
             {
-                Bay = player.EngineBay,
-                EffectMagnifier = EffectMagnifier.ForBay(player.EngineBay),
                 Services = Context?.EvaluationServices,
                 PlayerIndex = 0,
-            };
+            }.WithBay(player.EngineBay);
             var bay = (IReadOnlyList<IModifierCard>)player.EngineBay;
 
             // The Anchor Chain pins the clock: unmodifiable, ignores clock effects + Hyper-Drive.

@@ -95,6 +95,15 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         public ImmutableList<AlphaChainSubmission> SubmissionHistory { get; init; } = ImmutableList<AlphaChainSubmission>.Empty;
 
         /// <summary>
+        /// Attaches a bay and the effect-magnifier derived from it together, so the two can never
+        /// diverge. Every site that puts a bay on the context must go through here — the scoring
+        /// evaluator rebuilds a missing magnifier defensively, but the lifecycle-hook paths do not,
+        /// so a bay set without its matching magnifier would silently read ×1.0 magnification.
+        /// </summary>
+        public EngineEvaluationContext WithBay(IReadOnlyList<IModifierCard> bay)
+            => this with { Bay = bay, EffectMagnifier = Cards.Library.EffectMagnifier.ForBay(bay) };
+
+        /// <summary>
         /// The ordered Engine Bay for the player at <paramref name="playerIndex"/>. For the current
         /// player this is <see cref="Bay"/>; for others it reads their live bay. Returns empty when the
         /// index is out of range.

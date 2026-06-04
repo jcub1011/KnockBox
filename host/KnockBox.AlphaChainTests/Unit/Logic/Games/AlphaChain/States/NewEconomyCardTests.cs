@@ -126,6 +126,29 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.AreEqual(7, state.GamePlayers[owner].Score, "Original taxed word is still siphonable.");
         }
 
+        [TestMethod]
+        public async Task IrsAgentAndTaxWriteOff_Stack_SuppressBountyAndSalvageFirstLetter()
+        {
+            // Pins the interaction of the two tax rules that resolve in sequence (IRS override first,
+            // then Tax Write-Off salvage on top). Banned 'a' taxes "cat"; bay [irs, tax-write-off, anchor]:
+            // IRS forces the owner's taxed score to 0 and suppresses the bounty, then the write-off
+            // re-scores "c" clean (seed 1 + anchor 10 = 11) and adds it on top.
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
+            using var _ = state;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
+            var owner = state.TurnManager.TurnOrder[1];
+
+            GiveModifier(state, submitter, "irs");
+            GiveModifier(state, submitter, "tax-write-off");
+            GiveModifier(state, submitter, "anchor");
+            GiveModifier(state, owner, TestModifierCards.TaxCollectorId);
+
+            await engine.SubmitWordAsync(submitter, "cat", state);
+
+            Assert.AreEqual(11, state.GamePlayers[submitter].Score, "IRS grants 0, write-off salvages 11 on top.");
+            Assert.AreEqual(0, state.GamePlayers[owner].Score, "IRS suppresses the Tax Collector bounty.");
+        }
+
         // ── Chrono Syphon — a point per second left on an opponent's clock ──
 
         [TestMethod]

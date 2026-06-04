@@ -1,6 +1,7 @@
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
+using KnockBox.AlphaChain.Services.Logic.Scoring;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 using KnockBox.Core.Primitives.Returns;
@@ -72,6 +73,40 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
         private static ValueResult<FsmState?> HandleSubmitWord(AlphaChainGameContext context, SubmitWordCommand cmd)
         {
+            // Validate-and-build → score-and-tax → record/credit → fire card reactions → publish.
+            // Each stage is a behavior-preserving slice of the former monolith; the ordering here is
+            // the contract. A rejection short-circuits with the typed result already stashed.
+            if (!TryBuildAndValidate(context, cmd, out var submission))
+                return null;
+
+            var scored = ScoreAndResolveTax(context, submission);
+            ConsumeHijackBan(submission);
+            RecordPlayAndCredit(context.State, submission, scored);
+
+            var resolution = new WordResolution(
+                cmd.ActorUserId, submission.Word, submission.Taxed, scored.BaseScore, scored.Score, scored.OffendingLetter)
+            {
+                SiphonSuppressed = scored.SuppressBounty,
+                RemainingSeconds = (int)submission.Remaining,
+            };
+
+            FireReactions(submission, resolution);
+            PublishReplayAndResult(context, cmd, submission, scored);
+
+            return AdvanceTurnAndEvaluate(context, cmd.Now, holdForReplay: true);
+        }
+
+        /// <summary>
+        /// Steps 0–7: gate the submission (transition hold, active player, empty, succession,
+        /// uniqueness, dictionary), build the single <see cref="EngineEvaluationContext"/> threaded
+        /// through the rest of the submission, and decide whether the Zero-Point Tax applies. On any
+        /// rejection it stashes the typed result on <see cref="AlphaChainGameContext.LastSubmitResult"/>
+        /// and returns false (a dictionary miss still fires the owner's <c>OnValidationFailed</c> hooks).
+        /// </summary>
+        private static bool TryBuildAndValidate(
+            AlphaChainGameContext context, SubmitWordCommand cmd, out ValidatedSubmission submission)
+        {
+            submission = default;
             var state = context.State;
             var turnManager = state.TurnManager;
 
@@ -79,14 +114,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             if (state.PendingTransitionAt is not null)
             {
                 context.LastSubmitResult = new SubmitWordResult.RejectedNotYourTurn();
-                return null;
+                return false;
             }
 
             // 1. Only the active player may submit.
             if (cmd.ActorUserId != turnManager.CurrentPlayer.GetValueOrDefault())
             {
                 context.LastSubmitResult = new SubmitWordResult.RejectedNotYourTurn();
-                return null;
+                return false;
             }
 
             // 2. Normalize.
@@ -96,7 +131,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             if (word.Length == 0)
             {
                 context.LastSubmitResult = new SubmitWordResult.RejectedEmpty();
-                return null;
+                return false;
             }
 
             state.GamePlayers.TryGetValue(cmd.ActorUserId, out var player);
@@ -118,8 +153,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             var evalCtx = new EngineEvaluationContext(word, CollectBannedLetters(state, hijackBan, cardBans), players)
             {
-                Bay = player?.EngineBay ?? [],
-                EffectMagnifier = EffectMagnifier.ForBay(player?.EngineBay ?? []),
                 Services = services,
                 PlayerIndex = playerIndex,
                 SubmissionHistory = state.SubmissionHistory,
@@ -129,21 +162,21 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                     : state.ComputeArmedShotClockSeconds(player),
                 RemainingShotClockDuration = remaining,
                 Score = player?.Score ?? 0,
-            };
+            }.WithBay(player?.EngineBay ?? []);
 
             // 4. Chain (succession) rule — a held Wildcard exempts the owner.
             bool ignoresSuccession = player is not null && evalCtx.Bay.IgnoresSuccession(evalCtx);
             if (!ignoresSuccession && state.RequiredStartLetter is { } required && word[0] != required)
             {
                 context.LastSubmitResult = new SubmitWordResult.RejectedChainBroken(required);
-                return null;
+                return false;
             }
 
             // 5. Uniqueness.
             if (state.PlayedWords.Contains(word))
             {
                 context.LastSubmitResult = new SubmitWordResult.RejectedDuplicate();
-                return null;
+                return false;
             }
 
             // 6. Dictionary membership. The Prism's OnValidationFailed refills the clock on a typo.
@@ -153,7 +186,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                     foreach (var card in player.EngineBay)
                         evalCtx = card.OnValidationFailed(evalCtx, card);
                 context.LastSubmitResult = new SubmitWordResult.RejectedNotInDictionary();
-                return null;
+                return false;
             }
 
             // 7. Zero-Point Tax: any active banned letter zeroes the score — era letter, personal hijack
@@ -165,14 +198,29 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 // A card-driven legality rule (Slow Burn's 6-letter floor) taxes the word like a ban.
                 || (player is not null && evalCtx.Bay.ViolatesLegalityRule(evalCtx));
 
+            submission = new ValidatedSubmission(
+                player, word, evalCtx, services, players, hijackBan, cardBans, faraday, taxed, remaining);
+            return true;
+        }
+
+        /// <summary>
+        /// Steps 8/8c/8d: run the scoring pipeline, then resolve the two owner-side tax rules in order
+        /// — The IRS Agent's flat override (and bounty suppression) first, then Tax Write-Off's
+        /// first-letter salvage on top — and capture the offending banned letter.
+        /// </summary>
+        private static ScoredSubmission ScoreAndResolveTax(AlphaChainGameContext context, in ValidatedSubmission v)
+        {
+            var state = context.State;
+            var evalCtx = v.EvalCtx;
+
             // 8. Scoring pipeline (sequential, left → right over the bay).
-            var breakdown = context.Evaluator.CalculateSteps(evalCtx, taxed);
+            var breakdown = context.Evaluator.CalculateSteps(evalCtx, v.Taxed);
             int baseScore = breakdown.FinalBeforeTax;
             int score = breakdown.FinalScore;
 
             // 8c. The IRS Agent overrides the owner's own Zero-Point Tax (flat points, suppressed bounty).
             bool suppressBounty = false;
-            if (taxed && player is not null && evalCtx.Bay.OwnTaxPolicy() is { } ownTax)
+            if (v.Taxed && v.Player is not null && evalCtx.Bay.OwnTaxPolicy() is { } ownTax)
             {
                 score = ownTax.GetTaxedScore(evalCtx, baseScore);
                 suppressBounty = ownTax.SuppressesSiphonBounty;
@@ -182,7 +230,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             // 8d. Tax Write-Off: on the owner's own taxed word, salvage by scoring the first letter
             //     clean and adding it on top (the original word still scores 0 and stays siphonable).
-            if (taxed && player is not null && evalCtx.Bay.TaxWriteOffPolicy() is { } writeOff)
+            if (v.Taxed && v.Player is not null && evalCtx.Bay.TaxWriteOffPolicy() is { } writeOff)
             {
                 int bonus = writeOff.GetWriteOffBonus(evalCtx, context.Evaluator);
                 if (bonus > 0)
@@ -193,67 +241,93 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             }
 
             // The banned letter the word used, captured before the personal ban is consumed.
-            char? offendingLetter = (taxed && player is not null)
-                ? FirstBannedLetterUsed(word, state.BannedLetter, hijackBan,
-                    faraday ? null : cardBans)
+            char? offendingLetter = (v.Taxed && v.Player is not null)
+                ? FirstBannedLetterUsed(v.Word, state.BannedLetter, v.HijackBan, v.Faraday ? null : v.CardBans)
                 : null;
 
-            // 9. Consume the submitter's transient hijack ban.
-            if (player is not null)
-                services.Get<IHijackBanService>()?.ConsumeFor(player);
+            return new ScoredSubmission(score, baseScore, breakdown, suppressBounty, offendingLetter);
+        }
 
-            // 10. Record the play and update the chain.
-            state.PlayedWords.Add(word);
-            state.LastWord = word;
+        /// <summary>Step 9: consume the submitter's one-shot hijack ban now it has been read for the tax check.</summary>
+        private static void ConsumeHijackBan(in ValidatedSubmission v)
+        {
+            if (v.Player is not null)
+                v.Services.Get<IHijackBanService>()?.ConsumeFor(v.Player);
+        }
+
+        /// <summary>Steps 10–11: record the played word, advance the chain's required start letter, and
+        /// credit the submitter their score.</summary>
+        private static void RecordPlayAndCredit(AlphaChainGameState state, in ValidatedSubmission v, in ScoredSubmission scored)
+        {
+            state.PlayedWords.Add(v.Word);
+            state.LastWord = v.Word;
             state.RequiredStartLetter =
-                (state.BannedLetter is { } b && b == word[^1]) ? null : word[^1];
+                (state.BannedLetter is { } b && b == v.Word[^1]) ? null : v.Word[^1];
 
-            // 11. Credit the player.
-            if (player is not null)
-                player.Score += score;
+            if (v.Player is not null)
+                v.Player.Score += scored.Score;
+        }
 
-            var resolution = new WordResolution(cmd.ActorUserId, word, taxed, baseScore, score, offendingLetter)
+        /// <summary>
+        /// Steps 11a–c: fire the card lifecycle hooks for an accepted word — the owner's
+        /// <c>OnWordAccepted</c>, the double-letter mark, every other active player's
+        /// <c>OnOpponentWordResolved</c>, and the owner's <c>OnTurnEnded</c> automated aggression
+        /// (routed through victims' interceptors). Hook side effects land on live player states and
+        /// room services; the threaded evaluation context is discarded once the hooks finish.
+        /// </summary>
+        private static void FireReactions(in ValidatedSubmission v, WordResolution resolution)
+        {
+            if (v.Player is null)
+                return;
+
+            var player = v.Player;
+            var services = v.Services;
+            var players = v.Players;
+            var evalCtx = v.EvalCtx;
+
+            // 11a. OnWordAccepted — the owner's post-credit reactions, each routed through their cards.
+            foreach (var card in player.EngineBay)
+                evalCtx = card.OnWordAccepted(evalCtx, card);
+
+            // Track a double-letter word so opponents' Scattershot can target this player this era.
+            if (HasDoubleLetter(v.Word))
+                services.Get<IDoubleLetterTracker>()?.Mark(player);
+
+            // 11b. OnOpponentWordResolved — reactive economy/penalties on every OTHER active player
+            //      (Tax Collector, Toll Booth, Bounty Hunter), each routed through their cards.
+            foreach (var other in players)
             {
-                SiphonSuppressed = suppressBounty,
-                RemainingSeconds = (int)remaining,
-            };
-
-            if (player is not null)
-            {
-                // 11a. OnWordAccepted — the owner's post-credit reactions, each routed through their cards.
-                foreach (var card in player.EngineBay)
-                    evalCtx = card.OnWordAccepted(evalCtx, card);
-
-                // Track a double-letter word so opponents' Scattershot can target this player this era.
-                if (HasDoubleLetter(word))
-                    services.Get<IDoubleLetterTracker>()?.Mark(player);
-
-                // 11b. OnOpponentWordResolved — reactive economy/penalties on every OTHER active player
-                //      (Tax Collector, Toll Booth, Bounty Hunter), each routed through their cards.
-                foreach (var other in players)
+                if (other.UserId == player.UserId || other.IsEliminated || other.HasLeft)
+                    continue;
+                int oidx = players.IndexOf(other);
+                var octx = new EngineEvaluationContext(v.Word, Array.Empty<char>(), players)
                 {
-                    if (other.UserId == player.UserId || other.IsEliminated || other.HasLeft)
-                        continue;
-                    int oidx = players.IndexOf(other);
-                    var octx = new EngineEvaluationContext(word, Array.Empty<char>(), players)
-                    {
-                        Bay = other.EngineBay,
-                        EffectMagnifier = EffectMagnifier.ForBay(other.EngineBay),
-                        Services = services,
-                        PlayerIndex = oidx,
-                        SubmissionHistory = state.SubmissionHistory,
-                        Resolution = resolution,
-                    };
-                    foreach (var card in other.EngineBay)
-                        octx = card.OnOpponentWordResolved(octx, card);
-                }
-
-                // 11c. OnTurnEnded — the submitter's automated aggression (Flak Cannon time-shaves,
-                //      Bait & Switch letter-hijacks), each routed through the victim's Titanium Mirror.
-                evalCtx = evalCtx with { Resolution = resolution };
-                foreach (var card in player.EngineBay)
-                    evalCtx = card.OnTurnEnded(evalCtx, card);
+                    Services = services,
+                    PlayerIndex = oidx,
+                    SubmissionHistory = v.EvalCtx.SubmissionHistory,
+                    Resolution = resolution,
+                }.WithBay(other.EngineBay);
+                foreach (var card in other.EngineBay)
+                    octx = card.OnOpponentWordResolved(octx, card);
             }
+
+            // 11c. OnTurnEnded — the submitter's automated aggression (Flak Cannon time-shaves,
+            //      Bait & Switch letter-hijacks), each routed through the victim's Titanium Mirror.
+            evalCtx = evalCtx with { Resolution = resolution };
+            foreach (var card in player.EngineBay)
+                evalCtx = card.OnTurnEnded(evalCtx, card);
+        }
+
+        /// <summary>
+        /// Gather the per-resolution card outputs (era-tax collectors/bounty, engine notices), append
+        /// the accepted word to the match history, publish the score-replay trace, and stash the typed
+        /// submit result the engine reads back to the page.
+        /// </summary>
+        private static void PublishReplayAndResult(
+            AlphaChainGameContext context, SubmitWordCommand cmd, in ValidatedSubmission v, in ScoredSubmission scored)
+        {
+            var state = context.State;
+            var services = v.Services;
 
             // Gather the per-resolution outputs the cards produced.
             IReadOnlyList<string> collectors = services.EraTaxCollectors.Count > 0
@@ -262,32 +336,53 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             int bounty = services.EraTaxBounty;
             var effects = services.Notices.ToList();
 
-            string displayName = player?.DisplayName ?? cmd.ActorUserId.ToString();
+            string displayName = v.Player?.DisplayName ?? cmd.ActorUserId.ToString();
 
             // Append the accepted submission to the match history. This single list backs the UI feed,
             // the game-over totals, and the prior-words snapshot the next submission's context reads
             // (this word was excluded from the context built above, which snapshotted before this append).
             state.SubmissionHistory = state.SubmissionHistory.Add(new AlphaChainSubmission(
-                DateTimeOffset.UtcNow, cmd.ActorUserId, displayName,
-                word, score, taxed, bounty, breakdown));
+                cmd.Now, cmd.ActorUserId, displayName,
+                v.Word, scored.Score, v.Taxed, bounty, scored.Breakdown));
 
             // Publish the scoring trace + any fired effects so every client plays the replay strip.
             state.ScoreReplaySequence++;
             state.LatestScoreReplay = new ScoreReplay(
                 state.ScoreReplaySequence, cmd.ActorUserId, displayName,
-                breakdown, bounty, collectors, effects);
+                scored.Breakdown, bounty, collectors, effects);
             if (effects.Count > 0)
             {
                 state.LatestEngineNotices = effects;
                 state.EngineNoticeSequence++;
             }
 
-            context.LastSubmitResult = (taxed && score == 0)
+            context.LastSubmitResult = (v.Taxed && scored.Score == 0)
                 ? new SubmitWordResult.AcceptedZeroPointTax()
-                : new SubmitWordResult.Accepted(score);
-
-            return AdvanceTurnAndEvaluate(context, DateTimeOffset.UtcNow, holdForReplay: true);
+                : new SubmitWordResult.Accepted(scored.Score);
         }
+
+        /// <summary>A validated, ready-to-score submission: the player (null only when the actor has
+        /// vanished), the normalized word, the single evaluation context, the per-room services, the
+        /// turn-ordered players, the snapshotted bans, and whether the Zero-Point Tax applies.</summary>
+        private readonly record struct ValidatedSubmission(
+            AlphaChainPlayerState? Player,
+            string Word,
+            EngineEvaluationContext EvalCtx,
+            AlphaChainEvaluationServices Services,
+            List<AlphaChainPlayerState> Players,
+            char? HijackBan,
+            IReadOnlyCollection<char> CardBans,
+            bool Faraday,
+            bool Taxed,
+            double Remaining);
+
+        /// <summary>The scored outcome of a submission after the two owner-side tax rules resolve.</summary>
+        private readonly record struct ScoredSubmission(
+            int Score,
+            int BaseScore,
+            ScoreBreakdown Breakdown,
+            bool SuppressBounty,
+            char? OffendingLetter);
 
         // ── Banned-letter helpers ─────────────────────────────────────────────
 

@@ -190,6 +190,28 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.IsNull(state.RequiredStartLetter);
         }
 
+        [TestMethod]
+        public async Task Submit_StampsHistoryWithCommandTime_NotWallClock()
+        {
+            // PlayedAt must come from the command timestamp threaded in, not the wall clock, so
+            // history ordering is deterministic. Times far in the past prove it isn't UtcNow.
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat", "tea"), banned: 'z');
+            using var _ = state;
+
+            var t1 = new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero);
+            var t2 = t1.AddMinutes(5);
+
+            var first = state.TurnManager.CurrentPlayer!.Value;
+            await engine.SubmitWordAsync(first, "cat", state, t1);
+
+            var second = state.TurnManager.CurrentPlayer!.Value;
+            await engine.SubmitWordAsync(second, "tea", state, t2);
+
+            Assert.AreEqual(2, state.SubmissionHistory.Count);
+            Assert.AreEqual(t1, state.SubmissionHistory[0].PlayedAt);
+            Assert.AreEqual(t2, state.SubmissionHistory[1].PlayedAt);
+        }
+
         // ── Shot-clock timeout ──────────────────────────────────────────────────
 
         [TestMethod]
