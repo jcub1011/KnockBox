@@ -133,6 +133,13 @@ Lifesavers that occupy a scoring slot but pair with the high-risk cards above.
 *   **Slow Burn** — **FX**. Lengthens your shot clock by **+20%**, but words shorter than **6 letters**
     are illegal — a too-short word takes the Zero-Point Tax (scores 0, still siphonable) like a banned
     letter.
+*   **Magnifying Glass** — **FX**. Magnifies the effect of the card placed **immediately to its right**
+    by **×1.5**, decided by that card: a scoring card scales its magnitude directly (a ×2 becomes a ×3,
+    a +10 becomes a +15), Forgery's perceived length scales (×2 → ×3), clock deltas and reactive
+    economy values scale, while inert ×1.0 cards stay inert. **Stacks**: glasses in series compound onto
+    the one neighbor (two → ×2.25, three → ×3.375) because each glass also magnifies the glass on its
+    left. Excluded: fixed/cap shot-clock bounds (Hyper-Drive's 5s cap, the Anchor Chain's pin) and
+    boolean/structural effects (Succession exemption, input masking, letter-class overrides).
 
 ---
 
@@ -175,6 +182,17 @@ armed clock at 5 s (an `IShotClockCap`) while folding a positional ×1.5 in the 
 **Forgery** is a meta factor of a different kind: an `ILetterCountModifier` that doubles the letter
 count *perceived* by every length-based card placed after it (via `GetEffectiveLetterCount`), without
 touching the evaluator's word-length seed.
+
+**Magnifying Glass** is a neighbor amplifier, expressed through a per-evaluation `IEffectMagnifier`
+registry derived from the bay. A glass *pushes* a ×1.5 magnification under the
+`ImmediateRightNeighbor` rule; every other card *pulls* `GetMagnification(self)` and decides how to
+scale its own numbers (scoring magnitude, Forgery's perceived length, clock deltas, economy values).
+The registry is deliberately dumb — it only maps a submitter's slot + rule to the target and
+accumulates products. Stacking is **not** in the registry: it emerges because the registry is
+populated by an ordered left→right walk in which each glass folds the magnification already applied to
+*itself* into what it submits, so `[Glass][Glass][card]` lands ×2.25 on the one neighbor. Inert ×1.0
+cards opt out (they leave their factor at 1.0), so the glass never silently turns an FX card into a
+multiplier; fixed/cap clock bounds and boolean capabilities are likewise left unmagnified.
 
 ### 5.3 Evaluation architecture
 Behavior beyond the pure scoring fold is expressed three ways, so adding an exotic card never touches

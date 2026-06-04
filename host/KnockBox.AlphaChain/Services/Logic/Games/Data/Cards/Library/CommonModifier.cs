@@ -40,6 +40,11 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public bool CheckIfTriggered(EngineEvaluationContext context) => TriggerChecker.Invoke(context);
 
         public EngineEvaluationContext ExecuteModifier(EngineEvaluationContext context, IModifierCard self)
-            => ModifierMath.Apply(context, ModifierType, MagnitudeProvider.Invoke(context, self));
+        {
+            // Every CommonModifier is a real scoring card, so it always opts into magnification: a
+            // Magnifying Glass on its immediate left scales its magnitude directly (+10 → +15, ×2 → ×3).
+            double magnitude = MagnitudeProvider.Invoke(context, self) * (context.EffectMagnifier?.GetMagnification(self) ?? 1.0);
+            return ModifierMath.Apply(context, ModifierType, magnitude);
+        }
     }
 }

@@ -50,6 +50,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public virtual bool CheckIfTriggered(EngineEvaluationContext context) => true;
 
+        /// <summary>The effect magnification a Magnifying Glass on this card's immediate left applies to
+        /// it (1.0 when none). A scoring card multiplies its magnitude by this to opt in; an inert card
+        /// leaves its 1.0/0.0 magnitude alone so it is never silently turned into a multiplier.</summary>
+        protected double GetMagnification(EngineEvaluationContext context)
+            => context.EffectMagnifier?.GetMagnification(this) ?? 1.0;
+
         /// <summary>The addend (additive cards) or factor (multiplicative cards) this card contributes
         /// when triggered. Defaults to the additive/multiplicative identity.</summary>
         protected virtual double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
@@ -63,6 +69,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public virtual EngineEvaluationContext OnTurnEnded(EngineEvaluationContext context, IModifierCard self) => context;
         public virtual EngineEvaluationContext OnOpponentWordResolved(EngineEvaluationContext context, IModifierCard self) => context;
         public virtual EngineEvaluationContext OnValidationFailed(EngineEvaluationContext context, IModifierCard self) => context;
+        public virtual void SubmitMagnifications(IEffectMagnifier magnifier) { }
     }
 
     /// <summary>A class-based card that adds to the score.</summary>

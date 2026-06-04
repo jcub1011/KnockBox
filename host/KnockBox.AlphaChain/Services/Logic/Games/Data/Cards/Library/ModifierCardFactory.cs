@@ -87,6 +87,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
                 ModifierId.IrsAgent => new IrsAgentCard(),
                 ModifierId.Prism => new PrismCard(),
                 ModifierId.TitaniumMirror => new TitaniumMirrorCard(),
+                ModifierId.MagnifyingGlass => new MagnifyingGlassCard(),
 
                 // ── Economy / aggression cards ───────────────────────────────────
                 ModifierId.TaxCollector => new TaxCollectorCard(),

@@ -56,6 +56,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Support
             ["tax-write-off"] = ModifierId.TaxWriteOff,
             ["booster-pack"] = ModifierId.BoosterPack,
             ["scavenger"] = ModifierId.Scavenger,
+            ["magnifying-glass"] = ModifierId.MagnifyingGlass,
         };
 
         /// <summary>Maps a legacy string id to its <see cref="ModifierId"/>.</summary>

@@ -13,9 +13,43 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override string GetDescription(EngineEvaluationContext context)
             => "Hides your own word-input box while you type — no peeking at typos. Reward: ×1.8 on every valid word.";
         protected override string? MagnitudeLabel => "×1.8";
-        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.8;
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.8 * GetMagnification(context);
 
         public bool HidesOwnInput(EngineEvaluationContext context) => true;
+    }
+
+    /// <summary>
+    /// The Magnifying Glass: a scoring-inert (×1.0) support card that magnifies the effect/magnitude of
+    /// the card <i>immediately to its right</i> by ×1.5. It pushes its magnification through the
+    /// per-evaluation <see cref="IEffectMagnifier"/>; the right-hand card decides how to scale its own
+    /// numbers (additive addend, multiplier factor, Forgery's perceived length, clock deltas, economy
+    /// values). Stacking is automatic: a glass folds the magnification already applied to itself into
+    /// what it submits, so two glasses in series compound onto the one neighbor (1.5 × 1.5 = 2.25).
+    /// </summary>
+    public sealed class MagnifyingGlassCard : MultiplicativeCardBase
+    {
+        /// <summary>The base factor a single glass magnifies its right-hand neighbor by.</summary>
+        public const double BaseMagnification = 1.5;
+
+        public override ModifierId GetId() => ModifierId.MagnifyingGlass;
+        public override string GetName() => "Magnifying Glass";
+        public override string GetDescription(EngineEvaluationContext context)
+            => "Grants 0 points. Magnifies the effect of the card immediately to its right by ×1.5. Stacks: glasses in series compound (two → ×2.25).";
+        protected override string? MagnitudeLabel => "FX";
+
+        // Inert in the scoring fold — its whole job is to magnify its neighbor, not to score.
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
+
+        public override System.Collections.Immutable.ImmutableArray<CardChip> GetChips(EngineEvaluationContext context)
+            => [new CardChip("×1.5 →", CardChips.Effect)];
+
+        public override void SubmitMagnifications(IEffectMagnifier magnifier)
+        {
+            // Fold the magnification already applied to THIS glass (a glass on my left) into what I emit,
+            // so stacking compounds without this card or the service knowing about neighbors.
+            double own = magnifier.GetMagnification(this);
+            magnifier.SubmitMagnification(BaseMagnification * own, MagnificationApplicationRule.ImmediateRightNeighbor);
+        }
     }
 
     /// <summary>Lets the owner ignore the Succession (chain) rule.</summary>
@@ -95,7 +129,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         protected override string? MagnitudeLabel => "shield";
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
-            => Multiplier(context);
+            => Multiplier(context) * GetMagnification(context);
 
         public bool TryIntercept(AlphaChainPlayerState owner, IModifierCard self, IServiceProvider services)
         {

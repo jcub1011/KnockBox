@@ -211,6 +211,7 @@ namespace KnockBox.AlphaChain.Services.State.Games
             var ctx = new EngineEvaluationContext(string.Empty, Array.Empty<char>(), new[] { player })
             {
                 Bay = player.EngineBay,
+                EffectMagnifier = EffectMagnifier.ForBay(player.EngineBay),
                 Services = Context?.EvaluationServices,
                 PlayerIndex = 0,
             };
@@ -223,7 +224,7 @@ namespace KnockBox.AlphaChain.Services.State.Games
             // The base clock — or a latched Hyper-Drive's replacement — then per-owner clock effects:
             // all fractions, then all flat seconds.
             double seconds = bay.BaseShotClockSeconds(ctx) ?? Settings.ShotClockSeconds;
-            var (fraction, flat) = bay.ShotClockEffect();
+            var (fraction, flat) = bay.ShotClockEffect(ctx);
             seconds = seconds * (1 + fraction) + flat;
 
             int armed = (int)Math.Round(seconds, MidpointRounding.AwayFromZero);

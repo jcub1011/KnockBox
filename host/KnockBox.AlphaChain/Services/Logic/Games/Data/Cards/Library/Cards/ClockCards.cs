@@ -9,7 +9,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override string GetName() => "The Vault";
         public override string GetDescription(EngineEvaluationContext context) => "×1.5 on every word, but shortens your shot clock by 10% while equipped.";
         protected override string? MagnitudeLabel => "×1.5";
-        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.5;
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.5 * GetMagnification(context);
 
         public double FractionDelta => -0.10;
         public int FlatDelta => 0;
@@ -22,7 +22,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override string GetName() => "Redline";
         public override string GetDescription(EngineEvaluationContext context) => "×2 on every word, but shortens your shot clock by 20% while equipped.";
         protected override string? MagnitudeLabel => "×2";
-        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 2.0;
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 2.0 * GetMagnification(context);
 
         public double FractionDelta => -0.20;
         public int FlatDelta => 0;
@@ -41,7 +41,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         protected override string? MagnitudeLabel => "×1.35 – 2.7";
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
-            => context.RemainingShotClockDuration >= DangerZoneSeconds ? 2.7 : 1.35;
+            => (context.RemainingShotClockDuration >= DangerZoneSeconds ? 2.7 : 1.35) * GetMagnification(context);
 
         public double FractionDelta => -0.50;
         public int FlatDelta => 0;
@@ -72,7 +72,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             => "Locks your shot clock to a strict, unmodifiable 5 seconds for the era. In exchange: ×(0.5 per letter) of your word.";
         protected override string? MagnitudeLabel => "×0.5 / ltr";
 
-        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 0.5 * context.Word.Length;
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 0.5 * context.Word.Length * GetMagnification(context);
 
         public int? GetFixedShotClockSeconds(EngineEvaluationContext context) => PinnedSeconds;
     }
@@ -105,7 +105,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetEffectiveLetterCount(context) > LengthThreshold;
 
-        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => Factor;
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => Factor * GetMagnification(context);
 
         public int GetShotClockCapSeconds(EngineEvaluationContext context) => CapSeconds;
     }

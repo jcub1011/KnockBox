@@ -62,6 +62,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         TaxWriteOff,
         BoosterPack,
         Scavenger,
+        MagnifyingGlass,
     }
 
     /// <summary>
@@ -127,6 +128,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         /// <summary>Fired on the owner when their submission fails validation (a typo) — The Prism refills the clock.</summary>
         EngineEvaluationContext OnValidationFailed(EngineEvaluationContext context, IModifierCard self) => context;
+
+        /// <summary>
+        /// Pushes this card's effect magnifications into the per-evaluation <see cref="IEffectMagnifier"/>
+        /// during its ordered populate walk. Only the Magnifying Glass overrides this; it reads the
+        /// magnification already applied to itself and folds it into what it submits for its neighbor, so
+        /// stacked glasses compound without any card knowing about the next one. Default: no-op.
+        /// </summary>
+        void SubmitMagnifications(IEffectMagnifier magnifier) { }
     }
 
     // ── Card-contributed room state services ────────────────────────────────────
@@ -355,13 +364,16 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         /// for length conditionals and per-letter magnitudes so a preceding Forgery flows through.</summary>
         public static int GetEffectiveLetterCount(this IModifierCard currentCard, EngineEvaluationContext context)
         {
-            int multiplier = 1;
+            double factor = 1.0;
             foreach (var card in context.GetModifierCards(context.PlayerIndex))
             {
                 if (card == currentCard) break;
-                if (card is ILetterCountModifier m) multiplier *= m.LetterCountMultiplier;
+                // A Magnifying Glass immediately before this Forgery magnifies its perceived-length
+                // factor directly (×2 → ×3), per the card's own decision on how its effect scales.
+                if (card is ILetterCountModifier m)
+                    factor *= m.LetterCountMultiplier * (context.EffectMagnifier?.GetMagnification(card) ?? 1.0);
             }
-            return context.Word.Length * multiplier;
+            return (int)Math.Round(context.Word.Length * factor, MidpointRounding.AwayFromZero);
         }
 
         /// <summary>The smallest shot-clock cap among the bay (Hyper-Drive), or null when none is active.</summary>
@@ -425,18 +437,21 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             return baseSeconds;
         }
 
-        /// <summary>The summed fractional and flat shot-clock deltas across the bay's <see cref="IShotClockModifier"/> cards.</summary>
-        public static (double Fraction, int Flat) ShotClockEffect(this IReadOnlyList<IModifierCard> bay)
+        /// <summary>The summed fractional and flat shot-clock deltas across the bay's
+        /// <see cref="IShotClockModifier"/> cards, each scaled by any Magnifying Glass on its left
+        /// (a −20% delta behind one glass becomes −30%).</summary>
+        public static (double Fraction, int Flat) ShotClockEffect(this IReadOnlyList<IModifierCard> bay, EngineEvaluationContext context)
         {
             double fraction = 0;
-            int flat = 0;
+            double flat = 0;
             foreach (var card in bay)
                 if (card is IShotClockModifier m)
                 {
-                    fraction += m.FractionDelta;
-                    flat += m.FlatDelta;
+                    double mag = context.EffectMagnifier?.GetMagnification(card) ?? 1.0;
+                    fraction += m.FractionDelta * mag;
+                    flat += m.FlatDelta * mag;
                 }
-            return (fraction, flat);
+            return (fraction, (int)Math.Round(flat, MidpointRounding.AwayFromZero));
         }
 
         /// <summary>Whether any card in the bay grants a Succession exemption (The Wildcard).</summary>

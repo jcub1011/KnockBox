@@ -22,11 +22,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
         {
             var bay = context.Bay;
 
-            // Seed the running value (word length) and the Hyper-Drive multiplier scale once.
+            // Seed the running value (word length) and the Hyper-Drive multiplier scale once, and ensure
+            // an effect magnifier exists so a scoring context built without one (the evaluator unit tests,
+            // the Tax Write-Off re-entry) still resolves Magnifying Glass effects from the bay.
             var ctx = context with
             {
                 ValueToAdd = context.Word.Length,
                 MultiplierScale = bay.MultiplierScale(context),
+                EffectMagnifier = context.EffectMagnifier ?? EffectMagnifier.ForBay(bay),
             };
 
             var steps = new List<ScoreStep>(bay.Count);

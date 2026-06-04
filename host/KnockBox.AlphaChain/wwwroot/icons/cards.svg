@@ -247,6 +247,13 @@
     <line x1="14.5" y1="14.5" x2="20" y2="20" />
     <circle cx="10" cy="10" r="0.6" />
   </symbol>
+  <!-- Magnifying Glass — a lens with a + boost mark; magnifies its neighbor's effect. -->
+  <symbol id="MagnifyingGlass" viewBox="0 0 24 24">
+    <circle cx="10" cy="10" r="6" />
+    <line x1="14.5" y1="14.5" x2="20" y2="20" />
+    <line x1="10" y1="7" x2="10" y2="13" />
+    <line x1="7" y1="10" x2="13" y2="10" />
+  </symbol>
   <!-- Fallback — the original default circle, used for Unknown / unmapped ids. -->
   <symbol id="fallback" viewBox="0 0 24 24">
     <circle cx="12" cy="12" r="6" />

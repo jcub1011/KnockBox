@@ -40,6 +40,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         /// </summary>
         public IServiceProvider? Services { get; init; }
 
+        /// <summary>
+        /// Per-evaluation effect-magnification registry, derived from <see cref="Bay"/>. A card pulls the
+        /// magnification that applies to itself (a Magnifying Glass on its immediate left) and decides
+        /// how to scale its own numbers. Null for an ad-hoc/display context, where it reads as no
+        /// magnification (1.0); the evaluator builds one from the bay if a scoring context lacks it.
+        /// </summary>
+        public Cards.Library.IEffectMagnifier? EffectMagnifier { get; init; }
+
         /// <summary>The shot clock duration without any modifiers.</summary>
         public double ShotClockDuration { get; init; }
 

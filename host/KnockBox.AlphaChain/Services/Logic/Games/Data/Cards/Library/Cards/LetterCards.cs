@@ -13,7 +13,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetVowelIndicies(context).Count() > this.GetConsonantIndicies(context).Count();
 
-        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 3.0;
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 3.0 * GetMagnification(context);
     }
 
     /// <summary>×1.5 when the word's only vowels are 'A' or 'E'.</summary>
@@ -27,7 +27,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetVowelIndicies(context).All(i => context.Word[i] is 'a' or 'e');
 
-        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.5;
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.5 * GetMagnification(context);
     }
 
     /// <summary>×1.5 when the word ends in a vowel.</summary>
@@ -42,7 +42,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => context.Word.Length > 0 && this.GetVowelIndicies(context).Contains(context.Word.Length - 1);
 
-        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.5;
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.5 * GetMagnification(context);
     }
 
     /// <summary>
@@ -84,7 +84,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
         {
             int letters = self.GetEffectiveLetterCount(context);
-            return letters < 7 ? letters : letters * 2;
+            return (letters < 7 ? letters : letters * 2) * GetMagnification(context);
         }
     }
 
@@ -100,7 +100,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             => this.GetEffectiveLetterCount(context) >= 6;
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
-            => self.GetEffectiveLetterCount(context);
+            => self.GetEffectiveLetterCount(context) * GetMagnification(context);
     }
 
     /// <summary>×3 when the word is 8 letters or longer.</summary>
@@ -114,7 +114,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetEffectiveLetterCount(context) >= 8;
 
-        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 3.0;
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 3.0 * GetMagnification(context);
     }
 
     /// <summary>×5 when the word is 10 letters or longer.</summary>
@@ -129,7 +129,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetEffectiveLetterCount(context) >= 10;
 
-        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 5.0;
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 5.0 * GetMagnification(context);
     }
 
     /// <summary>
@@ -151,9 +151,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
         {
             int cap = self.GetEffectiveLetterCount(context) / 2;
-            if (context.RemainingShotClockDuration <= 0)
-                return cap;
-            return Math.Min(1.0 / (context.RemainingShotClockDuration / context.ShotClockDuration), cap);
+            double factor = context.RemainingShotClockDuration <= 0
+                ? cap
+                : Math.Min(1.0 / (context.RemainingShotClockDuration / context.ShotClockDuration), cap);
+            return factor * GetMagnification(context);
         }
     }
 
@@ -175,7 +176,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
                 || this.GetEffectiveLetterCount(context) >= context.SubmissionHistory[^1].Word.Length;
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
-            => 3.0 * self.GetEffectiveLetterCount(context);
+            => 3.0 * self.GetEffectiveLetterCount(context) * GetMagnification(context);
     }
 
     /// <summary>
@@ -197,7 +198,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             => this.GetEffectiveLetterCount(context) > BaseLength;
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
-            => 1.0 + 0.1 * (self.GetEffectiveLetterCount(context) - BaseLength);
+            => (1.0 + 0.1 * (self.GetEffectiveLetterCount(context) - BaseLength)) * GetMagnification(context);
     }
 
     /// <summary>

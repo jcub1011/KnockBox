@@ -27,7 +27,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             if (owner is null || owner.UserId == res.SubmitterUserId)
                 return context;
 
-            int amount = ModifierMath.ClampScore(res.WouldBeScore * Rate);
+            int amount = ModifierMath.ClampScore(res.WouldBeScore * Rate * GetMagnification(context));
             if (amount <= 0) return context;
 
             owner.Score += amount;
@@ -70,7 +70,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
             if (context.Service<ICardBanService>()?.BanFor(owner, GetId()) is { } banned && res.Word.Contains(banned))
             {
-                int amount = ModifierMath.ClampScore(res.EarnedScore * Rate);
+                int amount = ModifierMath.ClampScore(res.EarnedScore * Rate * GetMagnification(context));
                 if (amount > 0) owner.Score += amount;
             }
             return context;
@@ -88,7 +88,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override string GetDescription(EngineEvaluationContext context)
             => "Each era, rolls you a personal banned letter (Zero-Point Tax if you use it). Reward: ×1.75 on every word you keep clean.";
         protected override string? MagnitudeLabel => "×1.75";
-        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.75;
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.75 * GetMagnification(context);
 
         public override EngineEvaluationContext OnEraStart(EngineEvaluationContext context, IModifierCard self)
         {
@@ -131,7 +131,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             if (owner is null || leader is null || owner.UserId == leader.UserId)
                 return context;
 
-            effects.Drain(self, owner, leader, Penalty);
+            effects.Drain(self, owner, leader, (int)Math.Round(Penalty * GetMagnification(context), MidpointRounding.AwayFromZero));
             return context;
         }
     }
@@ -154,9 +154,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             var effects = context.Service<IEngineEffects>();
             if (owner is null || effects is null) return context;
 
+            int shave = (int)Math.Round(ShaveSeconds * GetMagnification(context), MidpointRounding.AwayFromZero);
             foreach (var opp in effects.OrderedActivePlayers())
                 if (opp.UserId != owner.UserId && opp.Score > owner.Score)
-                    effects.TimeShave(self, owner, opp, ShaveSeconds);
+                    effects.TimeShave(self, owner, opp, shave);
 
             return context;
         }
@@ -223,7 +224,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             if (owner is null || owner.UserId == res.SubmitterUserId)
                 return context;
 
-            int amount = ModifierMath.ClampScore(res.RemainingSeconds);
+            int amount = ModifierMath.ClampScore(res.RemainingSeconds * GetMagnification(context));
             if (amount > 0) owner.Score += amount;
             return context;
         }
@@ -263,7 +264,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         protected override string? MagnitudeLabel => "+2 / card→";
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
-            => PerCard * Math.Max(0, context.Bay.Count - context.ModifierCardIndex - 1);
+            => PerCard * Math.Max(0, context.Bay.Count - context.ModifierCardIndex - 1) * GetMagnification(context);
     }
 
     /// <summary>Scavenger — +1 for every previously submitted word this match that contains your word's
@@ -285,7 +286,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             foreach (var submission in context.SubmissionHistory)
                 if (submission.Word.Contains(start))
                     count++;
-            return count;
+            return count * GetMagnification(context);
         }
     }
 }

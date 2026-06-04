@@ -119,6 +119,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             var evalCtx = new EngineEvaluationContext(word, CollectBannedLetters(state, hijackBan, cardBans), players)
             {
                 Bay = player?.EngineBay ?? [],
+                EffectMagnifier = EffectMagnifier.ForBay(player?.EngineBay ?? []),
                 Services = services,
                 PlayerIndex = playerIndex,
                 SubmissionHistory = state.SubmissionHistory,
@@ -237,6 +238,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                     var octx = new EngineEvaluationContext(word, Array.Empty<char>(), players)
                     {
                         Bay = other.EngineBay,
+                        EffectMagnifier = EffectMagnifier.ForBay(other.EngineBay),
                         Services = services,
                         PlayerIndex = oidx,
                         SubmissionHistory = state.SubmissionHistory,
