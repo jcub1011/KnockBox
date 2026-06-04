@@ -27,10 +27,18 @@ namespace KnockBox.AlphaChain.Services.Logic.Scoring
     /// </summary>
     /// <param name="Word">The scored word (normalized).</param>
     /// <param name="Seed">The starting score (word length).</param>
-    /// <param name="Steps">Per-card steps, in pipeline order (left → right).</param>
+    /// <param name="Steps">
+    /// Per-card steps, in pipeline order (left → right). Each <see cref="ScoreStep.RunningScore"/>
+    /// reflects only the pure scoring fold; post-fold adjustments applied outside the pipeline
+    /// (the IRS Agent's flat taxed score, Tax Write-Off's salvage) land on <paramref name="FinalScore"/>
+    /// alone, so the last step's running total need not equal it.
+    /// </param>
     /// <param name="FinalBeforeTax">The score after the full pipeline, before any tax.</param>
-    /// <param name="Taxed">True when the Zero-Point Tax applied (final score is 0).</param>
-    /// <param name="FinalScore">The points actually awarded (0 when <paramref name="Taxed"/>).</param>
+    /// <param name="Taxed">True when the Zero-Point Tax applied (the pure fold scored 0).</param>
+    /// <param name="FinalScore">
+    /// The points actually awarded. Normally 0 when <paramref name="Taxed"/>, but a self-tax salvage
+    /// (Tax Write-Off) or override (IRS Agent) can make it non-zero even on a taxed word.
+    /// </param>
     public sealed record ScoreBreakdown(
         string Word,
         int Seed,

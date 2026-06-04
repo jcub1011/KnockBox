@@ -79,11 +79,11 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
     /// <summary>
     /// Hyper-Drive: passively caps the owner's shot clock at 5s (it only lowers a longer clock, never
-    /// raises a shorter one), and — when the word is longer than 6 letters — applies a ×1.5 to every
-    /// card placed after it. Because the multiplier folds at this card's own bay position, only the
-    /// later (right-hand) cards' contributions compound on the boosted running total. Per-word: the
-    /// ×1.5 applies the turn it triggers, not for the era. The length trigger reads the
-    /// Forgery-perceived letter count.
+    /// raises a shorter one), and — when the word is longer than 6 letters — multiplies the running
+    /// score by ×1.5 at its own bay slot. Like any multiplicative card it folds in place, so the ×1.5
+    /// lands on the seed plus every card to its left; cards to its right then build on the boosted
+    /// total (they are not themselves multiplied). Per-word: the ×1.5 applies the turn it triggers,
+    /// not for the era. The length trigger reads the Forgery-perceived letter count.
     /// </summary>
     public sealed class HyperDriveCard : MultiplicativeCardBase, IShotClockCap
     {
@@ -93,13 +93,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         /// <summary>The word must be longer than this (perceived) length to fire the multiplier.</summary>
         public const int LengthThreshold = 6;
 
-        /// <summary>The multiplier applied to later cards when triggered.</summary>
+        /// <summary>The multiplier folded into the running score at this slot when triggered.</summary>
         public const double Factor = 1.5;
 
         public override ModifierId GetId() => ModifierId.HyperDrive;
         public override string GetName() => "Hyper-Drive";
         public override string GetDescription()
-            => "Caps your shot clock at 5s. When your word is longer than 6 letters, ×1.5 to every card placed after this one.";
+            => "Caps your shot clock at 5s. When your word is longer than 6 letters, ×1.5 to your score so far (this slot and everything to its left).";
         public override string? GetMagnitudeLabel() => "×1.5";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)

@@ -32,8 +32,10 @@
                     <div class="ac-hist-row-main">
                         <span class="ac-hist-word">@s.Word.ToUpperInvariant()</span>
                         <span class="ac-hist-by">@s.DisplayName</span>
+                        @* A taxed word normally scores 0, but Tax Write-Off salvages points on top —
+                           show the banked total alongside the tax tag rather than hiding it as "tax". *@
                         <span class="ac-hist-score @(s.ZeroPointTax ? "ac-hist-score-taxed" : "")">
-                            @(s.ZeroPointTax ? "tax" : "+" + s.Score)
+                            @(s.ZeroPointTax ? (s.Score > 0 ? $"tax +{s.Score}" : "tax") : "+" + s.Score)
                         </span>
                     </div>
 
@@ -58,7 +60,8 @@
                             }
                             <span class="ac-hist-marker ac-hist-final @(engine.Taxed ? "ac-hist-taxed" : "")">
                                 <span class="ac-hist-marker-op">@(engine.Taxed ? "tax" : "score")</span>
-                                <span class="ac-hist-marker-run">@(engine.Taxed ? "0" : $"+{engine.FinalScore}")</span>
+                                @* FinalScore carries any Tax Write-Off salvage even when taxed; surface it. *@
+                                <span class="ac-hist-marker-run">@(engine.Taxed && engine.FinalScore <= 0 ? "0" : $"+{engine.FinalScore}")</span>
                             </span>
                         </div>
                     }

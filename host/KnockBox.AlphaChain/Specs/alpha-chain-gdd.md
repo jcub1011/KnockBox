@@ -34,30 +34,38 @@ Two architecture rules govern every card:
 *   **Zero Manual Targeting.** There is no point-and-click targeting during live rounds. All
     offensive cards fire automatically from rule-driven linguistic or leaderboard triggers.
 
-The catalogue below is the **complete set of 32 shipped modifier cards**. Each is tagged
+The catalogue below is the **complete set of 40 shipped modifier cards**. Each is tagged
 Additive (+), Multiplier (×), or **FX** — a scoring-inert card (base ×1.0) whose power is a side
 effect. Clock effects apply when the owner's turn arms (fractions summed first, then flat seconds),
-floored at a **3 s** minimum.
+floored at a **3 s** minimum. Length-scoring cards read the **perceived** letter count, which a
+preceding **Forgery** (§3.8) doubles — so a card's letter threshold and per-letter payout both see
+the inflated count.
 
 ### 3.1 Core Additives (+)
 Flat or per-letter point bumps; place these **left** so multipliers act on a bigger base.
 *   **The Anchor** — +10 flat, always.
-*   **Vanilla** — +1 per letter in the word.
-*   **Consonant Crunch** — +2 per consonant.
-*   **Vocal Vowels** — +3 per vowel.
+*   **Vanilla** — +1 per letter; **+2** per letter when the word is **7+ letters**.
+*   **Consonant Crunch** — +2 per consonant; **+3** per consonant when the word is **7+ letters**.
+*   **Vocal Vowels** — +3 per vowel; **+4** per vowel when the word is **7+ letters**.
 *   **Brick Layer** — +1 per letter, but only when the word is **6+ letters**.
+*   **The Blueprint** — +3 per letter when your word is **at least as long as the previously submitted
+    word** (any player's; always pays out on the match's first word).
 *   **Letter Hoarder** — +1 per **distinct** letter.
 *   **High Roller** — +20 when the word **starts** with a rare letter (Q, X, Z, J).
+*   **Booster Pack** — +2 for every card placed **to the right** of this one in the bay.
+*   **Scavenger** — +1 for every **previously submitted word** (any player's) that contains your
+    word's **starting letter**.
 
 ### 3.2 Core Multipliers (×)
 Conditional multipliers; place these **right** so they scale the accumulated additives.
 *   **Vowel Surge** — ×3 when the word has **more vowels than consonants**.
-*   **The Architect** — ×2 when the word is **8+ letters**.
-*   **Sesquipedalian** — ×3 when the word is **10+ letters**.
+*   **The Architect** — ×3 when the word is **8+ letters**.
+*   **Sesquipedalian** — ×5 when the word is **10+ letters** (clamped to the max word score).
 *   **Guttural Roar** — ×1.5 when the word's **only** vowels are A or E.
 *   **Perfect Link** — ×1.5 when the word **ends in a vowel** (and hands the next player an easy letter).
-*   **Speedracer** — when the word is **longer than 4 letters**, ×(1 ÷ [remaining ÷ total clock]),
-    **capped at ×2** — reward for submitting fast.
+*   **Speedracer** — when the word is **longer than 6 letters**, ×(1 ÷ [remaining ÷ total clock]),
+    **capped at half the letter count** (integer; a 9-letter word caps at ×4) — reward for submitting fast.
+*   **Try Hard** — ×1.1 at **7 letters**, +0.1 per letter beyond (8 → ×1.2, 9 → ×1.3, …).
 *   **The Double Down** — ×2 when the word has a **repeat letter** (the 'ff' in *coffin*), else ×0.5.
 
 ### 3.3 Glass Cannon (high-risk clock multipliers)
@@ -67,9 +75,10 @@ Big multipliers paid for in your **own** shot clock or UI.
 *   **Panic Button** — **−50%** shot clock; ×1.35 normally, **×2.7** if you submit before the final 2 seconds.
 *   **The Anchor Chain** — pins your clock to a strict, **unmodifiable 5 s** for the era; in exchange,
     ×(0.5 per letter) of the played word.
-*   **Hyper-Drive** — **FX**. Submit in under **3 s** elapsed to **latch** an overdrive for the rest of
-    the era: your base clock drops to 5 s and **every multiplier you own is doubled**. Inert in the
-    scoring fold itself — its power is the latch.
+*   **Hyper-Drive** — passively **caps your shot clock at 5 s** (only ever lowers a longer clock, never
+    raises a shorter one). When your word is **longer than 6 letters**, it folds **×1.5** into your
+    running score at its own bay slot — boosting the seed plus every card to its left; cards to its
+    right then build on the boosted total. Per-word, the turn it triggers.
 *   **The Blindfold** — ×1.8 always; hides **your own** input box while you type (no peeking at typos).
 
 ### 3.4 Personal-Ban Economy (random personal bans)
@@ -79,13 +88,18 @@ the era letter) that triggers the Zero-Point Tax for the owner alone.
 *   **The Toll Booth** — **FX**. Banks **20%** of any opponent's earned score when their word uses your
     personal letter (they keep their points; you are minted the cut).
 
-### 3.5 Tax Economy
-These resolve reactively against *opponents'* taxed submissions (see §2.2); they do not fold into the
-owner's own scoring pipeline.
+### 3.5 Tax & Reactive Economy
+These resolve reactively against submissions (your own taxed words, or opponents' plays — see §2.2);
+they do not fold into the owner's own scoring pipeline.
 *   **Tax Collector** — **FX**. When an opponent eats the Zero-Point Tax, collect **half** the would-be score.
 *   **The IRS Agent** — **FX**. When *your own* word is taxed, you keep 0 and no opponent's Tax Collector profits from it.
 *   **Bait & Switch** — **FX**. When your word is taxed, curse the **next player** with the offending
     banned letter as a personal ban for their next turn.
+*   **Tax Write-Off** — **FX**. When *your own* word is taxed, re-score its **first letter** through your
+    engine as a clean (untaxed) submission and add that on top (the taxed word still scores 0 and stays
+    siphonable).
+*   **Chrono Syphon** — **FX**. Banks **+1** for every whole second left on an **opponent's** shot clock
+    when they submit (never pays out on your own submissions).
 
 ### 3.6 Automated Aggression (zero-friction PvP)
 Hands-free offensive cards that fire from the leaderboard or linguistic patterns — never targeted.
@@ -112,6 +126,13 @@ Lifesavers that occupy a scoring slot but pair with the high-risk cards above.
 *   **The Catalyst** — **FX**. For every card placed **after** it in the bay, the letters Y, W and H
     count as a **vowel** in addition to their normal consonant role (i.e. both) when evaluating that
     card's trigger.
+*   **Forgery** — **FX**. Every **length-scoring** card placed **after** it perceives your word as
+    having **double** the letters (its threshold and per-letter payout both see the doubled count). The
+    evaluator's word-length seed is untouched, and per-character cards (Consonant Crunch, Vocal Vowels,
+    Vowel Surge, Guttural Roar, Letter Hoarder, Perfect Link, Double Down) are unaffected.
+*   **Slow Burn** — **FX**. Lengthens your shot clock by **+20%**, but words shorter than **6 letters**
+    are illegal — a too-short word takes the Zero-Point Tax (scores 0, still siphonable) like a banned
+    letter.
 
 ---
 
@@ -132,9 +153,11 @@ The game is divided into 4-round "Eras." At the end of every 4th round, the game
 A word is scored by `EngineEvaluator.CalculateSteps`, which walks the player's Engine Bay **strictly
 left → right** as a sequential fold. The running value is **seeded with the word length**, then each
 triggered card folds itself in (`ExecuteModifier`): an additive card does `value + magnitude`, a
-multiplicative card does `value × (factor × MultiplierScale)`. The final running total is rounded
-**half-up** and clamped to `MaxWordScore` (**10,000**). The walk emits a `ScoreBreakdown` — a
-per-card `ScoreStep` trace (operator, value, running score) — which the UI replays.
+multiplicative card does `value × factor`. The final running total is rounded **half-up** and clamped
+to `MaxWordScore` (**10,000**). The walk emits a `ScoreBreakdown` — a per-card `ScoreStep` trace
+(operator, value, running score) — which the UI replays. Post-fold adjustments applied outside the
+pipeline (the IRS Agent's flat taxed score, Tax Write-Off's first-letter salvage) land on the
+breakdown's final score alone, so the last step's running total need not equal it.
 
 ### 5.1 The Formula
 Let $L$ be the word length, $A$ be the sum of active additives, and $M$ be the product of active multipliers.
@@ -147,11 +170,11 @@ smaller base. Conditional cards only contribute when their trigger fires for the
 
 ### 5.2 Time-aware and meta factors
 Some multiplicative cards read **turn context** rather than just the word: Speedracer and Panic Button
-scale with the seconds left on the shot clock at submit time. A latched **Hyper-Drive** raises a
-global **multiplier scale** for the rest of the era (seeded once from the bay's
-`IMultiplierScaleProvider` cards), so every multiplicative card's factor `M` is applied as
-`M × scale` (scale = 2 under Hyper-Drive) — "all multipliers doubled" without touching any individual
-card.
+scale with the seconds left on the shot clock at submit time, and **Hyper-Drive** caps the owner's
+armed clock at 5 s (an `IShotClockCap`) while folding a positional ×1.5 in the scoring pipeline.
+**Forgery** is a meta factor of a different kind: an `ILetterCountModifier` that doubles the letter
+count *perceived* by every length-based card placed after it (via `GetEffectiveLetterCount`), without
+touching the evaluator's word-length seed.
 
 ### 5.3 Evaluation architecture
 Behavior beyond the pure scoring fold is expressed three ways, so adding an exotic card never touches
@@ -159,19 +182,20 @@ the evaluator's core loop:
 
 *   **Capability interfaces, discovered by walking the bay.** A card opts into an interface and the
     engine finds it generically: letter classification (`IConsonantChecker` / `IVowelChecker` — the
-    Catalyst), shot-clock override / base / modifier (`IShotClockOverride` / `IBaseShotClockProvider`
-    / `IShotClockModifier` — Anchor Chain, Hyper-Drive, Vault, Redline, Panic Button, Heat Sink),
-    multiplier scale (`IMultiplierScaleProvider` — Hyper-Drive), own-tax policy (`IOwnTaxPolicy` — IRS
-    Agent), succession exemption (`ISuccessionExemption` — Wildcard), attack interception
+    Catalyst), shot-clock override / modifier / cap (`IShotClockOverride` / `IShotClockModifier`
+    / `IShotClockCap` — Anchor Chain; Vault, Redline, Panic Button, Heat Sink, Slow Burn; Hyper-Drive),
+    perceived letter count (`ILetterCountModifier` — Forgery), word legality (`IWordLegalityRule` —
+    Slow Burn), own-tax policy and salvage (`IOwnTaxPolicy` — IRS Agent; `ITaxWriteOffPolicy` — Tax
+    Write-Off), succession exemption (`ISuccessionExemption` — Wildcard), attack interception
     (`IAttackInterceptor` — Titanium Mirror), and input masking (`IInputMask` — Blindfold). Letter
     walks honor the **last** provider before the current card; engine-policy walks scan the whole bay.
-*   **Lifecycle hooks** fired at fixed points: `OnEraStart` (roll personal bans), `OnWordAccepted`
-    (Hyper-Drive latch), `OnTurnEnded` (Flak Cannon, Bait & Switch), `OnOpponentWordResolved` (Tax
-    Collector, Toll Booth, Bounty Hunter), `OnValidationFailed` (Prism clock refill).
+*   **Lifecycle hooks** fired at fixed points: `OnEraStart` (roll personal bans), `OnTurnEnded` (Flak
+    Cannon, Bait & Switch), `OnOpponentWordResolved` (Tax Collector, Toll Booth, Bounty Hunter, Chrono
+    Syphon), `OnValidationFailed` (Prism clock refill).
 *   **Card-contributed, player-keyed room-state services** (`IContributesRoomServices`): the shield,
-    Hyper-Drive latch, personal-ban, time-penalty, letter-hijack, and Prism-guard state each live in
-    their own service, instantiated as the union across the whole catalogue and reset on the right
-    turn / era boundary — never in the FSM.
+    personal-ban, time-penalty, letter-hijack, and Prism-guard state each live in their own service,
+    instantiated as the union across the whole catalogue and reset on the right turn / era boundary —
+    never in the FSM.
 
 ---
 
@@ -235,16 +259,18 @@ game actually does*.
 *   **Card behaviour is interfaces + hooks + room services, not data descriptors.** Each card is a
     self-contained `IModifierCard`: it folds into scoring via `ExecuteModifier` and expresses
     everything beyond pure scoring by (a) opting into **capability interfaces** the engine discovers
-    by walking the bay (letter classification, shot-clock override/base/modifier, multiplier scale,
-    own-tax policy, succession exemption, attack interception, input mask), (b) overriding
+    by walking the bay (letter classification, shot-clock override/modifier/cap, perceived letter
+    count, word legality, own-tax policy and salvage, succession exemption, attack interception, input
+    mask), (b) overriding
     **lifecycle hooks** (`OnEraStart`, `OnWordAccepted`, `OnTurnEnded`, `OnOpponentWordResolved`,
     `OnValidationFailed`), and (c) declaring **card-contributed, player-keyed room-state services**
     via `IContributesRoomServices` (see §5.3). Adding an exotic card is "implement the interface(s)
     and hook(s)"; only a genuinely new *kind* of capability touches the engine. Scoring stays pure —
     side-effecting state lives in the room services, never in the scoring fold.
-*   **Per-owner shot-clock effects.** The glass-cannon cards (Vault, Redline, Panic Button) and a
-    latched Hyper-Drive change the *owner's* armed shot clock — fractions applied before flat
-    seconds, floored at a 3s minimum — so the clock can shorten but never zero or invert.
+*   **Per-owner shot-clock effects.** The glass-cannon cards (Vault, Redline, Panic Button, Heat Sink,
+    Slow Burn) change the *owner's* armed shot clock — fractions applied before flat seconds — and
+    Hyper-Drive's cap then lowers a longer clock to 5 s (never raises a shorter one), all floored at a
+    3s minimum, so the clock can shorten but never zero or invert.
 *   **Generalised siphons.** The Tax Collector bounty is one case of a general "siphon": a player's
     matching collectors take the single highest rate (no stacking), and The Toll Booth siphons on a
     *normally-scored* word that used the owner's era-rolled personal letter (minting the owner a cut
@@ -255,8 +281,8 @@ game actually does*.
     its caster (decaying its multiplier per block). The pass is single-shot — a reflected hit always
     lands on the caster and is never itself re-reflected.
 *   **Deterministic submit time.** The submission timestamp is threaded into the FSM (not read from
-    the wall clock mid-pipeline) so time-aware scoring (Speedracer, Panic Button) and the Hyper-Drive
-    elapsed check are reproducible under test.
+    the wall clock mid-pipeline) so time-aware scoring (Speedracer, Panic Button) and clock-remaining
+    effects (Chrono Syphon's per-second bounty) are reproducible under test.
 *   **The Blindfold is client-enforced.** While the local player holds The Blindfold, a CSS class
     hides their own input text (the caret stays visible). The input still works and server validation
     is unchanged — only the rendered glyphs are hidden, so the penalty is purely self-inflicted.
