@@ -40,6 +40,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         /// <summary>Additive by default; <see cref="MultiplicativeCardBase"/> flips this.</summary>
         public virtual ModifierType GetModifierType(EngineEvaluationContext context) => ModifierType.Additive;
 
+        /// <summary>No chip by default; a card overrides this to surface its magnitude (or "FX").</summary>
+        public virtual string? GetMagnitudeLabel() => null;
+
         public virtual bool CheckIfTriggered(EngineEvaluationContext context) => true;
 
         /// <summary>The addend (additive cards) or factor (multiplicative cards) this card contributes

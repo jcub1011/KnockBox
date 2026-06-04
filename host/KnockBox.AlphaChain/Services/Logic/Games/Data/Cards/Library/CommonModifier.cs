@@ -14,13 +14,15 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     /// <param name="ModifierType">Whether <see cref="MagnitudeProvider"/> is an addend or a factor.</param>
     /// <param name="TriggerChecker">Whether the card contributes for the current word.</param>
     /// <param name="MagnitudeProvider">The addend (additive) or factor (multiplicative) when triggered.</param>
+    /// <param name="MagnitudeLabel">A short, glanceable chip label (e.g. "+10", "×0.5–2"); null hides the chip.</param>
     public readonly record struct CommonModifier(
         ModifierId Id,
         string Name,
         string Description,
         ModifierType ModifierType,
         Func<EngineEvaluationContext, bool> TriggerChecker,
-        Func<EngineEvaluationContext, IModifierCard, double> MagnitudeProvider)
+        Func<EngineEvaluationContext, IModifierCard, double> MagnitudeProvider,
+        string? MagnitudeLabel = null)
         : IModifierCard
     {
         public ModifierId GetId() => Id;
@@ -32,6 +34,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public string GetDescription(EngineEvaluationContext context) => Description;
 
         public ModifierType GetModifierType(EngineEvaluationContext context) => ModifierType;
+
+        public string? GetMagnitudeLabel() => MagnitudeLabel;
 
         public bool CheckIfTriggered(EngineEvaluationContext context) => TriggerChecker.Invoke(context);
 

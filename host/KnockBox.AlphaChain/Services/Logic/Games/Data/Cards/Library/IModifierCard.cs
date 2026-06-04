@@ -80,6 +80,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         /// <summary>Whether the card adds or multiplies for this context (UI glyph/tinting only).</summary>
         ModifierType GetModifierType(EngineEvaluationContext context);
 
+        /// <summary>
+        /// A short, glanceable magnitude label for the card's chip (e.g. "+10", "×0.5–2", "≤×2"), or
+        /// <c>"FX"</c> for a scoring-inert card whose power is a side effect. Null hides the chip.
+        /// Display-only — the authoritative magnitude lives in <see cref="ExecuteModifier"/>.
+        /// </summary>
+        string? GetMagnitudeLabel() => null;
+
         /// <summary>Whether the card contributes for the current word. Unconditional cards return true.</summary>
         bool CheckIfTriggered(EngineEvaluationContext context);
 

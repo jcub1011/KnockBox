@@ -40,6 +40,33 @@
     color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
 }
 
+/* Brutalist toggle to flip the whole grid between the Large and Small previews. */
+.ac-library-size {
+    margin-top: 0.35rem;
+    padding: 0.45rem 1.1rem;
+    border: 3px solid #000;
+    border-radius: 0.55rem;
+    background: var(--ac-cyan, #00e5ff);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+    transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.ac-library-size:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 #000;
+}
+
+.ac-library-size:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #000;
+}
+
 /* Flex-wrapped catalogue. GameCard owns its own fixed width, so the row just wraps and centers. */
 .ac-library-grid {
     display: flex;
@@ -47,4 +74,9 @@
     gap: 1rem;
     align-items: flex-start;
     justify-content: center;
+}
+
+/* Small tiles pack tighter than the large flip cards. */
+.ac-library-grid-small {
+    gap: 0.6rem;
 }

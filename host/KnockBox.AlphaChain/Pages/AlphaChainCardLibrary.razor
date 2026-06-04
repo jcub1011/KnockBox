@@ -22,12 +22,29 @@
         <header class="ac-library-head">
             <span class="ac-library-brand">ALPHA CHAIN</span>
             <span class="ac-library-tagline">Card Library · @Cards.Count cards</span>
+            <button type="button" class="ac-library-size" @onclick="ToggleSize">
+                @(_size == CardSize.Large ? "Show small cards" : "Show large cards")
+            </button>
         </header>
 
-        <div class="ac-library-grid">
+        <div class="ac-library-grid @(_size == CardSize.Small ? "ac-library-grid-small" : "")">
             @foreach (var card in Cards)
             {
-                <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Kind="@card.Kind" />
+                @if (_size == CardSize.Large)
+                {
+                    <button type="button" class="ac-cardbtn"
+                            title="Click to flip"
+                            @onclick="() => ToggleFlip(card.Id)">
+                        <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Kind="@card.Kind"
+                                  Size="CardSize.Large" MagnitudeText="@card.Magnitude"
+                                  Flipped="@_flipped.Contains(card.Id)" />
+                    </button>
+                }
+                else
+                {
+                    <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Kind="@card.Kind"
+                              Size="CardSize.Small" MagnitudeText="@card.Magnitude" />
+                }
             }
         </div>
     </div>
@@ -35,9 +52,24 @@
 
 @code {
     /// <summary>Display projection of a card: everything GameCard needs, resolved once at init.</summary>
-    private sealed record CardInfo(ModifierId Id, string Name, string Description, ModifierType Kind);
+    private sealed record CardInfo(ModifierId Id, string Name, string Description, ModifierType Kind, string? Magnitude);
 
     private List<CardInfo> Cards { get; set; } = [];
+    private readonly HashSet<ModifierId> _flipped = new();
+
+    /// <summary>Which variant the grid previews — Large (flippable) by default.</summary>
+    private CardSize _size = CardSize.Large;
+
+    /// <summary>Switches the whole grid between the Large and Small card previews.</summary>
+    private void ToggleSize()
+        => _size = _size == CardSize.Large ? CardSize.Small : CardSize.Large;
+
+    /// <summary>Flips a card to read its description, or back to its identity.</summary>
+    private void ToggleFlip(ModifierId id)
+    {
+        if (!_flipped.Remove(id))
+            _flipped.Add(id);
+    }
 
     protected override void OnInitialized()
     {
@@ -48,7 +80,8 @@
         Cards = ModifierCardFactory.AllDealableIds
             .Select(id => CardFactory.CreateCard(context, id))
             .Select(card => new CardInfo(
-                card.GetId(), card.GetName(), card.GetDescription(), card.GetModifierType(context)))
+                card.GetId(), card.GetName(), card.GetDescription(), card.GetModifierType(context),
+                card.GetMagnitudeLabel()))
             .ToList();
     }
 }

@@ -37,8 +37,9 @@
                             @onkeydown="e => OnKeyDown(e, index)">
                         <GameCard Name="@card.GetName()" Description="@card.GetDescription()" Card="@card.GetId()"
                                   Kind="card.GetModifierType(default)"
-                                  ValueText="@BadgeFor(card)"
-                                  Compact="@ReadOnly" Dragging="@(_dragIndex == index)" />
+                                  Size="CardSize.Small"
+                                  MagnitudeText="@card.GetMagnitudeLabel()"
+                                  LiveBadge="@BadgeFor(card)" Dragging="@(_dragIndex == index)" />
                     </button>
                 }
                 else

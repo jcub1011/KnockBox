@@ -53,23 +53,17 @@
     flex: 0 0 auto;
 }
 
-/* Empty slot placeholder — matches a card's footprint so the row stays even. */
+/* Empty slot placeholder — matches the Small card's fixed footprint so the row stays even. */
 .ac-bay-empty {
     display: flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    width: 9.75rem;
-    min-height: 5.5rem;
+    width: 7rem;
+    height: 4rem;
     border: 1px dashed var(--ac-border, rgba(255, 255, 255, 0.08));
     border-radius: 0.6rem;
     color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
     font-size: 0.7rem;
     font-style: italic;
-}
-
-/* Read-only opponent summaries use the compact card, so their empty slots match. */
-.ac-bay-readonly .ac-bay-empty {
-    width: 7.5rem;
-    min-height: 3.25rem;
 }

@@ -11,6 +11,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override string GetName() => "The Blindfold";
         public override string GetDescription()
             => "Hides your own word-input box while you type — no peeking at typos. Reward: ×1.8 on every valid word.";
+        public override string? GetMagnitudeLabel() => "×1.8";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.8;
 
         public bool HidesOwnInput(EngineEvaluationContext context) => true;
@@ -23,6 +24,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override string GetName() => "The Wildcard";
         public override string GetDescription()
             => "Grants 0 points. Your words ignore the Succession rule — they need not begin with the last letter of the previous word.";
+        public override string? GetMagnitudeLabel() => "FX";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 
         public bool IgnoresSuccession(EngineEvaluationContext context) => true;
@@ -38,6 +40,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override string GetName() => "The IRS Agent";
         public override string GetDescription()
             => "Grants 0 points. When YOUR word is hit by the Zero-Point Tax, no opponent's Tax Collector collects a thing.";
+        public override string? GetMagnitudeLabel() => "FX";
 
         // Inert in the scoring pipeline; its effect is the tax override below.
         public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
@@ -57,6 +60,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override string GetName() => "The Prism";
         public override string GetDescription()
             => "Grants 0 points. If your word is a typo or fails validation, your shot clock resets to full — once per turn — instead of ticking away.";
+        public override string? GetMagnitudeLabel() => "FX";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 
         public override EngineEvaluationContext OnValidationFailed(EngineEvaluationContext context, IModifierCard self)
@@ -87,6 +91,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override string GetName() => "The Titanium Mirror";
         public override string GetDescription()
             => "Passive ×1.0. Automatically blocks and reflects incoming attacks (time shaves, point drains, letter hijacks) back at their source — but loses 0.1× per block, carrying its decay across eras until discarded.";
+        public override string? GetMagnitudeLabel() => "shield";
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
             => Multiplier(context);

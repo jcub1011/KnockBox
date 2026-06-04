@@ -8,6 +8,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override ModifierId GetId() => ModifierId.VowelSurge;
         public override string GetName() => "Vowel Surge";
         public override string GetDescription() => "×3 when your word has more vowels than consonants.";
+        public override string? GetMagnitudeLabel() => "×3";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetVowelIndicies(context).Count() > this.GetConsonantIndicies(context).Count();
@@ -21,6 +22,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override ModifierId GetId() => ModifierId.GutturalRoar;
         public override string GetName() => "Guttural Roar";
         public override string GetDescription() => "×1.5 when your word's only vowels are 'A' or 'E'.";
+        public override string? GetMagnitudeLabel() => "×1.5";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => this.GetVowelIndicies(context).All(i => context.Word[i] is 'a' or 'e');
@@ -35,6 +37,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override string GetName() => "Perfect Link";
         public override string GetDescription()
             => "×1.5 when your word ends in a vowel — hand the next player an easy letter, pad your own score.";
+        public override string? GetMagnitudeLabel() => "×1.5";
 
         public override bool CheckIfTriggered(EngineEvaluationContext context)
             => context.Word.Length > 0 && this.GetVowelIndicies(context).Contains(context.Word.Length - 1);
@@ -57,6 +60,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override string GetName() => "The Catalyst";
         public override string GetDescription()
             => "Grants 0 points. For every card placed after it, the letters Y, W and H count as both a vowel AND a consonant.";
+        public override string? GetMagnitudeLabel() => "FX";
 
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 

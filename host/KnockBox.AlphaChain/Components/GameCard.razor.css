@@ -1,22 +1,14 @@
-/* Uniform card visual. One fixed width so cards align in any list; icon + name + inline
-   description so meaning is readable at a glance. Category accent vars come from cards.css. */
+/* Two purpose-built card footprints, both fixed-dimension so cards always line up.
+   Category accent vars come from the gc-additive / gc-multiplicative classes below. */
 
 .gc-card {
     position: relative;
     box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-    width: 9.75rem;
-    min-height: 5.5rem;
-    padding: 0.55rem 0.6rem;
-    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
-    border-radius: 0.6rem;
-    background: rgba(255, 255, 255, 0.04);
     color: var(--ac-ink, #eaf2ff);
     text-align: left;
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
+
+/* ── Category accents ────────────────────────────────────────────────── */
 
 .gc-additive {
     --gc-accent: var(--ac-additive, #14f195);
@@ -43,25 +35,189 @@
     --gc-accent: var(--ac-violet, #b97bff);
 }
 
-.gc-additive,
-.gc-multiplicative,
-.gc-reaction {
-    border-color: color-mix(in srgb, var(--gc-accent) 60%, transparent);
-    background: color-mix(in srgb, var(--gc-accent) 12%, transparent);
+/* ── Small variant — icon + chips, for at-a-glance recognition ───────── */
+
+.gc-small {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.4rem;
+    width: 7rem;
+    height: 4rem;
+    padding: 0.45rem 0.55rem;
+    overflow: hidden;
+    isolation: isolate;
+    /* Thick green/orange border = additive/multiplicative at a glance; fill = the card's identity color,
+       in the same top-down lightness gradient the large faces use. */
+    border: 3px solid var(--gc-accent);
+    border-radius: 0.6rem;
+    background:
+        linear-gradient(160deg,
+            color-mix(in srgb, var(--gc-card-color, var(--gc-accent)) 16%, transparent),
+            color-mix(in srgb, var(--gc-card-color, var(--gc-accent)) 5%, transparent)),
+        var(--ac-panel-solid, #121830);
+    transition: transform 0.14s ease, box-shadow 0.14s ease;
 }
 
-.gc-head {
+.gc-small .gc-icon {
+    width: 2.3rem;
+    height: 2.3rem;
+}
+
+.gc-small .gc-chips {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.18rem;
+    margin-left: auto;
+    max-width: 4.4rem;
+}
+
+/* ── Large variant — flip card that teaches the card ─────────────────── */
+
+.gc-large {
+    width: 11rem;
+    height: 15rem;
+    perspective: 1100px;
+}
+
+.gc-flip-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.gc-flipped .gc-flip-inner {
+    transform: rotateY(180deg);
+}
+
+.gc-face {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    padding: 0.8rem 0.75rem;
+    /* Thick green/orange border = additive/multiplicative at a glance; fill = the card's identity color. */
+    border: 3px solid var(--gc-accent);
+    border-radius: 0.8rem;
+    background:
+        linear-gradient(160deg,
+            color-mix(in srgb, var(--gc-card-color, var(--gc-accent)) 18%, transparent),
+            color-mix(in srgb, var(--gc-card-color, var(--gc-accent)) 6%, transparent)),
+        var(--ac-panel-solid, #121830);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    overflow: hidden;
+    isolation: isolate;
+    transition: box-shadow 0.18s ease;
+}
+
+.gc-front {
+    gap: 0.55rem;
+}
+
+.gc-large .gc-head {
+    display: flex;
+    align-items: flex-start;
     gap: 0.4rem;
 }
 
+.gc-large .gc-icon {
+    width: 2.85rem;
+    height: 2.85rem;
+}
+
+.gc-large .gc-chips {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+    margin-left: auto;
+    max-width: 5.5rem;
+}
+
+.gc-large .gc-name {
+    font-family: var(--font-display, system-ui);
+    font-size: 1.05rem;
+    font-weight: 800;
+    line-height: 1.15;
+}
+
+/* A teaser of the rules below the title, clamped with an ellipsis — flip for the full text. */
+.gc-front-desc {
+    margin: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    overflow: hidden;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.72));
+}
+
+.gc-flip-hint {
+    margin-top: auto;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+}
+
+.gc-back {
+    transform: rotateY(180deg);
+    gap: 0.4rem;
+}
+
+.gc-back-name {
+    flex: 0 0 auto;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: var(--gc-card-color, var(--gc-accent));
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.gc-back .gc-desc {
+    flex: 1 1 auto;
+    margin: 0;
+    overflow-y: auto;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--ac-ink, #eaf2ff);
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--gc-accent) 60%, transparent) transparent;
+}
+
+.gc-back .gc-desc::-webkit-scrollbar {
+    width: 0.35rem;
+}
+
+.gc-back .gc-desc::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--gc-accent) 55%, transparent);
+}
+
+/* ── Shared bits — icon, chips, live badge ───────────────────────────── */
+
+/* The icon is a swatch of the card's identity color: a 50%-transparent fill inside a solid full-color
+   border, with the glyph drawn in the full color — a clear, framed block of the card's hue. */
 .gc-icon {
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex: 0 0 auto;
-    width: 1.65rem;
-    height: 1.65rem;
-    color: var(--gc-accent);
+    box-sizing: border-box;
+    padding: 0.22rem;
+    border-radius: 0.4rem;
+    border: 2px solid var(--gc-card-color, var(--gc-accent));
+    color: var(--gc-card-color, var(--gc-accent));
+    background: color-mix(in srgb, var(--gc-card-color, var(--gc-accent)) 16%, transparent);
 }
 
 .gc-icon-svg {
@@ -69,49 +225,112 @@
     height: 100%;
 }
 
-.gc-op {
-    font-family: var(--font-mono, monospace);
-    font-size: 1.15rem;
-    font-weight: 800;
-    line-height: 1;
-    color: var(--gc-accent);
+/* A scaled-up, faint copy of the card's own glyph, bled off the bottom-right corner. Gives every card
+   a distinct *shape* behind its content — the differentiator that survives color-vision deficiency when
+   two cards' palette colors look alike. Sits behind content via z-index (cards isolate a context). */
+.gc-watermark {
+    position: absolute;
+    z-index: -1;
+    color: var(--gc-card-color, var(--gc-accent));
+    pointer-events: none;
 }
 
-.gc-badge {
-    margin-left: auto;
-    padding: 0.05rem 0.4rem;
-    font-size: 0.55rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+.gc-watermark .gc-icon-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.gc-small .gc-watermark {
+    right: -16%;
+    bottom: -28%;
+    width: 78%;
+    height: 160%;
+    opacity: 0.11;
+}
+
+.gc-large .gc-watermark {
+    right: -14%;
+    bottom: -16%;
+    width: 92%;
+    height: 92%;
+    opacity: 0.1;
+}
+
+.gc-chip {
+    display: inline-block;
+    padding: 0.08rem 0.4rem;
     border-radius: 0.35rem;
-    background: var(--gc-accent);
-    color: #07101e;
-    white-space: nowrap;
-}
-
-.gc-name {
-    font-family: var(--font-display, system-ui);
-    font-size: 0.82rem;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.6rem;
     font-weight: 800;
-    line-height: 1.1;
+    letter-spacing: 0.04em;
+    line-height: 1.25;
+    /* Labels carry spaces around their "/" and "–" separators so they can wrap cleanly. */
+    white-space: normal;
+    text-align: center;
+    overflow-wrap: break-word;
+    font-variant-numeric: tabular-nums;
 }
 
-.gc-desc {
-    margin: 0;
-    font-size: 0.68rem;
-    line-height: 1.25;
-    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.7));
+/* Type chip — outlined in the accent, signalling additive vs multiplicative. */
+.gc-chip-type {
+    color: var(--gc-accent);
+    background: color-mix(in srgb, var(--gc-accent) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--gc-accent) 55%, transparent);
+}
+
+/* Magnitude chip — solid in the card's identity color, the headline number. */
+.gc-chip-mag {
+    color: #07101e;
+    background: var(--gc-card-color, var(--gc-accent));
+}
+
+/* Effect chip — neutral violet for scoring-inert cards (no misleading multiplier). */
+.gc-chip-effect {
+    color: var(--ac-violet, #b97bff);
+    background: color-mix(in srgb, var(--ac-violet, #b97bff) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ac-violet, #b97bff) 55%, transparent);
+}
+
+/* Live per-player status (e.g. Titanium Mirror's "×0.7"). */
+.gc-livebadge {
+    padding: 0.05rem 0.35rem;
+    border-radius: 0.3rem;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.6rem;
+    font-weight: 800;
+    line-height: 1.2;
+    white-space: nowrap;
+    color: var(--ac-cyan, #00e5ff);
+    background: color-mix(in srgb, var(--ac-cyan, #00e5ff) 16%, transparent);
+    font-variant-numeric: tabular-nums;
 }
 
 /* ── States ──────────────────────────────────────────────────────────── */
 
-.gc-card:hover:not(.gc-dim) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+/* Small: lift (no scale — scaling rasterizes blurry) with an animated drop shadow + a colored glow. */
+.gc-small:hover:not(.gc-dim) {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.42),
+                0 0 18px color-mix(in srgb, var(--gc-card-color, var(--gc-accent)) 50%, transparent);
 }
 
-.gc-selected {
+/* Large: lift the whole card (outer container, so the flip transform is untouched). */
+.gc-large {
+    transition: transform 0.16s ease;
+}
+
+.gc-large:hover:not(.gc-dim) {
+    transform: translateY(-7px);
+}
+
+.gc-large:hover:not(.gc-dim) .gc-face {
+    box-shadow: 0 18px 34px rgba(0, 0, 0, 0.5),
+                0 0 24px color-mix(in srgb, var(--gc-card-color, var(--gc-accent)) 45%, transparent);
+}
+
+.gc-selected.gc-small,
+.gc-selected.gc-large .gc-face {
     outline: 2px solid var(--gc-accent);
     outline-offset: 1px;
     box-shadow: 0 0 14px color-mix(in srgb, var(--gc-accent) 45%, transparent);
@@ -119,6 +338,14 @@
 
 .gc-dragging {
     opacity: 0.5;
+}
+
+.gc-dragging.gc-small {
+    outline: 2px dashed var(--ac-cyan, #00e5ff);
+    outline-offset: 1px;
+}
+
+.gc-dragging.gc-large .gc-face {
     outline: 2px dashed var(--ac-cyan, #00e5ff);
     outline-offset: 1px;
 }
@@ -129,22 +356,20 @@
 
 .gc-new {
     animation: ac-pop 0.4s ease-out both;
+}
+
+.gc-new.gc-small {
     box-shadow: 0 0 16px color-mix(in srgb, var(--gc-accent) 50%, transparent);
 }
 
-.gc-compact {
-    width: 7.5rem;
-    min-height: 0;
-    padding: 0.4rem 0.45rem;
-    gap: 0.2rem;
-}
-
-.gc-compact .gc-name {
-    font-size: 0.74rem;
+.gc-new.gc-large .gc-face {
+    box-shadow: 0 0 16px color-mix(in srgb, var(--gc-accent) 50%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .gc-card,
+    .gc-small,
+    .gc-large,
+    .gc-flip-inner,
     .gc-new {
         animation: none;
         transition: none;

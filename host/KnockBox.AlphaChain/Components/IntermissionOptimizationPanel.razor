@@ -42,18 +42,24 @@
                 @ondragover:preventDefault="!HasSubmitted"
                 @ondrop="() => OnDrop(index)">
                 <span class="ac-im-opt-pos">@(index + 1)</span>
+                @if (isNew)
+                {
+                    <span class="ac-im-opt-newmark">NEW</span>
+                }
                 <button type="button"
                         class="ac-cardbtn"
-                        disabled="@HasSubmitted"
                         draggable="@(HasSubmitted ? "false" : "true")"
                         aria-grabbed="@(_dragIndex == index ? "true" : "false")"
+                        title="Click to flip · drag or ← / → to reorder"
                         @ondragstart="() => _dragIndex = index"
                         @ondragend="() => _dragIndex = null"
+                        @onclick="() => ToggleFlip(card.GetId())"
                         @onkeydown="e => OnKeyDown(e, index)">
                     <GameCard Name="@card.GetName()" Description="@card.GetDescription()" Card="@card.GetId()"
                               Kind="card.GetModifierType(default)"
-                              Dragging="@(_dragIndex == index)" New="@isNew"
-                              BadgeText="@(isNew ? "NEW" : null)" />
+                              Size="CardSize.Large" MagnitudeText="@card.GetMagnitudeLabel()"
+                              Flipped="@_flipped.Contains(card.GetId())"
+                              Dragging="@(_dragIndex == index)" New="@isNew" />
                 </button>
                 <button type="button" class="ac-im-opt-discard"
                         disabled="@HasSubmitted"
@@ -73,9 +79,10 @@
                         disabled="@HasSubmitted"
                         title="Put back"
                         @onclick="() => Restore(card.GetId())">
-                    <GameCard Name="@card.GetName()" Description="@card.GetDescription()" Card="@card.GetId()"
+                    <GameCard Name="@card.GetName()" Card="@card.GetId()"
                               Kind="card.GetModifierType(default)"
-                              Compact="true" Dim="true" />
+                              Size="CardSize.Small" MagnitudeText="@card.GetMagnitudeLabel()"
+                              Dim="true" />
                 </button>
             }
         </div>
@@ -112,8 +119,16 @@
 
     private List<IModifierCard> Kept = new();
     private List<IModifierCard> Discarded = new();
+    private readonly HashSet<ModifierId> _flipped = new();
     private int? _dragIndex;
     private string? _seededFor;
+
+    /// <summary>Toggles a Large card between its identity (front) and description (back).</summary>
+    private void ToggleFlip(ModifierId id)
+    {
+        if (!_flipped.Remove(id))
+            _flipped.Add(id);
+    }
 
     /// <summary>Cards held beyond the slot capacity (must be discarded before locking in).</summary>
     private int Overflow => Math.Max(0, Kept.Count - Slots);
@@ -128,6 +143,7 @@
         {
             Kept = Cards.ToList();
             Discarded = new();
+            _flipped.Clear();
             _dragIndex = null;
             _seededFor = signature;
         }
