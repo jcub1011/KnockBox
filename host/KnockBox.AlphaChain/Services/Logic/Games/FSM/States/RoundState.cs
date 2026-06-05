@@ -81,6 +81,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             var scored = ScoreAndResolveTax(context, submission);
             ConsumeHijackBan(submission);
+            ConsumeWildcard(submission);
             RecordPlayAndCredit(context.State, submission, scored);
 
             var resolution = new WordResolution(
@@ -151,7 +152,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 ? []
                 : services.Get<ICardBanService>()?.BansFor(player) ?? [];
 
-            var evalCtx = new EngineEvaluationContext(word, CollectBannedLetters(state, hijackBan, cardBans), players)
+            // The era Sniper Ban letter does not tax whoever is currently in last place (they pick it).
+            // Recomputed per submission, so the exemption follows the standings: if a different player
+            // drops to last, it moves to them and the prior last-place player is taxed again.
+            bool exemptFromEraBan = player is not null && EngineEffectResolver.LastPlaceUserId(state) == player.UserId;
+            char? eraBan = exemptFromEraBan ? null : state.BannedLetter;
+
+            var evalCtx = new EngineEvaluationContext(word, CollectBannedLetters(eraBan, hijackBan, cardBans), players)
             {
                 Services = services,
                 PlayerIndex = playerIndex,
@@ -163,12 +170,18 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 RemainingShotClockDuration = remaining,
             }.WithBay(player?.EngineBay ?? []);
 
-            // 4. Chain (succession) rule — a held Wildcard exempts the owner.
-            bool ignoresSuccession = player is not null && evalCtx.Bay.IgnoresSuccession(evalCtx);
-            if (!ignoresSuccession && state.RequiredStartLetter is { } required && word[0] != required)
+            // 4. Chain (succession) rule — a held Wildcard exempts the owner once per era. The bypass is
+            //    only *recorded* here; it is consumed (IWildcardGuard.Consume) once the word is accepted,
+            //    so a typo / duplicate that gets rejected below never burns the era's charge.
+            bool usedWildcard = false;
+            if (state.RequiredStartLetter is { } required && word[0] != required)
             {
-                context.LastSubmitResult = new SubmitWordResult.RejectedChainBroken(required);
-                return false;
+                if (player is null || !evalCtx.Bay.IgnoresSuccession(evalCtx))
+                {
+                    context.LastSubmitResult = new SubmitWordResult.RejectedChainBroken(required);
+                    return false;
+                }
+                usedWildcard = true;
             }
 
             // 5. Uniqueness.
@@ -192,13 +205,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             //    ban, or any era-rolled card-ban (unless a Faraday-style immunity applies).
             bool faraday = player is not null && evalCtx.Bay.ImmuneToOwnCardBans(evalCtx);
             bool taxed =
-                ContainsAny(word, state.BannedLetter, hijackBan)
+                ContainsAny(word, eraBan, hijackBan)
                 || (!faraday && ContainsAnyOf(word, cardBans))
                 // A card-driven legality rule (Slow Burn's 6-letter floor) taxes the word like a ban.
                 || (player is not null && evalCtx.Bay.ViolatesLegalityRule(evalCtx));
 
             submission = new ValidatedSubmission(
-                player, word, evalCtx, services, players, hijackBan, cardBans, faraday, taxed, remaining);
+                player, word, evalCtx, services, players, hijackBan, cardBans, faraday, taxed, remaining, usedWildcard, exemptFromEraBan);
             return true;
         }
 
@@ -239,9 +252,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 }
             }
 
-            // The banned letter the word used, captured before the personal ban is consumed.
+            // The banned letter the word used, captured before the personal ban is consumed. An exempt
+            // last-place player ignores the era letter here too, so Bait & Switch never fires off a word
+            // that wasn't actually era-taxed.
+            char? eraBan = v.ExemptFromEraBan ? null : state.BannedLetter;
             char? offendingLetter = (v.Taxed && v.Player is not null)
-                ? FirstBannedLetterUsed(v.Word, state.BannedLetter, v.HijackBan, v.Faraday ? null : v.CardBans)
+                ? FirstBannedLetterUsed(v.Word, eraBan, v.HijackBan, v.Faraday ? null : v.CardBans)
                 : null;
 
             return new ScoredSubmission(score, baseScore, breakdown, suppressBounty, offendingLetter);
@@ -252,6 +268,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         {
             if (v.Player is not null)
                 v.Services.Get<IHijackBanService>()?.ConsumeFor(v.Player);
+        }
+
+        /// <summary>Step 9b: spend the once-per-era Wildcard charge — only when the now-accepted word
+        /// actually relied on the Succession bypass, so typos/duplicates never burn it.</summary>
+        private static void ConsumeWildcard(in ValidatedSubmission v)
+        {
+            if (v.UsedWildcard && v.Player is not null)
+                v.Services.Get<IWildcardGuard>()?.Consume(v.Player);
         }
 
         /// <summary>Steps 10–11: record the played word, advance the chain's required start letter, and
@@ -373,7 +397,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             IReadOnlyCollection<char> CardBans,
             bool Faraday,
             bool Taxed,
-            double Remaining);
+            double Remaining,
+            bool UsedWildcard,
+            bool ExemptFromEraBan);
 
         /// <summary>The scored outcome of a submission after the two owner-side tax rules resolve.</summary>
         private readonly record struct ScoredSubmission(
@@ -387,12 +413,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
         /// <summary>The banned letters in effect for the submitter (era + personal hijack +
         /// era-rolled card bans), surfaced on the evaluation context for cards that read them. The
-        /// personal hijack and card bans are read from the room services and passed in.</summary>
+        /// effective era ban (null when the submitter is the exempt last-place player), the personal
+        /// hijack, and the card bans are all read from the room services / standings and passed in.</summary>
         private static IReadOnlyList<char> CollectBannedLetters(
-            AlphaChainGameState state, char? hijackBan, IReadOnlyCollection<char> cardBans)
+            char? eraBan, char? hijackBan, IReadOnlyCollection<char> cardBans)
         {
             var letters = new List<char>();
-            if (state.BannedLetter is { } era) letters.Add(era);
+            if (eraBan is { } era) letters.Add(era);
             if (hijackBan is { } personal) letters.Add(personal);
             letters.AddRange(cardBans);
             return letters;
@@ -451,8 +478,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         }
 
         /// <summary>Clears any active board-state at the start of a round and marks the leader the
-        /// Bounty Hunter watches, then arms the opening player's turn-scoped state (e.g. the Prism's
-        /// once-per-turn refill guard).</summary>
+        /// Bounty Hunter watches, then fires the opening player's turn-start boundary for any
+        /// turn-scoped room state.</summary>
         private static void BeginRound(AlphaChainGameContext context)
         {
             var state = context.State;
@@ -461,7 +488,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         }
 
         /// <summary>Fires the turn-start boundary for the now-active player, so every room state service
-        /// re-arms its per-turn state (The Prism's once-per-turn refill guard).</summary>
+        /// re-arms its per-turn state.</summary>
         private static void BeginTurnFor(AlphaChainGameContext context, Guid? userId)
         {
             if (userId is { } id && context.State.GamePlayers.TryGetValue(id, out var player))

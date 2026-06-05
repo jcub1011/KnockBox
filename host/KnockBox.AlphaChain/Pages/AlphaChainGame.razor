@@ -120,7 +120,15 @@
                     <div class="ac-cmd-cell ac-cmd-banned">
                         <span class="ac-cmd-label">Banned</span>
                         <span class="ac-cmd-letters">
-                            <span class="ac-cmd-letter">@BannedLetterDisplay</span>
+                            @if (ExemptFromEraBan)
+                            {
+                                <span class="ac-cmd-letter ac-cmd-exempt"
+                                      title="You're in last place — the banned letter doesn't tax you (until someone else drops to last).">@BannedLetterDisplay</span>
+                            }
+                            else
+                            {
+                                <span class="ac-cmd-letter">@BannedLetterDisplay</span>
+                            }
                             @if (PersonalBannedLetterDisplay is { } hijack)
                             {
                                 <span class="ac-cmd-letter ac-cmd-jinx"

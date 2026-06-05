@@ -103,6 +103,14 @@ namespace KnockBox.AlphaChain.Pages
         protected string BannedLetterDisplay =>
             GameState.BannedLetter is { } c ? char.ToUpperInvariant(c).ToString() : "—";
 
+        /// <summary>True when the local player is currently in last place and so is exempt from the era
+        /// banned letter (they pick it — it can't tax them). Tracks the live standings, so it turns off
+        /// the moment they climb out of last place. Drives the crossed-out banned-letter indicator.</summary>
+        protected bool ExemptFromEraBan =>
+            GameState.BannedLetter is not null
+            && CurrentUserId is { } me
+            && EngineEffectResolver.LastPlaceUserId(GameState) == me;
+
         /// <summary>The personal hijack letter forced onto the local player (Tracer Round / Bait &amp;
         /// Switch) as an upper-case string, or null when none. Shown beside the banned letter so the
         /// cursed player can see it (it is personal — only the affected player sees their own).</summary>

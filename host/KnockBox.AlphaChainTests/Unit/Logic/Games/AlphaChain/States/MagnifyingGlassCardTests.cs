@@ -63,6 +63,11 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         private static void GiveModifier(AlphaChainGameState state, Guid playerId, string cardId) =>
             state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
 
+        /// <summary>Score the player clear of last place so the era ban actually taxes them (the era ban
+        /// never taxes the last-place player, which on a fresh 0–0 field is the tie-broken turn-0 seat).</summary>
+        private static void ParkClearOfLastPlace(AlphaChainGameState state, Guid playerId) =>
+            state.Execute(() => state.GamePlayers[playerId].Score = 100);
+
         // ── Clock delta magnification ───────────────────────────────────────
 
         [TestMethod]
@@ -93,6 +98,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             GiveModifier(state, submitter, "anchor");
             GiveModifier(state, owner, "magnifying-glass");              // owner bay index 0
             GiveModifier(state, owner, TestModifierCards.TaxCollectorId); // index 1 — magnified ×1.5
+            ParkClearOfLastPlace(state, submitter); // so "cat" is era-taxed → the siphon fires
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 

@@ -77,6 +77,29 @@
     position: relative;
 }
 
+/* Last-place exemption: the era banned letter still shows so the player knows what it is, but it is
+   dimmed and overlaid with an X — they sit in last place, so it can't tax them (until someone else
+   drops to last). */
+.ac-cmd-banned .ac-cmd-exempt {
+    opacity: 0.5;
+    color: var(--ac-muted, #8a94a6);
+    text-shadow: none;
+}
+
+.ac-cmd-banned .ac-cmd-exempt::after {
+    content: "✕";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25em;
+    font-weight: 900;
+    color: var(--ac-go, #36d399);
+    text-shadow: 0 0 10px color-mix(in srgb, var(--ac-go, #36d399) 60%, transparent);
+    pointer-events: none;
+}
+
 /* Banned + Censor letters sit side by side. */
 .ac-cmd-letters {
     display: flex;

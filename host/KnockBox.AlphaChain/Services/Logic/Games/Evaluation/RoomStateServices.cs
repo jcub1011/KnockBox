@@ -24,15 +24,25 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
         void GrantFresh(AlphaChainPlayerState player);
     }
 
-    /// <summary>The Prism's once-per-turn refill gate.</summary>
-    public interface IPrismTurnGuard
+    /// <summary>The Prism's once-per-era refill gate.</summary>
+    public interface IPrismGuard
     {
-        /// <summary>Consumes the owner's per-turn refill: true exactly once per turn (then false until
-        /// the next turn arms).</summary>
+        /// <summary>Consumes the owner's per-era refill: true exactly once per era (then false until
+        /// the next era arms).</summary>
         bool TryConsume(AlphaChainPlayerState player);
 
-        /// <summary>Whether the owner has already consumed their refill this turn (non-consuming read).</summary>
+        /// <summary>Whether the owner has already consumed their refill this era (non-consuming read).</summary>
         bool HasConsumed(AlphaChainPlayerState player);
+    }
+
+    /// <summary>The Wildcard's once-per-era Succession-bypass gate.</summary>
+    public interface IWildcardGuard
+    {
+        /// <summary>Whether the owner has already spent their Succession bypass this era (non-consuming read).</summary>
+        bool HasConsumed(AlphaChainPlayerState player);
+
+        /// <summary>Marks the owner's Succession bypass as spent for this era.</summary>
+        void Consume(AlphaChainPlayerState player);
     }
 
     /// <summary>Era-rolled personal banned letters (Roulette Wheel, Toll Booth), keyed per card.</summary>
@@ -102,15 +112,26 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
         public void Reset() => _multiplier.Clear();
     }
 
-    internal sealed class PrismTurnGuard : IPrismTurnGuard, IRoomStateService
+    internal sealed class PrismEraGuard : IPrismGuard, IRoomStateService
     {
-        private readonly HashSet<Guid> _usedThisTurn = new();
+        private readonly HashSet<Guid> _usedThisEra = new();
 
-        public bool TryConsume(AlphaChainPlayerState player) => _usedThisTurn.Add(player.UserId);
-        public bool HasConsumed(AlphaChainPlayerState player) => _usedThisTurn.Contains(player.UserId);
+        public bool TryConsume(AlphaChainPlayerState player) => _usedThisEra.Add(player.UserId);
+        public bool HasConsumed(AlphaChainPlayerState player) => _usedThisEra.Contains(player.UserId);
 
-        public void OnTurnStarted(AlphaChainPlayerState player) => _usedThisTurn.Remove(player.UserId);
-        public void Reset() => _usedThisTurn.Clear();
+        public void OnEraStarted(AlphaChainPlayerState player) => _usedThisEra.Remove(player.UserId);
+        public void Reset() => _usedThisEra.Clear();
+    }
+
+    internal sealed class WildcardEraGuard : IWildcardGuard, IRoomStateService
+    {
+        private readonly HashSet<Guid> _usedThisEra = new();
+
+        public bool HasConsumed(AlphaChainPlayerState player) => _usedThisEra.Contains(player.UserId);
+        public void Consume(AlphaChainPlayerState player) => _usedThisEra.Add(player.UserId);
+
+        public void OnEraStarted(AlphaChainPlayerState player) => _usedThisEra.Remove(player.UserId);
+        public void Reset() => _usedThisEra.Clear();
     }
 
     internal sealed class CardBanService : ICardBanService, IRoomStateService

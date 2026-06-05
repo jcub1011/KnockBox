@@ -63,7 +63,7 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         // ── Card state ──────────────────────────────────────────────────────────
         //
         // Per-player card state (the Titanium Mirror shield multiplier, the Hyper-Drive latch, the
-        // Prism's once-per-turn guard, the Roulette Wheel / Toll Booth era-rolled bans, the Flak
+        // Prism's once-per-era guard, the Roulette Wheel / Toll Booth era-rolled bans, the Flak
         // Cannon time-shave queue, the Bait & Switch hijack ban, the Scattershot double-letter fact)
         // does NOT live here. Each card owns its state in a room-scoped, player-keyed service it
         // contributes (see IContributesRoomServices / the services in RoomStateServices.cs), so adding

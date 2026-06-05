@@ -63,6 +63,12 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         private static void GiveModifier(AlphaChainGameState state, Guid playerId, string cardId) =>
             state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
 
+        /// <summary>Score the player clear of last place so the era ban actually taxes them (the era ban
+        /// never taxes the last-place player, which on a fresh 0–0 field is the tie-broken turn-0 seat).</summary>
+        private const int NotLastPlaceScore = 100;
+        private static void ParkClearOfLastPlace(AlphaChainGameState state, Guid playerId) =>
+            state.Execute(() => state.GamePlayers[playerId].Score = NotLastPlaceScore);
+
         // ── Slow Burn — length floor routed through the Zero-Point Tax ──────
 
         [TestMethod]
@@ -118,10 +124,11 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             GiveModifier(state, submitter, "tax-write-off");
             GiveModifier(state, submitter, "anchor");
             GiveModifier(state, owner, TestModifierCards.TaxCollectorId);
+            ParkClearOfLastPlace(state, submitter);
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
-            Assert.AreEqual(11, state.GamePlayers[submitter].Score, "First letter scored clean (1 + 10).");
+            Assert.AreEqual(NotLastPlaceScore + 11, state.GamePlayers[submitter].Score, "First letter scored clean (1 + 10) on top of the baseline.");
             // The original word stays taxed and siphonable: would-be 13 → opponent takes round(13 × 0.5) = 7.
             Assert.AreEqual(7, state.GamePlayers[owner].Score, "Original taxed word is still siphonable.");
         }
@@ -142,10 +149,11 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             GiveModifier(state, submitter, "tax-write-off");
             GiveModifier(state, submitter, "anchor");
             GiveModifier(state, owner, TestModifierCards.TaxCollectorId);
+            ParkClearOfLastPlace(state, submitter);
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
-            Assert.AreEqual(11, state.GamePlayers[submitter].Score, "IRS grants 0, write-off salvages 11 on top.");
+            Assert.AreEqual(NotLastPlaceScore + 11, state.GamePlayers[submitter].Score, "IRS grants 0, write-off salvages 11 on top of the baseline.");
             Assert.AreEqual(0, state.GamePlayers[owner].Score, "IRS suppresses the Tax Collector bounty.");
         }
 

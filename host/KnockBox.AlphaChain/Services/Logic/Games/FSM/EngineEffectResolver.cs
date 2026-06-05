@@ -31,6 +31,25 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
         }
 
         /// <summary>
+        /// The active player currently in last place (lowest score; ties broken by earliest turn-order
+        /// index — the same deterministic ordering as the Sniper Ban picker), or null when no player is
+        /// active. Recomputed on demand so the era-ban exemption always tracks <i>current</i> last place.
+        /// </summary>
+        public static Guid? LastPlaceUserId(AlphaChainGameState state)
+        {
+            AlphaChainPlayerState? last = null;
+            foreach (var p in state.GamePlayers.Values)
+            {
+                if (p.IsEliminated || p.HasLeft) continue;
+                if (last is null
+                    || p.Score < last.Score
+                    || (p.Score == last.Score && TurnIndex(state, p.UserId) < TurnIndex(state, last.UserId)))
+                    last = p;
+            }
+            return last?.UserId;
+        }
+
+        /// <summary>
         /// The active player currently in first place (highest score; ties broken by earliest turn
         /// order), or null when no player is active. Snapshotted into
         /// <see cref="AlphaChainGameState.RoundLeaderUserId"/> at each round start for the Bounty Hunter.

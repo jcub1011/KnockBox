@@ -34,7 +34,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
 
             // Card-contributed state services exist room-wide (the catalogue union).
             Assert.IsNotNull(services.Get<IShieldService>());
-            Assert.IsNotNull(services.Get<IPrismTurnGuard>());
+            Assert.IsNotNull(services.Get<IPrismGuard>());
             Assert.IsNotNull(services.Get<ICardBanService>());
             Assert.IsNotNull(services.Get<ITimePenaltyService>());
             Assert.IsNotNull(services.Get<IHijackBanService>());
@@ -91,20 +91,23 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
             Assert.AreEqual(1.0, shield.GetMultiplier(a), 1e-9, "GrantFresh resets a replacement mirror to 1.0.");
         }
 
-        // ── Prism turn guard ────────────────────────────────────────────────────
+        // ── Prism era guard ─────────────────────────────────────────────────────
 
         [TestMethod]
-        public void PrismGuard_ConsumesOncePerTurn_AndReArmsAtTurnStart()
+        public void PrismGuard_ConsumesOncePerEra_AndReArmsAtEraStart()
         {
-            var guard = NewContainer().Get<IPrismTurnGuard>()!;
+            var guard = NewContainer().Get<IPrismGuard>()!;
             var p = Player("p");
 
-            Assert.IsTrue(guard.TryConsume(p), "First consume this turn succeeds.");
-            Assert.IsFalse(guard.TryConsume(p), "Second consume this turn is denied.");
+            Assert.IsTrue(guard.TryConsume(p), "First consume this era succeeds.");
+            Assert.IsFalse(guard.TryConsume(p), "Second consume this era is denied.");
             Assert.IsTrue(guard.HasConsumed(p));
 
             ((IRoomStateService)guard).OnTurnStarted(p);
-            Assert.IsFalse(guard.HasConsumed(p), "A fresh turn re-arms the guard.");
+            Assert.IsTrue(guard.HasConsumed(p), "A fresh turn does NOT re-arm the once-per-era guard.");
+
+            ((IRoomStateService)guard).OnEraStarted(p);
+            Assert.IsFalse(guard.HasConsumed(p), "A fresh era re-arms the guard.");
             Assert.IsTrue(guard.TryConsume(p), "And consume succeeds again.");
         }
 

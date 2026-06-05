@@ -88,7 +88,28 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             await engine.SubmitWordAsync(submitter, "cat", state);
 
             Assert.AreEqual(3, state.GamePlayers[submitter].Score, "Flak Cannon grants 0 points → just the length 3.");
-            Assert.AreEqual(2, RoomStateProbe.QueuedTimePenalty(state, ahead), "Higher-scored player is shaved 2s.");
+            Assert.AreEqual(2, RoomStateProbe.QueuedTimePenalty(state, ahead),
+                "Higher-scored player is shaved 10% of their 20s clock = 2s.");
+        }
+
+        [TestMethod]
+        public async Task FlakCannon_ShavesAPercentageOfTheVictimsClock()
+        {
+            // The shave is now 10% of the victim's armed clock, so a longer clock loses more: at a 40s
+            // shot clock the shave is round(40 × 0.10) = 4s, not the legacy flat 2s.
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 3, banned: 'z');
+            using var _ = state;
+            state.UpdateSettings(s => s with { ShotClockSeconds = 40 });
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
+            var ahead = state.TurnManager.TurnOrder[2];
+
+            GiveModifier(state, submitter, "flak-cannon");
+            SetScore(state, ahead, 100);
+
+            await engine.SubmitWordAsync(submitter, "cat", state);
+
+            Assert.AreEqual(4, RoomStateProbe.QueuedTimePenalty(state, ahead),
+                "10% of the 40s clock = 4s (the shave scales with the victim's clock length).");
         }
 
         [TestMethod]
@@ -258,6 +279,115 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // Tie at the top → earliest turn order wins.
             SetScore(state, p0, 7);
             Assert.AreEqual(p0, EngineEffectResolver.LeaderUserId(state));
+        }
+
+        [TestMethod]
+        public async Task LastPlaceUserId_IsLowestScorer_TiesByTurnOrder()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 3, banned: 'z');
+            using var _ = state;
+            var p0 = state.TurnManager.TurnOrder[0];
+            var p1 = state.TurnManager.TurnOrder[1];
+            var p2 = state.TurnManager.TurnOrder[2];
+            SetScore(state, p0, 5);
+            SetScore(state, p1, 2);
+            SetScore(state, p2, 2);
+
+            // Lowest score is last; the 2–2 tie breaks to the earlier turn-order index.
+            Assert.AreEqual(p1, EngineEffectResolver.LastPlaceUserId(state));
+
+            SetScore(state, p1, 9);
+            Assert.AreEqual(p2, EngineEffectResolver.LastPlaceUserId(state), "p2 is now alone at the bottom.");
+        }
+
+        // ── Era banned letter exempts the current last-place player ──────────
+
+        [TestMethod]
+        public async Task LastPlaceSubmitter_IsExemptFromEraBan()
+        {
+            // Submitter is in last place (0 vs the rival's 100), so the banned 'a' does NOT tax their
+            // word — it scores its normal length 3.
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
+            using var _ = state;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
+            var rival = state.TurnManager.TurnOrder[1];
+            SetScore(state, rival, 100);
+
+            var outcome = await engine.SubmitWordAsync(submitter, "cat", state);
+
+            Assert.IsTrue(outcome.TryGetSuccess(out var result));
+            Assert.IsInstanceOfType<SubmitWordResult.Accepted>(result, "Last place is exempt → not taxed.");
+            Assert.AreEqual(3, state.GamePlayers[submitter].Score, "Untaxed length-3 word.");
+        }
+
+        [TestMethod]
+        public async Task NonLastSubmitter_IsTaxedByEraBan()
+        {
+            // Submitter is NOT last (100 vs the rival's 0), so the banned 'a' taxes the word to 0.
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
+            using var _ = state;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
+            SetScore(state, submitter, 100);
+
+            var outcome = await engine.SubmitWordAsync(submitter, "cat", state);
+
+            Assert.IsTrue(outcome.TryGetSuccess(out var result));
+            Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(result, "Not last → the banned letter taxes them.");
+            Assert.AreEqual(100, state.GamePlayers[submitter].Score, "Taxed word adds 0 → unchanged.");
+        }
+
+        [TestMethod]
+        public async Task EraBanExemption_FollowsCurrentLastPlace()
+        {
+            // chain: cat →(t) tic →(c) car ; banned 'a' throughout.
+            var (engine, state) = await StartGameAsync(
+                new StubWordListService("cat", "tic", "car"), playerCount: 2, banned: 'a');
+            using var _ = state;
+            var a = state.TurnManager.CurrentPlayer!.Value; // turn 0
+            var b = state.TurnManager.TurnOrder[1];
+
+            // Round 1: A is in last place → the banned 'a' does NOT tax them.
+            SetScore(state, a, 0);
+            SetScore(state, b, 5);
+            var r1 = await engine.SubmitWordAsync(a, "cat", state);
+            Assert.IsTrue(r1.TryGetSuccess(out var o1));
+            Assert.IsInstanceOfType<SubmitWordResult.Accepted>(o1, "Last place A is exempt → 'cat' scores normally.");
+            Assert.AreEqual(3, state.GamePlayers[a].Score);
+
+            // A climbs clear of last; B drops to last. The exemption must move to B.
+            SetScore(state, a, 100);
+            SetScore(state, b, 0);
+
+            // B chains a banned-letter-free word to hand the turn back to A.
+            await engine.SubmitWordAsync(b, "tic", state);
+            Assert.AreEqual(a, state.TurnManager.CurrentPlayer, "Back to A for round 2.");
+
+            // Round 2: A is no longer last → the same banned 'a' now taxes them.
+            var r2 = await engine.SubmitWordAsync(a, "car", state);
+            Assert.IsTrue(r2.TryGetSuccess(out var o2));
+            Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(o2, "A left last place → 'a' now taxes A.");
+            Assert.AreEqual(100, state.GamePlayers[a].Score, "Taxed word adds 0.");
+        }
+
+        [TestMethod]
+        public async Task LastPlace_StillTaxedByPersonalCardBan()
+        {
+            // The exemption covers only the era ban. A is last (era ban 'z' wouldn't tax 'cat' anyway),
+            // but their own Roulette Wheel card-ban 't' is a personal ban that still taxes the word.
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
+            using var _ = state;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
+            var rival = state.TurnManager.TurnOrder[1];
+            SetScore(state, rival, 100); // submitter is last → exempt from the era ban only
+
+            GiveModifier(state, submitter, "roulette-wheel");
+            state.Execute(() => RoomStateProbe.SetCardBan(state, submitter, ModifierId.RouletteWheel, 't'));
+
+            var outcome = await engine.SubmitWordAsync(submitter, "cat", state);
+
+            Assert.IsTrue(outcome.TryGetSuccess(out var result));
+            Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(result, "Personal card-bans still tax the last-place player.");
+            Assert.AreEqual(0, state.GamePlayers[submitter].Score, "Taxed despite the era-ban exemption.");
         }
     }
 }

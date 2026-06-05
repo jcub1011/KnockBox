@@ -15,6 +15,7 @@
 
 ### 2.2 The "Zero-Point Tax" (Banned Letters)
 *   If a player submits a word containing a **Banned Letter**, the word is accepted to keep the chain alive, but the total score for that turn is **0**. 
+*   **Last-place exemption:** the era **Banned Letter** never taxes whoever is currently in **last place** (they picked it — see §"The Sniper Ban"). This tracks the live standings: the moment a different player drops to last, the exemption moves to them and the previous last-place player is taxed by it again. Personal banned letters (the Roulette Wheel / Toll Booth card-bans and a Bait & Switch hijack) still tax everyone, last place included.
 *   This acts as a tactical "pass" to reset the clock and shift a difficult starting letter to the next opponent.
 *   If a player plays a word with a banned letter as the last letter, then the next player can play any word.
 *   **Tax Collector payout:** A taxed word is not merely lost points — any opponent holding a **Tax Collector** modifier (§3.5) collects **half** of the score the word would otherwise have made. A banned-letter play can therefore actively feed your rivals.
@@ -120,9 +121,9 @@ Lifesavers that occupy a scoring slot but pair with the high-risk cards above.
 *   **The Heat Sink** — **FX**. +30% shot clock (neutralises Redline / Vault — but not the Anchor
     Chain's unmodifiable clock).
 *   **The Prism** — **FX**. If your word is a typo or fails validation, your shot clock resets to full
-    (once per turn) instead of ending the turn. The Blindfold's essential pairing.
-*   **The Wildcard** — **FX**. Your words may ignore the Succession rule (need not begin with the
-    previous word's last letter).
+    (once per era) instead of ending the turn. The Blindfold's essential pairing.
+*   **The Wildcard** — **FX**. One word per era may ignore the Succession rule (need not begin with the
+    previous word's last letter); the charge re-arms each era.
 *   **The Catalyst** — **FX**. For every card placed **after** it in the bay, the letters Y, W and H
     count as a **vowel** in addition to their normal consonant role (i.e. both) when evaluating that
     card's trigger.
@@ -151,7 +152,7 @@ The game is divided into 4-round "Eras." At the end of every 4th round, the game
 1.  **The Deal:** Every player receives fresh Modifier cards (§3) appended to their Engine Bay.
 2.  **Expansion:** Every player gains one additional **Modifier Slot**.
 3.  **Optimization (Fog of War):** Players rearrange their current and new modifiers. Opponents' cards are hidden during this step.
-4.  **The Sniper Ban:** The player in **last place** selects any letter of the alphabet to be the **Banned Letter** for the next 4 rounds.
+4.  **The Sniper Ban:** The player in **last place** selects any letter of the alphabet to be the **Banned Letter** for the next 4 rounds. Because they chose it, the banned letter never taxes the current last-place player (see §2.2) — and that exemption follows whoever is in last place at the moment of each submission.
 
 ---
 

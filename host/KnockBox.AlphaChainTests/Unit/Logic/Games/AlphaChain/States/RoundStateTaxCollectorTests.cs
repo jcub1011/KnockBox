@@ -69,6 +69,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         private static void GiveTaxCollector(AlphaChainGameState state, Guid playerId) =>
             GiveModifier(state, playerId, TestModifierCards.TaxCollectorId);
 
+        /// <summary>Score the player clear of last place so the era ban actually taxes them. The era ban
+        /// never taxes the last-place player, and a fresh 0–0 field makes turn-order-0 the tie-broken
+        /// last place — so a taxed-submitter test parks them above the field first. A taxed word still
+        /// scores 0, so the player stays at this baseline.</summary>
+        private const int NotLastPlaceScore = 100;
+        private static void ParkClearOfLastPlace(AlphaChainGameState state, Guid playerId) =>
+            state.Execute(() => state.GamePlayers[playerId].Score = NotLastPlaceScore);
+
         [TestMethod]
         public async Task OpponentTaxedWord_PaysHalfWouldBeScore_ToTaxCollectorOwner_SubmitterGetsZero()
         {
@@ -81,12 +89,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             GiveModifier(state, submitter, "anchor");
             GiveTaxCollector(state, owner);
+            ParkClearOfLastPlace(state, submitter);
 
             var outcome = await engine.SubmitWordAsync(submitter, "cat", state);
             Assert.IsTrue(outcome.TryGetSuccess(out var result));
             Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(result);
 
-            Assert.AreEqual(0, state.GamePlayers[submitter].Score, "Taxed submitter must score 0.");
+            Assert.AreEqual(NotLastPlaceScore, state.GamePlayers[submitter].Score, "Taxed word scores 0 → submitter unchanged.");
             Assert.AreEqual(7, state.GamePlayers[owner].Score, "Owner collects half the would-be 13.");
 
             // The play feed records the bounty that was paid.
@@ -118,12 +127,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             GiveModifier(state, submitter, "anchor");
             GiveTaxCollector(state, submitter);
+            ParkClearOfLastPlace(state, submitter);
 
             var outcome = await engine.SubmitWordAsync(submitter, "cat", state);
             Assert.IsTrue(outcome.TryGetSuccess(out var result));
             Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(result);
 
-            Assert.AreEqual(0, state.GamePlayers[submitter].Score);
+            Assert.AreEqual(NotLastPlaceScore, state.GamePlayers[submitter].Score, "Taxed word scores 0 → submitter unchanged (no self-collection).");
             Assert.AreEqual(0, state.SubmissionHistory[^1].TaxBounty);
 
             // No one collected, so the replay reports no steal.
@@ -163,6 +173,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             GiveModifier(state, submitter, "anchor"); // would-be 13
             GiveTaxCollector(state, owner1);
             GiveTaxCollector(state, owner2);
+            ParkClearOfLastPlace(state, submitter);
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 

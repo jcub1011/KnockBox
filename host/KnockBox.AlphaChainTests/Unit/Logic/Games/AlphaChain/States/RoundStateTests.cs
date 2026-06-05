@@ -72,6 +72,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             return outcome;
         }
 
+        /// <summary>Score (clear of last place) so the era ban actually taxes this player. The era ban
+        /// no longer taxes whoever is in last place, and on a fresh 0–0 field the tie-broken last-place
+        /// pick is turn-order-0 — so a taxed-submitter test must first park them above the field. The
+        /// taxed word still scores 0, so the player stays at this baseline.</summary>
+        private const int NotLastPlaceScore = 100;
+        private static void ParkClearOfLastPlace(AlphaChainGameState state, Guid playerId) =>
+            state.Execute(() => state.GamePlayers[playerId].Score = NotLastPlaceScore);
+
         // ── Rejections ────────────────────────────────────────────────────────
 
         [TestMethod]
@@ -168,11 +176,12 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'a');
             using var _ = state;
             var current = state.TurnManager.CurrentPlayer!.Value;
+            ParkClearOfLastPlace(state, current);
 
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
             Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(outcome);
-            Assert.AreEqual(0, state.GamePlayers[current].Score);
+            Assert.AreEqual(NotLastPlaceScore, state.GamePlayers[current].Score, "Taxed word adds 0 → score unchanged.");
             // Banned 'a' is not the last letter, so the chain continues on 't'.
             Assert.AreEqual('t', state.RequiredStartLetter);
         }
@@ -183,6 +192,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 't');
             using var _ = state;
             var current = state.TurnManager.CurrentPlayer!.Value;
+            ParkClearOfLastPlace(state, current);
 
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
@@ -282,12 +292,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 't');
             using var _ = state;
             var current = state.TurnManager.CurrentPlayer!.Value;
+            ParkClearOfLastPlace(state, current);
 
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
             // 't' is banned and present → Zero-Point Tax (score 0)…
             Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(outcome);
-            Assert.AreEqual(0, state.GamePlayers[current].Score);
+            Assert.AreEqual(NotLastPlaceScore, state.GamePlayers[current].Score, "Taxed word adds 0 → score unchanged.");
             // …but as the LAST letter it still clears the chain for the next player.
             Assert.IsNull(state.RequiredStartLetter);
         }
@@ -300,6 +311,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'a');
             using var _ = state;
             var current = state.TurnManager.CurrentPlayer!.Value;
+            ParkClearOfLastPlace(state, current);
 
             // No prior play → RequiredStartLetter is null (free choice).
             Assert.IsNull(state.RequiredStartLetter);
@@ -307,7 +319,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
             Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(outcome);
-            Assert.AreEqual(0, state.GamePlayers[current].Score);
+            Assert.AreEqual(NotLastPlaceScore, state.GamePlayers[current].Score, "Taxed word adds 0 → score unchanged.");
             // 'a' is not the last letter → the chain continues on 't'.
             Assert.AreEqual('t', state.RequiredStartLetter);
         }

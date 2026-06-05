@@ -352,13 +352,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             }
         }
 
-        /// <summary>Lowest-score active player; ties broken by earliest turn-order index. Null if none active.</summary>
+        /// <summary>Lowest-score active player; ties broken by earliest turn-order index. Null if none
+        /// active. Shares the canonical last-place ordering with the era-ban exemption.</summary>
         private static Guid? ResolveSniperBanPicker(AlphaChainGameState state)
-            => ActivePlayers(state)
-                .OrderBy(p => p.Score)
-                .ThenBy(p => TurnIndex(state, p.UserId))
-                .Select(p => (Guid?)p.UserId)
-                .FirstOrDefault();
+            => EngineEffectResolver.LastPlaceUserId(state);
 
         // ── Completion ───────────────────────────────────────────────────────
 
@@ -440,11 +437,5 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         private static bool AllSubmitted(AlphaChainGameState state)
             => state.OptimizationSubmissions.Count > 0
                && state.OptimizationSubmissions.Values.All(s => s.Submitted);
-
-        private static int TurnIndex(AlphaChainGameState state, Guid userId)
-        {
-            int idx = state.TurnManager.TurnOrder.IndexOf(userId);
-            return idx < 0 ? int.MaxValue : idx;
-        }
     }
 }

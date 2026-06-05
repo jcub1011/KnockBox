@@ -52,17 +52,27 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         }
     }
 
-    /// <summary>Lets the owner ignore the Succession (chain) rule.</summary>
-    public sealed class WildcardCard : MultiplicativeCardBase, ISuccessionExemption
+    /// <summary>Lets the owner ignore the Succession (chain) rule — once per era. The charge re-arms at
+    /// era start and is spent only when a chain-breaking word is actually accepted (see RoundState).</summary>
+    public sealed class WildcardCard : MultiplicativeCardBase, ISuccessionExemption, IContributesRoomServices
     {
         public override ModifierId GetId() => ModifierId.Wildcard;
         public override string GetName() => "The Wildcard";
         public override string GetDescription(EngineEvaluationContext context)
-            => "Grants 0 points. Your words ignore the Succession rule — they need not begin with the last letter of the previous word.";
+            => "Grants 0 points. Once per era, one of your words may ignore the Succession rule — it need not begin with the last letter of the previous word.";
         protected override string? MagnitudeLabel => "FX";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 
-        public bool IgnoresSuccession(EngineEvaluationContext context) => true;
+        // The exemption is available only while the owner hasn't spent it this era; the FSM consumes it
+        // (via IWildcardGuard.Consume) only when an accepted word actually relied on the bypass.
+        public bool IgnoresSuccession(EngineEvaluationContext context)
+        {
+            var owner = context.GetPlayer(context.PlayerIndex);
+            return owner is not null && context.Service<IWildcardGuard>()?.HasConsumed(owner) != true;
+        }
+
+        public IEnumerable<RoomServiceDescriptor> GetRoomServices()
+            => [new(typeof(IWildcardGuard), static _ => new WildcardEraGuard())];
     }
 
     /// <summary>
@@ -86,7 +96,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
     /// <summary>
     /// The Prism: inert in the pipeline, but on a failed/typo submission it refills the owner's shot
-    /// clock to full (once per turn) instead of letting it tick down — the essential pairing with The
+    /// clock to full (once per era) instead of letting it tick down — the essential pairing with The
     /// Blindfold.
     /// </summary>
     public sealed class PrismCard : MultiplicativeCardBase, IContributesRoomServices
@@ -94,22 +104,22 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public override ModifierId GetId() => ModifierId.Prism;
         public override string GetName() => "The Prism";
         public override string GetDescription(EngineEvaluationContext context)
-            => "Grants 0 points. If your word is a typo or fails validation, your shot clock resets to full — once per turn — instead of ticking away.";
+            => "Grants 0 points. If your word is a typo or fails validation, your shot clock resets to full — once per era — instead of ticking away.";
         protected override string? MagnitudeLabel => "FX";
         protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
 
         public override EngineEvaluationContext OnValidationFailed(EngineEvaluationContext context, IModifierCard self)
         {
-            // TryConsume returns true at most once per turn (and arms the once-per-turn guard); the
-            // guard re-arms on the owner's next turn-start via IPrismTurnGuard.OnTurnStarted.
+            // TryConsume returns true at most once per era (and arms the once-per-era guard); the
+            // guard re-arms on the owner's next era-start via IPrismGuard.OnEraStarted.
             var owner = context.GetPlayer(context.PlayerIndex);
-            if (owner is not null && context.Service<IPrismTurnGuard>()?.TryConsume(owner) == true)
+            if (owner is not null && context.Service<IPrismGuard>()?.TryConsume(owner) == true)
                 context.Service<IShotClockService>()?.RefillToFull(owner);
             return context;
         }
 
         public IEnumerable<RoomServiceDescriptor> GetRoomServices()
-            => [new(typeof(IPrismTurnGuard), static _ => new PrismTurnGuard())];
+            => [new(typeof(IPrismGuard), static _ => new PrismEraGuard())];
     }
 
     /// <summary>

@@ -106,6 +106,40 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         }
 
         [TestMethod]
+        public async Task Wildcard_SuccessionBypassIsOncePerEra()
+        {
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat", "tea", "dog"), banned: 'z');
+            using var _ = state;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
+            var other = state.TurnManager.TurnOrder[1];
+            GiveModifier(state, submitter, "wildcard");
+
+            // A chain-breaking typo is rejected before the accept path — it must NOT spend the charge.
+            state.Execute(() => state.RequiredStartLetter = 'q');
+            var typo = await engine.SubmitWordAsync(submitter, "zzz", state); // not in dictionary
+            Assert.IsTrue(typo.TryGetSuccess(out var rt));
+            Assert.IsInstanceOfType<SubmitWordResult.RejectedNotInDictionary>(rt);
+            Assert.AreEqual(submitter, state.TurnManager.CurrentPlayer, "A rejected word does not advance the turn.");
+
+            // First real chain-breaking word this era — the Wildcard bypass is granted (and now spent).
+            var first = await engine.SubmitWordAsync(submitter, "cat", state);
+            Assert.IsTrue(first.TryGetSuccess(out var r1));
+            Assert.IsInstanceOfType<SubmitWordResult.Accepted>(r1, "First Wildcard bypass this era is granted.");
+
+            // The other player chains normally ("cat" → must start with 't'); the round wraps back to the
+            // submitter while still inside era 1, so the once-per-era charge has NOT re-armed.
+            await engine.SubmitWordAsync(other, "tea", state);
+            Assert.AreEqual(submitter, state.TurnManager.CurrentPlayer, "Round wrapped back to the submitter.");
+            Assert.AreEqual(1, state.CurrentEra, "Still era 1 — the Wildcard charge stays spent.");
+
+            // Second chain-breaking word the same era — the bypass is gone → the chain rule is enforced.
+            state.Execute(() => state.RequiredStartLetter = 'q');
+            var second = await engine.SubmitWordAsync(submitter, "dog", state);
+            Assert.IsTrue(second.TryGetSuccess(out var r2));
+            Assert.IsInstanceOfType<SubmitWordResult.RejectedChainBroken>(r2, "Only one Wildcard bypass per era.");
+        }
+
+        [TestMethod]
         public async Task WithoutWildcard_SuccessionRuleIsEnforced()
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
@@ -118,10 +152,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.IsInstanceOfType<SubmitWordResult.RejectedChainBroken>(result);
         }
 
-        // ── The Prism (clock refill on a failed submission, once per turn) ────
+        // ── The Prism (clock refill on a failed submission, once per era) ─────
 
         [TestMethod]
-        public async Task Prism_RefillsClockOnInvalidWord_OncePerTurn()
+        public async Task Prism_RefillsClockOnInvalidWord_OncePerEra()
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
@@ -136,9 +170,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.IsTrue(first.TryGetSuccess(out var r1));
             Assert.IsInstanceOfType<SubmitWordResult.RejectedNotInDictionary>(r1);
             Assert.AreEqual(t0.AddSeconds(20), state.PhaseEndTime, "The Prism refills the clock to a full 20s (the default).");
-            Assert.IsTrue(RoomStateProbe.PrismUsedThisTurn(state, submitter));
+            Assert.IsTrue(RoomStateProbe.PrismUsedThisEra(state, submitter));
 
-            // A second typo the SAME turn must not refill again (once per turn).
+            // A second typo the SAME turn must not refill again (once per era covers this).
             state.Execute(() => state.PhaseEndTime = t0.AddSeconds(2));
             var second = await engine.SubmitWordAsync(submitter, "qqq", state, t0.AddSeconds(1));
             Assert.IsTrue(second.TryGetSuccess(out var r2));

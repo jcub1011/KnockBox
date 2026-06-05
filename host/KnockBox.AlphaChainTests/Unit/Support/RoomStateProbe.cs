@@ -32,8 +32,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Support
                 shield.Decay(player, 1.0 - value);
         }
 
-        public static bool PrismUsedThisTurn(AlphaChainGameState state, Guid userId)
-            => Service<IPrismTurnGuard>(state).HasConsumed(Player(state, userId));
+        public static bool PrismUsedThisEra(AlphaChainGameState state, Guid userId)
+            => Service<IPrismGuard>(state).HasConsumed(Player(state, userId));
 
         public static int QueuedTimePenalty(AlphaChainGameState state, Guid userId)
             => Service<ITimePenaltyService>(state).Peek(Player(state, userId));

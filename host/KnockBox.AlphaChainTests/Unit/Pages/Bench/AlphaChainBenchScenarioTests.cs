@@ -38,12 +38,15 @@ namespace KnockBox.AlphaChain.Tests.Unit.Pages.Bench
             scenario.SetBannedLetter('a');                     // 'a' is inside "cat" → Zero-Point Tax
             scenario.SetBay(submitter, [ModifierId.TheAnchor]);// would-be score = length 3 + 10 = 13
             scenario.SetBay(owner, [ModifierId.TaxCollector]);
+            // The era ban never taxes the last-place player; park the submitter above the field so the
+            // taxed-word path runs. The taxed word still scores 0, so they stay at this baseline.
+            scenario.SetScore(submitter, 100);
 
             var outcome = await scenario.SubmitAsync("cat");
 
             Assert.IsTrue(outcome.TryGetSuccess(out var result));
             Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(result);
-            Assert.AreEqual(0, scenario.Player(submitter)!.Score, "Taxed submitter scores 0.");
+            Assert.AreEqual(100, scenario.Player(submitter)!.Score, "Taxed word adds 0 → submitter unchanged.");
             Assert.AreEqual(7, scenario.Player(owner)!.Score, "Owner collects half the would-be 13.");
 
             var replay = scenario.LatestReplay!;

@@ -139,13 +139,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     /// <summary>Flak Cannon — 0 points; shaves the next clock of every player scoring higher than the owner.</summary>
     public sealed class FlakCannonCard : AdditiveCardBase, IContributesRoomServices
     {
-        /// <summary>Seconds shaved off each higher-scoring opponent's next clock.</summary>
-        public const int ShaveSeconds = 2;
+        /// <summary>Fraction of each higher-scoring opponent's next armed clock shaved off (10% — equal
+        /// to the legacy flat 2 s at the 20 s default clock, but now scaling with their clock length).</summary>
+        public const double ShaveFraction = 0.10;
 
         public override ModifierId GetId() => ModifierId.FlakCannon;
         public override string GetName() => "Flak Cannon";
         public override string GetDescription(EngineEvaluationContext context)
-            => "Grants 0 points. Takes 2 seconds off the next shot clock of every player scoring higher than you.";
+            => "Grants 0 points. Takes 10% off the next shot clock of every player scoring higher than you.";
         protected override string? MagnitudeLabel => "FX";
 
         public override EngineEvaluationContext OnTurnEnded(EngineEvaluationContext context, IModifierCard self)
@@ -154,10 +155,16 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             var effects = context.Service<IEngineEffects>();
             if (owner is null || effects is null) return context;
 
-            int shave = (int)Math.Round(ShaveSeconds * GetMagnification(context), MidpointRounding.AwayFromZero);
+            double magnification = GetMagnification(context);
+            var clock = context.Service<IShotClockService>();
             foreach (var opp in effects.OrderedActivePlayers())
                 if (opp.UserId != owner.UserId && opp.Score > owner.Score)
+                {
+                    // Shave a percentage of the victim's own armed clock, so a longer clock loses more.
+                    int oppClock = clock?.ComputeArmedSeconds(opp) ?? (int)context.ShotClockDuration;
+                    int shave = Math.Max(1, (int)Math.Round(oppClock * ShaveFraction * magnification, MidpointRounding.AwayFromZero));
                     effects.TimeShave(self, owner, opp, shave);
+                }
 
             return context;
         }
