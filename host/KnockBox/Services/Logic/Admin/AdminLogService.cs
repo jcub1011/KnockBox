@@ -48,8 +48,16 @@ namespace KnockBox.Services.Logic.Admin
             }
         }
 
+        private static string SanitizeForLog(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            return value.Replace("\r", string.Empty).Replace("\n", string.Empty);
+        }
+
         public LogPage? ReadPage(string fileName, int pageIndex, int pageSize)
         {
+            var safeFileName = SanitizeForLog(fileName);
+
             if (pageIndex < 0) pageIndex = 0;
             if (pageSize <= 0) pageSize = 200;
             if (pageSize > 5000) pageSize = 5000;
@@ -104,13 +112,15 @@ namespace KnockBox.Services.Logic.Admin
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to read log file [{File}] page {Page}.", fileName, pageIndex);
+                _logger.LogError(ex, "Failed to read log file [{File}] page {Page}.", safeFileName, pageIndex);
                 return null;
             }
         }
 
         public LogTail? TailSince(string fileName, long fromOffset)
         {
+            var safeFileName = SanitizeForLog(fileName);
+
             if (fromOffset < 0) fromOffset = 0;
 
             var absolutePath = GetValidatedAbsolutePath(fileName);
@@ -143,7 +153,7 @@ namespace KnockBox.Services.Logic.Admin
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to tail log file [{File}] from offset {Offset}.", fileName, fromOffset);
+                _logger.LogError(ex, "Failed to tail log file [{File}] from offset {Offset}.", safeFileName, fromOffset);
                 return null;
             }
         }
