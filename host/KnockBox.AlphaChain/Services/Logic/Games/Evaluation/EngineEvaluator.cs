@@ -27,7 +27,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
             // the Tax Write-Off re-entry) still resolves Magnifying Glass effects from the bay.
             var ctx = context with
             {
-                ValueToAdd = context.Word.Length,
+                ScoreContext = new ScoreContext(context.Word.Length),
                 MultiplierScale = bay.MultiplierScale(context),
                 EffectMagnifier = context.EffectMagnifier ?? EffectMagnifier.ForBay(bay),
             };
@@ -40,26 +40,28 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
                 ctx = ctx with { ModifierCardIndex = i };
 
                 bool triggered = card.CheckIfTriggered(ctx);
-                var type = card.GetModifierType();
                 string valueText = "—";
 
                 if (triggered)
                 {
-                    double before = ctx.ValueToAdd;
+                    double before = ctx.ScoreContext.CurrentScore;
                     ctx = card.ExecuteModifier(ctx, card);
-                    double after = ctx.ValueToAdd;
+                    double delta = ctx.ScoreContext.CurrentScore - before;
 
-                    valueText = type == ModifierType.Additive
-                        ? "+" + FormatValue(after - before)
-                        : "×" + FormatValue(before == 0 ? 0 : after / before);
+                    // A triggered card that moves the score shows its signed delta; one that fired but
+                    // made no direct score change (an effect card — the Magnifying Glass, Flak Cannon, a
+                    // ×1 capability card) reads "FX" (the effect-chip convention), distinct from the "—"
+                    // of a card that never triggered.
+                    string magnitude = FormatValue(Math.Abs(delta));
+                    valueText = magnitude == "0" ? "FX" : (delta >= 0 ? "+" : "−") + magnitude;
                 }
 
                 steps.Add(new ScoreStep(
                     card.GetId(), card.GetName(),
-                    type, triggered, valueText, ModifierMath.ClampScore(ctx.ValueToAdd)));
+                    card.GetAccent(), triggered, valueText, ModifierMath.ClampScore(ctx.ScoreContext.CurrentScore)));
             }
 
-            int finalBeforeTax = ModifierMath.ClampScore(ctx.ValueToAdd);
+            int finalBeforeTax = ModifierMath.ClampScore(ctx.ScoreContext.CurrentScore);
             return new ScoreBreakdown(
                 context.Word, context.Word.Length, steps, finalBeforeTax, taxed, taxed ? 0 : finalBeforeTax);
         }

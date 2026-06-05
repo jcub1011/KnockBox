@@ -23,11 +23,11 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
 
         // Trivial test doubles.
         private static CommonModifier Additive(double value) => new(
-            ModifierId.Unknown, "Add", "", ModifierType.Additive,
+            ModifierId.Unknown, "Add", "", ScoreFold.Additive,
             static _ => true, (_, _) => value);
 
         private static CommonModifier Mult(double factor) => new(
-            ModifierId.Unknown, "Mul", "", ModifierType.Multiplier,
+            ModifierId.Unknown, "Mul", "", ScoreFold.Multiplicative,
             static _ => true, (_, _) => factor);
 
         // Builds an evaluation context. A player (index 0) is always present so shield/Hyper-Drive
@@ -104,7 +104,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         [TestMethod]
         public void ConditionalMiss_CardIgnored()
         {
-            var never = new CommonModifier(ModifierId.Unknown, "X", "", ModifierType.Multiplier,
+            var never = new CommonModifier(ModifierId.Unknown, "X", "", ScoreFold.Multiplicative,
                 static _ => false, static (_, _) => 100);
             Assert.AreEqual(3, _eval.Calculate(Ctx("cat", [never])));
         }
@@ -386,7 +386,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         // ── CalculateSteps (score-replay trace) ─────────────────────────────
 
         [TestMethod]
-        public void Steps_CaptureRunningTotalsAndOperatorText()
+        public void Steps_CaptureRunningTotalsAndScoreDelta()
         {
             var breakdown = _eval.CalculateSteps(Ctx("cat", [Additive(2), Additive(5), Mult(2)]), taxed: false);
 
@@ -394,8 +394,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
             Assert.AreEqual(3, breakdown.Steps.Count);
             Assert.AreEqual(5, breakdown.Steps[0].RunningScore);
             Assert.AreEqual(20, breakdown.Steps[2].RunningScore);
+            // ValueText is the score delta each card applied — additive +2, then ×2 of 10 adds +10.
             Assert.AreEqual("+2", breakdown.Steps[0].ValueText);
-            Assert.AreEqual("×2", breakdown.Steps[2].ValueText);
+            Assert.AreEqual("+10", breakdown.Steps[2].ValueText);
             Assert.AreEqual(20, breakdown.FinalBeforeTax);
             Assert.AreEqual(20, breakdown.FinalScore);
         }
@@ -412,10 +413,31 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         }
 
         [TestMethod]
-        public void Steps_MultiplicativeValueText_FormatsWithoutTrailingZeros()
+        public void Steps_FractionalValueText_FormatsWithoutTrailingZeros()
         {
+            // ×1.5 of the bare length 3 adds +1.5 — the delta formats without a trailing zero.
             var breakdown = _eval.CalculateSteps(Ctx("cat", [Mult(1.5)]), taxed: false);
-            Assert.AreEqual("×1.5", breakdown.Steps[0].ValueText);
+            Assert.AreEqual("+1.5", breakdown.Steps[0].ValueText);
+        }
+
+        [TestMethod]
+        public void Steps_TriggeredNoScoreChange_ShowsEffectMarker()
+        {
+            // A card that triggers but nets zero change (+0 additive, ×1 multiplicative) reads "FX" — it
+            // fired and did something other than score — not the "—" of a card that never triggered.
+            var breakdown = _eval.CalculateSteps(Ctx("cat", [Additive(0), Mult(1)]), taxed: false);
+            Assert.AreEqual("FX", breakdown.Steps[0].ValueText);
+            Assert.AreEqual("FX", breakdown.Steps[1].ValueText);
+        }
+
+        [TestMethod]
+        public void Steps_UntriggeredCard_ShowsDash()
+        {
+            var never = new CommonModifier(ModifierId.Unknown, "X", "", ScoreFold.Additive,
+                static _ => false, static (_, _) => 100);
+            var breakdown = _eval.CalculateSteps(Ctx("cat", [never]), taxed: false);
+            Assert.IsFalse(breakdown.Steps[0].Triggered);
+            Assert.AreEqual("—", breakdown.Steps[0].ValueText);
         }
 
         // ── Whole-catalogue smoke test ──────────────────────────────────────

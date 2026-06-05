@@ -78,10 +78,9 @@
 }
 
 .ac-replay-seed .ac-replay-run { color: var(--ac-cyan, #00e5ff); }
-.ac-replay-add .ac-replay-icon { color: var(--ac-additive, #14f195); }
-.ac-replay-add .ac-replay-op { color: var(--ac-additive, #14f195); }
-.ac-replay-mul .ac-replay-icon { color: var(--ac-multiplicative, #ffb020); }
-.ac-replay-mul .ac-replay-op { color: var(--ac-multiplicative, #ffb020); }
+/* Icon carries the card's family accent; the op (delta) is colored semantically inline
+   (green gain / red loss / violet FX) by ScoreStepColors. */
+.ac-replay-step .ac-replay-icon { color: var(--ac-step-accent, var(--ac-accent-neutral, #8aa0b3)); }
 .ac-replay-skip { opacity: 0.5; }
 
 .ac-replay-final {

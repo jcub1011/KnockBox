@@ -161,7 +161,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                     ? state.Settings.ShotClockSeconds
                     : state.ComputeArmedShotClockSeconds(player),
                 RemainingShotClockDuration = remaining,
-                Score = player?.Score ?? 0,
             }.WithBay(player?.EngineBay ?? []);
 
             // 4. Chain (succession) rule — a held Wildcard exempts the owner.

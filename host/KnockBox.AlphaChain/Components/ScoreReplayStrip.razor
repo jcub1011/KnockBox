@@ -1,5 +1,6 @@
 @using KnockBox.AlphaChain.Services.State.Games.Data
 @using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
+@using KnockBox.AlphaChain.Services.Logic.Scoring
 
 @* The score replay shown in one fixed spot below the word-submit box (so every player reads
    the result in the same place regardless of how many bays are on screen). Animates the word
@@ -21,12 +22,10 @@
         @for (int i = 0; i < Replay.Breakdown.Steps.Count; i++)
         {
             var step = Replay.Breakdown.Steps[i];
-            var kindClass = step.Triggered
-                ? (step.Kind == ModifierType.Additive ? "ac-replay-add" : "ac-replay-mul")
-                : "ac-replay-skip";
-            <span class="ac-replay-seq @kindClass" style="animation-delay: calc(var(--ac-step) * @(i + 1))">
+            var kindClass = step.Triggered ? "ac-replay-step" : "ac-replay-skip";
+            <span class="ac-replay-seq @kindClass" style="animation-delay: calc(var(--ac-step) * @(i + 1)); --ac-step-accent: @CardAccents.Color(step.Accent)">
                 <span class="ac-replay-icon"><CardIcon Card="@step.CardId" /></span>
-                <span class="ac-replay-op">@(step.Triggered ? step.ValueText : "—")</span>
+                <span class="ac-replay-op" style="color: @ScoreStepColors.Delta(step)">@(step.Triggered ? step.ValueText : "—")</span>
                 <span class="ac-replay-run">@step.RunningScore</span>
             </span>
         }

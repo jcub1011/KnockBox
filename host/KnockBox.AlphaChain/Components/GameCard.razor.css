@@ -1,22 +1,16 @@
 /* Two purpose-built card footprints, both fixed-dimension so cards always line up.
-   Category accent vars come from the gc-additive / gc-multiplicative classes below. */
+   The family accent (--gc-accent) is set inline by GameCard from the card's CardAccent;
+   a neutral fallback keeps the border visible if it is ever unset. */
 
 .gc-card {
     position: relative;
     box-sizing: border-box;
     color: var(--ac-ink, #eaf2ff);
     text-align: left;
+    --gc-accent: var(--ac-accent-neutral, #8aa0b3);
 }
 
 /* ── Category accents ────────────────────────────────────────────────── */
-
-.gc-additive {
-    --gc-accent: var(--ac-additive, #14f195);
-}
-
-.gc-multiplicative {
-    --gc-accent: var(--ac-multiplicative, #ffb020);
-}
 
 /* Reactions default to the special/violet accent; the role sub-tint overrides it. */
 .gc-reaction {
@@ -46,8 +40,8 @@
     padding: 0.45rem 0.55rem;
     overflow: hidden;
     isolation: isolate;
-    /* Thick green/orange border = additive/multiplicative at a glance; fill = the card's identity color,
-       in the same top-down lightness gradient the large faces use. */
+    /* Thick border in the card's family accent (letter/clock/economy/utility) for at-a-glance purpose;
+       fill = the card's identity color, in the same top-down lightness gradient the large faces use. */
     border: 3px solid var(--gc-accent);
     border-radius: 0.6rem;
     background:
@@ -125,7 +119,7 @@
     display: flex;
     flex-direction: column;
     padding: 0.8rem 0.75rem;
-    /* Thick green/orange border = additive/multiplicative at a glance; fill = the card's identity color. */
+    /* Thick border in the card's family accent (letter/clock/economy/utility); fill = identity color. */
     border: 3px solid var(--gc-accent);
     border-radius: 0.8rem;
     background:

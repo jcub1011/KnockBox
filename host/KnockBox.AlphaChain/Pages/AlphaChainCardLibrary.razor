@@ -76,7 +76,7 @@
                             var info = _cardsById[_bay[index]];
                             <div class="ac-bench-slot">
                                 <GameCard Name="@info.Name" Description="@info.Description" Card="@info.Id"
-                                          Kind="@info.Kind" Size="CardSize.Small" Chips="@info.Chips" />
+                                          Accent="@info.Accent" Size="CardSize.Small" Chips="@info.Chips" />
                                 <div class="ac-bench-slot-ops">
                                     <button type="button" title="Move left" disabled="@(index == 0)"
                                             @onclick="() => MoveCard(index, -1)">◀</button>
@@ -102,12 +102,10 @@
                         </span>
                         @foreach (var step in result.Steps)
                         {
-                            var kindClass = step.Triggered
-                                ? (step.Kind == ModifierType.Additive ? "ac-bd-add" : "ac-bd-mul")
-                                : "ac-bd-skip";
-                            <span class="ac-bd-step @kindClass">
+                            var kindClass = step.Triggered ? "ac-bd-triggered" : "ac-bd-skip";
+                            <span class="ac-bd-step @kindClass" style="--ac-step-accent: @CardAccents.Color(step.Accent)">
                                 <span class="ac-bd-icon"><CardIcon Card="@step.CardId" /></span>
-                                <span class="ac-bd-op">@(step.Triggered ? step.ValueText : "—")</span>
+                                <span class="ac-bd-op" style="color: @ScoreStepColors.Delta(step)">@(step.Triggered ? step.ValueText : "—")</span>
                                 <span class="ac-bd-run">@step.RunningScore</span>
                             </span>
                         }
@@ -140,14 +138,14 @@
                     {
                         <button type="button" class="ac-cardbtn" title="Click to flip"
                                 @onclick="() => ToggleFlip(card.Id)">
-                            <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Kind="@card.Kind"
+                            <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Accent="@card.Accent"
                                       Size="CardSize.Large" Chips="@card.Chips"
                                       Flipped="@_flipped.Contains(card.Id)" />
                         </button>
                     }
                     else
                     {
-                        <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Kind="@card.Kind"
+                        <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Accent="@card.Accent"
                                   Size="CardSize.Small" Chips="@card.Chips" />
                     }
                     <button type="button" class="ac-palette-add" @onclick="() => AddCard(card.Id)">＋ Add</button>
@@ -159,7 +157,7 @@
 
 @code {
     /// <summary>Display projection of a card: everything GameCard needs, resolved once at init.</summary>
-    private sealed record CardInfo(ModifierId Id, string Name, string Description, ModifierType Kind, ImmutableArray<CardChip> Chips);
+    private sealed record CardInfo(ModifierId Id, string Name, string Description, CardAccent Accent, ImmutableArray<CardChip> Chips);
 
     private List<CardInfo> Cards { get; set; } = [];
 
@@ -243,7 +241,7 @@
         Cards = ModifierCardFactory.AllDealableIds
             .Select(id => CardFactory.CreateCard(context, id))
             .Select(card => new CardInfo(
-                card.GetId(), card.GetName(), card.GetDescription(context), card.GetModifierType(),
+                card.GetId(), card.GetName(), card.GetDescription(context), card.GetAccent(),
                 card.GetChips(context)))
             .ToList();
 

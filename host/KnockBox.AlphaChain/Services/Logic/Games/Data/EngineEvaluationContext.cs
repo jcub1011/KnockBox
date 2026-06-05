@@ -57,11 +57,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         /// <summary>The remaining time in the shot clock when the engine began evaluation.</summary>
         public double RemainingShotClockDuration { get; init; }
 
-        /// <summary>The score of the player when the engine began evaluation.</summary>
-        public double Score { get; init; }
-
-        /// <summary>The running value to add to the score; folded through each card and read back when evaluation completes.</summary>
-        public double ValueToAdd { get; init; }
+        /// <summary>The running word score, seeded with the word length and folded through each card
+        /// (each card decides how it changes <see cref="Data.ScoreContext.CurrentScore"/>); read back
+        /// when evaluation completes.</summary>
+        public ScoreContext ScoreContext { get; init; }
 
         /// <summary>The index (into <see cref="Players"/>) of the current player.</summary>
         public int PlayerIndex { get; init; }

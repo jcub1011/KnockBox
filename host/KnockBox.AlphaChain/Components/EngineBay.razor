@@ -36,7 +36,7 @@
                             @ondragend="() => _dragIndex = null"
                             @onkeydown="e => OnKeyDown(e, index)">
                         <GameCard Name="@card.GetName()" Description="@card.GetDescription(default)" Card="@card.GetId()"
-                                  Kind="card.GetModifierType()"
+                                  Accent="card.GetAccent()"
                                   Size="CardSize.Small"
                                   Chips="@card.GetChips(BadgeContext ?? default)"
                                   Dragging="@(_dragIndex == index)" />

@@ -12,7 +12,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
     /// <param name="Id">The card's stable identity.</param>
     /// <param name="Name">Display name.</param>
     /// <param name="Description">Static rules text.</param>
-    /// <param name="ModifierType">Whether <see cref="MagnitudeProvider"/> is an addend or a factor.</param>
+    /// <param name="Fold">How the card folds its magnitude into the running score — typically
+    /// <see cref="ScoreFold.Additive"/> or <see cref="ScoreFold.Multiplicative"/>.</param>
     /// <param name="TriggerChecker">Whether the card contributes for the current word.</param>
     /// <param name="MagnitudeProvider">The addend (additive) or factor (multiplicative) when triggered.</param>
     /// <param name="MagnitudeLabel">A short, glanceable chip label (e.g. "+10", "×0.5–2"); null hides the chip.</param>
@@ -20,7 +21,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         ModifierId Id,
         string Name,
         string Description,
-        ModifierType ModifierType,
+        Func<EngineEvaluationContext, double, EngineEvaluationContext> Fold,
         Func<EngineEvaluationContext, bool> TriggerChecker,
         Func<EngineEvaluationContext, IModifierCard, double> MagnitudeProvider,
         string? MagnitudeLabel = null)
@@ -32,8 +33,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         public string GetDescription(EngineEvaluationContext context) => Description;
 
-        public ModifierType GetModifierType() => ModifierType;
-
         public ImmutableArray<CardChip> GetChips(EngineEvaluationContext context)
             => MagnitudeLabel is { } label ? [CardChips.Magnitude(label)] : [];
 
@@ -44,7 +43,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
             // Every CommonModifier is a real scoring card, so it always opts into magnification: a
             // Magnifying Glass on its immediate left scales its magnitude directly (+10 → +15, ×2 → ×3).
             double magnitude = MagnitudeProvider.Invoke(context, self) * (context.EffectMagnifier?.GetMagnification(self) ?? 1.0);
-            return ModifierMath.Apply(context, ModifierType, magnitude);
+            return Fold.Invoke(context, magnitude);
         }
     }
 }

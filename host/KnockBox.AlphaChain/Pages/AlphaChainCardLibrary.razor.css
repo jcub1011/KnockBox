@@ -284,12 +284,8 @@
     color: var(--ac-ink, #eaf2ff);
 }
 
-.ac-bd-add {
-    border-color: var(--ac-additive, #38e08b);
-}
-
-.ac-bd-mul {
-    border-color: var(--ac-multiplicative, #ff9f43);
+.ac-bd-triggered {
+    border-color: var(--ac-step-accent, var(--ac-accent-neutral, #8aa0b3));
 }
 
 .ac-bd-skip {

@@ -78,8 +78,8 @@ else
     /// <summary>The card whose glyph to show, resolved by <see cref="CardIcon"/>.</summary>
     [Parameter] public ModifierId Card { get; set; }
 
-    /// <summary>Modifier type (additive/multiplicative), driving the accent tint + border.</summary>
-    [Parameter] public ModifierType? Kind { get; set; }
+    /// <summary>The card's standardized family accent, driving the border + accent tint.</summary>
+    [Parameter] public CardAccent Accent { get; set; } = CardAccent.Neutral;
 
     /// <summary>The card's glanceable chips (type, magnitude, any live status), in display order.</summary>
     [Parameter] public ImmutableArray<CardChip> Chips { get; set; } = [];
@@ -102,9 +102,9 @@ else
     /// <summary>Plays the entrance pop + glow (a freshly-dealt card).</summary>
     [Parameter] public bool New { get; set; }
 
-    /// <summary>Full root class string (base + size + category + state modifiers).</summary>
+    /// <summary>Full root class string (base + size + state modifiers).</summary>
     private string RootClass =>
-        $"gc-card gc-{SizeClass} gc-{CategoryClass}{StateClasses}";
+        $"gc-card gc-{SizeClass}{StateClasses}";
 
     private string SizeClass => Size == CardSize.Large ? "large" : "small";
 
@@ -133,12 +133,13 @@ else
         }
     }
 
-    /// <summary>The card's identity color, exposed as the <c>--gc-card-color</c> variable that fills the
-    /// icon swatch, the magnitude chip, the faint icon watermark, and (faintly) the background. Picked by
-    /// hand (see <see cref="CardColor"/>) and spread across hue and lightness for separation. Color alone
-    /// can't fully separate ~32 categories under color-vision deficiency, so the big icon watermark and
-    /// the unique glyph carry shape as the dependable cue; additive-vs-multiplicative stays on the border.</summary>
-    private string CardColorStyle => $"--gc-card-color:{CardColor(Card)}";
+    /// <summary>The card's identity color (<c>--gc-card-color</c>: fills the icon swatch, magnitude chip,
+    /// faint watermark, and background) plus its standardized family accent (<c>--gc-accent</c>: the
+    /// border + accent tint). Identity color is picked by hand (see <see cref="CardColor"/>) and spread
+    /// across hue/lightness for separation; the family accent encodes the card's purpose. Color alone
+    /// can't fully separate ~32 cards under color-vision deficiency, so the big icon watermark and the
+    /// unique glyph carry shape as the dependable cue; the family accent stays on the border.</summary>
+    private string CardColorStyle => $"--gc-card-color:{CardColor(Card)};--gc-accent:{CardAccents.Color(Accent)}";
 
     /// <summary>Hand-tuned per-card palette — vivid, with deliberate lightness variation so confusable
     /// hues still differ in brightness. Unknown/unmapped falls back to a neutral slate.</summary>
@@ -185,10 +186,6 @@ else
         string.IsNullOrEmpty(Description)
             ? (string.IsNullOrEmpty(Name) ? null : Name)
             : $"{Name} — {Description}";
-
-    /// <summary>additive / multiplicative — selects the accent variable.</summary>
-    private string CategoryClass =>
-        Kind == ModifierType.Multiplier ? "multiplicative" : "additive";
 
     private string StateClasses =>
         (Flipped ? " gc-flipped" : "")

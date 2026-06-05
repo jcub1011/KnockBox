@@ -22,10 +22,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         private static IModifierCard Glass() => Card(ModifierId.MagnifyingGlass);
 
         private static CommonModifier Additive(double value) => new(
-            ModifierId.Unknown, "Add", "", ModifierType.Additive, static _ => true, (_, _) => value);
+            ModifierId.Unknown, "Add", "", ScoreFold.Additive, static _ => true, (_, _) => value);
 
         private static CommonModifier Mult(double factor) => new(
-            ModifierId.Unknown, "Mul", "", ModifierType.Multiplier, static _ => true, (_, _) => factor);
+            ModifierId.Unknown, "Mul", "", ScoreFold.Multiplicative, static _ => true, (_, _) => factor);
 
         private static EngineEvaluationContext Ctx(string word, IReadOnlyList<IModifierCard> bay)
             => new(word, Array.Empty<char>(), new[] { new AlphaChainPlayerState { UserId = Guid.NewGuid() } })
@@ -80,9 +80,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         [TestMethod]
         public void Glass_AppearsInTheScoreStepTrace_WithTheMagnifiedValue()
         {
-            // [Glass, ×2] → the ×2 step reads ×3 in the replay trace.
+            // [Glass, ×2] "cat": the magnified ×3 of the bare length 3 adds +6 in the replay trace.
             var breakdown = _eval.CalculateSteps(Ctx("cat", [Glass(), Mult(2)]), taxed: false);
-            Assert.AreEqual("×3", breakdown.Steps[1].ValueText);
+            Assert.AreEqual("+6", breakdown.Steps[1].ValueText);
             Assert.AreEqual(9, breakdown.FinalScore);
         }
     }

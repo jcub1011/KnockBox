@@ -53,7 +53,7 @@
                                     <GameCard Size="CardSize.Small"
                                               Card="step.CardId"
                                               Name="@step.Name"
-                                              Kind="step.Kind"
+                                              Accent="step.Accent"
                                               Chips="@StepChips(step)"
                                               Dim="!step.Triggered" />
                                 </div>
@@ -74,11 +74,11 @@
 @code {
     private enum SortOrder { HighestScore, OldestFirst, NewestFirst }
 
-    /// <summary>The replay chips for one scoring step: the per-card value it folded in (or "—" when it
-    /// didn't trigger), colored by add/multiply, and the running score after it.</summary>
+    /// <summary>The replay chips for one scoring step: the per-card delta it folded in (or "—" when it
+    /// didn't trigger), colored by its gain/loss/effect semantic, and the running score after it.</summary>
     private static ImmutableArray<CardChip> StepChips(ScoreStep step) =>
     [
-        new CardChip(step.Triggered ? step.ValueText : "—", CardChips.Accent),
+        new CardChip(step.Triggered ? step.ValueText : "—", ScoreStepColors.Delta(step)),
         new CardChip(step.RunningScore.ToString(), CardChips.Live),
     ];
 

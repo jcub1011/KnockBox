@@ -5,18 +5,6 @@ using KnockBox.AlphaChain.Services.State.Games.Data;
 
 namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 {
-    /// <summary>Whether a modifier adds to, or multiplies against, the running score. Informational
-    /// only — the actual fold lives in <see cref="IModifierCard.ExecuteModifier"/>; this drives the
-    /// UI operator glyph (+ vs ×) and tinting.</summary>
-    public enum ModifierType
-    {
-        /// <summary>A modifier that adds to a score.</summary>
-        Additive,
-
-        /// <summary>A modifier that multiplies against a score.</summary>
-        Multiplier,
-    }
-
     /// <summary>Strongly-typed identity for every modifier card, replacing the legacy string ids.
     /// The factory creates a card from one of these; the network/UI id surface is <c>ToString()</c>.</summary>
     public enum ModifierId
@@ -85,8 +73,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         /// vary its wording live; most cards ignore the context and return static text.</summary>
         string GetDescription(EngineEvaluationContext context);
 
-        /// <summary>Whether the card adds or multiplies (UI glyph/tinting only). A fixed per-card trait.</summary>
-        ModifierType GetModifierType();
+        /// <summary>The card's standardized accent, coloring its border so a player can recognize its
+        /// family at a glance. Defaults to the family mapped from <see cref="GetId"/>; a card may override.</summary>
+        CardAccent GetAccent() => CardAccents.For(GetId());
 
         /// <summary>
         /// The card's glanceable chips for the bay/library UI, in display order: a magnitude chip
@@ -102,7 +91,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
         /// <summary>
         /// Folds this card into the scoring pipeline, returning the context with an updated
-        /// <see cref="EngineEvaluationContext.ValueToAdd"/>. Called only when
+        /// <see cref="ScoreContext.CurrentScore"/>. Called only when
         /// <see cref="CheckIfTriggered"/> returned true. <paramref name="self"/> is this card, so
         /// capability helpers (e.g. <c>self.GetConsonantIndicies(ctx)</c>) can walk the bay up to it.
         /// </summary>

@@ -9,14 +9,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Scoring
     /// </summary>
     /// <param name="CardId">The card at this step — its <see cref="ModifierId"/>, which also keys its icon glyph.</param>
     /// <param name="Name">Card display name.</param>
-    /// <param name="Kind">Additive or multiplicative.</param>
+    /// <param name="Accent">The card's standardized accent (family color), for tinting the step.</param>
     /// <param name="Triggered">Whether the card's trigger fired for this word.</param>
-    /// <param name="ValueText">The applied operator/value (e.g. "+12", "×1.5"), or "—" when skipped.</param>
+    /// <param name="ValueText">The score delta this card applied (e.g. "+12", "−4"), or "—" when skipped.</param>
     /// <param name="RunningScore">The running score (rounded, clamped) after this step.</param>
     public sealed record ScoreStep(
         ModifierId CardId,
         string Name,
-        ModifierType Kind,
+        CardAccent Accent,
         bool Triggered,
         string ValueText,
         int RunningScore);
