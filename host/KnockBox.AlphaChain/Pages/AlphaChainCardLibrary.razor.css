@@ -316,6 +316,221 @@
     color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
 }
 
+/* ── Scenario bar + per-player columns ─────────────────────────────────── */
+.ac-bench-scenario {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.85rem;
+}
+
+.ac-bench-turn {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin-left: auto;
+    font-family: var(--font-display, system-ui);
+    font-size: 1.05rem;
+    color: var(--ac-cyan, #00e5ff);
+}
+
+.ac-bench-phasehint {
+    margin: 0;
+    padding: 0.5rem 0.7rem;
+    border: 2px dashed var(--ac-magenta, #ff2e8b);
+    border-radius: 0.5rem;
+    font-size: 0.82rem;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-bench-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.ac-bench-player {
+    flex: 1 1 16rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.7rem;
+    border: 3px solid #000;
+    border-radius: 0.6rem;
+    background: rgba(8, 18, 32, 0.45);
+}
+
+/* The seat whose turn it is — cyan rail. */
+.ac-bench-player-current {
+    border-color: var(--ac-cyan, #00e5ff);
+    box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.25);
+}
+
+/* The seat the palette ＋ Add targets — magenta rail (can coincide with current). */
+.ac-bench-player-active {
+    background: rgba(255, 46, 139, 0.12);
+}
+
+.ac-bench-player-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.ac-bench-player-name {
+    padding: 0.35rem 0.6rem;
+    border: 2px solid #000;
+    border-radius: 0.45rem;
+    background: var(--ac-ink, #eaf2ff);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-weight: 800;
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+}
+
+.ac-bench-player-active .ac-bench-player-name {
+    background: var(--ac-magenta, #ff2e8b);
+    color: #fff;
+}
+
+.ac-bench-score {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.ac-bench-score .ac-input-num {
+    width: 4.5rem;
+}
+
+/* ── Submit row extras + feedback ──────────────────────────────────────── */
+.ac-bench-skip {
+    padding: 0.55rem 1.2rem;
+    border: 3px solid #000;
+    border-radius: 0.55rem;
+    background: var(--ac-ink, #eaf2ff);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+    transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.ac-bench-skip:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 #000;
+}
+
+.ac-bench-skip:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #000;
+}
+
+.ac-bench-msg {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+/* ── Steal line + automated-effect feed ────────────────────────────────── */
+.ac-bench-steal {
+    margin: 0.6rem 0 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ac-magenta, #ff2e8b);
+}
+
+.ac-bench-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.6rem;
+}
+
+.ac-bench-feed-line {
+    padding: 0.35rem 0.55rem;
+    border-left: 3px solid var(--ac-cyan, #00e5ff);
+    background: rgba(8, 18, 32, 0.5);
+    border-radius: 0.3rem;
+    font-size: 0.82rem;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+/* ── Submission history ────────────────────────────────────────────────── */
+.ac-bench-history {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.6rem;
+    border-top: 2px dashed rgba(234, 242, 255, 0.2);
+    padding-top: 0.6rem;
+}
+
+.ac-bench-history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.ac-bench-history-item {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.35rem 0.55rem;
+    border-radius: 0.35rem;
+    background: rgba(8, 18, 32, 0.5);
+    font-size: 0.85rem;
+}
+
+.ac-bench-history-num {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    min-width: 2rem;
+}
+
+.ac-bench-history-who {
+    font-weight: 800;
+    color: var(--ac-cyan, #00e5ff);
+    min-width: 3rem;
+}
+
+.ac-bench-history-word {
+    font-family: var(--font-display, system-ui);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: var(--ac-ink, #eaf2ff);
+    flex: 1 1 auto;
+}
+
+.ac-bench-history-score {
+    font-weight: 800;
+    color: var(--ac-additive, #38e08b);
+}
+
+.ac-bench-history-tax {
+    font-weight: 800;
+    color: var(--ac-magenta, #ff2e8b);
+}
+
+.ac-bench-history-bounty {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--ac-magenta, #ff2e8b);
+}
+
 /* ── Palette ────────────────────────────────────────────────────────────── */
 .ac-library-toolbar {
     display: flex;

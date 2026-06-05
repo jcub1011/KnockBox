@@ -1,20 +1,31 @@
 @page "/room/alpha-chain/card-library"
+@implements IDisposable
 
 @using System.Collections.Immutable
+@using KnockBox.AlphaChain.Pages.Bench
+@using KnockBox.AlphaChain.Services.Logic.Games
 @using KnockBox.AlphaChain.Services.Logic.Games.Data
 @using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 @using KnockBox.AlphaChain.Services.Logic.Games.Evaluation
+@using KnockBox.AlphaChain.Services.Logic.Games.FSM
 @using KnockBox.AlphaChain.Services.Logic.Scoring
+@using KnockBox.AlphaChain.Services.State.Games
 @using KnockBox.AlphaChain.Services.State.Games.Data
+@using KnockBox.Core.Services.Logic.RandomGeneration
+@using Microsoft.Extensions.Logging
 @inject IModifierCardFactory CardFactory
 @inject IEngineEvaluator Evaluator
+@inject IRandomNumberService Rng
+@inject ILogger<AlphaChainGameEngine> EngineLogger
+@inject ILogger<AlphaChainGameState> StateLogger
 
 @* Hidden card-balancing test bench. A literal route, so it outranks the lobby's
-   "/room/alpha-chain/{ObfuscatedRoomCode}" param route and never needs a session. Build an Engine
-   Bay from the card palette, type a word, set the shot-clock / tax / Hyper-Drive knobs, and Run it
-   through the real scoring pipeline (IEngineEvaluator.CalculateSteps) to read the per-card
-   breakdown and final score. Lets cards be balanced in isolation and in combination.
-   Not linked from anywhere. *@
+   "/room/alpha-chain/{ObfuscatedRoomCode}" param route and never needs a session. Unlike a pure
+   scoring view, this drives a live, throwaway N-player match through the REAL engine
+   (AlphaChainBenchScenario), so player-to-player cards — Tax Collector, Bounty Hunter, Flak Cannon,
+   Titanium Mirror, … — react exactly as they do in a real game. Build each player's Engine Bay, set
+   the era ban + scores, then submit words turn-by-turn (or skip a turn) and watch the scoreboard,
+   per-card scoring trace, steals, and engine notices evolve. Not linked from anywhere. *@
 
 <PageTitle>Alpha Chain · Card Bench</PageTitle>
 
@@ -28,79 +39,125 @@
     <div class="ac-library">
         <header class="ac-library-head">
             <span class="ac-library-brand">ALPHA CHAIN</span>
-            <span class="ac-library-tagline">Card Bench · @Cards.Count cards</span>
+            <span class="ac-library-tagline">Card Bench · @Cards.Count cards · live engine</span>
         </header>
 
-        @* ── Test bench: controls, the bay under test, and the scored result ──────────── *@
+        @* ── Scenario: player count, ban, whose turn it is ───────────────────────────── *@
         <section class="ac-bench">
-            <div class="ac-bench-controls">
-                <label class="ac-field ac-field-word">
-                    <span class="ac-field-label">Word</span>
-                    <input type="text" class="ac-input" @bind="_word" @bind:event="oninput"
-                           placeholder="type a word…" />
-                </label>
+            <div class="ac-bench-scenario">
                 <label class="ac-field">
-                    <span class="ac-field-label">Shot clock (s)</span>
-                    <input type="number" class="ac-input ac-input-num" min="1" step="1" @bind="_totalClock" />
+                    <span class="ac-field-label">Players</span>
+                    <select class="ac-input" value="@_playerCount" @onchange="OnPlayerCountChanged">
+                        @for (int n = AlphaChainBenchScenario.MinPlayers; n <= AlphaChainBenchScenario.MaxPlayers; n++)
+                        {
+                            <option value="@n">@n</option>
+                        }
+                    </select>
                 </label>
+                <button type="button" class="ac-run" @onclick="ResetAsync">Reset</button>
                 <label class="ac-field">
-                    <span class="ac-field-label">Remaining (s)</span>
-                    <input type="number" class="ac-input ac-input-num" min="0" step="1" @bind="_remainingClock" />
+                    <span class="ac-field-label">Banned letter</span>
+                    <input type="text" class="ac-input ac-input-num" maxlength="1" value="@_banLetter"
+                           @oninput="OnBanInput" placeholder="—" />
                 </label>
-                <label class="ac-toggle">
-                    <input type="checkbox" @bind="_taxed" />
-                    <span>Zero-Point Tax</span>
-                </label>
-                <button type="button" class="ac-run" @onclick="Run">Run</button>
+                <div class="ac-bench-turn">
+                    <span class="ac-field-label">Current turn</span>
+                    <strong>@CurrentLabel</strong>
+                </div>
             </div>
 
-            <div class="ac-bench-bay">
-                <div class="ac-bench-bay-head">
-                    <span class="ac-bench-bay-title">Engine Bay · pipeline order →</span>
-                    @if (_bay.Count > 0)
-                    {
-                        <button type="button" class="ac-bench-clear" @onclick="ClearBay">Clear</button>
-                    }
-                </div>
+            @if (_scenario.Phase != AlphaChainGamePhase.Round)
+            {
+                <p class="ac-bench-phasehint">
+                    Scenario phase is @_scenario.Phase — press <strong>Reset</strong> to start a fresh round.
+                </p>
+            }
 
-                @if (_bay.Count == 0)
+            @* ── Per-player columns: each player's bay + score; click a name to target the palette. ── *@
+            <div class="ac-bench-players">
+                @for (int pi = 0; pi < _scenario.TurnOrder.Count; pi++)
                 {
-                    <p class="ac-bench-empty">Add cards from the palette below to build a bay.</p>
-                }
-                else
-                {
-                    <div class="ac-bench-slots">
-                        @for (int i = 0; i < _bay.Count; i++)
+                    var index = pi;
+                    var id = _scenario.TurnOrder[index];
+                    var player = _scenario.Player(id);
+                    var isCurrent = id == _scenario.CurrentPlayerId;
+                    var isTarget = index == _selectedPlayer;
+                    var bay = _bays.Count > index ? _bays[index] : new List<ModifierId>();
+                    <div class="ac-bench-player @(isCurrent ? "ac-bench-player-current" : "") @(isTarget ? "ac-bench-player-active" : "")">
+                        <div class="ac-bench-player-head">
+                            <button type="button" class="ac-bench-player-name" @onclick="() => _selectedPlayer = index">
+                                @(player?.DisplayName ?? $"P{index}")@(isCurrent ? " • turn" : "")
+                            </button>
+                            <label class="ac-bench-score">
+                                <span class="ac-field-label">Score</span>
+                                <input type="number" class="ac-input ac-input-num" min="0"
+                                       value="@(player?.Score ?? 0)" @onchange="@(e => OnScoreChanged(id, e))" />
+                            </label>
+                        </div>
+
+                        @if (bay.Count == 0)
                         {
-                            var index = i;
-                            var info = _cardsById[_bay[index]];
-                            <div class="ac-bench-slot">
-                                <GameCard Name="@info.Name" Description="@info.Description" Card="@info.Id"
-                                          Accent="@info.Accent" Size="CardSize.Small" Chips="@info.Chips" />
-                                <div class="ac-bench-slot-ops">
-                                    <button type="button" title="Move left" disabled="@(index == 0)"
-                                            @onclick="() => MoveCard(index, -1)">◀</button>
-                                    <button type="button" title="Remove"
-                                            @onclick="() => RemoveCard(index)">✕</button>
-                                    <button type="button" title="Move right" disabled="@(index == _bay.Count - 1)"
-                                            @onclick="() => MoveCard(index, 1)">▶</button>
-                                </div>
+                            <p class="ac-bench-empty">No cards. Click this name, then ＋ Add from the palette.</p>
+                        }
+                        else
+                        {
+                            <div class="ac-bench-slots">
+                                @for (int i = 0; i < bay.Count; i++)
+                                {
+                                    var slot = i;
+                                    var info = _cardsById[bay[slot]];
+                                    <div class="ac-bench-slot">
+                                        <GameCard Name="@info.Name" Description="@info.Description" Card="@info.Id"
+                                                  Accent="@info.Accent" Size="CardSize.Small" Chips="@info.Chips" />
+                                        <div class="ac-bench-slot-ops">
+                                            <button type="button" title="Move left" disabled="@(slot == 0)"
+                                                    @onclick="() => MoveCard(index, slot, -1)">◀</button>
+                                            <button type="button" title="Remove"
+                                                    @onclick="() => RemoveCard(index, slot)">✕</button>
+                                            <button type="button" title="Move right" disabled="@(slot == bay.Count - 1)"
+                                                    @onclick="() => MoveCard(index, slot, 1)">▶</button>
+                                        </div>
+                                    </div>
+                                }
                             </div>
                         }
                     </div>
                 }
             </div>
 
-            @if (_result is { } result)
+            @* ── Submit a word for the current player, or skip their turn. ────────────────── *@
+            <div class="ac-bench-controls">
+                <label class="ac-field ac-field-word">
+                    <span class="ac-field-label">Word for @CurrentLabel</span>
+                    <input type="text" class="ac-input" @bind="_word" @bind:event="oninput"
+                           placeholder="type a word…" />
+                </label>
+                <label class="ac-field">
+                    <span class="ac-field-label">Remaining (s)</span>
+                    <input type="number" class="ac-input ac-input-num" min="0" step="1" @bind="_remaining" />
+                </label>
+                <button type="button" class="ac-run" @onclick="SubmitAsync">Submit</button>
+                <button type="button" class="ac-bench-skip" @onclick="SkipAsync">Skip turn ▶</button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(_message))
+            {
+                <p class="ac-bench-msg">@_message</p>
+            }
+
+            @* ── The last accepted word's scoring trace, steal line, and effect feed. ─────── *@
+            @if (_scenario.LatestReplay is { } replay)
             {
                 <div class="ac-bench-result">
                     <div class="ac-breakdown">
-                        <span class="ac-breakdown-word">@(string.IsNullOrEmpty(result.Word) ? "∅" : result.Word.ToUpperInvariant())</span>
+                        <span class="ac-breakdown-word">
+                            @(replay.DisplayName): @(string.IsNullOrEmpty(replay.Breakdown.Word) ? "∅" : replay.Breakdown.Word.ToUpperInvariant())
+                        </span>
                         <span class="ac-bd-step ac-bd-seed">
                             <span class="ac-bd-op">len</span>
-                            <span class="ac-bd-run">@result.Seed</span>
+                            <span class="ac-bd-run">@replay.Breakdown.Seed</span>
                         </span>
-                        @foreach (var step in result.Steps)
+                        @foreach (var step in replay.Breakdown.Steps)
                         {
                             var kindClass = step.Triggered ? "ac-bd-triggered" : "ac-bd-skip";
                             <span class="ac-bd-step @kindClass" style="--ac-step-accent: @CardAccents.Color(step.Accent)">
@@ -109,22 +166,83 @@
                                 <span class="ac-bd-run">@step.RunningScore</span>
                             </span>
                         }
-                        <span class="ac-bd-step ac-bd-final @(result.Taxed ? "ac-bd-taxed" : "")">
-                            <span class="ac-bd-op">@(result.Taxed ? "tax" : "score")</span>
-                            <span class="ac-bd-run">@(result.Taxed ? "0" : $"+{result.FinalScore}")</span>
+                        <span class="ac-bd-step ac-bd-final @(replay.Breakdown.Taxed ? "ac-bd-taxed" : "")">
+                            <span class="ac-bd-op">@(replay.Breakdown.Taxed ? "tax" : "score")</span>
+                            <span class="ac-bd-run">@($"+{replay.Breakdown.FinalScore}")</span>
                         </span>
                     </div>
-                    @if (result.Taxed && result.FinalBeforeTax != result.FinalScore)
+
+                    @if (replay.Breakdown.Taxed && replay.Breakdown.FinalBeforeTax != replay.Breakdown.FinalScore)
                     {
-                        <p class="ac-bench-note">Would have scored @result.FinalBeforeTax before the Zero-Point Tax.</p>
+                        <p class="ac-bench-note">Would have scored @replay.Breakdown.FinalBeforeTax before the Zero-Point Tax.</p>
                     }
+
+                    @if (replay.HasSteal)
+                    {
+                        <p class="ac-bench-steal">
+                            Stolen by @string.Join(", ", replay.TaxCollectors!): +@replay.TaxBounty each (Tax Collector).
+                        </p>
+                    }
+
+                    @if (replay.HasEffects)
+                    {
+                        <div class="ac-bench-feed">
+                            <span class="ac-field-label">This submission</span>
+                            @foreach (var fx in replay.Effects!)
+                            {
+                                <div class="ac-bench-feed-line">@FormatEffect(fx)</div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (_scenario.EngineNotices.Count > 0)
+            {
+                <div class="ac-bench-feed">
+                    <span class="ac-field-label">Off-turn effects</span>
+                    @foreach (var fx in _scenario.EngineNotices)
+                    {
+                        <div class="ac-bench-feed-line">@FormatEffect(fx)</div>
+                    }
+                </div>
+            }
+
+            @* ── Every accepted word this scenario, newest first. ─────────────────────────── *@
+            @if (_scenario.SubmissionHistory.Count > 0)
+            {
+                <div class="ac-bench-history">
+                    <span class="ac-field-label">Submission history · @_scenario.SubmissionHistory.Count</span>
+                    <ol class="ac-bench-history-list">
+                        @for (int i = _scenario.SubmissionHistory.Count - 1; i >= 0; i--)
+                        {
+                            var sub = _scenario.SubmissionHistory[i];
+                            <li class="ac-bench-history-item">
+                                <span class="ac-bench-history-num">#@(i + 1)</span>
+                                <span class="ac-bench-history-who">@sub.DisplayName</span>
+                                <span class="ac-bench-history-word">@sub.Word.ToUpperInvariant()</span>
+                                @if (sub.ZeroPointTax)
+                                {
+                                    <span class="ac-bench-history-tax">taxed · 0</span>
+                                }
+                                else
+                                {
+                                    <span class="ac-bench-history-score">+@sub.Score</span>
+                                }
+                                @if (sub.TaxBounty > 0)
+                                {
+                                    <span class="ac-bench-history-bounty">bounty +@sub.TaxBounty</span>
+                                }
+                            </li>
+                        }
+                    </ol>
                 </div>
             }
         </section>
 
-        @* ── Palette: every dealable card; click "Add" to drop it into the bay. ───────── *@
+        @* ── Palette: every dealable card; ＋ Add drops it into the targeted player's bay. ─── *@
         <div class="ac-library-toolbar">
-            <span class="ac-library-tagline">Palette</span>
+            <span class="ac-library-tagline">Palette → adding to @TargetLabel</span>
             <button type="button" class="ac-library-size" @onclick="ToggleSize">
                 @(_size == CardSize.Large ? "Show small cards" : "Show large cards")
             </button>
@@ -161,7 +279,7 @@
 
     private List<CardInfo> Cards { get; set; } = [];
 
-    /// <summary>Card presentation keyed by id, so the bay can render a chosen card without re-resolving it.</summary>
+    /// <summary>Card presentation keyed by id, so a bay can render a chosen card without re-resolving it.</summary>
     private Dictionary<ModifierId, CardInfo> _cardsById = new();
 
     private readonly HashSet<ModifierId> _flipped = new();
@@ -169,17 +287,37 @@
     /// <summary>Which variant the palette previews — Large (flippable) by default.</summary>
     private CardSize _size = CardSize.Large;
 
-    // ── Test-bench state ──────────────────────────────────────────────────────
-    /// <summary>The ordered Engine Bay under test (left → right is pipeline order).</summary>
-    private readonly List<ModifierId> _bay = new();
+    // ── Scenario state ────────────────────────────────────────────────────────
+    /// <summary>The live throwaway match the bench drives through the real engine.</summary>
+    private AlphaChainBenchScenario _scenario = default!;
+
+    /// <summary>Number of players to start the next scenario with.</summary>
+    private int _playerCount = 2;
+
+    /// <summary>The banned-letter text field (at most one char); mirrored onto the scenario on input.</summary>
+    private string _banLetter = "";
+
+    /// <summary>Turn-order index of the player the palette's ＋ Add targets.</summary>
+    private int _selectedPlayer;
+
+    /// <summary>Each player's intended bay (by turn-order index); the edit source, pushed to the scenario on change.</summary>
+    private List<List<ModifierId>> _bays = new();
 
     private string _word = "";
-    private double _totalClock = 30;
-    private double _remainingClock = 15;
-    private bool _taxed;
+    private int _remaining = 15;
 
-    /// <summary>The most recent scored result, or null before the first Run.</summary>
-    private ScoreBreakdown? _result;
+    /// <summary>Last submit/skip feedback (acceptance, rejection reason, or an engine error).</summary>
+    private string _message = "";
+
+    private string CurrentLabel => LabelFor(_scenario.CurrentPlayerId);
+
+    private string TargetLabel =>
+        _selectedPlayer >= 0 && _selectedPlayer < _scenario.TurnOrder.Count
+            ? LabelFor(_scenario.TurnOrder[_selectedPlayer])
+            : "—";
+
+    private string LabelFor(Guid? id) =>
+        id is { } g && _scenario.Player(g) is { } p ? p.DisplayName : "—";
 
     /// <summary>Switches the palette between the Large and Small card previews.</summary>
     private void ToggleSize()
@@ -192,44 +330,116 @@
             _flipped.Add(id);
     }
 
-    private void AddCard(ModifierId id) => _bay.Add(id);
-
-    private void RemoveCard(int index) => _bay.RemoveAt(index);
-
-    private void ClearBay() => _bay.Clear();
-
-    /// <summary>Shifts the card at <paramref name="index"/> one slot left (-1) or right (+1).</summary>
-    private void MoveCard(int index, int delta)
+    /// <summary>Changing the player count rebuilds the scenario immediately — the column count is
+    /// fundamental, so a fresh match is the only coherent response (it also clears bays/scores).</summary>
+    private async Task OnPlayerCountChanged(ChangeEventArgs e)
     {
-        int target = index + delta;
-        if (target < 0 || target >= _bay.Count)
-            return;
-        (_bay[index], _bay[target]) = (_bay[target], _bay[index]);
+        if (int.TryParse(e.Value?.ToString(), out var count))
+        {
+            _playerCount = count;
+            await ResetAsync();
+        }
     }
 
-    /// <summary>Builds the live bay + evaluation context from the current knobs and scores the word.</summary>
-    private void Run()
+    /// <summary>Tears down the current match and starts a fresh one with the chosen player count.</summary>
+    private async Task ResetAsync()
     {
-        // A display context is enough to construct cards — they never dereference it at creation.
-        var displayContext = new EngineEvaluationContext(string.Empty, [], []);
-        var bay = _bay.Select(id => CardFactory.CreateCard(displayContext, id)).ToList();
+        _selectedPlayer = 0;
+        _word = "";
+        _message = "";
+        _banLetter = "";
+        await _scenario.ResetAsync(_playerCount);
+        _bays = Enumerable.Range(0, _scenario.TurnOrder.Count).Select(_ => new List<ModifierId>()).ToList();
+    }
 
-        // A single owner so capability walks that read GetPlayer(PlayerIndex) have a non-null player.
-        var owner = new AlphaChainPlayerState { UserId = Guid.Empty, DisplayName = "Bench" };
-        var players = new List<AlphaChainPlayerState> { owner };
+    /// <summary>Mirrors the first typed character onto the scenario's banned letter (blank clears it).</summary>
+    private void OnBanInput(ChangeEventArgs e)
+    {
+        var text = e.Value?.ToString() ?? "";
+        _banLetter = text.Length > 0 ? text[..1] : "";
+        char? letter = _banLetter.Length > 0 && char.IsLetter(_banLetter[0])
+            ? char.ToLowerInvariant(_banLetter[0])
+            : null;
+        _scenario.SetBannedLetter(letter);
+    }
 
-        var word = (_word ?? string.Empty).Trim().ToLowerInvariant();
+    /// <summary>Sets a player's running score directly to stage leader / relative-score scenarios.</summary>
+    private void OnScoreChanged(Guid id, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var score))
+            _scenario.SetScore(id, score);
+    }
 
-        var context = new EngineEvaluationContext(word, [], players)
+    /// <summary>Adds the chosen card to the targeted player's bay and pushes the change to the live state.</summary>
+    private void AddCard(ModifierId id)
+    {
+        if (_selectedPlayer < 0 || _selectedPlayer >= _bays.Count) return;
+        _bays[_selectedPlayer].Add(id);
+        SyncBay(_selectedPlayer);
+    }
+
+    private void RemoveCard(int playerIndex, int slot)
+    {
+        _bays[playerIndex].RemoveAt(slot);
+        SyncBay(playerIndex);
+    }
+
+    /// <summary>Shifts the card at <paramref name="slot"/> one place left (-1) or right (+1).</summary>
+    private void MoveCard(int playerIndex, int slot, int delta)
+    {
+        var bay = _bays[playerIndex];
+        int target = slot + delta;
+        if (target < 0 || target >= bay.Count) return;
+        (bay[slot], bay[target]) = (bay[target], bay[slot]);
+        SyncBay(playerIndex);
+    }
+
+    /// <summary>Pushes a player's edited bay onto the live game state.</summary>
+    private void SyncBay(int playerIndex)
+        => _scenario.SetBay(_scenario.TurnOrder[playerIndex], _bays[playerIndex]);
+
+    /// <summary>Submits the word for the current player and surfaces the engine's typed result.</summary>
+    private async Task SubmitAsync()
+    {
+        _message = "";
+        var outcome = await _scenario.SubmitAsync(_word, _remaining);
+        if (outcome.TryGetFailure(out var error))
         {
-            Bay = bay,
-            PlayerIndex = 0,
-            ShotClockDuration = _totalClock,
-            ModifiedShotClockDuration = _totalClock,
-            RemainingShotClockDuration = _remainingClock,
-        };
+            _message = error.PublicMessage;
+            return;
+        }
+        outcome.TryGetSuccess(out var result);
+        _message = Describe(result);
+    }
 
-        _result = Evaluator.CalculateSteps(context, _taxed);
+    /// <summary>Advances the active seat without playing a word.</summary>
+    private async Task SkipAsync()
+    {
+        _message = "";
+        var outcome = await _scenario.SkipTurnAsync();
+        if (outcome.TryGetFailure(out var error))
+            _message = error.PublicMessage;
+    }
+
+    /// <summary>Human-readable summary of a submit result for the inline feedback line.</summary>
+    private static string Describe(SubmitWordResult? result) => result switch
+    {
+        SubmitWordResult.Accepted a => $"Accepted · +{a.Score}",
+        SubmitWordResult.AcceptedZeroPointTax => "Accepted but taxed · scored 0 (banned letter)",
+        SubmitWordResult.RejectedNotYourTurn => "Rejected · not this player's turn",
+        SubmitWordResult.RejectedChainBroken c => $"Rejected · must start with '{char.ToUpperInvariant(c.Required)}'",
+        SubmitWordResult.RejectedNotInDictionary => "Rejected · not a word (letters only)",
+        SubmitWordResult.RejectedDuplicate => "Rejected · already played this match",
+        SubmitWordResult.RejectedEmpty => "Rejected · empty word",
+        _ => "No result.",
+    };
+
+    /// <summary>One feed line for an automated engine effect (who, which card, target, what happened).</summary>
+    private static string FormatEffect(EngineEffectEvent fx)
+    {
+        var prefix = fx.Negated ? "⛊ blocked — " : "";
+        var target = fx.TargetName is { } t ? $" → {t}" : "";
+        return $"{prefix}{fx.HolderName} · {fx.CardName}{target} · {fx.Reason}";
     }
 
     protected override void OnInitialized()
@@ -246,5 +456,12 @@
             .ToList();
 
         _cardsById = Cards.ToDictionary(c => c.Id);
+
+        _scenario = new AlphaChainBenchScenario(Rng, Evaluator, CardFactory, EngineLogger, StateLogger);
     }
+
+    protected override async Task OnInitializedAsync()
+        => await ResetAsync();
+
+    public void Dispose() => _scenario?.Dispose();
 }
