@@ -1,6 +1,4 @@
 @inherits DisposableComponent
-@using KnockBox.AlphaChain.Services.Logic.Games.Data
-@using KnockBox.AlphaChain.Services.State.Games
 @using KnockBox.Core.Services.Navigation
 @using KnockBox.Core.Services.State.Games.Shared
 
@@ -8,15 +6,6 @@
     <a class="ac-header-brand" href="@NavigationService.GetHomeUri()" title="Click to return home">
         <span class="ac-header-text">ALPHA CHAIN</span>
     </a>
-
-    @if (ShowProgress)
-    {
-        <div class="ac-header-progress" aria-label="Match progress">
-            <span class="ac-header-progress-era">Era @_state!.CurrentEra</span>
-            <span class="ac-header-progress-sep">·</span>
-            <span class="ac-header-progress-round">Round @_state!.CurrentRound</span>
-        </div>
-    }
 
     <div class="ac-header-actions">
         <RoomCodeButton ClassName="ac-header-code"
@@ -33,32 +22,5 @@
     [Inject] INavigationService NavigationService { get; set; } = default!;
     [Inject] IGameSessionService GameSessionService { get; set; } = default!;
 
-    private AlphaChainGameState? _state;
-    private IDisposable? _stateSubscription;
-
-    // Show the live indicator only once the match is under way; in Setup (and when there's
-    // no resolvable state) the header stays clean.
-    private bool ShowProgress => _state is { Phase: not AlphaChainGamePhase.Setup };
-
-    protected override void OnInitialized()
-    {
-        // Resolve the running game state off the current session so the indicator can read
-        // CurrentEra/CurrentRound, and subscribe so it re-renders as the match advances.
-        if (GameSessionService.TryGetCurrentSession(out var session)
-            && session.LobbyRegistration.State is AlphaChainGameState state)
-        {
-            _state = state;
-            _stateSubscription = state.StateChangedEventManager.Subscribe(OnStateChangedAsync);
-        }
-    }
-
-    private async ValueTask OnStateChangedAsync() => await InvokeAsync(StateHasChanged);
-
     private void Leave() => GameSessionService.LeaveCurrentSession(navigateHome: true);
-
-    public override void Dispose()
-    {
-        _stateSubscription?.Dispose();
-        base.Dispose();
-    }
 }

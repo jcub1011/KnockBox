@@ -102,6 +102,11 @@ else
     /// <summary>Plays the entrance pop + glow (a freshly-dealt card).</summary>
     [Parameter] public bool New { get; set; }
 
+    /// <summary>For a Small card: when true, the hover tooltip is just the rules text
+    /// (<see cref="Description"/>) rather than "name — description" — used where the card's name is
+    /// already shown elsewhere and only the rules add information (e.g. the end-game word history).</summary>
+    [Parameter] public bool DescriptionTooltip { get; set; }
+
     /// <summary>Full root class string (base + size + state modifiers).</summary>
     private string RootClass =>
         $"gc-card gc-{SizeClass}{StateClasses}";
@@ -180,12 +185,15 @@ else
         _ => "#8aa0b3",
     };
 
-    /// <summary>Hover tooltip for the Small card (which shows no text): title + description if present,
-    /// else just the title. Null when there's nothing to show, so the attribute is omitted.</summary>
+    /// <summary>Hover tooltip for the Small card. Default: title + description if present, else just
+    /// the title. When <see cref="DescriptionTooltip"/> is set: just the description. Null when there's
+    /// nothing to show, so the attribute is omitted.</summary>
     private string? SmallTooltip =>
-        string.IsNullOrEmpty(Description)
-            ? (string.IsNullOrEmpty(Name) ? null : Name)
-            : $"{Name} — {Description}";
+        DescriptionTooltip
+            ? (string.IsNullOrEmpty(Description) ? null : Description)
+            : string.IsNullOrEmpty(Description)
+                ? (string.IsNullOrEmpty(Name) ? null : Name)
+                : $"{Name} — {Description}";
 
     private string StateClasses =>
         (Flipped ? " gc-flipped" : "")

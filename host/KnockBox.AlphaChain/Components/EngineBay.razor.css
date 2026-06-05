@@ -6,12 +6,17 @@
     border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
     border-radius: 0.75rem;
     background: var(--ac-panel, rgba(18, 24, 44, 0.72));
-    min-width: 14rem;
+    width: 100%;
+    box-sizing: border-box;
+    /* Card footprint for the cards in this bay — desktop 100px tall, ~1.3 w:h ratio. These
+       custom properties cascade into the child GameCards' .gc-small (CSS variables inherit
+       through the DOM regardless of Blazor scoping). */
+    --gc-small-h: 100px;
+    --gc-small-w: 130px;
 }
 
 .ac-bay-readonly {
     opacity: 0.9;
-    min-width: 9rem;
 }
 
 .ac-bay-header {
@@ -40,30 +45,53 @@
     background: rgba(255, 255, 255, 0.04);
 }
 
+/* A single horizontal row that scrolls — the whole bay stays on one line (mobile-friendly),
+   newest design order left → right. A little bottom padding keeps the scrollbar clear of the
+   cards' hover-lift. */
 .ac-bay-slots {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0.5rem;
     margin: 0;
-    padding: 0;
+    padding: 0 0 0.35rem;
     list-style: none;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--ac-cyan, #00e5ff) 45%, transparent) transparent;
+}
+
+.ac-bay-slots::-webkit-scrollbar {
+    height: 0.4rem;
+}
+
+.ac-bay-slots::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ac-cyan, #00e5ff) 45%, transparent);
 }
 
 .ac-bay-slot {
     flex: 0 0 auto;
 }
 
-/* Empty slot placeholder — matches the Small card's fixed footprint so the row stays even. */
+/* Empty slot placeholder — matches the Small card's footprint so the row stays even. */
 .ac-bay-empty {
     display: flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    width: 7rem;
-    height: 5.4rem;
+    width: var(--gc-small-w, 7rem);
+    height: var(--gc-small-h, 5.4rem);
     border: 1px dashed var(--ac-border, rgba(255, 255, 255, 0.08));
     border-radius: 0.6rem;
     color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
     font-size: 0.7rem;
     font-style: italic;
+}
+
+/* Mobile: shrink the card footprint to ~70px tall (the internals scale with it). */
+@media (max-width: 48rem) {
+    .ac-bay {
+        --gc-small-h: 70px;
+        --gc-small-w: 91px;
+    }
 }

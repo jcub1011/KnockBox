@@ -391,73 +391,104 @@
 
 .ac-feedback-bad { color: var(--ac-danger); }
 
-/* ── Chain trail ──────────────────────────────────────────────────────── */
-.ac-trail {
+/* ── Recent words ─────────────────────────────────────────────────────── */
+/* Newest → oldest, scrolls horizontally. The newest entry is accented so the eye lands on it;
+   the player rarely needs more than the last word or two, so older entries just scroll away. */
+.ac-recent {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    flex-wrap: nowrap;
     gap: 0.5rem;
-    padding: 0.6rem 0.75rem;
+    padding: 0.5rem;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--ac-cyan) 45%, transparent) transparent;
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid var(--ac-border);
     border-radius: 0.7rem;
 }
 
-.ac-trail-word {
-    display: inline-flex;
-    gap: 2px;
-    padding: 0.15rem;
-    border-radius: 0.4rem;
+.ac-recent::-webkit-scrollbar {
+    height: 0.4rem;
 }
 
-.ac-trail-letter {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.5rem;
-    height: 1.7rem;
-    border-radius: 0.3rem;
-    background: rgba(255, 255, 255, 0.05);
+.ac-recent::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ac-cyan) 45%, transparent);
+}
+
+.ac-recent-item {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 6rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--ac-border);
+}
+
+/* The newest word: cyan accent so it reads as the live link to chain from. */
+.ac-recent-newest {
+    border-color: var(--ac-cyan);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-cyan) 45%, transparent);
+}
+
+.ac-recent-word {
     font-family: var(--font-mono);
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: var(--ac-ink-soft);
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ac-ink);
+    white-space: nowrap;
 }
 
-.ac-trail-link {
-    background: color-mix(in srgb, var(--ac-cyan) 25%, transparent);
+.ac-recent-newest .ac-recent-word {
     color: var(--ac-cyan);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-cyan) 50%, transparent);
 }
 
-.ac-trail-taxed .ac-trail-letter {
-    color: var(--ac-danger);
+.ac-recent-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+}
+
+.ac-recent-by {
+    flex: 1;
+    min-width: 0;
+    max-width: 7rem;
+    font-size: 0.7rem;
+    color: var(--ac-ink-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ac-recent-score {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--ac-mint);
+}
+
+.ac-recent-taxed .ac-recent-word {
     text-decoration: line-through;
-    opacity: 0.7;
-}
-
-/* Tunnel Vision: the holder's view masks the most recent word's first & last letters. */
-.ac-trail-hidden {
-    color: var(--ac-ink-faint);
-    background: repeating-linear-gradient(
-        45deg,
-        color-mix(in srgb, var(--ac-ink-faint) 18%, transparent),
-        color-mix(in srgb, var(--ac-ink-faint) 18%, transparent) 3px,
-        transparent 3px,
-        transparent 6px);
+    opacity: 0.6;
 }
 
 /* ── Cards ────────────────────────────────────────────────────────────── */
+/* The own bay is a single full-width horizontal row (it scrolls internally). */
 .ac-cards {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 1rem;
+    display: block;
 }
 
+/* Opponents stack vertically; each opponent bay is itself a full-width horizontal scrolling
+   row (same EngineBay component as the player's). */
 .ac-opponent-bays {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 0.75rem;
     opacity: 0.85;
 }
@@ -595,62 +626,69 @@
     color: var(--ac-tax);
 }
 
-/* ── Words-played feed ────────────────────────────────────────────────── */
-.ac-feed {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    max-height: 16rem;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
+/* ── Mobile leaderboard strip ─────────────────────────────────────────────
+   Hidden on desktop (the rail shows the vertical board). On mobile it sits inline above the
+   word box as a single horizontal scroller that auto-centres on the local player (see centerMe
+   in alpha-chain-input.js). Full names, no truncation — long names just widen their item. */
+.ac-lbm {
+    display: none;
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+    overflow-x: auto;
+    padding: 0.1rem 0.1rem 0.35rem;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--ac-cyan) 45%, transparent) transparent;
 }
 
-.ac-feed-row {
+.ac-lbm::-webkit-scrollbar {
+    height: 0.35rem;
+}
+
+.ac-lbm::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ac-cyan) 45%, transparent);
+}
+
+.ac-lbm-item {
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.3rem 0.5rem;
-    border-radius: 0.4rem;
-    font-size: 0.85rem;
-    animation: ac-rise 0.25s ease-out;
+    gap: 0.4rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 0.55rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 3px solid var(--accent);
 }
 
-.ac-feed-row:nth-child(odd) {
-    background: rgba(255, 255, 255, 0.02);
-}
-
-.ac-feed-word {
+.ac-lbm-rank {
     font-family: var(--font-mono);
-    font-weight: 700;
-    color: var(--ac-ink);
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: var(--ac-ink-faint);
 }
 
-.ac-feed-player {
-    flex: 1;
-    min-width: 0;
-    font-size: 0.75rem;
-    color: var(--ac-ink-soft);
-    overflow: hidden;
-    text-overflow: ellipsis;
+.ac-lbm-name {
+    font-weight: 700;
     white-space: nowrap;
 }
 
-.ac-feed-score {
+.ac-lbm-score {
     font-family: var(--font-mono);
+    font-size: 0.95rem;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
-    color: var(--ac-mint);
+    color: var(--ac-ink);
 }
 
-.ac-feed-taxed .ac-feed-word {
-    text-decoration: line-through;
-    opacity: 0.6;
+/* The local player's item: brighter accent wash + ring so it's obvious where you are. */
+.ac-lbm-me {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
-.ac-feed-taxed .ac-feed-score {
-    color: var(--ac-ink-faint);
+.ac-lbm-me .ac-lbm-name {
+    color: var(--accent);
 }
 
 /* ── Intermission shell ───────────────────────────────────────────────── */
@@ -741,8 +779,10 @@
         grid-template-columns: 1fr;
     }
 
+    /* The vertical rail leaderboard is replaced on mobile by the inline horizontal strip
+       (.ac-lbm) that sits above the word box. */
     .ac-rail {
-        position: static;
+        display: none;
     }
 
     .ac-command {
@@ -753,6 +793,11 @@
 
     .ac-turnflag-meta {
         font-size: 0.66rem;
+    }
+
+    /* Reveal the inline leaderboard strip as a single horizontal scroller. */
+    .ac-lbm {
+        display: flex;
     }
 }
 

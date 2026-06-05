@@ -161,15 +161,24 @@ namespace KnockBox.AlphaChain.Pages
                 .ThenBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-        /// <summary>The play feed, newest first.</summary>
+        /// <summary>The play feed (recent-words list), newest first.</summary>
         protected IReadOnlyList<AlphaChainSubmission> PlayFeed =>
             GameState.SubmissionHistory.AsEnumerable().Reverse().ToList();
 
-        /// <summary>Most recent accepted words, oldest→newest, for the chain trail.</summary>
-        protected IReadOnlyList<AlphaChainSubmission> ChainTrail =>
-            GameState.SubmissionHistory.Count <= 7
-                ? GameState.SubmissionHistory
-                : GameState.SubmissionHistory.Skip(GameState.SubmissionHistory.Count - 7).ToList();
+        /// <summary>The word as shown in the recent-words list. Tunnel Vision masks the newest word's
+        /// first &amp; last letter for its holder only — they must remember it (or read the required
+        /// start letter); the chain rule stays server-enforced regardless.</summary>
+        protected string DisplayWord(AlphaChainSubmission play, bool isNewest)
+        {
+            var word = play.Word.ToUpperInvariant();
+            if (!isNewest || !LocalPlayerHasTunnelVision || word.Length == 0)
+                return word;
+
+            var chars = word.ToCharArray();
+            chars[0] = '·';
+            chars[^1] = '·';
+            return new string(chars);
+        }
 
         /// <summary>The latest accepted word's score replay, shown once in a fixed spot below the
         /// submit box for every player (the strip's subtitle names the submitter). Null when there
@@ -188,6 +197,12 @@ namespace KnockBox.AlphaChain.Pages
         // ── Leaderboard rank-change tracking (view-only, for the ▲/▼ indicator) ──
         private List<Guid> _prevRankOrder = new();
         private readonly Dictionary<Guid, int> _rankMovement = new();
+
+        // ── Mobile leaderboard auto-centre ──
+        // The inline mobile strip scrolls to keep the local player's item centred; we re-centre
+        // only when their rank index actually changes (not on every tick re-render).
+        private ElementReference _mobileLbRef;
+        private int _lastMyRankIndex = -1;
 
         /// <summary>Maps a player to a turn-order accent slot (1-based, wraps at 6).</summary>
         protected int AccentSlot(Guid userId)
@@ -429,6 +444,23 @@ namespace KnockBox.AlphaChain.Pages
                     {
                         await _inputModule.InvokeVoidAsync("armDeadline", _inputId, -1, AutoSubmitLeadMs);
                         await _inputModule.InvokeVoidAsync("clear", _inputId);
+                    }
+                }
+
+                // Re-centre the mobile leaderboard strip on the local player whenever their rank
+                // changes (the strip is hidden on desktop, where centerMe is a no-op).
+                if (CurrentUserId is { } myId)
+                {
+                    var board = Leaderboard;
+                    int myIndex = -1;
+                    for (int i = 0; i < board.Count; i++)
+                    {
+                        if (board[i].UserId == myId) { myIndex = i; break; }
+                    }
+                    if (myIndex >= 0 && myIndex != _lastMyRankIndex)
+                    {
+                        _lastMyRankIndex = myIndex;
+                        await _inputModule.InvokeVoidAsync("centerMe", _mobileLbRef);
                     }
                 }
             }

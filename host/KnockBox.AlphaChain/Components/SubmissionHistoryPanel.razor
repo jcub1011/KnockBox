@@ -1,7 +1,10 @@
 @using System.Collections.Immutable
 @using KnockBox.AlphaChain.Services.State.Games.Data
 @using KnockBox.AlphaChain.Services.Logic.Scoring
+@using KnockBox.AlphaChain.Services.Logic.Games.Data
 @using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
+@using KnockBox.AlphaChain.Services.Logic.Games.Evaluation
+@inject IModifierCardFactory CardFactory
 
 @* Post-game word history: every accepted submission with its score, submitter, and the engine
    (Engine Bay scoring trace) that produced it — so players can review which engine designs
@@ -53,6 +56,8 @@
                                     <GameCard Size="CardSize.Small"
                                               Card="step.CardId"
                                               Name="@step.Name"
+                                              Description="@DescriptionFor(step.CardId)"
+                                              DescriptionTooltip="true"
                                               Accent="step.Accent"
                                               Chips="@StepChips(step)"
                                               Dim="!step.Triggered" />
@@ -87,6 +92,22 @@
 
     private SortOrder _sort = SortOrder.HighestScore;
     private List<AlphaChainSubmission> _sorted = [];
+
+    /// <summary>Card rules text by id, for the hover tooltip on each engine-strip card. Built once —
+    /// descriptions are static here (an empty context is enough; see AlphaChainCardLibrary).</summary>
+    private Dictionary<ModifierId, string> _descriptions = new();
+
+    protected override void OnInitialized()
+    {
+        var context = new EngineEvaluationContext(string.Empty, [], []);
+        _descriptions = ModifierCardFactory.AllDealableIds.ToDictionary(
+            id => id,
+            id => CardFactory.CreateCard(context, id).GetDescription(context));
+    }
+
+    /// <summary>The rules text for a card id, or null if unmapped (the tooltip is then omitted).</summary>
+    private string? DescriptionFor(ModifierId id) =>
+        _descriptions.TryGetValue(id, out var description) ? description : null;
 
     protected override void OnParametersSet() => Resort();
 
