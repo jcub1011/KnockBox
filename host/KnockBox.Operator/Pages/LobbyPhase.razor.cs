@@ -2,10 +2,10 @@ using KnockBox.Tooling.Collections;
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.Logic.Games;
 using KnockBox.Operator.Services.State;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Core.Services.Storage.ClientStorage;
 using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 
 namespace KnockBox.Operator.Pages
 {
@@ -114,11 +114,11 @@ namespace KnockBox.Operator.Pages
             await InvokeAsync(StateHasChanged);
         }
 
-        protected void KickPlayer(string userId)
+        protected void KickPlayer(Guid userId)
         {
-            if (string.IsNullOrWhiteSpace(userId))
+            if (userId == Guid.Empty)
             {
-                Logger.LogWarning("Cannot kick player: user ID is null or empty.");
+                Logger.LogWarning("Cannot kick player: user ID is empty.");
                 return;
             }
 
@@ -181,27 +181,18 @@ namespace KnockBox.Operator.Pages
 
         private async Task LoadSettingsAsync()
         {
-            try
+            var savedResult = await LocalStorage.GetAsync<OperatorSettings>("operator", "settings", _cts.Token);
+            // If the host already edited a setting while the load was in flight,
+            // the user's edit wins — the saved snapshot would clobber it. A failed/canceled
+            // read is a non-success result that simply falls through to built-in defaults.
+            if (savedResult.TryGetSuccess(out var saved) && saved is not null && !_userHasEdited)
             {
-                var saved = await LocalStorage.GetAsync<OperatorSettings>("operator", "settings", _cts.Token);
-                // If the host already edited a setting while the load was in flight,
-                // the user's edit wins — the saved snapshot would clobber it.
-                if (saved is not null && !_userHasEdited)
+                if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
                 {
-                    if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
-                    {
-                        Logger.LogError("Failed to apply saved Operator settings: {Error}", error.PublicMessage);
-                        return;
-                    }
-                    StateHasChanged();
+                    Logger.LogError("Failed to apply saved Operator settings: {Error}", error.PublicMessage);
+                    return;
                 }
-            }
-            catch (OperationCanceledException) { /* component disposed */ }
-            catch (ObjectDisposedException) { /* circuit gone */ }
-            catch (JSDisconnectedException) { /* circuit gone */ }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error loading Operator settings.");
+                StateHasChanged();
             }
         }
 
@@ -217,24 +208,16 @@ namespace KnockBox.Operator.Pages
             {
                 try { await prior; } catch { /* prior failure already logged */ }
             }
-            try
-            {
-                await LocalStorage.SetAsync("operator", "settings", settings, ct);
-            }
-            catch (OperationCanceledException) { /* component disposed */ }
-            catch (ObjectDisposedException) { /* circuit gone */ }
-            catch (JSDisconnectedException) { /* circuit gone */ }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error saving Operator settings.");
-            }
+            var saveResult = await LocalStorage.SetAsync("operator", "settings", settings, ct);
+            if (saveResult.TryGetFailure(out var saveError))
+                Logger.LogError("Error saving Operator settings: {Error}", saveError.InternalMessage);
         }
 
         public async ValueTask DisposeAsync()
         {
             // Flush the last pending save before tearing down so a change made right before
-            // navigating away isn't lost. A dead circuit makes SetAsync throw
-            // JSDisconnectedException, which SaveSettingsAsync swallows.
+            // navigating away isn't lost. Storage calls no longer throw on a dead circuit —
+            // they return a non-success Result, which SaveSettingsAsync logs and ignores.
             if (_saveTask is not null)
             {
                 try { await _saveTask; } catch { /* best-effort flush */ }

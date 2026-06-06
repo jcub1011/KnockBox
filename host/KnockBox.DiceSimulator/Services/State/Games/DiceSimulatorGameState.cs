@@ -13,7 +13,7 @@ namespace KnockBox.DiceSimulator.Services.State.Games
           IPlayerTrackedGameState<PlayerStats>
     {
         private readonly List<DiceRollEntry> _rollHistory = [];
-        public ConcurrentDictionary<string, PlayerStats> GamePlayers { get; } = new();
+        public ConcurrentDictionary<Guid, PlayerStats> GamePlayers { get; } = new();
 
         public IReadOnlyList<DiceRollEntry> RollHistory 
         { 
@@ -26,7 +26,7 @@ namespace KnockBox.DiceSimulator.Services.State.Games
             } 
         }
         
-        public IReadOnlyDictionary<string, PlayerStats> PlayerStats => GamePlayers;
+        public IReadOnlyDictionary<Guid, PlayerStats> PlayerStats => GamePlayers;
 
         public void AddRoll(DiceRollEntry entry)
         {
@@ -36,7 +36,7 @@ namespace KnockBox.DiceSimulator.Services.State.Games
             }
         }
         
-        public PlayerStats GetOrAddPlayerStats(string playerId, string playerName)
+        public PlayerStats GetOrAddPlayerStats(Guid playerId, string playerName)
         {
             return GamePlayers.GetOrAdd(playerId, _ => new PlayerStats { PlayerName = playerName });
         }

@@ -16,7 +16,7 @@ namespace KnockBox.DndMapper.Pages.Components
     public partial class DiceCanvas : DisposableComponent, IAsyncDisposable
     {
         [Parameter, EditorRequired] public DndMapperGameState State { get; set; } = default!;
-        [Parameter] public string CurrentUserId { get; set; } = string.Empty;
+        [Parameter] public Guid CurrentUserId { get; set; }
         [Parameter] public bool IsHost { get; set; }
 
         [Inject] protected IJSRuntime Js { get; set; } = default!;

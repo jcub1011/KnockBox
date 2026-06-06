@@ -15,15 +15,15 @@ namespace KnockBox.DiceSimulator.Pages
         protected DiceRollAction RollAction { get; set; } = new();
         protected bool IsRoomCodeVisible { get; set; } = false;
 
-        private readonly HashSet<string> _expandedPlayerIds = [];
+        private readonly HashSet<Guid> _expandedPlayerIds = [];
 
-        protected void TogglePlayerHistory(string playerId)
+        protected void TogglePlayerHistory(Guid playerId)
         {
             if (!_expandedPlayerIds.Add(playerId))
                 _expandedPlayerIds.Remove(playerId);
         }
 
-        protected bool IsPlayerExpanded(string playerId) => _expandedPlayerIds.Contains(playerId);
+        protected bool IsPlayerExpanded(Guid playerId) => _expandedPlayerIds.Contains(playerId);
 
         protected void ToggleRoomCode()
         {

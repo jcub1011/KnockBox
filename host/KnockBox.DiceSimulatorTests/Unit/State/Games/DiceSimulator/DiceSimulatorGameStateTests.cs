@@ -17,7 +17,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.State
         public void Setup()
         {
             _loggerMock = new Mock<ILogger<DiceSimulatorGameState>>();
-            _host = UserFactory.Create("HostUser", "host-id");
+            _host = UserFactory.Create("HostUser", System.Guid.NewGuid());
         }
 
         private DiceRollEntry CreateValidEntry()
@@ -25,7 +25,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.State
             return new DiceRollEntry
             {
                 Id = System.Guid.NewGuid(),
-                PlayerId = "p1",
+                PlayerId = System.Guid.NewGuid(),
                 PlayerName = "Player",
                 DiceType = DiceType.D20,
                 DiceCount = 1,
@@ -57,12 +57,13 @@ namespace KnockBox.DiceSimulator.Tests.Unit.State
         {
             using var state = new DiceSimulatorGameState(_host, _loggerMock.Object);
 
-            var stats1 = state.GetOrAddPlayerStats("player1", "Player One");
+            var playerId = System.Guid.NewGuid();
+            var stats1 = state.GetOrAddPlayerStats(playerId, "Player One");
             Assert.AreEqual("Player One", stats1.PlayerName);
 
             stats1.TotalRolls = 5;
 
-            var stats2 = state.GetOrAddPlayerStats("player1", "Player One");
+            var stats2 = state.GetOrAddPlayerStats(playerId, "Player One");
             Assert.AreEqual(5, stats2.TotalRolls);
             Assert.AreSame(stats1, stats2);
         }
@@ -72,7 +73,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.State
         {
             using var state = new DiceSimulatorGameState(_host, _loggerMock.Object);
             state.AddRoll(CreateValidEntry());
-            state.GetOrAddPlayerStats("player1", "Player One");
+            state.GetOrAddPlayerStats(System.Guid.NewGuid(), "Player One");
 
             Assert.HasCount(1, state.RollHistory);
             Assert.HasCount(1, state.PlayerStats);

@@ -12,7 +12,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States
         public ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?> OnEnter(HiddenAgendaGameContext context)
         {
             var currentPlayerId = context.State.TurnManager.CurrentPlayer;
-            if (currentPlayerId == null || !context.GamePlayers.TryGetValue(currentPlayerId, out var player))
+            if (currentPlayerId is not { } currentPlayerIdVal || !context.GamePlayers.TryGetValue(currentPlayerIdVal, out var player))
                 return ValueResult<IGameState<HiddenAgendaGameContext, HiddenAgendaCommand>?>.FromValue(AdvanceToNextPlayer(context));
 
             // If player already guessed, skip

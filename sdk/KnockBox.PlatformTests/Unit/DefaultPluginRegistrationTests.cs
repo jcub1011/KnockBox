@@ -62,8 +62,8 @@ public sealed class DefaultPluginRegistrationTests
     // denylist tests don't need to satisfy constructor dependencies.
     private sealed class FakeProfanityFilter : IProfanityFilter
     {
-        public ValueTask<List<ProfanityMatch>?> ExtractProfanitiesAsync(string text, CancellationToken ct = default)
-            => ValueTask.FromResult<List<ProfanityMatch>?>(null);
+        public ValueTask<ValueResult<List<ProfanityMatch>?>> ExtractProfanitiesAsync(string text, CancellationToken ct = default)
+            => ValueTask.FromResult(ValueResult<List<ProfanityMatch>?>.FromValue(null));
     }
 
     private sealed class FakeLobbyCodeService : ILobbyCodeService

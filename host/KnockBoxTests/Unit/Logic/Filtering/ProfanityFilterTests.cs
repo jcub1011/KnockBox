@@ -16,7 +16,8 @@ public sealed class ProfanityFilterTests
     {
         var result = await _filter.ExtractProfanitiesAsync(string.Empty);
 
-        Assert.IsNull(result);
+        Assert.IsTrue(result.TryGetSuccess(out var matches));
+        Assert.IsNull(matches);
     }
 
     [TestMethod]
@@ -28,7 +29,8 @@ public sealed class ProfanityFilterTests
 
         var result = await _filter.ExtractProfanitiesAsync(text);
 
-        Assert.IsNull(result);
+        Assert.IsTrue(result.TryGetSuccess(out var matches));
+        Assert.IsNull(matches);
     }
 
     [TestMethod]
@@ -39,12 +41,13 @@ public sealed class ProfanityFilterTests
 
         var result = await _filter.ExtractProfanitiesAsync(text);
 
-        Assert.IsNotNull(result);
-        Assert.HasCount(expected.Count, result);
+        Assert.IsTrue(result.TryGetSuccess(out var matches));
+        Assert.IsNotNull(matches);
+        Assert.HasCount(expected.Count, matches);
 
         for (var i = 0; i < expected.Count; i++)
         {
-            Assert.AreEqual(expected[i], result[i]);
+            Assert.AreEqual(expected[i], matches[i]);
         }
     }
 

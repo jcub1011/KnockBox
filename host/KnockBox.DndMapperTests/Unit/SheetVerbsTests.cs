@@ -404,7 +404,7 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.IsTrue(tcr.IsFailure);
         }
 
-        private Guid SeedSheetForPlayer(string? ownerUserId)
+        private Guid SeedSheetForPlayer(Guid? ownerUserId)
         {
             var result = _engine.CreateSheetAsync(_state, _host, ownerUserId, "Sheet");
             Assert.IsTrue(result.TryGetSuccess(out var sheetId));

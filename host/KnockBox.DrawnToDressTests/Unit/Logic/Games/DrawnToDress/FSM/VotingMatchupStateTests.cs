@@ -31,7 +31,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _randomMock = new Mock<IRandomNumberService>();
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.Parse("00000000-0000-0000-0000-000000000001"));
             _engine = new DrawnToDressGameEngine(_engineLoggerMock.Object, _stateLoggerMock.Object, _randomMock.Object);
         }
 
@@ -42,7 +42,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
         /// three players (pA, pB, pC) who all have submitted outfits.  pA and pB will
         /// be in the first generated matchup; pC is the eligible third-party voter.
         /// </summary>
-        private async Task<(DrawnToDressGameState state, DrawnToDressGameContext context, SwissMatchup matchup, string outsider)>
+        private async Task<(DrawnToDressGameState state, DrawnToDressGameContext context, SwissMatchup matchup, Guid outsider)>
             SetupVotingStateAsync(List<VotingCriterionDefinition>? criteria = null)
         {
             var stateResult = await _engine.CreateStateAsync(_host);
@@ -54,9 +54,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
-            state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
-            state.GamePlayers["pC"] = new() { PlayerId = "pC", SubmittedOutfit = new() { PlayerId = "pC" } };
+            state.GamePlayers[Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")] = new() { PlayerId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), SubmittedOutfit = new() { PlayerId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA") } };
+            state.GamePlayers[Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")] = new() { PlayerId = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), SubmittedOutfit = new() { PlayerId = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB") } };
+            state.GamePlayers[Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")] = new() { PlayerId = Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"), SubmittedOutfit = new() { PlayerId = Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC") } };
 
             context.Fsm.TransitionTo(context, new VotingRoundSetupState());
             Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState);
@@ -66,7 +66,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // Extract player IDs for outsider lookup.
             var entrantAPlayer = firstMatchup.EntrantAId.PlayerId;
             var entrantBPlayer = firstMatchup.EntrantBId.PlayerId;
-            string outsider = new[] { "pA", "pB", "pC" }
+            var outsider = new Guid[] { Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC") }
                 .First(id => id != entrantAPlayer && id != entrantBPlayer);
 
             return (state, context, firstMatchup, outsider);
@@ -113,7 +113,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             var nonExistentMatchupId = Guid.NewGuid();
             _engine.ProcessCommand(context,
-                new CastVoteCommand(outsider, nonExistentMatchupId, "creativity", new EntrantId("pA", 1)));
+                new CastVoteCommand(outsider, nonExistentMatchupId, "creativity", new EntrantId(Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), 1)));
 
             Assert.HasCount(votesBefore, state.Votes,
                 "A vote referencing a matchup not in the current round must not be recorded.");
@@ -128,7 +128,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             int votesBefore = state.Votes.Count;
 
             _engine.ProcessCommand(context,
-                new CastVoteCommand("pUnknown", matchup.Id, "creativity", matchup.EntrantAId));
+                new CastVoteCommand(Guid.NewGuid(), matchup.Id, "creativity", matchup.EntrantAId));
 
             Assert.HasCount(votesBefore, state.Votes,
                 "A vote from an unregistered player must not be recorded.");
@@ -190,9 +190,9 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
-            state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
-            state.GamePlayers["pC"] = new() { PlayerId = "pC", SubmittedOutfit = new() { PlayerId = "pC" } };
+            state.GamePlayers[Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")] = new() { PlayerId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), SubmittedOutfit = new() { PlayerId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA") } };
+            state.GamePlayers[Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")] = new() { PlayerId = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), SubmittedOutfit = new() { PlayerId = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB") } };
+            state.GamePlayers[Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")] = new() { PlayerId = Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"), SubmittedOutfit = new() { PlayerId = Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC") } };
 
             context.Fsm.TransitionTo(context, new VotingRoundSetupState());
             Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState);
@@ -201,7 +201,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var matchup = round.Matchups[0];
             var playerA = matchup.EntrantAId.PlayerId;
             var playerB = matchup.EntrantBId.PlayerId;
-            string outsider = new[] { "pA", "pB", "pC" }
+            var outsider = new Guid[] { Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC") }
                 .First(id => id != playerA && id != playerB);
 
             // Cast a vote — the deadline is already in the past so it must be marked late.
@@ -283,10 +283,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             await _engine.StartAsync(_host, state);
             var context = state.Context!;
 
-            state.GamePlayers["pA"] = new() { PlayerId = "pA", SubmittedOutfit = new() { PlayerId = "pA" } };
-            state.GamePlayers["pB"] = new() { PlayerId = "pB", SubmittedOutfit = new() { PlayerId = "pB" } };
-            state.GamePlayers["pC"] = new() { PlayerId = "pC", SubmittedOutfit = new() { PlayerId = "pC" } };
-            state.GamePlayers["pD"] = new() { PlayerId = "pD", SubmittedOutfit = new() { PlayerId = "pD" } };
+            state.GamePlayers[Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")] = new() { PlayerId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), SubmittedOutfit = new() { PlayerId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA") } };
+            state.GamePlayers[Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")] = new() { PlayerId = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), SubmittedOutfit = new() { PlayerId = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB") } };
+            state.GamePlayers[Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")] = new() { PlayerId = Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"), SubmittedOutfit = new() { PlayerId = Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC") } };
+            state.GamePlayers[Guid.Parse("DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD")] = new() { PlayerId = Guid.Parse("DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD"), SubmittedOutfit = new() { PlayerId = Guid.Parse("DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD") } };
 
             context.Fsm.TransitionTo(context, new VotingRoundSetupState());
             Assert.IsInstanceOfType<VotingMatchupState>(context.Fsm.CurrentState);
@@ -297,7 +297,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             // Cast a vote from only one of the eligible voters (there must be at least one more).
             var pA2 = firstMatchup.EntrantAId.PlayerId;
             var pB2 = firstMatchup.EntrantBId.PlayerId;
-            string voter1 = new[] { "pA", "pB", "pC", "pD" }
+            var voter1 = new Guid[] { Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), Guid.Parse("CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC"), Guid.Parse("DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD") }
                 .First(id => id != pA2 && id != pB2);
 
             _engine.ProcessCommand(context,

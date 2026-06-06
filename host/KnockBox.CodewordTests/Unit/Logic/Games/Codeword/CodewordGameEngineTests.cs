@@ -37,7 +37,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             _engineLoggerMock = new Mock<ILogger<CodewordGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<CodewordGameState>>();
 
-            _host = UserFactory.Create("Host", "host-id");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
 
             _engine = new CodewordGameEngine(
                 _randomMock.Object,
@@ -45,7 +45,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
                 _stateLoggerMock.Object);
         }
 
-        private User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<CodewordGameState> CreateStateWithPlayersAsync(int count)
         {
@@ -122,7 +122,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         public async Task StartAsync_WithNonHost_ReturnsError()
         {
             using var state = await CreateStateWithPlayersAsync(4);
-            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+            var nonHost = UserFactory.Create("NotHost", Guid.NewGuid());
 
             var result = await _engine.StartAsync(nonHost, state);
 
@@ -242,7 +242,8 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             var result = await _engine.CreateStateAsync(_host);
             using var state = (CodewordGameState)result.Value!;
 
-            state.RegisterPlayer(UserFactory.Create("Host", "collider-id"));
+            var colliderId = Guid.NewGuid();
+            state.RegisterPlayer(UserFactory.Create("Host", colliderId));
             state.RegisterPlayer(MakePlayer(1));
             state.RegisterPlayer(MakePlayer(2));
 
@@ -251,7 +252,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
 
             Assert.AreEqual("Host", state.GamePlayers[_host.Id].DisplayName,
                 "Host's DisplayName must not be disambiguated.");
-            Assert.AreEqual("Host (1)", state.GamePlayers["collider-id"].DisplayName,
+            Assert.AreEqual("Host (1)", state.GamePlayers[colliderId].DisplayName,
                 "Colliding player must be disambiguated to 'Host (1)'.");
         }
 
@@ -272,7 +273,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         {
             using var state = await CreateStateWithPlayersAsync(4);
 
-            var result = _engine.CastVote(MakePlayer(0), state, "p1-id");
+            var result = _engine.CastVote(MakePlayer(0), state, Guid.NewGuid());
 
             Assert.IsTrue(result.IsFailure);
         }
@@ -323,7 +324,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         public async Task ReturnToLobby_NonHost_ReturnsError()
         {
             using var state = await CreateStartedGameAsync(4);
-            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+            var nonHost = UserFactory.Create("NotHost", Guid.NewGuid());
 
             var result = _engine.ReturnToLobby(nonHost, state);
 
@@ -400,24 +401,26 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         public async Task HandlePlayerLeft_RemovesFromTurnOrder()
         {
             using var state = await CreateStartedGameAsync(4);
-            var leavingPlayer = MakePlayer(0);
+            var leavingId = state.TurnManager.TurnOrder[0];
+            var leavingPlayer = UserFactory.Create("Player0", leavingId);
             int initialCount = state.TurnManager.TurnOrder.Count;
 
             _engine.HandlePlayerLeft(leavingPlayer, state);
 
             Assert.HasCount(initialCount - 1, state.TurnManager.TurnOrder);
-            Assert.DoesNotContain(leavingPlayer.Id, state.TurnManager.TurnOrder);
+            Assert.DoesNotContain(leavingId, state.TurnManager.TurnOrder);
         }
 
         [TestMethod]
         public async Task HandlePlayerLeft_MarksPlayerAsEliminated()
         {
             using var state = await CreateStartedGameAsync(4);
-            var leavingPlayer = MakePlayer(0);
+            var leavingId = state.TurnManager.TurnOrder[0];
+            var leavingPlayer = UserFactory.Create("Player0", leavingId);
 
             _engine.HandlePlayerLeft(leavingPlayer, state);
 
-            var ps = state.Context!.GetPlayer(leavingPlayer.Id);
+            var ps = state.Context!.GetPlayer(leavingId);
             Assert.IsNotNull(ps);
             Assert.IsTrue(ps.IsEliminated);
         }
@@ -439,9 +442,9 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             // Set the current clue player to index 3
             state.TurnManager.SetCurrentPlayerIndex(3);
             // Remove player at index 1 (before current)
-            string leavingPlayerId = state.TurnManager.TurnOrder[1];
+            Guid leavingPlayerId = state.TurnManager.TurnOrder[1];
 
-            _engine.HandlePlayerLeft(UserFactory.Create(leavingPlayerId, leavingPlayerId), state);
+            _engine.HandlePlayerLeft(UserFactory.Create("leaving", leavingPlayerId), state);
 
             Assert.AreEqual(2, state.TurnManager.CurrentPlayerIndex);
         }

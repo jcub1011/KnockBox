@@ -6,7 +6,7 @@ namespace KnockBox.Codeword.Services.State.Games.Data
     public class CodewordPlayerState
     {
         /// <summary>Unique player identifier.</summary>
-        public string PlayerId { get; set; } = string.Empty;
+        public Guid PlayerId { get; set; } = Guid.Empty;
 
         /// <summary>Human-readable display name.</summary>
         public string DisplayName { get; set; } = string.Empty;
@@ -38,7 +38,7 @@ namespace KnockBox.Codeword.Services.State.Games.Data
         public List<string> ClueHistory { get; set; } = [];
 
         /// <summary>The player ID this player has voted to eliminate.</summary>
-        public string? VoteTargetId { get; set; }
+        public Guid? VoteTargetId { get; set; }
 
         /// <summary>Whether this player has cast their vote for the current round.</summary>
         public bool HasVoted { get; set; }

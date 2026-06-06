@@ -25,10 +25,11 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
         [TestMethod]
         public void DrawnClothingItem_Claim_UpdatesClaimMetadata()
         {
+            var playerId = Guid.NewGuid();
             var item = new DrawnClothingItem { IsInPool = true };
-            item.ClaimedByPlayerId = "player1";
+            item.ClaimedByPlayerId = playerId;
 
-            Assert.AreEqual("player1", item.ClaimedByPlayerId);
+            Assert.AreEqual(playerId, item.ClaimedByPlayerId);
         }
 
         // ── OutfitSubmission ──────────────────────────────────────────────────
@@ -55,7 +56,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
             var itemId = Guid.NewGuid();
             var submission = new OutfitSubmission
             {
-                PlayerId = "player1",
+                PlayerId = Guid.NewGuid(),
                 SelectedItemsByType = new Dictionary<ClothingType, Guid>
                 {
                     [ClothingType.Hat] = itemId,
@@ -98,11 +99,13 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
         public void SwissMatchup_Construction_PreservesAllFields()
         {
             var id = Guid.NewGuid();
-            var matchup = new SwissMatchup(id, new EntrantId("playerA", 1), new EntrantId("playerB", 1), 1);
+            var playerAId = Guid.NewGuid();
+            var playerBId = Guid.NewGuid();
+            var matchup = new SwissMatchup(id, new EntrantId(playerAId, 1), new EntrantId(playerBId, 1), 1);
 
             Assert.AreEqual(id, matchup.Id);
-            Assert.AreEqual("playerA", matchup.PlayerAId);
-            Assert.AreEqual("playerB", matchup.PlayerBId);
+            Assert.AreEqual(playerAId, matchup.PlayerAId);
+            Assert.AreEqual(playerBId, matchup.PlayerBId);
             Assert.AreEqual(1, matchup.RoundNumber);
         }
 
@@ -128,22 +131,24 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
         [TestMethod]
         public void VoteSubmission_Construction_PreservesAllFields()
         {
+            var voterId = Guid.NewGuid();
+            var playerAId = Guid.NewGuid();
             var matchupId = Guid.NewGuid();
             var before = DateTimeOffset.UtcNow;
 
             var vote = new VoteSubmission
             {
-                VoterPlayerId = "voter1",
+                VoterPlayerId = voterId,
                 MatchupId = matchupId,
                 CriterionId = "creativity",
-                ChosenEntrantId = new EntrantId("playerA", 1),
+                ChosenEntrantId = new EntrantId(playerAId, 1),
                 IsLate = false,
             };
 
-            Assert.AreEqual("voter1", vote.VoterPlayerId);
+            Assert.AreEqual(voterId, vote.VoterPlayerId);
             Assert.AreEqual(matchupId, vote.MatchupId);
             Assert.AreEqual("creativity", vote.CriterionId);
-            Assert.AreEqual("playerA", vote.ChosenPlayerId);
+            Assert.AreEqual(playerAId, vote.ChosenPlayerId);
             Assert.IsFalse(vote.IsLate);
             Assert.IsGreaterThanOrEqualTo(before, vote.SubmittedAt);
         }
@@ -177,13 +182,14 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
         {
             var requestId = Guid.NewGuid();
             var matchupId = Guid.NewGuid();
+            var winnerPlayerId = Guid.NewGuid();
 
-            var result = new CoinFlipResult(requestId, matchupId, IsHeads: true, WinnerPlayerId: "playerA");
+            var result = new CoinFlipResult(requestId, matchupId, IsHeads: true, WinnerPlayerId: winnerPlayerId);
 
             Assert.AreEqual(requestId, result.RequestId);
             Assert.AreEqual(matchupId, result.MatchupId);
             Assert.IsTrue(result.IsHeads);
-            Assert.AreEqual("playerA", result.WinnerPlayerId);
+            Assert.AreEqual(winnerPlayerId, result.WinnerPlayerId);
         }
 
         // ── DrawnToDressPlayerState ───────────────────────────────────────────

@@ -48,7 +48,7 @@ namespace KnockBox.Codeword.Pages
             }
         }
 
-        protected void SelectTarget(string targetId)
+        protected void SelectTarget(Guid targetId)
         {
             if (UserService.CurrentUser == null) return;
 

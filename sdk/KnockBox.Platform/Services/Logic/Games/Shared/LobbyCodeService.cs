@@ -27,7 +27,12 @@ namespace KnockBox.Services.Logic.Games.Shared
                     ct.ThrowIfCancellationRequested();
 
                     var code = GenerateCode();
-                    var profanities = await profanityFilter.ExtractProfanitiesAsync(code, ct);
+                    var profanityResult = await profanityFilter.ExtractProfanitiesAsync(code, ct);
+                    if (profanityResult.IsCanceled) return ValueResult<string>.FromCancellation();
+                    if (profanityResult.TryGetFailure(out var profanityError)) return profanityError;
+
+                    // A null value means no profanity was found; anything matched means retry.
+                    profanityResult.TryGetSuccess(out var profanities);
                     if (profanities is not null)
                     {
                         continue;

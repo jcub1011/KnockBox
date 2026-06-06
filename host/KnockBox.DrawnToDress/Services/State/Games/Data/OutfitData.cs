@@ -53,7 +53,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
     public class OutfitSubmission
     {
         /// <summary>The player ID of the player who submitted this outfit.</summary>
-        public string PlayerId { get; set; } = string.Empty;
+        public Guid PlayerId { get; set; }
 
         /// <summary>
         /// The selected clothing items keyed by clothing type. Each value is the

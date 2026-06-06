@@ -20,7 +20,7 @@ namespace KnockBox.DrawnToDress.Pages
         private string? _themeText;
         private string? _errorMessage;
 
-        private string CurrentPlayerId => UserService.CurrentUser?.Id ?? string.Empty;
+        private Guid CurrentPlayerId => UserService.CurrentUser?.Id ?? Guid.Empty;
 
         protected void SubmitHostTheme()
         {

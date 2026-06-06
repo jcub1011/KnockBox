@@ -43,12 +43,12 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
         {
             if (now < _expiresAt) return null;
             var currentPlayerId = context.CurrentPlayerId;
-            if (currentPlayerId is null) return null;
-            context.Logger.LogDebug("PlayerTurn: auto-drawing for [{id}] after timeout.", currentPlayerId);
+            if (currentPlayerId is not { } cpId) return null;
+            context.Logger.LogDebug("PlayerTurn: auto-drawing for [{id}] after timeout.", cpId);
             // Always return a state so the engine calls TransitionTo, which invokes OnEnter
             // and resets _expiresAt for the next player's turn. If the draw itself triggers a
             // state change (e.g. RoundEndState), pass that through; otherwise start a fresh turn.
-            var drawResult = HandleDraw(context, new DrawCardCommand(currentPlayerId));
+            var drawResult = HandleDraw(context, new DrawCardCommand(cpId));
             return drawResult.IsSuccess && drawResult.Value is not null ? drawResult : new PlayerTurnState();
         }
 
@@ -80,7 +80,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             if (context.State.HedgeYourBetPlayerId is { } hedgePlayerId)
             {
                 context.State.HedgeYourBetPlayerId = null;
-                var hedger = context.GetPlayer(hedgePlayerId);
+                var hedger = context.GetPlayer(hedgePlayerId); // hedgePlayerId is Guid
                 if (hedger is not null)
                 {
                     var op = hedger.Balance < 0 ? Operator.Add : Operator.Subtract;
@@ -228,7 +228,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                 player.DisplayName,
                 card.Action,
                 cmd.TargetPlayerId,
-                cmd.TargetPlayerId is not null ? context.GetPlayer(cmd.TargetPlayerId)?.DisplayName : null);
+                cmd.TargetPlayerId is { } tpId ? context.GetPlayer(tpId)?.DisplayName : null);
 
             context.RecordActionCardPlay(player, card);
 
@@ -249,7 +249,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
 
         // ── Discard ───────────────────────────────────────────────────────────
 
-        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleFeelingLucky(CardCounterGameContext context, string sourceId)
+        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleFeelingLucky(CardCounterGameContext context, Guid sourceId)
         {
             if (context.TurnOrder.Count <= 1)
             {
@@ -259,11 +259,11 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
 
             // Determine the next player in turn order (wrapping) to be the first target
             int nextIndex = (context.State.TurnManager.CurrentPlayerIndex + 1) % context.TurnOrder.Count;
-            string targetId = context.TurnOrder[nextIndex];
+            Guid targetId = context.TurnOrder[nextIndex];
             return new FeelingLuckyChainState(sourceId, targetId);
         }
 
-        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleMakeMyLuck(CardCounterGameContext context, string sourceId)
+        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleMakeMyLuck(CardCounterGameContext context, Guid sourceId)
         {
             if (context.CurrentShoe.Count == 0) return null;
 
@@ -296,21 +296,21 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
         private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleBlockable(
             CardCounterGameContext context, PlayActionCardCommand cmd, ActionCard card)
         {
-            if (string.IsNullOrEmpty(cmd.TargetPlayerId))
+            if (cmd.TargetPlayerId is not { } blockTarget)
             {
                 context.Logger.LogWarning("Blockable action [{a}] requires a target.", card.Action);
                 return null;
             }
 
-            var target = context.GetPlayer(cmd.TargetPlayerId);
+            var target = context.GetPlayer(blockTarget);
             if (target is null)
             {
-                context.Logger.LogWarning("Blockable action [{a}]: target [{id}] not found.", card.Action, cmd.TargetPlayerId);
+                context.Logger.LogWarning("Blockable action [{a}]: target [{id}] not found.", card.Action, blockTarget);
                 return null;
             }
 
             // Self-targeting: apply the effect immediately without a reaction window.
-            if (cmd.PlayerId == cmd.TargetPlayerId)
+            if (cmd.PlayerId == blockTarget)
             {
                 context.Logger.LogDebug(
                     "Blockable action [{a}]: self-targeted by [{id}]; applying immediately.", card.Action, cmd.PlayerId);
@@ -329,10 +329,10 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                 return new PlayerTurnState();
             }
 
-            return new WaitingForReactionState(cmd.PlayerId, cmd.TargetPlayerId, card);
+            return new WaitingForReactionState(cmd.PlayerId, blockTarget, card);
         }
 
-        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleTilt(CardCounterGameContext context, string sourceId)
+        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleTilt(CardCounterGameContext context, Guid sourceId)
         {
             // Collect all number cards from all players' pots into one pool
             var allDigits = new List<int>();
@@ -380,14 +380,14 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
         private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleSkim(
             CardCounterGameContext context, PlayActionCardCommand cmd)
         {
-            if (string.IsNullOrEmpty(cmd.TargetPlayerId))
+            if (cmd.TargetPlayerId is not { } skimTarget)
             {
                 context.Logger.LogWarning("Skim requires a target.");
                 return null;
             }
 
             var source = context.GetPlayer(cmd.PlayerId);
-            var target = context.GetPlayer(cmd.TargetPlayerId);
+            var target = context.GetPlayer(skimTarget);
 
             if (source is null || target is null)
             {
@@ -408,10 +408,10 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             }
 
             // Build the SkimState which lets the source choose digit indices
-            return new SkimState(cmd.PlayerId, cmd.TargetPlayerId, new ActionCard(ActionType.Skim));
+            return new SkimState(cmd.PlayerId, skimTarget, new ActionCard(ActionType.Skim));
         }
 
-        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleHedgeYourBet(CardCounterGameContext context, string sourceId)
+        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleHedgeYourBet(CardCounterGameContext context, Guid sourceId)
         {
             if (context.CurrentShoe.Count == 0)
             {
@@ -425,7 +425,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             return null; // stay in PlayerTurnState
         }
 
-        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleLetItRide(CardCounterGameContext context, string sourceId)
+        private static ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> HandleLetItRide(CardCounterGameContext context, Guid sourceId)
         {
             var player = context.GetPlayer(sourceId);
             if (player is null) return null;

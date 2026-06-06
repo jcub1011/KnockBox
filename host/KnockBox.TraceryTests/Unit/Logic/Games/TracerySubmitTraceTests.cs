@@ -42,7 +42,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         [TestMethod]
         public async Task SubmitTrace_ValidWord_BanksIt()
         {
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             var (engine, state) = await StartIntoPlayingAsync(host);
             var (word, path) = FirstFindable();
 
@@ -63,7 +63,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         [DataRow(new[] { 6, 3, 0 }, "isn't a word", DisplayName = "not a word (prt)")]
         public async Task SubmitTrace_InvalidPath_RejectsWithReason(int[] path, string fragment)
         {
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             var (engine, state) = await StartIntoPlayingAsync(host);
 
             var result = engine.SubmitTrace(state, host, path);
@@ -82,7 +82,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         [TestMethod]
         public async Task SubmitTrace_AfterRoundEnds_IsRejected()
         {
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             var (engine, state) = await StartIntoPlayingAsync(host);
             var (_, path) = FirstFindable();
 
@@ -99,9 +99,9 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         [TestMethod]
         public async Task SubmitTrace_ByObservingHost_IsRejected()
         {
-            var host = UserFactory.Create("Host", "host1");
-            var p1 = UserFactory.Create("P1", "p1");
-            var p2 = UserFactory.Create("P2", "p2");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
+            var p1 = UserFactory.Create("P1", Guid.NewGuid());
+            var p2 = UserFactory.Create("P2", Guid.NewGuid());
             // Others present + HostPlaysAlong off → host is the display-only observer.
             var (engine, state) = await StartIntoPlayingAsync(host, new() { p1, p2 });
             Assert.IsFalse(state.HostIsParticipant);
@@ -117,9 +117,9 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         [TestMethod]
         public async Task SubmitTrace_ByStranger_IsRejected()
         {
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             var (engine, state) = await StartIntoPlayingAsync(host);
-            var stranger = UserFactory.Create("Nobody", "stranger1");
+            var stranger = UserFactory.Create("Nobody", Guid.NewGuid());
             var (_, path) = FirstFindable();
 
             var result = engine.SubmitTrace(state, stranger, path);
@@ -136,7 +136,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         [TestMethod]
         public async Task SubmitTrace_AlreadyBankedWord_IsSilentNoOpSuccess()
         {
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             var (engine, state) = await StartIntoPlayingAsync(host);
             var (word, path) = FirstFindable();
 
@@ -155,7 +155,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         [TestMethod]
         public async Task SubmitTrace_DistinctWordsReusingCells_BothBank()
         {
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             var (engine, state) = await StartIntoPlayingAsync(host);
 
             // Two findable words whose paths share at least one cell — proves cells are not

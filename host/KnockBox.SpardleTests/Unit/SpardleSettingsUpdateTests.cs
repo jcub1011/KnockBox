@@ -14,7 +14,7 @@ public class SpardleSettingsUpdateTests
     [TestInitialize]
     public void Setup()
     {
-        var host = UserFactory.Create("Host", "host-id");
+        var host = UserFactory.Create("Host", Guid.NewGuid());
         _state = new SpardleState(host, NullLogger.Instance);
     }
 

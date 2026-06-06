@@ -11,7 +11,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
     /// <param name="ModifierBayIds">The desired left → right ordering of modifier-card ids.</param>
     /// <param name="Submitted">Whether the player has committed this ordering.</param>
     public record OptimizationSubmission(
-        string UserId,
+        Guid UserId,
         IReadOnlyList<string> ModifierBayIds,
         bool Submitted);
 }

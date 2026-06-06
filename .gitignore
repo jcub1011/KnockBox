@@ -370,3 +370,4 @@ FodyWeavers.xsd
 /.playwright-mcp
 
 .gemini/settings.json
+/host/.playwright-mcp

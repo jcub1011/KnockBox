@@ -1,3 +1,4 @@
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Storage.IndexedDb;
 
 namespace KnockBox.DndMapperTests.Helpers
@@ -17,22 +18,22 @@ namespace KnockBox.DndMapperTests.Helpers
         public bool Disposed { get; private set; }
         public List<FakeBlobShare> PublishedShares { get; } = [];
 
-        public override ValueTask<byte[]> ReadAllBytesAsync(CancellationToken ct = default)
-            => ValueTask.FromResult(_bytes);
+        public override ValueTask<ValueResult<byte[], IndexedDbError>> ReadAllBytesAsync(CancellationToken ct = default)
+            => ValueTask.FromResult(ValueResult<byte[], IndexedDbError>.FromValue(_bytes));
 
-        public override ValueTask<Stream> OpenReadAsync(CancellationToken ct = default)
-            => ValueTask.FromResult<Stream>(new MemoryStream(_bytes, writable: false));
+        public override ValueTask<ValueResult<Stream, IndexedDbError>> OpenReadAsync(CancellationToken ct = default)
+            => ValueTask.FromResult(ValueResult<Stream, IndexedDbError>.FromValue(new MemoryStream(_bytes, writable: false)));
 
-        public override ValueTask<string> CreateObjectUrlAsync(CancellationToken ct = default)
-            => ValueTask.FromResult($"blob:fake/{Guid.NewGuid():D}");
+        public override ValueTask<ValueResult<string, IndexedDbError>> CreateObjectUrlAsync(CancellationToken ct = default)
+            => ValueTask.FromResult(ValueResult<string, IndexedDbError>.FromValue($"blob:fake/{Guid.NewGuid():D}"));
 
-        public override ValueTask<IBlobShare> PublishForSharingAsync(
+        public override ValueTask<ValueResult<IBlobShare, IndexedDbError>> PublishForSharingAsync(
             BlobShareOptions? options = null,
             CancellationToken ct = default)
         {
             var share = new FakeBlobShare(ContentType, Length);
             PublishedShares.Add(share);
-            return ValueTask.FromResult<IBlobShare>(share);
+            return ValueTask.FromResult(ValueResult<IBlobShare, IndexedDbError>.FromValue((IBlobShare)share));
         }
 
         public override ValueTask DisposeAsync()

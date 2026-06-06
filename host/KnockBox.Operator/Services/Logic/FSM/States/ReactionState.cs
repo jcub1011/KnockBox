@@ -26,7 +26,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
     private ValueResult<IGameState<OperatorGameContext, OperatorCommand>?> TransitionAfterReaction(OperatorGameContext context)
     {
         var currentPlayerId = context.State.TurnManager.CurrentPlayer;
-        if (currentPlayerId != null && context.GamePlayers.TryGetValue(currentPlayerId, out var pState) && pState.Hand.Count == 0)
+        if (currentPlayerId != null && context.GamePlayers.TryGetValue(currentPlayerId.Value, out var pState) && pState.Hand.Count == 0)
         {
             context.State.Phase = OperatorGamePhase.Draw;
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
@@ -73,7 +73,7 @@ public class ReactionState : IOperatorGameState, ITimedGameState<OperatorGameCon
             context.State.DiscardPile.Add(shield);
 
             string reactorName = context.State.Participants.FirstOrDefault(p => p.User.Id == react.PlayerId).DisplayName ?? "Unknown";
-            string attackerName = context.State.Participants.FirstOrDefault(p => p.User.Id == context.State.TurnManager.CurrentPlayer).DisplayName ?? "Unknown";
+            string attackerName = context.State.Participants.FirstOrDefault(p => p.User.Id == context.State.TurnManager.CurrentPlayer.GetValueOrDefault()).DisplayName ?? "Unknown";
 
             context.State.ActionLog.Add(new ActionLogEntry(
                 $"{reactorName} used a Shield to block {attackerName}'s action.",

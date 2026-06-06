@@ -1,3 +1,4 @@
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Storage.ClientStorage;
 using KnockBox.Services.State.Shared;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -26,7 +27,7 @@ public class SessionTokenProviderTests : ISessionTokenProviderContractTests<Sess
             {
                 var compositeKey = $"{module}_{key}";
                 var val = _inMemoryStorage.TryGetValue(compositeKey, out var result) ? result : string.Empty;
-                return new ValueTask<string>(val);
+                return new ValueTask<ValueResult<string?>>(ValueResult<string?>.FromValue(val));
             });
 
         _sessionStorageMock
@@ -35,7 +36,7 @@ public class SessionTokenProviderTests : ISessionTokenProviderContractTests<Sess
             {
                 var compositeKey = $"{module}_{key}";
                 _inMemoryStorage[compositeKey] = value;
-                return ValueTask.CompletedTask;
+                return new ValueTask<Result>(Result.Success);
             });
     }
 

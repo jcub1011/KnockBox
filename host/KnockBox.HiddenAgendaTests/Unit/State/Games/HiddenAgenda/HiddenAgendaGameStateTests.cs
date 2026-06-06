@@ -16,7 +16,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.State
         public void Setup()
         {
             _loggerMock = new Mock<ILogger<HiddenAgendaGameState>>();
-            _host = UserFactory.Create("HostUser", "host-id");
+            _host = UserFactory.Create("HostUser", Guid.NewGuid());
         }
 
         [TestMethod]

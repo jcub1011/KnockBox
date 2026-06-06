@@ -58,7 +58,7 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
         {
             var tokenId = SpawnNpc();
 
-            var result = _engine.ReassignTokenOwnerAsync(_state, _host, tokenId, "not-a-player", TokenType.PlayerToken);
+            var result = _engine.ReassignTokenOwnerAsync(_state, _host, tokenId, Guid.NewGuid(), TokenType.PlayerToken);
 
             Assert.IsTrue(result.IsFailure);
         }
@@ -96,7 +96,7 @@ namespace KnockBox.DndMapperTests.Unit.Logic.Games
         {
             var tokenId = SpawnNpc();
 
-            var result = _engine.ReassignTokenOwnerAsync(_state, _host, tokenId, "not-a-player", TokenType.NPCToken);
+            var result = _engine.ReassignTokenOwnerAsync(_state, _host, tokenId, Guid.NewGuid(), TokenType.NPCToken);
 
             Assert.IsTrue(result.IsFailure);
             var token = _state.Maps[0].Tokens.Single(t => t.Id == tokenId);

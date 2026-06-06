@@ -27,13 +27,14 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<CardCounterGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new CardCounterGameState(host, _stateLoggerMock.Object);
             _context = new CardCounterGameContext(_state, _randomMock.Object, _loggerMock.Object);
         }
 
-        private PlayerState AddPlayer(string id, string name)
+        private PlayerState AddPlayer(string name)
         {
+            var id = Guid.NewGuid();
             var player = new PlayerState { PlayerId = id, DisplayName = name };
             _state.GamePlayers[id] = player;
             _state.TurnManager.TurnOrder.Add(id);
@@ -55,7 +56,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void OnEnter_PositiveBalance_AddsPotValueToBalance()
         {
-            var p1 = AddPlayer("p1", "Player 1");
+            var p1 = AddPlayer("Player 1");
             p1.Balance = 10;
             p1.Pot.AddRange([5, 3]); // pot = 53
 
@@ -68,7 +69,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void OnEnter_ZeroBalance_AddsPotValueToBalance()
         {
-            var p1 = AddPlayer("p1", "Player 1");
+            var p1 = AddPlayer("Player 1");
             p1.Balance = 0;
             p1.Pot.AddRange([2, 0]); // pot = 20
 
@@ -81,7 +82,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void OnEnter_NegativeBalance_SubtractsPotValueFromBalance()
         {
-            var p1 = AddPlayer("p1", "Player 1");
+            var p1 = AddPlayer("Player 1");
             p1.Balance = -10;
             p1.Pot.AddRange([5, 3]); // pot = 53
 
@@ -94,7 +95,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void OnEnter_EmptyPot_DoesNotChangeBalance()
         {
-            var p1 = AddPlayer("p1", "Player 1");
+            var p1 = AddPlayer("Player 1");
             p1.Balance = 42;
             // Pot is empty
 
@@ -107,7 +108,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void OnEnter_ClearsPotAfterApplying()
         {
-            var p1 = AddPlayer("p1", "Player 1");
+            var p1 = AddPlayer("Player 1");
             p1.Balance = 5;
             p1.Pot.AddRange([1, 2]); // pot = 12
 
@@ -120,15 +121,15 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void OnEnter_MultiplePlayers_AppliesEachPotIndependently()
         {
-            var p1 = AddPlayer("p1", "Player 1");
+            var p1 = AddPlayer("Player 1");
             p1.Balance = 100;
             p1.Pot.AddRange([2, 5]); // pot = 25 → balance + 25 = 125
 
-            var p2 = AddPlayer("p2", "Player 2");
+            var p2 = AddPlayer("Player 2");
             p2.Balance = -50;
             p2.Pot.AddRange([1, 0]); // pot = 10 → balance - 10 = -60
 
-            var p3 = AddPlayer("p3", "Player 3");
+            var p3 = AddPlayer("Player 3");
             p3.Balance = 7;
             // empty pot → balance unchanged
 

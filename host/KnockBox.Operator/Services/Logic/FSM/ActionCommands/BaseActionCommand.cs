@@ -17,13 +17,13 @@ public abstract class BaseActionCommand(
     
     public IEnumerable<Card> PlayedCards { get; } = playedCards;
 
-    public string InitiatorPlayerId => PlayCommand.PlayerId;
+    public Guid InitiatorPlayerId => PlayCommand.PlayerId;
 
     public Card? PrimaryCard => PlayedCards.FirstOrDefault(c => c is ActionCard || c is OperatorCard);
 
     public virtual bool RequiresReaction => false;
 
-    public virtual IEnumerable<string> GetReactionTargetIds() => [];
+    public virtual IEnumerable<Guid> GetReactionTargetIds() => [];
 
     public virtual void SetupPendingState() { }
 
@@ -31,7 +31,7 @@ public abstract class BaseActionCommand(
 
     public virtual void OnBlocked() { }
 
-    public virtual void UpdateTarget(string newTargetId)
+    public virtual void UpdateTarget(Guid newTargetId)
     {
         PlayCommand = PlayCommand with { TargetPlayerId = newTargetId };
     }
@@ -50,7 +50,7 @@ public abstract class BaseActionCommand(
     protected void LogPlay(bool actionBlocked)
     {
         string sourceName = GetPlayerName(PlayCommand.PlayerId);
-        string targetName = PlayCommand.TargetPlayerId != null ? GetPlayerName(PlayCommand.TargetPlayerId) : "themselves";
+        string targetName = PlayCommand.TargetPlayerId != null ? GetPlayerName(PlayCommand.TargetPlayerId.Value) : "themselves";
         string cardNames = string.Join(", ", PlayedCards.Select(c => c.TooltipName()));
 
         Context.State.ActionLog.Add(new ActionLogEntry(
@@ -69,7 +69,7 @@ public abstract class BaseActionCommand(
         }
     }
 
-    protected string GetPlayerName(string playerId)
+    protected string GetPlayerName(Guid playerId)
     {
         return Context.State.Participants.FirstOrDefault(p => p.User.Id == playerId).DisplayName ?? "Unknown";
     }

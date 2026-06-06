@@ -34,7 +34,7 @@ public sealed class IndexedDbBlobImplTests
         using var registry = IndexedDbTestHelpers.NewRegistry();
         var blob = NewBlob(interop.Object, registry, length: 4);
 
-        var share = await blob.PublishForSharingAsync();
+        Assert.IsTrue((await blob.PublishForSharingAsync()).TryGetSuccess(out var share));
 
         Assert.IsNotNull(registry.TryGetAndTouch(Guid.Parse(share.Url["/blob-share/".Length..])));
         Assert.AreEqual(4, share.Length);
@@ -49,8 +49,8 @@ public sealed class IndexedDbBlobImplTests
         using var registry = IndexedDbTestHelpers.NewRegistry();
         var blob = NewBlob(interop.Object, registry, length: 4);
 
-        var share1 = await blob.PublishForSharingAsync();
-        var share2 = await blob.PublishForSharingAsync();
+        Assert.IsTrue((await blob.PublishForSharingAsync()).TryGetSuccess(out var share1));
+        Assert.IsTrue((await blob.PublishForSharingAsync()).TryGetSuccess(out var share2));
 
         Assert.IsNotNull(registry.TryGetAndTouch(Guid.Parse(share1.Url["/blob-share/".Length..])));
         Assert.IsNotNull(registry.TryGetAndTouch(Guid.Parse(share2.Url["/blob-share/".Length..])));
@@ -68,12 +68,13 @@ public sealed class IndexedDbBlobImplTests
         using var registry = IndexedDbTestHelpers.NewRegistry();
         var blob = NewBlob(interop.Object, registry);
 
-        var share = await blob.PublishForSharingAsync(new BlobShareOptions
+        var shareResult = await blob.PublishForSharingAsync(new BlobShareOptions
         {
             AbsoluteExpiry = TimeSpan.FromMinutes(5),
             SlidingExpiry = TimeSpan.FromMinutes(1),
             CacheControl = "public, max-age=300",
         });
+        Assert.IsTrue(shareResult.TryGetSuccess(out var share));
 
         Assert.IsNotNull(registry.TryGetAndTouch(Guid.Parse(share.Url["/blob-share/".Length..])));
         await share.DisposeAsync();
@@ -146,8 +147,8 @@ public sealed class IndexedDbBlobImplTests
         using var registry = IndexedDbTestHelpers.NewRegistry();
         var blob = NewBlob(interop.Object, registry);
 
-        var url1 = await blob.CreateObjectUrlAsync();
-        var url2 = await blob.CreateObjectUrlAsync();
+        Assert.IsTrue((await blob.CreateObjectUrlAsync()).TryGetSuccess(out var url1));
+        Assert.IsTrue((await blob.CreateObjectUrlAsync()).TryGetSuccess(out var url2));
         Assert.AreEqual("blob:abc", url1);
         Assert.AreEqual(url1, url2);
         interop.Verify(x => x.InvokeAsync<BlobUrlResponse>(
@@ -157,7 +158,7 @@ public sealed class IndexedDbBlobImplTests
     }
 
     [TestMethod]
-    public async Task CreateObjectUrlAsync_Failure_ThrowsIOException()
+    public async Task CreateObjectUrlAsync_Failure_ReturnsError()
     {
         var interop = IndexedDbTestHelpers.NewInteropMock();
         interop.Setup(x => x.InvokeAsync<BlobUrlResponse>(
@@ -168,9 +169,10 @@ public sealed class IndexedDbBlobImplTests
         using var registry = IndexedDbTestHelpers.NewRegistry();
         var blob = NewBlob(interop.Object, registry);
 
-        var ex = await Assert.ThrowsExactlyAsync<IOException>(
-            async () => await blob.CreateObjectUrlAsync());
-        StringAssert.Contains(ex.Message, "blobCreateObjectUrl");
+        var result = await blob.CreateObjectUrlAsync();
+        Assert.IsTrue(result.TryGetFailure(out var err));
+        Assert.AreEqual(IndexedDbErrorKind.Aborted, err.Kind);
+        StringAssert.Contains(err.Message, "circuit gone");
     }
 
     [TestMethod]

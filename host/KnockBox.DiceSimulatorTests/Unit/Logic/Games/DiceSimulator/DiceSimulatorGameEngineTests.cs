@@ -27,7 +27,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
             _randomMock = new Mock<IRandomNumberService>();
             _engineLoggerMock = new Mock<ILogger<DiceSimulatorGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<DiceSimulatorGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
 
             _engine = new DiceSimulatorGameEngine(
                 _randomMock.Object,
@@ -79,7 +79,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DiceSimulatorGameState)stateResult.Value!;
-            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+            var nonHost = UserFactory.Create("NotHost", Guid.NewGuid());
 
             var result = await _engine.StartAsync(nonHost, state);
 
@@ -114,7 +114,8 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
                 Mode = RollMode.Normal
             };
 
-            var user = UserFactory.Create("Player", "p1");
+            var playerId = Guid.NewGuid();
+            var user = UserFactory.Create("Player", playerId);
 
             var result = _engine.RollDice(user, state, action);
 
@@ -126,7 +127,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
             Assert.HasCount(2, roll.RawRolls);
             Assert.IsNull(roll.AltRolls);
 
-            var stats = state.PlayerStats["p1"];
+            var stats = state.PlayerStats[playerId];
             Assert.AreEqual(1, stats.TotalRolls);
             Assert.AreEqual(2, stats.TotalDiceRolled);
             Assert.AreEqual(22, stats.HighestResult);
@@ -153,7 +154,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
                 Mode = RollMode.Advantage
             };
 
-            var user = UserFactory.Create("Player", "p1");
+            var user = UserFactory.Create("Player", Guid.NewGuid());
             var result = _engine.RollDice(user, state, action);
 
             Assert.IsTrue((bool)result.IsSuccess);
@@ -181,7 +182,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
                 Mode = RollMode.Disadvantage
             };
 
-            var user = UserFactory.Create("Player", "p1");
+            var user = UserFactory.Create("Player", Guid.NewGuid());
             var result = _engine.RollDice(user, state, action);
 
             Assert.IsTrue((bool)result.IsSuccess);
@@ -232,7 +233,7 @@ namespace KnockBox.DiceSimulator.Tests.Unit.Logic
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DiceSimulatorGameState)stateResult.Value!;
-            var user = UserFactory.Create("A", "B");
+            var user = UserFactory.Create("A", Guid.NewGuid());
             
             var result = _engine.ClearHistory(user, state);
             Assert.IsTrue((bool)result.IsFailure);

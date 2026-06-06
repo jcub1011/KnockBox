@@ -2,7 +2,7 @@
 @using KnockBox.Codeword.Services.State.Games
 
 @{
-    var myId = UserService.CurrentUser?.Id ?? "";
+    var myId = UserService.CurrentUser?.Id ?? Guid.Empty;
     var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
     int aliveCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated);
     int endVotes = GameState.EndGameVoteStatus.VotedToEnd.Count;

@@ -75,28 +75,28 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM
         /// Resolution stack used for multi-step interactions such as the Feeling Lucky chain
         /// and Comp'd responses. Bottom entry is the chain originator.
         /// </summary>
-        public Stack<string> ResolutionStack { get; } = new();
+        public Stack<Guid> ResolutionStack { get; } = new();
 
         // ── Convenience accessors (delegate to State) ─────────────────────────
 
-        public System.Collections.Concurrent.ConcurrentDictionary<string, PlayerState> GamePlayers => State.GamePlayers;
+        public System.Collections.Concurrent.ConcurrentDictionary<Guid, PlayerState> GamePlayers => State.GamePlayers;
         public Stack<BaseCard> MainDeck => State.MainDeck;
         public Stack<BaseCard> CurrentShoe => State.CurrentShoe;
         public Stack<BaseCard> DiscardPile => State.DiscardPile;
-        public Stack<string> ForceDrawStack => State.ForceDrawStack;
-        public List<string> TurnOrder => State.TurnManager.TurnOrder;
+        public Stack<Guid> ForceDrawStack => State.ForceDrawStack;
+        public List<Guid> TurnOrder => State.TurnManager.TurnOrder;
         public CardCounterSettings Settings => State.Settings;
 
         // ── Turn helpers ──────────────────────────────────────────────────────
 
         /// <summary>Player ID of the currently active player, or null if there are no players.</summary>
-        public string? CurrentPlayerId => State.TurnManager.CurrentPlayer;
+        public Guid? CurrentPlayerId => State.TurnManager.CurrentPlayer;
 
-        public bool IsCurrentPlayer(string playerId) => CurrentPlayerId == playerId;
+        public bool IsCurrentPlayer(Guid playerId) => CurrentPlayerId == playerId;
 
         public PlayerState? GetCurrentPlayer() => State.CurrentPlayerState;
 
-        public PlayerState? GetPlayer(string playerId) =>
+        public PlayerState? GetPlayer(Guid playerId) =>
             GamePlayers.TryGetValue(playerId, out var ps) ? ps : null;
 
         /// <summary>Advances the turn pointer to the next player in TurnOrder (wraps around).</summary>

@@ -1,0 +1,586 @@
+.content {
+    padding: 1rem;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-library {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 1rem 0 2rem;
+}
+
+.ac-library-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    text-align: center;
+}
+
+.ac-library-brand {
+    font-family: var(--font-display, system-ui);
+    font-size: clamp(2rem, 9vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    background: linear-gradient(90deg, var(--ac-cyan, #00e5ff), var(--ac-magenta, #ff2e8b));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 18px rgba(0, 229, 255, 0.3));
+}
+
+.ac-library-tagline {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+/* Brutalist toggle to flip the whole grid between the Large and Small previews. */
+.ac-library-size {
+    margin-top: 0.35rem;
+    padding: 0.45rem 1.1rem;
+    border: 3px solid #000;
+    border-radius: 0.55rem;
+    background: var(--ac-cyan, #00e5ff);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+    transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.ac-library-size:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 #000;
+}
+
+.ac-library-size:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #000;
+}
+
+/* ── Test bench ─────────────────────────────────────────────────────────── */
+.ac-bench {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    border: 3px solid #000;
+    border-radius: 0.75rem;
+    background: var(--ac-panel, rgba(8, 18, 32, 0.55));
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+}
+
+.ac-bench-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.85rem;
+}
+
+.ac-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.ac-field-word {
+    flex: 1 1 14rem;
+}
+
+.ac-field-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-input {
+    padding: 0.5rem 0.65rem;
+    border: 3px solid #000;
+    border-radius: 0.5rem;
+    background: var(--ac-ink, #eaf2ff);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.ac-input-num {
+    width: 6rem;
+}
+
+.ac-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--ac-ink, #eaf2ff);
+    cursor: pointer;
+}
+
+.ac-toggle input {
+    width: 1.1rem;
+    height: 1.1rem;
+    cursor: pointer;
+}
+
+.ac-run {
+    margin-left: auto;
+    padding: 0.55rem 1.6rem;
+    border: 3px solid #000;
+    border-radius: 0.55rem;
+    background: var(--ac-magenta, #ff2e8b);
+    color: #fff;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+    transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.ac-run:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 #000;
+}
+
+.ac-run:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #000;
+}
+
+.ac-bench-bay {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.ac-bench-bay-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.ac-bench-bay-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-bench-clear {
+    padding: 0.25rem 0.7rem;
+    border: 2px solid #000;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: var(--ac-ink, #eaf2ff);
+    font-weight: 700;
+    font-size: 0.72rem;
+    cursor: pointer;
+}
+
+.ac-bench-empty {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-bench-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.ac-bench-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ac-bench-slot-ops {
+    display: flex;
+    gap: 0.2rem;
+}
+
+.ac-bench-slot-ops button {
+    width: 1.6rem;
+    height: 1.6rem;
+    border: 2px solid #000;
+    border-radius: 0.35rem;
+    background: var(--ac-ink, #eaf2ff);
+    color: #042029;
+    font-size: 0.7rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.ac-bench-slot-ops button:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+/* Scored breakdown — a row of seed → per-card steps → final, mirroring the in-game replay strip. */
+.ac-bench-result {
+    border-top: 2px dashed rgba(234, 242, 255, 0.2);
+    padding-top: 0.85rem;
+}
+
+.ac-breakdown {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ac-breakdown-word {
+    font-family: var(--font-display, system-ui);
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--ac-cyan, #00e5ff);
+    margin-right: 0.35rem;
+}
+
+.ac-bd-step {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 2.6rem;
+    padding: 0.3rem 0.4rem;
+    border: 2px solid #000;
+    border-radius: 0.45rem;
+    background: rgba(8, 18, 32, 0.6);
+    font-weight: 700;
+}
+
+.ac-bd-icon {
+    width: 1.4rem;
+    height: 1.4rem;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-bd-op {
+    font-size: 0.72rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-bd-run {
+    font-size: 0.95rem;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-bd-triggered {
+    border-color: var(--ac-step-accent, var(--ac-accent-neutral, #8aa0b3));
+}
+
+.ac-bd-skip {
+    opacity: 0.5;
+}
+
+.ac-bd-final {
+    background: var(--ac-cyan, #00e5ff);
+}
+
+.ac-bd-final .ac-bd-op,
+.ac-bd-final .ac-bd-run {
+    color: #042029;
+}
+
+.ac-bd-taxed {
+    background: var(--ac-magenta, #ff2e8b);
+}
+
+.ac-bd-taxed .ac-bd-op,
+.ac-bd-taxed .ac-bd-run {
+    color: #fff;
+}
+
+.ac-bench-note {
+    margin: 0.6rem 0 0;
+    font-size: 0.8rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+/* ── Scenario bar + per-player columns ─────────────────────────────────── */
+.ac-bench-scenario {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.85rem;
+}
+
+.ac-bench-turn {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin-left: auto;
+    font-family: var(--font-display, system-ui);
+    font-size: 1.05rem;
+    color: var(--ac-cyan, #00e5ff);
+}
+
+.ac-bench-phasehint {
+    margin: 0;
+    padding: 0.5rem 0.7rem;
+    border: 2px dashed var(--ac-magenta, #ff2e8b);
+    border-radius: 0.5rem;
+    font-size: 0.82rem;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-bench-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.ac-bench-player {
+    flex: 1 1 16rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.7rem;
+    border: 3px solid #000;
+    border-radius: 0.6rem;
+    background: rgba(8, 18, 32, 0.45);
+}
+
+/* The seat whose turn it is — cyan rail. */
+.ac-bench-player-current {
+    border-color: var(--ac-cyan, #00e5ff);
+    box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.25);
+}
+
+/* The seat the palette ＋ Add targets — magenta rail (can coincide with current). */
+.ac-bench-player-active {
+    background: rgba(255, 46, 139, 0.12);
+}
+
+.ac-bench-player-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.ac-bench-player-name {
+    padding: 0.35rem 0.6rem;
+    border: 2px solid #000;
+    border-radius: 0.45rem;
+    background: var(--ac-ink, #eaf2ff);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-weight: 800;
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+}
+
+.ac-bench-player-active .ac-bench-player-name {
+    background: var(--ac-magenta, #ff2e8b);
+    color: #fff;
+}
+
+.ac-bench-score {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.ac-bench-score .ac-input-num {
+    width: 4.5rem;
+}
+
+/* ── Submit row extras + feedback ──────────────────────────────────────── */
+.ac-bench-skip {
+    padding: 0.55rem 1.2rem;
+    border: 3px solid #000;
+    border-radius: 0.55rem;
+    background: var(--ac-ink, #eaf2ff);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+    transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.ac-bench-skip:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 #000;
+}
+
+.ac-bench-skip:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #000;
+}
+
+.ac-bench-msg {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+/* ── Steal line + automated-effect feed ────────────────────────────────── */
+.ac-bench-steal {
+    margin: 0.6rem 0 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ac-magenta, #ff2e8b);
+}
+
+.ac-bench-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.6rem;
+}
+
+.ac-bench-feed-line {
+    padding: 0.35rem 0.55rem;
+    border-left: 3px solid var(--ac-cyan, #00e5ff);
+    background: rgba(8, 18, 32, 0.5);
+    border-radius: 0.3rem;
+    font-size: 0.82rem;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+/* ── Submission history ────────────────────────────────────────────────── */
+.ac-bench-history {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.6rem;
+    border-top: 2px dashed rgba(234, 242, 255, 0.2);
+    padding-top: 0.6rem;
+}
+
+.ac-bench-history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.ac-bench-history-item {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.35rem 0.55rem;
+    border-radius: 0.35rem;
+    background: rgba(8, 18, 32, 0.5);
+    font-size: 0.85rem;
+}
+
+.ac-bench-history-num {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    min-width: 2rem;
+}
+
+.ac-bench-history-who {
+    font-weight: 800;
+    color: var(--ac-cyan, #00e5ff);
+    min-width: 3rem;
+}
+
+.ac-bench-history-word {
+    font-family: var(--font-display, system-ui);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: var(--ac-ink, #eaf2ff);
+    flex: 1 1 auto;
+}
+
+.ac-bench-history-score {
+    font-weight: 800;
+    color: var(--ac-additive, #38e08b);
+}
+
+.ac-bench-history-tax {
+    font-weight: 800;
+    color: var(--ac-magenta, #ff2e8b);
+}
+
+.ac-bench-history-bounty {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--ac-magenta, #ff2e8b);
+}
+
+/* ── Palette ────────────────────────────────────────────────────────────── */
+.ac-library-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.85rem;
+}
+
+.ac-palette-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.ac-palette-add {
+    padding: 0.3rem 0.9rem;
+    border: 2px solid #000;
+    border-radius: 0.4rem;
+    background: var(--ac-additive, #38e08b);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-weight: 800;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 #000;
+    transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.ac-palette-add:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 #000;
+}
+
+.ac-palette-add:active {
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 #000;
+}
+
+/* Flex-wrapped catalogue. GameCard owns its own fixed width, so the row just wraps and centers. */
+.ac-library-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+/* Small tiles pack tighter than the large flip cards. */
+.ac-library-grid-small {
+    gap: 0.6rem;
+}

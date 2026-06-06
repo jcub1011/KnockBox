@@ -47,10 +47,10 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             if (command is not SubmitClueCommand cmd)
                 return null;
 
-            string? currentPlayerId = context.State.TurnManager.CurrentPlayer;
+            Guid? currentPlayerId = context.State.TurnManager.CurrentPlayer;
 
             // Only the current player may submit.
-            if (cmd.PlayerId != currentPlayerId)
+            if (cmd.PlayerId != currentPlayerId.GetValueOrDefault())
                 return new ResultError("It is not your turn to submit a clue.");
 
             var player = context.GetPlayer(cmd.PlayerId);
@@ -108,8 +108,8 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
                 return null;
 
             // Auto-submit for the timed-out player. Use pending clue text if valid, otherwise "...".
-            string? currentPlayerId = context.State.TurnManager.CurrentPlayer;
-            var player = currentPlayerId is not null ? context.GetPlayer(currentPlayerId) : null;
+            Guid? currentPlayerId = context.State.TurnManager.CurrentPlayer;
+            var player = currentPlayerId is { } cpId ? context.GetPlayer(cpId) : null;
             if (player is not null && !player.HasSubmittedClue)
             {
                 string clue = ResolvePendingClue(context, player);
@@ -182,7 +182,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
 
             for (int i = 0; i < turnOrder.Count; i++)
             {
-                string playerId = turnOrder[context.State.TurnManager.CurrentPlayerIndex];
+                Guid playerId = turnOrder[context.State.TurnManager.CurrentPlayerIndex];
                 var player = context.GetPlayer(playerId);
                 if (player is not null && !player.IsEliminated && !player.HasSubmittedClue)
                     return true;

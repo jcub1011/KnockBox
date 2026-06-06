@@ -37,10 +37,10 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             _engineLoggerMock = new Mock<ILogger<CardCounterGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<CardCounterGameState>>();
 
-            _host = UserFactory.Create("Host", "host-id");
-            _player1 = UserFactory.Create("Player1", "p1-id");
-            _player2 = UserFactory.Create("Player2", "p2-id");
-            _player3 = UserFactory.Create("Player3", "p3-id");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
+            _player1 = UserFactory.Create("Player1", Guid.NewGuid());
+            _player2 = UserFactory.Create("Player2", Guid.NewGuid());
+            _player3 = UserFactory.Create("Player3", Guid.NewGuid());
 
             _engine = new CardCounterGameEngine(
                 _randomMock.Object,

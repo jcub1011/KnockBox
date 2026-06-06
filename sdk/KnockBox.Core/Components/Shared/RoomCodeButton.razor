@@ -8,18 +8,40 @@
 <a href="@JoinUrl"
    target="_blank"
    class="@ClassName @(_isRevealed ? "revealed" : "")"
+   @ref="_buttonRef"
    @onclick="Toggle"
    @onclick:preventDefault="true"
+   @ondblclick="OpenModal"
+   @ondblclick:preventDefault="true"
    @oncontextmenu="OnContextMenu"
    @oncontextmenu:preventDefault="true"
    @onpointerdown="OnPointerDown"
    @onpointerup="OnPointerUp"
    @onpointercancel="OnPointerCancel"
    @onpointerleave="OnPointerCancel"
-   title="Click to reveal. Right-click/long-press to copy code. Ctrl+right-click to copy link. Middle-click to join in a new tab.">
+   title="Click to reveal. Double-click to enlarge. Right-click/long-press to copy code. Ctrl+right-click to copy link. Middle-click to join in a new tab.">
     <span class="@CoverClassName">@CoverText</span>
     <span class="@ValueClassName">@Code</span>
 </a>
+
+@if (_isModalOpen)
+{
+    <div class="kb-rc-overlay" style="top:@(_modalTopPx)px"
+         @onclick="CloseModal"
+         @onkeydown="OnModalKeyDown" tabindex="-1" @ref="_overlayRef">
+        <div class="kb-rc-card" role="dialog" aria-modal="true"
+             aria-label="Room code" @onclick:stopPropagation="true">
+            <button type="button" class="kb-rc-close" aria-label="Close"
+                    @onclick="CloseModal">&times;</button>
+            <span class="kb-rc-label">Join Code</span>
+            <span class="kb-rc-code">@Code</span>
+            <div class="kb-rc-actions">
+                <button type="button" class="kb-rc-btn" @onclick="CopyCodeAsync">Copy code</button>
+                <button type="button" class="kb-rc-btn" @onclick="CopyJoinUrlAsync">Copy link</button>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     [Inject] INavigationService NavigationService { get; set; } = default!;
@@ -33,6 +55,12 @@
     [Parameter] public string CoverText { get; set; } = "Join Code";
 
     private bool _isRevealed;
+    private bool _isModalOpen;
+    private bool _modalNeedsFocus;
+    private int _modalTopPx;
+    private ElementReference _overlayRef;
+    private ElementReference _buttonRef;
+    private IJSObjectReference? _jsModule;
     private CancellationTokenSource? _longPressCts;
 
     private string JoinUrl => GameSessionService.TryGetCurrentSession(out var session)
@@ -45,6 +73,43 @@
             : string.Empty;
 
     private void Toggle() => _isRevealed = !_isRevealed;
+
+    private async Task OpenModal()
+    {
+        // Measure the header bottom first so the popup opens already positioned below
+        // it (leaving the header visible) without a top-of-viewport flicker.
+        try
+        {
+            _jsModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/KnockBox.Core/js/roomCodeButton.js");
+            _modalTopPx = await _jsModule.InvokeAsync<int>("getHeaderBottom", _buttonRef);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to measure header offset for room code popup.");
+            _modalTopPx = 0;
+        }
+
+        _isModalOpen = true;
+        _modalNeedsFocus = true;
+    }
+
+    private void CloseModal() => _isModalOpen = false;
+
+    private void OnModalKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") CloseModal();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Focus the overlay once after it opens so it receives the Escape keystroke.
+        if (_isModalOpen && _modalNeedsFocus)
+        {
+            _modalNeedsFocus = false;
+            await _overlayRef.FocusAsync();
+        }
+    }
 
     // Right-click copies the room code; Ctrl+right-click copies the full join URL.
     private Task OnContextMenu(MouseEventArgs e) =>
@@ -119,5 +184,17 @@
         _longPressCts = null;
     }
 
-    public void Dispose() => CancelLongPress();
+    public void Dispose()
+    {
+        CancelLongPress();
+
+        if (_jsModule is not null)
+        {
+            // Fire-and-forget; the circuit may already be gone during teardown.
+            _ = _jsModule.DisposeAsync().AsTask().ContinueWith(
+                t => Logger.LogDebug(t.Exception, "Room code popup JS module disposal failed."),
+                TaskContinuationOptions.OnlyOnFaulted);
+            _jsModule = null;
+        }
+    }
 }

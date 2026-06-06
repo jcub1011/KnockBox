@@ -25,7 +25,7 @@ namespace KnockBox.HiddenAgenda.Pages
             StateHasChanged();
         }
 
-        private void HandleSubmit(Dictionary<string, List<string>> guesses)
+        private void HandleSubmit(Dictionary<Guid, List<string>> guesses)
         {
             if (UserService.CurrentUser == null) return;
             var result = Engine.SubmitFinalGuess(UserService.CurrentUser, GameState, guesses);

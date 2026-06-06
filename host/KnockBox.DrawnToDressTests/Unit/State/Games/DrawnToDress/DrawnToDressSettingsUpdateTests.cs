@@ -22,7 +22,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.State.Games.DrawnToDress
                 NullLogger<DrawnToDressGameEngine>.Instance,
                 NullLogger<DrawnToDressGameState>.Instance,
                 rng.Object);
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             var result = await engine.CreateStateAsync(host);
             _state = (DrawnToDressGameState)result.Value!;
         }

@@ -6,8 +6,8 @@
 
 @{
     var myPlayer = GetMyPlayer();
-    var myId = UserService.CurrentUser?.Id ?? "";
-    var activeId = GameState.TurnManager.CurrentPlayer ?? "";
+    var myId = UserService.CurrentUser?.Id ?? Guid.Empty;
+    var activeId = GameState.TurnManager.CurrentPlayer ?? Guid.Empty;
     var isSharedDisplay = IsSharedDisplay();
     // Show all game players in the player list (including self; host has no player state)
     var allPlayers = GameState.GamePlayers.Values.ToList();
@@ -147,11 +147,11 @@ else if (GameState.GamePlayers.Values.Any(p => p.ActionHand.Count > GameState.Se
     bool isPendingReaction = !isFeelingLucky && isAnyPendingReaction;
     bool isSkim = isPendingReaction && GameState.PendingReaction?.PlayedCard.Action == ActionType.Skim;
 
-    string sourceId = isFeelingLucky
-        ? (GameState.ForceDrawStack.Count > 0 ? GameState.ForceDrawStack.Peek() : GameState.LastPlayedAction?.PlayerId ?? "")
-        : (GameState.PendingReaction?.SourceId ?? "");
+    Guid sourceId = isFeelingLucky
+        ? (GameState.ForceDrawStack.Count > 0 ? GameState.ForceDrawStack.Peek() : GameState.LastPlayedAction?.PlayerId ?? Guid.Empty)
+        : (GameState.PendingReaction?.SourceId ?? Guid.Empty);
 
-    string theTargetId = isFeelingLucky ? (GameState.FeelingLuckyTargetId ?? "") : (GameState.PendingReaction?.TargetId ?? "");
+    Guid theTargetId = isFeelingLucky ? (GameState.FeelingLuckyTargetId ?? Guid.Empty) : (GameState.PendingReaction?.TargetId ?? Guid.Empty);
 
     var sourcePlayer = GameState.GamePlayers.TryGetValue(sourceId, out var sp) ? sp : null;
     var targetPlayer = GameState.GamePlayers.TryGetValue(theTargetId, out var tp2) ? tp2 : null;
@@ -1300,7 +1300,7 @@ else
         </div>
         <p class="cc-target-hint">Click a player in the list to select them as your target, then confirm.</p>
         <div class="cc-target-confirm">
-            @if (_selectedTargetId != null && GameState.GamePlayers.TryGetValue(_selectedTargetId, out var targetPl))
+            @if (_selectedTargetId is { } selId && GameState.GamePlayers.TryGetValue(selId, out var targetPl))
             {
                 <span class="cc-target-name">🎯 @targetPl.DisplayName</span>
             }

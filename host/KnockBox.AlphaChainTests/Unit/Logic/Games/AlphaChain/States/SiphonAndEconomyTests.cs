@@ -1,7 +1,9 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
+using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -27,16 +29,16 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartGameAsync(
             StubWordListService words, int playerCount, char banned)
         {
             var engine = new AlphaChainGameEngine(
-                words, new FixedRandomNumberService(), new ScoreCalculator(),
+                words, new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -45,34 +47,51 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             state.UpdateSettings(s => s with { EnableTutorials = false });
             await engine.StartAsync(_host, state);
+            DrainCountdown(engine, state);
             state.Execute(() => state.BannedLetter = banned);
             return (engine, state);
         }
 
-        private static void GiveModifier(AlphaChainGameState state, string playerId, string cardId) =>
-            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(ModifierLibrary.FindById(cardId)!));
+        /// <summary>Ticks past the pre-round "Get Ready" countdown so the FSM lands in RoundState.</summary>
+        private static void DrainCountdown(AlphaChainGameEngine engine, AlphaChainGameState state)
+        {
+            if (state.Phase == AlphaChainGamePhase.Countdown)
+                engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
+        }
 
-        private static void SetCardBan(AlphaChainGameState state, string playerId, string cardId, char letter) =>
-            state.Execute(() => state.GamePlayers[playerId].CardBannedLetters[cardId] = letter);
+        private static void GiveModifier(AlphaChainGameState state, Guid playerId, string cardId) =>
+            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
+
+        private static void SetCardBan(AlphaChainGameState state, Guid playerId, string cardId, char letter) =>
+            state.Execute(() => RoomStateProbe.SetCardBan(state, playerId, TestModifierCards.ToId(cardId), letter));
+
+        /// <summary>Score the player clear of last place so the era ban actually taxes them. The era ban
+        /// never taxes the last-place player, and a fresh 0–0 field makes turn-order-0 the tie-broken
+        /// last place — so taxed-submitter tests park them above the field first. A taxed word still
+        /// scores 0, so the player stays at this baseline.</summary>
+        private const int NotLastPlaceScore = 100;
+        private static void ParkClearOfLastPlace(AlphaChainGameState state, Guid playerId) =>
+            state.Execute(() => state.GamePlayers[playerId].Score = NotLastPlaceScore);
 
         // ── Tax Collector ───────────────────────────────────────────────────
 
         [TestMethod]
         public async Task TaxCollector_CollectsHalfTheWouldBeScore()
         {
-            // "cat" + Anchor → would-be 9; banned 'a' taxes it. Tax Collector owner takes 50% → 5.
+            // "cat" + Anchor → would-be 13 (3 + 10); banned 'a' taxes it. Tax Collector owner takes 50%.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var owner = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, submitter, "anchor");
-            GiveModifier(state, owner, ModifierLibrary.TaxCollectorId);
+            GiveModifier(state, owner, TestModifierCards.TaxCollectorId);
+            ParkClearOfLastPlace(state, submitter);
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
-            Assert.AreEqual(0, state.GamePlayers[submitter].Score);
-            Assert.AreEqual(5, state.GamePlayers[owner].Score, "Tax Collector collects round(9 × 0.5) = 5 (half-up).");
+            Assert.AreEqual(NotLastPlaceScore, state.GamePlayers[submitter].Score, "Taxed word adds 0 → submitter unchanged.");
+            Assert.AreEqual(7, state.GamePlayers[owner].Score, "Tax Collector collects round(13 × 0.5) = 7 (half-up).");
         }
 
         // ── The Toll Booth (card-ban siphon) ────────────────────────────────
@@ -80,11 +99,11 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         [TestMethod]
         public async Task TollBooth_MintsCut_WhenOpponentUsesRolledLetter()
         {
-            // Clean word (banned 'z' absent from "cat"); submitter Anchor → earns 9. Owner's Toll
-            // Booth letter 't' is in "cat" → owner minted round(9 × 0.2) = 2; submitter keeps 9.
+            // Clean word (banned 'z' absent from "cat"); submitter Anchor → earns 13 (3 + 10). Owner's
+            // Toll Booth letter 't' is in "cat" → owner minted round(13 × 0.2) = 3; submitter keeps 13.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var owner = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, submitter, "anchor");
@@ -93,8 +112,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
-            Assert.AreEqual(9, state.GamePlayers[submitter].Score, "Submitter keeps their full score.");
-            Assert.AreEqual(2, state.GamePlayers[owner].Score, "Owner is minted round(9 × 0.2) = 2 (half-up).");
+            Assert.AreEqual(13, state.GamePlayers[submitter].Score, "Submitter keeps their full score.");
+            Assert.AreEqual(3, state.GamePlayers[owner].Score, "Owner is minted round(13 × 0.2) = 3 (half-up).");
         }
 
         [TestMethod]
@@ -103,11 +122,12 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // Banned 'a' taxes "cat" to 0 → no earned points → no Smuggler mint even though 't' is used.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var owner = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, owner, "toll-booth");
             SetCardBan(state, owner, "toll-booth", 't');
+            ParkClearOfLastPlace(state, submitter); // so "cat" is era-taxed, not exempt
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
@@ -123,17 +143,18 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // points (it is a utility slot, no salvage) but denies the opposing Tax Collector its cut.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var owner = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, submitter, "irs");
-            GiveModifier(state, owner, ModifierLibrary.TaxCollectorId);
+            GiveModifier(state, owner, TestModifierCards.TaxCollectorId);
+            ParkClearOfLastPlace(state, submitter);
 
             var outcome = await engine.SubmitWordAsync(submitter, "cat", state);
             Assert.IsTrue(outcome.TryGetSuccess(out var result));
             Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(result, "0-point tax reads as a taxed accept.");
 
-            Assert.AreEqual(0, state.GamePlayers[submitter].Score, "The IRS Agent grants 0 points.");
+            Assert.AreEqual(NotLastPlaceScore, state.GamePlayers[submitter].Score, "The IRS Agent grants 0 points → submitter unchanged.");
             Assert.AreEqual(0, state.GamePlayers[owner].Score, "Tax Collector bounty is suppressed by The IRS Agent.");
         }
 
@@ -146,15 +167,16 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // cursed with a personal 'a' ban for their upcoming turn.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var next = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, submitter, "bait-and-switch");
+            ParkClearOfLastPlace(state, submitter); // so "cat" is era-taxed → Bait & Switch fires
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
             Assert.AreEqual(next, state.TurnManager.CurrentPlayer, "Turn advanced to the next player.");
-            Assert.AreEqual('a', state.GamePlayers[next].PersonalBannedLetter, "Next player is cursed with the offending 'a'.");
+            Assert.AreEqual('a', RoomStateProbe.PersonalBannedLetter(state, next), "Next player is cursed with the offending 'a'.");
         }
 
         // ── Roulette Wheel (reward + self-tax) ──────────────────────────────
@@ -166,7 +188,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // length 3 = 5.25 → 5 (half-up).
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
 
             GiveModifier(state, submitter, "roulette-wheel");
             SetCardBan(state, submitter, "roulette-wheel", 'q');
@@ -182,7 +204,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // Rolled personal ban 't' is in "cat" → Zero-Point Tax → score 0 despite the ×1.75.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
 
             GiveModifier(state, submitter, "roulette-wheel");
             SetCardBan(state, submitter, "roulette-wheel", 't');

@@ -14,7 +14,7 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
     /// <param name="Duration">Wall-clock time from game start to game over.</param>
     public record GameResults(
         IReadOnlyList<PlayerResult> Rankings,
-        string WinnerUserId,
+        Guid WinnerUserId,
         int TotalWordsPlayed,
         TimeSpan Duration);
 
@@ -25,7 +25,7 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
     /// <param name="Eliminated">Whether the player was eliminated (Survival mode).</param>
     /// <param name="WordsPlayed">How many accepted plays this player contributed.</param>
     public record PlayerResult(
-        string UserId,
+        Guid UserId,
         string DisplayName,
         int Score,
         bool Eliminated,

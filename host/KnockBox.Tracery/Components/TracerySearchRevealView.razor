@@ -65,7 +65,7 @@
     [Parameter, EditorRequired] public TraceryGameState State { get; set; } = default!;
 
     /// <summary>The viewer's user id, used to highlight their row.</summary>
-    [Parameter] public string? CurrentUserId { get; set; }
+    [Parameter] public Guid? CurrentUserId { get; set; }
 
     /// <summary>Invoked when the host skips the remaining intermission. Host-only in the UI.</summary>
     [Parameter] public EventCallback OnSkip { get; set; }

@@ -17,8 +17,8 @@ public class HotPotatoCommand(
 
     public override bool RequiresReaction => GetReactionTargetIds().Any();
 
-    public override IEnumerable<string> GetReactionTargetIds() =>
-        (!string.IsNullOrEmpty(PlayCommand.TargetPlayerId) && PlayCommand.TargetPlayerId != PlayCommand.PlayerId) ? [PlayCommand.TargetPlayerId] : [];
+    public override IEnumerable<Guid> GetReactionTargetIds() =>
+        (PlayCommand.TargetPlayerId != null && PlayCommand.TargetPlayerId.Value != PlayCommand.PlayerId) ? [PlayCommand.TargetPlayerId.Value] : [];
 
     public override void SetupPendingState()
     {

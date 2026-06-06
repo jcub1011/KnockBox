@@ -27,13 +27,14 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<CardCounterGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new CardCounterGameState(host, _stateLoggerMock.Object);
             _context = new CardCounterGameContext(_state, _randomMock.Object, _loggerMock.Object);
         }
 
-        private PlayerState AddPlayer(string id, string name)
+        private PlayerState AddPlayer(string name)
         {
+            var id = Guid.NewGuid();
             var player = new PlayerState { PlayerId = id, DisplayName = name };
             _state.GamePlayers[id] = player;
             _state.TurnManager.TurnOrder.Add(id);
@@ -53,7 +54,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void OnEnter_WhenDeckHasCards_SetsIsNewShoe()
         {
-            AddPlayer("p1", "Player 1");
+            AddPlayer("Player 1");
             // Push enough cards for the minimum shoe size
             PushCardsToMainDeck(_state.Settings.MinShoeSize);
 
@@ -66,7 +67,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void OnEnter_WhenDeckEmpty_TransitionsToGameOver()
         {
-            AddPlayer("p1", "Player 1");
+            AddPlayer("Player 1");
             // Main deck is empty
 
             var fsmState = new RoundEndState();
@@ -78,7 +79,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void OnEnter_WhenDeckHasCards_PopulatesCurrentShoe()
         {
-            AddPlayer("p1", "Player 1");
+            AddPlayer("Player 1");
             PushCardsToMainDeck(_state.Settings.MinShoeSize + 5);
 
             var fsmState = new RoundEndState();
@@ -90,7 +91,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void OnEnter_WhenDeckHasCards_DealActionCardsToPlayers()
         {
-            var p1 = AddPlayer("p1", "Player 1");
+            var p1 = AddPlayer("Player 1");
             PushCardsToMainDeck(_state.Settings.MinShoeSize);
 
             var fsmState = new RoundEndState();
@@ -103,7 +104,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void OnEnter_AllPlayersUnderHandLimit_ReturnsPlayerTurnState()
         {
-            AddPlayer("p1", "Player 1");
+            AddPlayer("Player 1");
             PushCardsToMainDeck(_state.Settings.MinShoeSize);
 
             var fsmState = new RoundEndState();
@@ -116,7 +117,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void HandleCommand_Discard_ValidIndices_RemovesCards()
         {
-            var p1 = AddPlayer("p1", "Player 1");
+            var p1 = AddPlayer("Player 1");
             PushCardsToMainDeck(_state.Settings.MinShoeSize);
 
             // Pre-fill the hand to beyond the limit
@@ -137,7 +138,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             int excessCount = currentCount - limit;
             int[] indicesToDiscard = [.. Enumerable.Range(limit, excessCount)];
 
-            var next = fsmState.HandleCommand(_context, new DiscardActionCardsCommand("p1", indicesToDiscard));
+            var next = fsmState.HandleCommand(_context, new DiscardActionCardsCommand(p1.PlayerId, indicesToDiscard));
 
             Assert.HasCount(limit, p1.ActionHand, "Player should be at the action hand limit after discarding.");
         }
@@ -145,7 +146,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void HandleCommand_Discard_InvalidIndices_IsNoOp()
         {
-            var p1 = AddPlayer("p1", "Player 1");
+            var p1 = AddPlayer("Player 1");
             int limit = _state.Settings.ActionHandLimit;
             for (int i = 0; i <= limit; i++)
                 p1.ActionHand.Add(new ActionCard(ActionType.Burn));
@@ -154,7 +155,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             int countBefore = p1.ActionHand.Count;
             // Pass an out-of-range index
-            fsmState.HandleCommand(_context, new DiscardActionCardsCommand("p1", [999]));
+            fsmState.HandleCommand(_context, new DiscardActionCardsCommand(p1.PlayerId, [999]));
 
             Assert.HasCount(countBefore, p1.ActionHand, "Invalid indices should leave hand unchanged.");
         }
@@ -162,7 +163,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void HandleCommand_Discard_DuplicateIndices_IsNoOp()
         {
-            var p1 = AddPlayer("p1", "Player 1");
+            var p1 = AddPlayer("Player 1");
             int limit = _state.Settings.ActionHandLimit;
             for (int i = 0; i <= limit; i++)
                 p1.ActionHand.Add(new ActionCard(ActionType.Burn));
@@ -171,7 +172,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             int countBefore = p1.ActionHand.Count;
             // Duplicate index (same card twice)
-            fsmState.HandleCommand(_context, new DiscardActionCardsCommand("p1", [0, 0]));
+            fsmState.HandleCommand(_context, new DiscardActionCardsCommand(p1.PlayerId, [0, 0]));
 
             Assert.HasCount(countBefore, p1.ActionHand, "Duplicate indices should be rejected.");
         }
@@ -179,7 +180,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void HandleCommand_Discard_NotEnoughCardsDiscarded_IsNoOp()
         {
-            var p1 = AddPlayer("p1", "Player 1");
+            var p1 = AddPlayer("Player 1");
             int limit = _state.Settings.ActionHandLimit;
             // Two cards over the limit
             for (int i = 0; i < limit + 2; i++)
@@ -189,7 +190,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             int countBefore = p1.ActionHand.Count;
             // Only discard one — still over limit, so command should be rejected
-            fsmState.HandleCommand(_context, new DiscardActionCardsCommand("p1", [0]));
+            fsmState.HandleCommand(_context, new DiscardActionCardsCommand(p1.PlayerId, [0]));
 
             Assert.HasCount(countBefore, p1.ActionHand,
                 "Discarding too few cards (still over limit) should be rejected.");
@@ -198,8 +199,8 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void HandleCommand_Discard_AllPlayersUnderLimit_TransitionsToPlayerTurnState()
         {
-            var p1 = AddPlayer("p1", "Player 1");
-            var p2 = AddPlayer("p2", "Player 2");
+            var p1 = AddPlayer("Player 1");
+            var p2 = AddPlayer("Player 2");
             int limit = _state.Settings.ActionHandLimit;
 
             // Both players have one card over limit
@@ -212,7 +213,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             while (p2.ActionHand.Count > limit) p2.ActionHand.RemoveAt(p2.ActionHand.Count - 1);
 
             var fsmState = new RoundEndState();
-            var next = fsmState.HandleCommand(_context, new DiscardActionCardsCommand("p1", [limit]));
+            var next = fsmState.HandleCommand(_context, new DiscardActionCardsCommand(p1.PlayerId, [limit]));
 
             Assert.IsNotNull(next.Value);
             Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState), "When all players are under limit, transition to PlayerTurnState.");
@@ -221,10 +222,10 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void HandleCommand_NonDiscardCommand_IsIgnored()
         {
-            AddPlayer("p1", "Player 1");
+            var p1 = AddPlayer("Player 1");
             var fsmState = new RoundEndState();
 
-            var next = fsmState.HandleCommand(_context, new DrawCardCommand("p1"));
+            var next = fsmState.HandleCommand(_context, new DrawCardCommand(p1.PlayerId));
 
             Assert.IsNull(next.Value, "Non-discard commands should be ignored in RoundEndState.");
         }

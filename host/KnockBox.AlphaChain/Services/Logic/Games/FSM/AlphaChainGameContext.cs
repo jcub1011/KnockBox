@@ -1,5 +1,6 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 using KnockBox.Core.Services.Logic.RandomGeneration;
@@ -18,7 +19,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
         AlphaChainGameEngine engine,
         IWordListService wordList,
         IRandomNumberService rng,
-        IScoreCalculator scoreCalculator,
+        IEngineEvaluator evaluator,
+        IModifierCardFactory modifierFactory,
         ILogger logger)
     {
         /// <summary>The underlying game state for this game instance.</summary>
@@ -39,10 +41,20 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
         public IRandomNumberService Rng { get; } = rng;
 
         /// <summary>
-        /// The deterministic scoring pipeline (singleton, forwarded from the engine). FSM
-        /// states score submissions through this so scoring is centralised and testable.
+        /// The sequential scoring driver (singleton, forwarded from the engine). FSM states score
+        /// submissions through this so scoring is centralised and testable.
         /// </summary>
-        public IScoreCalculator ScoreCalculator { get; } = scoreCalculator;
+        public IEngineEvaluator Evaluator { get; } = evaluator;
+
+        /// <summary>Creates live <see cref="IModifierCard"/> instances (singleton, forwarded from the engine).</summary>
+        public IModifierCardFactory ModifierFactory { get; } = modifierFactory;
+
+        /// <summary>
+        /// Per-room, plugin-internal service provider backing <c>EngineEvaluationContext.Services</c>.
+        /// Cards resolve engine operations (ban rolls, attacks, clock refills) from it; the FSM refreshes
+        /// its per-resolution scratch state via <see cref="AlphaChainEvaluationServices.BeginResolution"/>.
+        /// </summary>
+        public AlphaChainEvaluationServices EvaluationServices { get; } = new(state, rng, modifierFactory);
 
         /// <summary>
         /// The outcome of the most recent <see cref="SubmitWordCommand"/>. The FSM writes
@@ -58,6 +70,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
         public IFiniteStateMachine<AlphaChainGameContext, AlphaChainCommand> Fsm { get; set; } = null!;
 
         /// <summary>Shortcut to <see cref="AlphaChainGameState.GamePlayers"/>.</summary>
-        public ConcurrentDictionary<string, AlphaChainPlayerState> GamePlayers => State.GamePlayers;
+        public ConcurrentDictionary<Guid, AlphaChainPlayerState> GamePlayers => State.GamePlayers;
     }
 }

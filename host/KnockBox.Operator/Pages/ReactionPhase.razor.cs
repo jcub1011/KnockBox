@@ -26,12 +26,12 @@ namespace KnockBox.Operator.Pages
             UserService.CurrentUser != null ? GameState.Context?.GamePlayers.GetValueOrDefault(UserService.CurrentUser.Id) : null;
 
         protected bool IsTargeted =>
-            GameState.ReactionTargetPlayerIds.Contains(UserService.CurrentUser?.Id ?? "")
-            && !GameState.PlayerReactions.Any(r => r.PlayerId == (UserService.CurrentUser?.Id ?? ""));
+            GameState.ReactionTargetPlayerIds.Contains(UserService.CurrentUser?.Id ?? Guid.Empty)
+            && !GameState.PlayerReactions.Any(r => r.PlayerId == (UserService.CurrentUser?.Id ?? Guid.Empty));
 
         protected bool HasReacted =>
-            GameState.ReactionTargetPlayerIds.Contains(UserService.CurrentUser?.Id ?? "")
-            && GameState.PlayerReactions.Any(r => r.PlayerId == (UserService.CurrentUser?.Id ?? ""));
+            GameState.ReactionTargetPlayerIds.Contains(UserService.CurrentUser?.Id ?? Guid.Empty)
+            && GameState.PlayerReactions.Any(r => r.PlayerId == (UserService.CurrentUser?.Id ?? Guid.Empty));
 
         protected bool CanRedirectHotPotato => GameState.PendingGameActionCommand is HotPotatoCommand;
 
@@ -78,7 +78,7 @@ namespace KnockBox.Operator.Pages
             _redirectingWithCardId = null;
         }
 
-        protected async Task RedirectHotPotato(string targetPlayerId)
+        protected async Task RedirectHotPotato(Guid targetPlayerId)
         {
             if (!IsTargeted || UserService.CurrentUser == null || _redirectingWithCardId == null) return;
 

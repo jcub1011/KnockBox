@@ -155,7 +155,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
                 var a = unpaired[0];
                 unpaired.RemoveAt(0);
 
-                string aPlayer = a.PlayerId;
+                Guid aPlayer = a.PlayerId;
 
                 // Find the best opponent:
                 // 1. Not a rematch AND not the same player

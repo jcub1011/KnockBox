@@ -105,11 +105,11 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
         private static ValueResult<IGameState<CodewordGameContext, CodewordCommand>?>
             TallyAndTransition(CodewordGameContext context)
         {
-            string? eliminatedId = context.TallyVotes();
+            Guid? eliminatedId = context.TallyVotes();
 
             if (eliminatedId is not null)
             {
-                var eliminated = context.GetPlayer(eliminatedId)!;
+                var eliminated = context.GetPlayer(eliminatedId.Value)!;
                 eliminated.IsEliminated = true;
                 context.State.LastElimination = new EliminationResult(
                     eliminated.PlayerId, eliminated.DisplayName, eliminated.Role, WasTie: false);
@@ -121,7 +121,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             {
                 // Tie — no one eliminated.
                 context.State.LastElimination = new EliminationResult(
-                    string.Empty, string.Empty, default, WasTie: true);
+                    Guid.Empty, string.Empty, default, WasTie: true);
 
                 context.Logger.LogDebug("VotePhase: vote resulted in a tie.");
             }

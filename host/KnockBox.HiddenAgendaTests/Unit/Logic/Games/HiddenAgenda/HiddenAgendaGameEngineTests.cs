@@ -28,7 +28,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
             _rngMock = new Mock<IRandomNumberService>();
             _engineLoggerMock = new Mock<ILogger<HiddenAgendaGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<HiddenAgendaGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
 
             _engine = new HiddenAgendaGameEngine(
                 _rngMock.Object,
@@ -56,9 +56,9 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
             
             // Register minimum players (3)
             // Note: Host is NOT a player in the Players list for AbstractGameState
-            state.RegisterPlayer(UserFactory.Create("Player 1", "p1"));
-            state.RegisterPlayer(UserFactory.Create("Player 2", "p2"));
-            state.RegisterPlayer(UserFactory.Create("Player 3", "p3"));
+            state.RegisterPlayer(UserFactory.Create("Player 1", Guid.NewGuid()));
+            state.RegisterPlayer(UserFactory.Create("Player 2", Guid.NewGuid()));
+            state.RegisterPlayer(UserFactory.Create("Player 3", Guid.NewGuid()));
 
             var result = await _engine.StartAsync(_host, state);
 
@@ -77,10 +77,10 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (HiddenAgendaGameState)stateResult.Value!;
-            state.RegisterPlayer(UserFactory.Create("Player 1", "p1"));
-            state.RegisterPlayer(UserFactory.Create("Player 2", "p2"));
-            state.RegisterPlayer(UserFactory.Create("Player 3", "p3"));
-            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+            state.RegisterPlayer(UserFactory.Create("Player 1", Guid.NewGuid()));
+            state.RegisterPlayer(UserFactory.Create("Player 2", Guid.NewGuid()));
+            state.RegisterPlayer(UserFactory.Create("Player 3", Guid.NewGuid()));
+            var nonHost = UserFactory.Create("NotHost", Guid.NewGuid());
 
             var result = await _engine.StartAsync(nonHost, state);
 

@@ -6,8 +6,8 @@
 @{
     bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
 
-    string? myId = UserService.CurrentUser?.Id;
-    var myPlayer = myId is not null && GameState.GamePlayers.TryGetValue(myId, out var pOut) ? pOut : null;
+    var myId = UserService.CurrentUser?.Id;
+    var myPlayer = myId is { } myIdVal && GameState.GamePlayers.TryGetValue(myIdVal, out var pOut) ? pOut : null;
     int mySubmitted = myPlayer is not null ? CountSubmittedForCurrentType(myPlayer) : 0;
     int myMax = CurrentTypeMaxItems;
     bool canSubmit = myMax == 0 || mySubmitted < myMax;

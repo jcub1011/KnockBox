@@ -24,9 +24,9 @@ namespace KnockBox.DrawnToDress.Pages
 
         private bool _submitting;
         private string? _errorMessage;
-        private readonly HashSet<string> _expandedPlayers = [];
+        private readonly HashSet<Guid> _expandedPlayers = [];
 
-        private string CurrentPlayerId => UserService.CurrentUser?.Id ?? string.Empty;
+        private Guid CurrentPlayerId => UserService.CurrentUser?.Id ?? Guid.Empty;
 
         /// <summary>Per-outfit score for a single voting round.</summary>
         protected record OutfitRoundScore(int RoundNumber, EntrantId EntrantId, double Score);
@@ -34,15 +34,15 @@ namespace KnockBox.DrawnToDress.Pages
         /// <summary>Full breakdown for a player: per-round outfit scores, bonus points, and bye rounds.</summary>
         protected record PlayerBreakdown(List<OutfitRoundScore> OutfitScores, int BonusPoints, List<int> ByeRounds);
 
-        protected void ToggleBreakdown(string playerId)
+        protected void ToggleBreakdown(Guid playerId)
         {
             if (!_expandedPlayers.Remove(playerId))
                 _expandedPlayers.Add(playerId);
         }
 
-        protected bool IsExpanded(string playerId) => _expandedPlayers.Contains(playerId);
+        protected bool IsExpanded(Guid playerId) => _expandedPlayers.Contains(playerId);
 
-        protected PlayerBreakdown GetBreakdown(string playerId)
+        protected PlayerBreakdown GetBreakdown(Guid playerId)
         {
             var outfitScores = new List<OutfitRoundScore>();
             var votes = GameState.Votes.Values.ToList();

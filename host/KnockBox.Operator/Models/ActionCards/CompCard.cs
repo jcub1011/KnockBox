@@ -1,3 +1,4 @@
+using System;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
@@ -29,7 +30,7 @@ public sealed class CompCard() : ActionCard(CardAction.Comp)
         return ValueResult<CardPlayResult>.FromValue(CardPlayResult.Ok());
     }
 
-    public static void Resolve(OperatorGameContext context, string playerId)
+    public static void Resolve(OperatorGameContext context, Guid playerId)
     {
         if (context.GamePlayers.TryGetValue(playerId, out var player) && !player.IsAudited)
         {

@@ -15,15 +15,15 @@ namespace KnockBox.HiddenAgenda.Pages
         [Parameter, EditorRequired] public HiddenAgendaGameEngine Engine { get; set; } = default!;
         [Parameter, EditorRequired] public IUserService UserService { get; set; } = default!;
 
-        private string? _selectedTargetPlayerId;
+        private Guid? _selectedTargetPlayerId;
         private string? _errorMessage;
         private int _errorKey;
 
         private bool IsCurrentPlayer => UserService.CurrentUser?.Id == GameState.TurnManager.CurrentPlayer;
-        private HiddenAgendaPlayerState? CurrentPlayerState => GameState.TurnManager.CurrentPlayer != null && GameState.GamePlayers.TryGetValue(GameState.TurnManager.CurrentPlayer, out var p) ? p : null;
+        private HiddenAgendaPlayerState? CurrentPlayerState => GameState.TurnManager.CurrentPlayer is { } cp && GameState.GamePlayers.TryGetValue(cp, out var p) ? p : null;
         private string CurrentPlayerName => CurrentPlayerState?.DisplayName ?? "Unknown";
 
-        private List<SecretTask>? PlayerTasks => UserService.CurrentUser != null && GameState.GamePlayers.TryGetValue(UserService.CurrentUser.Id, out var p) ? p.SecretTasks : null;
+        private List<SecretTask>? PlayerTasks => UserService.CurrentUser is not null && GameState.GamePlayers.TryGetValue(UserService.CurrentUser.Id, out var p) ? p.SecretTasks : null;
 
         private void ShowError(string message)
         {
@@ -58,21 +58,21 @@ namespace KnockBox.HiddenAgenda.Pages
 
             if (cardType == EventCardType.Catalog)
             {
-                if (string.IsNullOrEmpty(_selectedTargetPlayerId))
+                if (!_selectedTargetPlayerId.HasValue)
                 {
                     ShowError("Please select a target player.");
                     return;
                 }
-                result = Engine.PlayCatalog(UserService.CurrentUser, GameState, _selectedTargetPlayerId);
+                result = Engine.PlayCatalog(UserService.CurrentUser, GameState, _selectedTargetPlayerId.Value);
             }
             else if (cardType == EventCardType.Detour)
             {
-                if (string.IsNullOrEmpty(_selectedTargetPlayerId))
+                if (!_selectedTargetPlayerId.HasValue)
                 {
                     ShowError("Please select a target player.");
                     return;
                 }
-                result = Engine.PlayDetour(UserService.CurrentUser, GameState, _selectedTargetPlayerId);
+                result = Engine.PlayDetour(UserService.CurrentUser, GameState, _selectedTargetPlayerId.Value);
             }
             else
             {

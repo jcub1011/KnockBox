@@ -38,6 +38,18 @@
     --ac-action: #b97bff;
     --ac-tax: #ff3b5c;
 
+    /* ── Standardized card-family accents (border + step tint) ────────────
+       Chosen for color-blind separation: the four families differ in BOTH hue
+       and lightness (the one channel preserved across every CVD type). The blue
+       (Clock) and purple (Utility) are deliberately split onto opposite warm/cool
+       sides — Utility is a red-dominant magenta, not a blue-violet — so red-green
+       color blindness can't collapse them together. */
+    --ac-accent-letter: #14f195;   /* mint green     — word/letter scoring (cool, high lightness) */
+    --ac-accent-clock: #2f86e6;    /* deep blue      — shot-clock (cool, low lightness) */
+    --ac-accent-economy: #ffb020;  /* amber          — points/economy + aggression (warm, light) */
+    --ac-accent-utility: #e36ec9;  /* magenta/orchid — utility / defensive / policy (warm, red-dominant) */
+    --ac-accent-neutral: #8aa0b3;  /* slate          — unknown / inert */
+
     /* ── Player accent rotation (assigned by turn-order index) ────────── */
     --ac-p1: #00e5ff;
     --ac-p2: #ff2e8b;

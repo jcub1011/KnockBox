@@ -6,8 +6,8 @@ namespace KnockBox.DndMapper.Services.State.Games.Data
     {
         public Guid Id { get; init; }
         public TokenType Type { get; init; }
-        public string? OwnerUserId { get; init; }
-        public string? RepresentsUserId { get; init; }
+        public Guid? OwnerUserId { get; init; }
+        public Guid? RepresentsUserId { get; init; }
         public string Name { get; init; } = string.Empty;
         public string Color { get; init; } = string.Empty;
         public TokenIconKind IconKind { get; init; } = TokenIconKind.Initial;

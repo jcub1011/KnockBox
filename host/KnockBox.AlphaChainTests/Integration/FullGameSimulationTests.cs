@@ -2,7 +2,8 @@ using System.Text;
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -30,7 +31,7 @@ namespace KnockBox.AlphaChain.Tests.Integration
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
         [TestMethod]
@@ -45,13 +46,13 @@ namespace KnockBox.AlphaChain.Tests.Integration
         {
             var words = new AnyWordListService();
             var engine = new AlphaChainGameEngine(
-                words, new FixedRandomNumberService(), new ScoreCalculator(),
+                words, new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
             using var _ = state;
             for (int i = 0; i < playerCount; i++)
-                state.RegisterPlayer(UserFactory.Create($"Player{i}", $"p{i}-id"));
+                state.RegisterPlayer(UserFactory.Create($"Player{i}", Guid.NewGuid()));
 
             // Tutorials off — this drives raw gameplay end-to-end; the tutorial phases are covered
             // by dedicated unit tests.
@@ -73,6 +74,14 @@ namespace KnockBox.AlphaChain.Tests.Integration
                     continue;
                 }
 
+                // The pre-round "Get Ready" countdown precedes every round (at the start and after
+                // each letter ban); tick past it to begin the round (as the host tick does).
+                if (state.Phase == AlphaChainGamePhase.Countdown)
+                {
+                    engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
+                    continue;
+                }
+
                 // A round-ending word leaves the FSM holding in RoundState so its score animation
                 // can finish; tick past the hold to fire the transition (as the host tick does).
                 if (state.PendingTransitionAt is { } holdUntil)
@@ -82,7 +91,7 @@ namespace KnockBox.AlphaChain.Tests.Integration
                 }
 
                 // RoundState: the active player answers immediately (no timeout).
-                var actor = state.TurnManager.CurrentPlayer!;
+                var actor = state.TurnManager.CurrentPlayer!.Value;
                 var word = NextWord(state.RequiredStartLetter, state.BannedLetter, ref counter);
 
                 var outcome = await engine.SubmitWordAsync(actor, word, state);
@@ -108,7 +117,7 @@ namespace KnockBox.AlphaChain.Tests.Integration
 
             var results = state.Results!;
             Assert.AreEqual(playerCount, results.Rankings.Count, "Every player should appear in the standings.");
-            Assert.AreEqual(state.PlayLog.Count, results.TotalWordsPlayed);
+            Assert.AreEqual(state.SubmissionHistory.Count, results.TotalWordsPlayed);
 
             // ── Winner genuinely holds the top score (non-survival mode). ──
             int topScore = state.GamePlayers.Values.Max(p => p.Score);
@@ -123,7 +132,7 @@ namespace KnockBox.AlphaChain.Tests.Integration
                 Assert.IsTrue(player.EngineBay.Count <= player.ModifierSlots,
                     $"Player {player.UserId} overflowed their Engine Bay ({player.EngineBay.Count} > {player.ModifierSlots}).");
 
-                var distinctIds = player.EngineBay.Select(c => c.Id).Distinct().Count();
+                var distinctIds = player.EngineBay.Select(c => c.GetId()).Distinct().Count();
                 Assert.AreEqual(player.EngineBay.Count, distinctIds,
                     $"Player {player.UserId} has duplicate modifier ids in their bay.");
             }

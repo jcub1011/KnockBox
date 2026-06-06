@@ -15,7 +15,7 @@ namespace KnockBox.LinkedList.Tests.Unit.State
         public void Setup()
         {
             _loggerMock = new Mock<ILogger<LinkedListGameState>>();
-            _host = UserFactory.Create("HostUser", "host-id");
+            _host = UserFactory.Create("HostUser", Guid.NewGuid());
         }
 
         [TestMethod]

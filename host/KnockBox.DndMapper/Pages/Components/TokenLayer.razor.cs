@@ -15,7 +15,7 @@ namespace KnockBox.DndMapper.Pages.Components
         [Parameter, EditorRequired] public DndMapperGameState State { get; set; } = default!;
         [Parameter] public Map? Map { get; set; }
         [Parameter] public bool IsHost { get; set; }
-        [Parameter] public string CurrentUserId { get; set; } = string.Empty;
+        [Parameter] public Guid CurrentUserId { get; set; }
         [Parameter, EditorRequired] public string SvgId { get; set; } = string.Empty;
 
         /// <summary>

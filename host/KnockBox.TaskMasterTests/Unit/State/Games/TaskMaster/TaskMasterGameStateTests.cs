@@ -16,7 +16,7 @@ namespace KnockBox.TaskMaster.Tests.Unit.State
         public void Setup()
         {
             _loggerMock = new Mock<ILogger<TaskMasterGameState>>();
-            _host = UserFactory.Create("HostUser", "host-id");
+            _host = UserFactory.Create("HostUser", Guid.NewGuid());
         }
 
         [TestMethod]

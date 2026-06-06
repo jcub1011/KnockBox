@@ -15,7 +15,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         [TestInitialize]
         public void Setup()
         {
-            var host = UserFactory.Create("HostUser", "host-id");
+            var host = UserFactory.Create("HostUser", Guid.NewGuid());
             _state = new DndMapperGameState(host, NullLogger<DndMapperGameState>.Instance);
         }
 
@@ -126,7 +126,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
 
         private static RollResult MakeRoll(string label) => new(
             Guid.NewGuid(),
-            "u1",
+            Guid.NewGuid(),
             ForcedByUserId: null,
             Rolls: [],
             Total: 0,

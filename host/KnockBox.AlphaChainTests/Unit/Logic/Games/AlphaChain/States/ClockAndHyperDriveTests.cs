@@ -1,6 +1,8 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
+using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -10,9 +12,9 @@ using Moq;
 namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 {
     /// <summary>
-    /// Exercises the glass-cannon clock cards (Vault, Redline, Panic Button) via
-    /// <see cref="AlphaChainGameState.ComputeArmedShotClockSeconds"/>, and the Hyper-Drive
-    /// era-scoped latch via the real submit path with a deterministic submission timestamp.
+    /// Exercises the glass-cannon clock cards (Vault, Redline, Panic Button, Heat Sink, Anchor Chain)
+    /// and Hyper-Drive's passive 5s shot-clock cap via
+    /// <see cref="AlphaChainGameState.ComputeArmedShotClockSeconds"/>.
     /// </summary>
     [TestClass]
     public class ClockAndHyperDriveTests
@@ -26,16 +28,16 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartGameAsync(
             StubWordListService words, int playerCount = 2, char? banned = null)
         {
             var engine = new AlphaChainGameEngine(
-                words, new FixedRandomNumberService(), new ScoreCalculator(),
+                words, new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -46,6 +48,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // configured default (which is 20s).
             state.UpdateSettings(s => s with { EnableTutorials = false, ShotClockSeconds = 12 });
             await engine.StartAsync(_host, state);
+            DrainCountdown(engine, state);
 
             if (banned is { } b)
                 state.Execute(() => state.BannedLetter = b);
@@ -53,8 +56,15 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             return (engine, state);
         }
 
-        private static void GiveModifier(AlphaChainGameState state, string playerId, string cardId) =>
-            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(ModifierLibrary.FindById(cardId)!));
+        /// <summary>Ticks past the pre-round "Get Ready" countdown so the FSM lands in RoundState.</summary>
+        private static void DrainCountdown(AlphaChainGameEngine engine, AlphaChainGameState state)
+        {
+            if (state.Phase == AlphaChainGamePhase.Countdown)
+                engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
+        }
+
+        private static void GiveModifier(AlphaChainGameState state, Guid playerId, string cardId) =>
+            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
 
         // ── Clock effects (ComputeArmedShotClockSeconds) ────────────────────
 
@@ -63,7 +73,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "the-vault");
 
             // 12 × 0.9 = 10.8 → 11 (half-up).
@@ -75,7 +85,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "redline");
 
             // 12 × 0.8 = 9.6 → 10 (half-up).
@@ -87,7 +97,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "panic-button");
 
             // 12 × 0.5 = 6.
@@ -99,7 +109,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "redline");    // −20%
             GiveModifier(state, id, "the-vault");  // −10%
 
@@ -112,7 +122,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "panic-button"); // −50%
             GiveModifier(state, id, "redline");      // −20%
             GiveModifier(state, id, "the-vault");    // −10%
@@ -123,15 +133,15 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         }
 
         [TestMethod]
-        public async Task HeatSink_AddsFiveSeconds()
+        public async Task HeatSink_LengthensTheShotClock()
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "heat-sink");
 
-            // Default shot clock 12 + 5 = 17.
-            Assert.AreEqual(17, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+            // Heat Sink declares a +0.3 fractional clock effect, so 12 × (1 + 0.3) = 15.6 → 16.
+            Assert.AreEqual(16, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
         }
 
         [TestMethod]
@@ -139,7 +149,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "anchor-chain"); // fixed, unmodifiable 5s
             GiveModifier(state, id, "heat-sink");    // +5s … which the override ignores
             GiveModifier(state, id, "the-vault");    // −3s … also ignored
@@ -148,40 +158,58 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                 "The Anchor Chain pins the clock to a strict, unmodifiable 5 seconds.");
         }
 
-        // ── Hyper-Drive latch (submit path) ─────────────────────────────────
+        // ── Hyper-Drive shot-clock cap (ComputeArmedShotClockSeconds) ───────
 
         [TestMethod]
-        public async Task HyperDrive_LatchesWhenSubmittingFast()
+        public async Task HyperDrive_CapsClockAtFive()
         {
-            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "hyper-drive");
 
-            // Arm the clock to a known window, then submit 2s in (elapsed 2 < 3 threshold).
-            var armAt = DateTimeOffset.UtcNow;
-            state.Execute(() => state.PhaseEndTime = armAt.AddSeconds(12));
-            await engine.SubmitWordAsync(id, "cat", state, armAt.AddSeconds(2));
-
-            Assert.IsTrue(state.GamePlayers[id].HyperDriveActive, "Fast submit should latch Hyper-Drive.");
-            // Once latched, the owner's clock is overridden to the rule's 5s.
+            // Base 12 capped down to the rule's 5s.
             Assert.AreEqual(5, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
         }
 
         [TestMethod]
-        public async Task HyperDrive_DoesNotLatchWhenSubmittingSlow()
+        public async Task HyperDrive_CapLowersEvenALengthenedClock()
         {
-            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
-            var id = state.TurnManager.CurrentPlayer!;
+            var id = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, id, "hyper-drive");
+            GiveModifier(state, id, "heat-sink"); // +30% → 12 × 1.3 = 15.6 → 16, then capped to 5.
 
-            // Submit 10s in (elapsed 10 ≥ 3 threshold) → no latch.
-            var armAt = DateTimeOffset.UtcNow;
-            state.Execute(() => state.PhaseEndTime = armAt.AddSeconds(12));
-            await engine.SubmitWordAsync(id, "cat", state, armAt.AddSeconds(10));
+            Assert.AreEqual(5, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+        }
 
-            Assert.IsFalse(state.GamePlayers[id].HyperDriveActive, "Slow submit must not latch Hyper-Drive.");
+        [TestMethod]
+        public async Task HyperDrive_CapNeverRaisesAShorterClock()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
+            using var _ = state;
+            var id = state.TurnManager.CurrentPlayer!.Value;
+            GiveModifier(state, id, "hyper-drive");
+            GiveModifier(state, id, "panic-button"); // −50%
+            GiveModifier(state, id, "redline");      // −20%
+            GiveModifier(state, id, "the-vault");    // −10%
+
+            // 12 × 0.2 = 2.4 → 2, the 5s cap does NOT raise it, then floored to the 3s minimum.
+            Assert.AreEqual(AlphaChainGameState.MinShotClockSeconds,
+                state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
+        }
+
+        [TestMethod]
+        public async Task AnchorChain_OverrideWins_AndIsNotCappedByHyperDrive()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"));
+            using var _ = state;
+            var id = state.TurnManager.CurrentPlayer!.Value;
+            GiveModifier(state, id, "anchor-chain"); // pins to a strict, unmodifiable 5s
+            GiveModifier(state, id, "hyper-drive");   // cap is ignored by the override path
+
+            Assert.AreEqual(5, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
         }
     }
 }

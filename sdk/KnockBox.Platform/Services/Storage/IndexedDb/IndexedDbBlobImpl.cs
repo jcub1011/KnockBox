@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Storage.IndexedDb;
 using Microsoft.JSInterop;
 
@@ -45,19 +46,37 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
         _length = length;
     }
 
-    public override async ValueTask<byte[]> ReadAllBytesAsync(CancellationToken ct = default)
+    public override async ValueTask<ValueResult<byte[], IndexedDbError>> ReadAllBytesAsync(CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        await using var stream = await OpenReadStreamAsync(_length, ct).ConfigureAwait(false);
-        using var buffer = new MemoryStream(capacity: (int)Math.Min(_length, int.MaxValue));
-        await stream.CopyToAsync(buffer, IndexedDbBlobChunking.ChunkSize, ct).ConfigureAwait(false);
-        return buffer.ToArray();
+        try
+        {
+            await using var stream = await OpenReadStreamAsync(_length, ct).ConfigureAwait(false);
+            using var buffer = new MemoryStream(capacity: (int)Math.Min(_length, int.MaxValue));
+            await stream.CopyToAsync(buffer, IndexedDbBlobChunking.ChunkSize, ct).ConfigureAwait(false);
+            return buffer.ToArray();
+        }
+        catch (OperationCanceledException) { return ValueResult<byte[], IndexedDbError>.Canceled; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Reading all bytes for blob {BlobId} failed.", _blobId);
+            return new IndexedDbError(IndexedDbErrorKind.Unknown, $"Failed to read blob: {ex.Message}");
+        }
     }
 
-    public override async ValueTask<Stream> OpenReadAsync(CancellationToken ct = default)
+    public override async ValueTask<ValueResult<Stream, IndexedDbError>> OpenReadAsync(CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return await OpenReadStreamAsync(_length, ct).ConfigureAwait(false);
+        try
+        {
+            return await OpenReadStreamAsync(_length, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { return ValueResult<Stream, IndexedDbError>.Canceled; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Opening read stream for blob {BlobId} failed.", _blobId);
+            return new IndexedDbError(IndexedDbErrorKind.Unknown, $"Failed to open blob read stream: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -145,7 +164,7 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
         }
     }
 
-    public override async ValueTask<string> CreateObjectUrlAsync(CancellationToken ct = default)
+    public override async ValueTask<ValueResult<string, IndexedDbError>> CreateObjectUrlAsync(CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_cachedObjectUrl is not null) return _cachedObjectUrl;
@@ -153,17 +172,17 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
             "blobCreateObjectUrl", ct, _blobId).ConfigureAwait(false);
         if (!result.TryGetSuccess(out var resp))
         {
-            var msg = result.IsCanceled
-                ? "Object URL creation was canceled."
-                : $"[{result.Error.Error.Kind}] {result.Error.Error.Message}";
-            _logger.LogError("blobCreateObjectUrl({BlobId}) failed: {Message}", _blobId, msg);
-            throw new IOException("blobCreateObjectUrl failed: " + msg);
+            if (result.IsCanceled)
+                return ValueResult<string, IndexedDbError>.Canceled;
+            var err = result.Error.Error;
+            _logger.LogError("blobCreateObjectUrl({BlobId}) failed: [{Kind}] {Message}", _blobId, err.Kind, err.Message);
+            return err;
         }
         _cachedObjectUrl = resp.Url;
         return _cachedObjectUrl;
     }
 
-    public override ValueTask<IBlobShare> PublishForSharingAsync(
+    public override ValueTask<ValueResult<IBlobShare, IndexedDbError>> PublishForSharingAsync(
         BlobShareOptions? options = null, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -194,12 +213,21 @@ internal sealed class IndexedDbBlobImpl : IndexedDbBlob
             // the originating circuit's blob each time a player fetches.
             StreamOpener = openCt => OpenReadStreamAsync(_length, openCt),
         };
-        _shareRegistry.Register(entry);
-        _publishedShares.Add(token);
+        try
+        {
+            _shareRegistry.Register(entry);
+            _publishedShares.Add(token);
 
-        var url = $"/blob-share/{token:D}";
-        IBlobShare share = new BlobShare(_shareRegistry, token, url, _contentType, _length);
-        return ValueTask.FromResult(share);
+            var url = $"/blob-share/{token:D}";
+            IBlobShare share = new BlobShare(_shareRegistry, token, url, _contentType, _length);
+            return ValueTask.FromResult(ValueResult<IBlobShare, IndexedDbError>.FromValue(share));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Publishing share for blob {BlobId} failed.", _blobId);
+            return ValueTask.FromResult(ValueResult<IBlobShare, IndexedDbError>.FromError(
+                new IndexedDbError(IndexedDbErrorKind.Unknown, $"Failed to publish blob share: {ex.Message}")));
+        }
     }
 
     public override async ValueTask DisposeAsync()

@@ -1,6 +1,7 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM.States;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -26,16 +27,16 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartGameAsync(
             int playerCount, bool survival = false)
         {
             var engine = new AlphaChainGameEngine(
-                new StubWordListService(), new FixedRandomNumberService(), new ScoreCalculator(),
+                new StubWordListService(), new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -128,10 +129,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var first = state.TurnManager.TurnOrder[0];
             state.Execute(() =>
             {
-                state.PlayLog.Add(new KnockBox.AlphaChain.Services.State.Games.Data.AlphaChainWordPlay(
-                    DateTimeOffset.UtcNow, first, "Player0", "cat", 3, false));
-                state.PlayLog.Add(new KnockBox.AlphaChain.Services.State.Games.Data.AlphaChainWordPlay(
-                    DateTimeOffset.UtcNow, first, "Player0", "tap", 3, false));
+                state.SubmissionHistory = state.SubmissionHistory
+                    .Add(new KnockBox.AlphaChain.Services.State.Games.Data.AlphaChainSubmission(
+                        DateTimeOffset.UtcNow, first, "Player0", "cat", 3, false, 0,
+                        new KnockBox.AlphaChain.Services.Logic.Scoring.ScoreBreakdown("cat", 3, [], 3, false, 3)))
+                    .Add(new KnockBox.AlphaChain.Services.State.Games.Data.AlphaChainSubmission(
+                        DateTimeOffset.UtcNow, first, "Player0", "tap", 3, false, 0,
+                        new KnockBox.AlphaChain.Services.Logic.Scoring.ScoreBreakdown("tap", 3, [], 3, false, 3)));
             });
 
             EnterGameOver(state);

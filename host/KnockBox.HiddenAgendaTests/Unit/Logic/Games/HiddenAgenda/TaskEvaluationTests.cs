@@ -21,16 +21,18 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
         private Mock<ILogger<HiddenAgendaGameState>> _stateLoggerMock = default!;
         private HiddenAgendaGameState _state = default!;
         private HiddenAgendaGameContext _context = default!;
-        private string _playerId = "p1";
+        private Guid _playerId = default!;
 
         [TestInitialize]
         public void Setup()
         {
+            _playerId = Guid.NewGuid();
+
             _rngMock = new Mock<IRandomNumberService>();
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<HiddenAgendaGameState>>();
 
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new HiddenAgendaGameState(host, _stateLoggerMock.Object);
             _state.BoardGraph = BoardDefinitions.CreateGrandCircuit();
 
@@ -261,7 +263,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
         {
             var task = GetTask("M3");
             var player = _state.GamePlayers[_playerId];
-            string otherId = "p2";
+            Guid otherId = Guid.NewGuid();
             _state.GamePlayers[otherId] = new HiddenAgendaPlayerState { PlayerId = otherId };
 
             // Turn 1: Other moves to space 1
@@ -309,7 +311,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
         {
             var task = GetTask("R1");
             var player = _state.GamePlayers[_playerId];
-            string otherId = "p2";
+            Guid otherId = Guid.NewGuid();
             _state.GamePlayers[otherId] = new HiddenAgendaPlayerState { PlayerId = otherId };
 
             for (int i = 1; i <= 3; i++)
@@ -331,7 +333,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
         {
             var task = GetTask("R6");
             var player = _state.GamePlayers[_playerId];
-            string otherId = "p2";
+            Guid otherId = Guid.NewGuid();
             player.RivalryTargetPlayerId = otherId;
             _state.GamePlayers[otherId] = new HiddenAgendaPlayerState { PlayerId = otherId };
 
@@ -340,7 +342,7 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
                 int turnBase = (i - 1) * 2 + 1;
                 // Other player moves to GrandHall
                 _state.RoundPlayHistory.Add(new TurnRecord(turnBase, otherId, null, 1, Wing.GrandHall));
-                
+
                 // This player moves to GrandHall
                 player.MovementHistory.Add(new MovementRecord(i, 2, Wing.GrandHall, 3));
                 _state.RoundPlayHistory.Add(new TurnRecord(turnBase + 1, _playerId, null, 2, Wing.GrandHall));
@@ -352,14 +354,15 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic
         [TestMethod]
         public void DrawTasksForPlayer_AssignsR6Target()
         {
-            _state.GamePlayers["p2"] = new HiddenAgendaPlayerState { PlayerId = "p2" };
+            Guid p2Id = Guid.NewGuid();
+            _state.GamePlayers[p2Id] = new HiddenAgendaPlayerState { PlayerId = p2Id };
             _state.CurrentTaskPool = [GetTask("R6")];
             _rngMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), RandomType.Fast)).Returns(0);
 
             _context.DrawTasksForPlayer(_playerId);
 
             var player = _state.GamePlayers[_playerId];
-            Assert.AreEqual("p2", player.RivalryTargetPlayerId);
+            Assert.AreEqual(p2Id, player.RivalryTargetPlayerId);
         }
     }
 }

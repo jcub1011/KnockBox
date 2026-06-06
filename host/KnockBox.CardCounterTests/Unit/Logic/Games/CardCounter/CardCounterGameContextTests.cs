@@ -26,13 +26,14 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<CardCounterGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new CardCounterGameState(host, _stateLoggerMock.Object);
             _context = new CardCounterGameContext(_state, _randomMock.Object, _loggerMock.Object);
         }
 
-        private PlayerState MakePlayer(string id, string name, double balance = 0, int[]? pot = null)
+        private PlayerState MakePlayer(string name, double balance = 0, int[]? pot = null)
         {
+            var id = Guid.NewGuid();
             var player = new PlayerState { PlayerId = id, DisplayName = name, Balance = balance };
             if (pot != null) player.Pot.AddRange(pot);
             _state.GamePlayers[id] = player;
@@ -45,7 +46,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyOperatorCard_Add_IncreasesBalance()
         {
-            var player = MakePlayer("p1", "P1", balance: 100, pot: [2, 5]); // pot = 25
+            var player = MakePlayer("P1", balance: 100, pot: [2, 5]); // pot = 25
 
             _context.ApplyOperatorCard(player, new OperatorCard(Operator.Add));
 
@@ -56,7 +57,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyOperatorCard_Subtract_DecreasesBalance()
         {
-            var player = MakePlayer("p1", "P1", balance: 100, pot: [1, 0]); // pot = 10
+            var player = MakePlayer("P1", balance: 100, pot: [1, 0]); // pot = 10
 
             _context.ApplyOperatorCard(player, new OperatorCard(Operator.Subtract));
 
@@ -66,7 +67,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyOperatorCard_Multiply_MultipliesBalance()
         {
-            var player = MakePlayer("p1", "P1", balance: 50, pot: [3]); // pot = 3
+            var player = MakePlayer("P1", balance: 50, pot: [3]); // pot = 3
 
             _context.ApplyOperatorCard(player, new OperatorCard(Operator.Multiply));
 
@@ -76,7 +77,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyOperatorCard_Divide_DividesBalance()
         {
-            var player = MakePlayer("p1", "P1", balance: 100, pot: [4]); // pot = 4
+            var player = MakePlayer("P1", balance: 100, pot: [4]); // pot = 4
 
             _context.ApplyOperatorCard(player, new OperatorCard(Operator.Divide));
 
@@ -86,7 +87,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyOperatorCard_Multiply_RoundsToNearest()
         {
-            var player = MakePlayer("p1", "P1", balance: 10, pot: [3]); // 10 * 3 = 30, exact
+            var player = MakePlayer("P1", balance: 10, pot: [3]); // 10 * 3 = 30, exact
 
             _context.ApplyOperatorCard(player, new OperatorCard(Operator.Multiply));
 
@@ -96,12 +97,12 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyOperatorCard_RecordsOperatorResult()
         {
-            var player = MakePlayer("p1", "P1", balance: 200, pot: [5, 0]); // pot = 50
+            var player = MakePlayer("P1", balance: 200, pot: [5, 0]); // pot = 50
 
             _context.ApplyOperatorCard(player, new OperatorCard(Operator.Subtract));
 
             Assert.IsNotNull(_state.LastOperatorResult);
-            Assert.AreEqual("p1", _state.LastOperatorResult.PlayerId);
+            Assert.AreEqual(player.PlayerId, _state.LastOperatorResult.PlayerId);
             Assert.AreEqual(200.0, _state.LastOperatorResult.BalanceBefore);
             Assert.AreEqual(150.0, _state.LastOperatorResult.BalanceAfter);
             Assert.AreEqual(Operator.Subtract, _state.LastOperatorResult.Op);
@@ -113,7 +114,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         public void ApplyOperatorCard_DivideByZero_GivesExtraPass_WhenRollIs0()
         {
             // pot = [0] → potValue = 0 → divide by zero
-            var player = MakePlayer("p1", "P1", balance: 100, pot: [0]);
+            var player = MakePlayer("P1", balance: 100, pot: [0]);
             player.PassesRemaining = 2;
             _randomMock.Setup(r => r.GetRandomInt(0, 4, RandomType.Secure)).Returns(0); // roll = 0 → gain pass
 
@@ -126,7 +127,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyOperatorCard_DivideByZero_LosesPass_WhenRollIs1()
         {
-            var player = MakePlayer("p1", "P1", balance: 100, pot: [0]);
+            var player = MakePlayer("P1", balance: 100, pot: [0]);
             player.PassesRemaining = 2;
             _randomMock.Setup(r => r.GetRandomInt(0, 4, RandomType.Secure)).Returns(1); // roll = 1 → lose pass
 
@@ -138,7 +139,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyOperatorCard_DivideByZero_GainsActionCard_WhenRollIs2()
         {
-            var player = MakePlayer("p1", "P1", balance: 100, pot: [0]);
+            var player = MakePlayer("P1", balance: 100, pot: [0]);
             // Roll = 2 → gain action card (if under hand limit)
             // Use a sequence: first call returns 2 (div-by-zero outcome), subsequent calls return 0 (action card selection)
             var callCount = 0;
@@ -154,7 +155,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyOperatorCard_DivideByZero_LosesActionCard_WhenRollIs3()
         {
-            var player = MakePlayer("p1", "P1", balance: 100, pot: [0]);
+            var player = MakePlayer("P1", balance: 100, pot: [0]);
             player.ActionHand.Add(new ActionCard(ActionType.Burn));
             _randomMock.Setup(r => r.GetRandomInt(0, 4, RandomType.Secure)).Returns(3); // roll = 3 → lose action card
             _randomMock.Setup(r => r.GetRandomInt(0, 1, RandomType.Secure)).Returns(0);
@@ -167,7 +168,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyOperatorCard_DivideByZero_LosesPass_ButNotBelowZero()
         {
-            var player = MakePlayer("p1", "P1", balance: 100, pot: [0]);
+            var player = MakePlayer("P1", balance: 100, pot: [0]);
             player.PassesRemaining = 0; // already 0
             _randomMock.Setup(r => r.GetRandomInt(0, 4, RandomType.Secure)).Returns(1);
 
@@ -243,8 +244,8 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void DealActionCards_DealsActionsDealtPerRoundToEachPlayer()
         {
-            var p1 = MakePlayer("p1", "P1");
-            var p2 = MakePlayer("p2", "P2");
+            var p1 = MakePlayer("P1");
+            var p2 = MakePlayer("P2");
 
             _context.DealActionCards();
 
@@ -293,8 +294,8 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void AdvanceTurn_WrapsAroundToFirstPlayer()
         {
-            MakePlayer("p1", "P1");
-            MakePlayer("p2", "P2");
+            MakePlayer("P1");
+            MakePlayer("P2");
             _state.TurnManager.SetCurrentPlayerIndex(1); // last player
 
             _context.AdvanceTurn();
@@ -305,9 +306,9 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void AdvanceTurn_IncrementsByOne()
         {
-            MakePlayer("p1", "P1");
-            MakePlayer("p2", "P2");
-            MakePlayer("p3", "P3");
+            MakePlayer("P1");
+            MakePlayer("P2");
+            MakePlayer("P3");
             _state.TurnManager.SetCurrentPlayerIndex(0);
 
             _context.AdvanceTurn();
@@ -320,20 +321,20 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void RecordDraw_UpdatesLastDrawnCard()
         {
-            var player = MakePlayer("p1", "P1");
+            var player = MakePlayer("P1");
             var card = new NumberCard(4);
 
             _context.RecordDraw(player, card);
 
             Assert.IsNotNull(_state.LastDrawnCard);
-            Assert.AreEqual("p1", _state.LastDrawnCard.DrawerId);
+            Assert.AreEqual(player.PlayerId, _state.LastDrawnCard.DrawerId);
             Assert.AreEqual(card, _state.LastDrawnCard.Card);
         }
 
         [TestMethod]
         public void RecordDraw_AppendsToDiscardHistory()
         {
-            var player = MakePlayer("p1", "P1");
+            var player = MakePlayer("P1");
             var card = new NumberCard(7);
 
             _context.RecordDraw(player, card);
@@ -345,22 +346,22 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void RecordRedirectedDraw_SetsRedirectTargetInfo()
         {
-            var drawer = MakePlayer("drawer", "Drawer");
-            var target = MakePlayer("target", "Target");
+            var drawer = MakePlayer("Drawer");
+            var target = MakePlayer("Target");
             var card = new OperatorCard(Operator.Add);
 
             _context.RecordRedirectedDraw(drawer, target, card);
 
             Assert.IsNotNull(_state.LastDrawnCard);
-            Assert.AreEqual("drawer", _state.LastDrawnCard.DrawerId);
-            Assert.AreEqual("target", _state.LastDrawnCard.RedirectTargetId);
+            Assert.AreEqual(drawer.PlayerId, _state.LastDrawnCard.DrawerId);
+            Assert.AreEqual(target.PlayerId, _state.LastDrawnCard.RedirectTargetId);
             Assert.AreEqual("Target", _state.LastDrawnCard.RedirectTargetName);
         }
 
         [TestMethod]
         public void RecordActionCardPlay_AppendsToDiscardHistoryAsActionCard()
         {
-            var player = MakePlayer("p1", "P1");
+            var player = MakePlayer("P1");
             var card = new ActionCard(ActionType.Burn);
 
             _context.RecordActionCardPlay(player, card);
@@ -375,7 +376,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyNumberCard_AppendsDigitToPot()
         {
-            var player = MakePlayer("p1", "P1");
+            var player = MakePlayer("P1");
             player.Pot.Add(1);
 
             _context.ApplyNumberCard(player, new NumberCard(9));

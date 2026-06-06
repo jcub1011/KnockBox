@@ -21,7 +21,7 @@ namespace KnockBox.TaskMaster.Tests.Unit.Logic
         {
             _engineLoggerMock = new Mock<ILogger<TaskMasterGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<TaskMasterGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
 
             _engine = new TaskMasterGameEngine(
                 _engineLoggerMock.Object,
@@ -73,7 +73,7 @@ namespace KnockBox.TaskMaster.Tests.Unit.Logic
         {
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (TaskMasterGameState)stateResult.Value!;
-            var nonHost = UserFactory.Create("NotHost", "nothost-id");
+            var nonHost = UserFactory.Create("NotHost", Guid.NewGuid());
 
             var result = await _engine.StartAsync(nonHost, state);
 

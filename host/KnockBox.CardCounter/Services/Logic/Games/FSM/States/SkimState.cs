@@ -8,10 +8,10 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
     /// Waiting for the Skim source player to select which digit in their pot to swap
     /// with a digit in the target's pot. The target may still block with Comp'd.
     /// </summary>
-    public sealed class SkimState(string sourceId, string targetId, ActionCard pendingCard) : ITimedCardCounterGameState
+    public sealed class SkimState(Guid sourceId, Guid targetId, ActionCard pendingCard) : ITimedCardCounterGameState
     {
-        private readonly string _sourceId = sourceId;
-        private readonly string _targetId = targetId;
+        private readonly Guid _sourceId = sourceId;
+        private readonly Guid _targetId = targetId;
         private readonly ActionCard _pendingCard = pendingCard;
         private DateTimeOffset _expiresAt;
         private bool _targetAccepted;
@@ -24,7 +24,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
             _expiresAt = DateTimeOffset.UtcNow.AddMilliseconds(context.Settings.SkimTimeoutMs);
             context.State.PendingReaction = new PendingReactionInfo(
                 _sourceId,
-                context.GetPlayer(_sourceId)?.DisplayName ?? _sourceId,
+                context.GetPlayer(_sourceId)?.DisplayName ?? _sourceId.ToString(),
                 _targetId,
                 _pendingCard);
             context.Logger.LogDebug(

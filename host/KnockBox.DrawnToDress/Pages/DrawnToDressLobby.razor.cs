@@ -42,7 +42,7 @@ namespace KnockBox.DrawnToDress.Pages
             if (!GameSessionService.TryGetCurrentSession(out var session))
             {
                 Logger.LogWarning("User [{userId}] attempted to enter room [{code}] without a session set.",
-                    UserService.CurrentUser?.Id ?? "Unknown", ObfuscatedRoomCode);
+                    UserService.CurrentUser?.Id.ToString() ?? "Unknown", ObfuscatedRoomCode);
                 NavigationService.ToHome();
                 return;
             }
@@ -50,7 +50,7 @@ namespace KnockBox.DrawnToDress.Pages
             if (!TryExtractObfuscatedRoomCode(session.LobbyRegistration.Uri, out var roomCode))
             {
                 Logger.LogError("User [{userId}] attempted to enter room [{code}] but their session registration uri [{uri}] could not be parsed.",
-                    UserService.CurrentUser?.Id ?? "Unknown", ObfuscatedRoomCode, session.LobbyRegistration.Uri);
+                    UserService.CurrentUser?.Id.ToString() ?? "Unknown", ObfuscatedRoomCode, session.LobbyRegistration.Uri);
                 NavigationService.ToHome();
                 return;
             }
@@ -58,7 +58,7 @@ namespace KnockBox.DrawnToDress.Pages
             if (roomCode.Trim() != ObfuscatedRoomCode)
             {
                 Logger.LogError("User [{userId}] attempted to enter room [{code}] but their session registration uri [{uri}] does not match.",
-                    UserService.CurrentUser?.Id ?? "Unknown", ObfuscatedRoomCode, session.LobbyRegistration.Uri);
+                    UserService.CurrentUser?.Id.ToString() ?? "Unknown", ObfuscatedRoomCode, session.LobbyRegistration.Uri);
                 NavigationService.ToHome();
                 return;
             }

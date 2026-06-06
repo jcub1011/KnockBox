@@ -169,7 +169,8 @@ public sealed class IndexedDbServiceTests
         var bytes = new byte[] { 1, 2, 3, 4, 5 };
         interop.SetupVoidSuccess("releaseHandle");
 
-        var blob = await service.CreateBlobAsync(bytes, "application/octet-stream");
+        var blobResult = await service.CreateBlobAsync(bytes, "application/octet-stream");
+        Assert.IsTrue(blobResult.TryGetSuccess(out var blob));
 
         Assert.AreEqual(5, blob.Length);
         Assert.AreEqual("application/octet-stream", blob.ContentType);
@@ -183,7 +184,7 @@ public sealed class IndexedDbServiceTests
     }
 
     [TestMethod]
-    public async Task CreateBlobAsync_Bytes_Small_FailureThrowsIOException()
+    public async Task CreateBlobAsync_Bytes_Small_FailureReturnsError()
     {
         var interop = IndexedDbTestHelpers.NewInteropMock();
         interop.SetupTypedFailure<BlobCreateResponse>("createBlobFromBytes",
@@ -192,8 +193,9 @@ public sealed class IndexedDbServiceTests
         using var registry = IndexedDbTestHelpers.NewRegistry();
         var service = NewService(interop.Object, registry);
 
-        await Assert.ThrowsExactlyAsync<IOException>(async () =>
-            await service.CreateBlobAsync(new byte[] { 1, 2 }, "application/octet-stream"));
+        var result = await service.CreateBlobAsync(new byte[] { 1, 2 }, "application/octet-stream");
+        Assert.IsTrue(result.TryGetFailure(out var err));
+        Assert.AreEqual(IndexedDbErrorKind.QuotaExceeded, err.Kind);
     }
 
     [TestMethod]
@@ -210,7 +212,8 @@ public sealed class IndexedDbServiceTests
         using var registry = IndexedDbTestHelpers.NewRegistry();
         var service = NewService(interop.Object, registry);
 
-        var blob = await service.CreateBlobAsync(new byte[len], "application/octet-stream");
+        var blobResult = await service.CreateBlobAsync(new byte[len], "application/octet-stream");
+        Assert.IsTrue(blobResult.TryGetSuccess(out var blob));
 
         Assert.AreEqual(len, blob.Length);
         // Exactly one upload call — no per-chunk loop on the C# side.
@@ -258,7 +261,8 @@ public sealed class IndexedDbServiceTests
         var service = NewService(interop.Object, registry);
 
         var stream = new TrackingStream(new byte[] { 1, 2, 3 });
-        var blob = await service.CreateBlobAsync(stream, length: 3, "application/octet-stream");
+        var blobResult = await service.CreateBlobAsync(stream, length: 3, "application/octet-stream");
+        Assert.IsTrue(blobResult.TryGetSuccess(out var blob));
 
         Assert.IsTrue(stream.WasDisposed);
         await blob.DisposeAsync();
@@ -276,7 +280,8 @@ public sealed class IndexedDbServiceTests
         var service = NewService(interop.Object, registry);
 
         var stream = new TrackingStream(new byte[] { 1, 2, 3 });
-        var blob = await service.CreateBlobAsync(stream, length: 3, "application/octet-stream", leaveOpen: true);
+        var blobResult = await service.CreateBlobAsync(stream, length: 3, "application/octet-stream", leaveOpen: true);
+        Assert.IsTrue(blobResult.TryGetSuccess(out var blob));
 
         Assert.IsFalse(stream.WasDisposed);
         await blob.DisposeAsync();
@@ -293,8 +298,9 @@ public sealed class IndexedDbServiceTests
         var service = NewService(interop.Object, registry);
 
         var stream = new TrackingStream(new byte[] { 1, 2, 3 });
-        await Assert.ThrowsExactlyAsync<IOException>(async () =>
-            await service.CreateBlobAsync(stream, length: 3, "application/octet-stream"));
+        var result = await service.CreateBlobAsync(stream, length: 3, "application/octet-stream");
+        Assert.IsTrue(result.TryGetFailure(out var err));
+        Assert.AreEqual(IndexedDbErrorKind.QuotaExceeded, err.Kind);
         Assert.IsTrue(stream.WasDisposed,
             "stream must be disposed in the finally block even when the JS upload call fails");
     }

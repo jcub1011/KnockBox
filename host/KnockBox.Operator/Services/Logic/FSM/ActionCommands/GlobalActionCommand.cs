@@ -17,7 +17,7 @@ public class GlobalActionCommand(
 
     public override bool RequiresReaction => GetReactionTargetIds().Any();
 
-    public override IEnumerable<string> GetReactionTargetIds()
+    public override IEnumerable<Guid> GetReactionTargetIds()
     {
         var targets = Context.GamePlayers.Values.Where(p => p.UserId != PlayCommand.PlayerId);
         if (_actionCard.IsOperatorOnlyAction)

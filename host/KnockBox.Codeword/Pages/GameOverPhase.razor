@@ -2,7 +2,7 @@
 @using KnockBox.Codeword.Services.State.Games
 
 @{
-    var myId = UserService.CurrentUser?.Id ?? "";
+    var myId = UserService.CurrentUser?.Id ?? Guid.Empty;
     var isHost = GameState.Host.Id == myId;
     var isHostSpectator = isHost && !GameState.HostIsParticipant;
     var winResult = GameState.WinResult;

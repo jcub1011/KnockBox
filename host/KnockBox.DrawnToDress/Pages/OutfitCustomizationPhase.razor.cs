@@ -48,7 +48,7 @@ namespace KnockBox.DrawnToDress.Pages
         private bool _dragInitialized;
         private CancellationTokenSource? _nameSyncCts;
 
-        private string CurrentPlayerId => UserService.CurrentUser?.Id ?? string.Empty;
+        private Guid CurrentPlayerId => UserService.CurrentUser?.Id ?? Guid.Empty;
 
         protected override void OnInitialized()
         {
@@ -130,7 +130,7 @@ namespace KnockBox.DrawnToDress.Pages
             if (_dragInitialized) return;
 
             var myId = UserService.CurrentUser?.Id;
-            var myPlayer = myId is not null && GameState.GamePlayers.TryGetValue(myId, out var p) ? p : null;
+            var myPlayer = myId is { } id && GameState.GamePlayers.TryGetValue(id, out var p) ? p : null;
             var myOutfit = myPlayer?.GetOutfit(OutfitRound);
             if (myOutfit is null) return;
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.PlayLog;
 using KnockBox.Core.Services.Storage.ClientStorage;
 using KnockBox.Services.State.PlayLog;
@@ -23,7 +24,7 @@ public sealed class PlayLogServiceTests
         await service.StoreLogAsync(GameLog.Create("card-counter"));
         await service.StoreLogAsync(GameLog.Create("codeword"));
 
-        var logs = await service.GetLogsAsync();
+        var logs = Unwrap(await service.GetLogsAsync());
 
         Assert.AreEqual(2, logs.Count);
         Assert.AreEqual("codeword", logs[0].GameIdentifier, "Most recent store must be first.");
@@ -39,7 +40,7 @@ public sealed class PlayLogServiceTests
         for (int i = 0; i < PlayLogService.MaxEntries + 10; i++)
             await service.StoreLogAsync(GameLog.Create($"game-{i}"));
 
-        var logs = await service.GetLogsAsync();
+        var logs = Unwrap(await service.GetLogsAsync());
 
         Assert.AreEqual(PlayLogService.MaxEntries, logs.Count);
         // Newest retained, oldest (game-0..game-9) dropped.
@@ -52,7 +53,7 @@ public sealed class PlayLogServiceTests
     {
         var service = NewService(out _);
 
-        var logs = await service.GetLogsAsync();
+        var logs = Unwrap(await service.GetLogsAsync());
 
         Assert.AreEqual(0, logs.Count);
     }
@@ -65,7 +66,7 @@ public sealed class PlayLogServiceTests
         await service.StoreLogAsync(GameLog.Create("codeword"));
         await service.StoreLogAsync(GameLog.Create("card-counter"));
 
-        var logs = await service.GetLogsAsync("card-counter");
+        var logs = Unwrap(await service.GetLogsAsync("card-counter"));
 
         Assert.AreEqual(2, logs.Count);
         Assert.IsTrue(logs.All(l => l.GameIdentifier == "card-counter"));
@@ -79,7 +80,7 @@ public sealed class PlayLogServiceTests
 
         await service.ClearAsync();
 
-        var logs = await service.GetLogsAsync();
+        var logs = Unwrap(await service.GetLogsAsync());
         Assert.AreEqual(0, logs.Count);
     }
 
@@ -95,7 +96,7 @@ public sealed class PlayLogServiceTests
 
         await service.StoreLogAsync(GameLog.Create("card-counter", metadata));
 
-        var stored = (await service.GetLogsAsync()).Single();
+        var stored = Unwrap(await service.GetLogsAsync()).Single();
         Assert.AreEqual("3", stored.GetMetadata("place"));
         Assert.AreEqual("00:12:45", stored.GetMetadata("duration"));
         Assert.IsNull(stored.GetMetadata("missing"));
@@ -107,13 +108,13 @@ public sealed class PlayLogServiceTests
         var service = NewService(out var storage);
         storage.SeedRaw("play-log", "history", "{ not a valid json array ]");
 
-        var logs = await service.GetLogsAsync();
+        var corruptResult = await service.GetLogsAsync();
 
-        Assert.AreEqual(0, logs.Count, "Corrupt history must read as empty.");
+        Assert.IsTrue(corruptResult.IsFailure, "Corrupt history must surface as a read failure, distinct from 'empty'.");
 
-        // Self-heal: the corrupt key was cleared, so a subsequent append works cleanly.
+        // Self-heal: the corrupt key was cleared on the failed read, so a subsequent append works cleanly.
         await service.StoreLogAsync(GameLog.Create("codeword"));
-        var after = await service.GetLogsAsync();
+        var after = Unwrap(await service.GetLogsAsync());
         Assert.AreEqual(1, after.Count);
         Assert.AreEqual("codeword", after[0].GameIdentifier);
     }
@@ -127,7 +128,7 @@ public sealed class PlayLogServiceTests
             .ToList();
         await storage.SetAsync("play-log", "history", oversized);
 
-        var logs = await service.GetLogsAsync();
+        var logs = Unwrap(await service.GetLogsAsync());
 
         Assert.AreEqual(PlayLogService.MaxEntries, logs.Count, "Reads must honor the cap even if storage holds more.");
     }
@@ -141,23 +142,23 @@ public sealed class PlayLogServiceTests
         await Task.WhenAll(Enumerable.Range(0, count)
             .Select(i => service.StoreLogAsync(GameLog.Create($"game-{i}")).AsTask()));
 
-        var logs = await service.GetLogsAsync();
+        var logs = Unwrap(await service.GetLogsAsync());
         Assert.AreEqual(count, logs.Count, "The write lock must prevent lost appends under concurrency.");
         for (int i = 0; i < count; i++)
             Assert.IsTrue(logs.Any(l => l.GameIdentifier == $"game-{i}"), $"game-{i} was lost.");
     }
 
     [TestMethod]
-    public async Task GetLogsAsync_ReturnsEmpty_WhenCanceled()
+    public async Task GetLogsAsync_ReturnsCancellation_WhenCanceled()
     {
         var service = NewService(out _);
         await service.StoreLogAsync(GameLog.Create("codeword"));
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        var logs = await service.GetLogsAsync(cts.Token);
+        var result = await service.GetLogsAsync(cts.Token);
 
-        Assert.AreEqual(0, logs.Count, "A canceled read must return empty, not throw.");
+        Assert.IsTrue(result.IsCanceled, "A canceled read must yield a cancellation result, not throw.");
     }
 
     [TestMethod]
@@ -169,7 +170,7 @@ public sealed class PlayLogServiceTests
 
         await service.StoreLogAsync(GameLog.Create("codeword"), cts.Token); // must not throw
 
-        var logs = await service.GetLogsAsync();
+        var logs = Unwrap(await service.GetLogsAsync());
         Assert.AreEqual(0, logs.Count, "A canceled store must not persist.");
     }
 
@@ -182,6 +183,13 @@ public sealed class PlayLogServiceTests
     }
 
     // ─── fixtures ───────────────────────────────────────────────────────────
+
+    /// <summary>Asserts a successful read and returns the unwrapped history.</summary>
+    private static IReadOnlyList<GameLog> Unwrap(ValueResult<IReadOnlyList<GameLog>> result)
+    {
+        Assert.IsTrue(result.TryGetSuccess(out var logs), "Expected a successful play-log read.");
+        return logs;
+    }
 
     private static PlayLogService NewService(out JsonLocalStorage storage)
     {
@@ -204,33 +212,43 @@ public sealed class PlayLogServiceTests
         /// corrupt/legacy JSON already sitting in browser storage.</summary>
         public void SeedRaw(string scope, string key, string rawJson) => _store[(scope, key)] = rawJson;
 
-        public ValueTask<TType> GetAsync<TType>(string scope, string key, CancellationToken ct = default)
+        public ValueTask<ValueResult<TType?>> GetAsync<TType>(string scope, string key, CancellationToken ct = default)
         {
-            // The real (JS-interop) storage observes cancellation; mirror that so the service's
-            // cancellation handling is exercised.
-            ct.ThrowIfCancellationRequested();
-            return new(_store.TryGetValue((scope, key), out var json)
-                ? JsonSerializer.Deserialize<TType>(json, Options)!
-                : default!);
+            // Mirror the real (JS-interop) storage: cancellation and deserialization
+            // failures surface as non-success results, not exceptions.
+            try
+            {
+                ct.ThrowIfCancellationRequested();
+                if (!_store.TryGetValue((scope, key), out var json))
+                    return new(ValueResult<TType?>.FromValue(default));
+                return new(ValueResult<TType?>.FromValue(JsonSerializer.Deserialize<TType>(json, Options)));
+            }
+            catch (OperationCanceledException) { return new(ValueResult<TType?>.FromCancellation()); }
+            catch (Exception ex) { return new(ValueResult<TType?>.FromError("Read failed.", ex.ToString())); }
         }
 
-        public ValueTask SetAsync<TType>(string scope, string key, TType value, CancellationToken ct = default)
+        public ValueTask<Result> SetAsync<TType>(string scope, string key, TType value, CancellationToken ct = default)
         {
-            ct.ThrowIfCancellationRequested();
-            _store[(scope, key)] = JsonSerializer.Serialize(value, Options);
-            return ValueTask.CompletedTask;
+            try
+            {
+                ct.ThrowIfCancellationRequested();
+                _store[(scope, key)] = JsonSerializer.Serialize(value, Options);
+                return new(Result.Success);
+            }
+            catch (OperationCanceledException) { return new(Result.FromCancellation()); }
+            catch (Exception ex) { return new(Result.FromError("Write failed.", ex.ToString())); }
         }
 
-        public ValueTask RemoveAsync(string scope, string key)
+        public ValueTask<Result> RemoveAsync(string scope, string key)
         {
             _store.Remove((scope, key));
-            return ValueTask.CompletedTask;
+            return new(Result.Success);
         }
 
-        public ValueTask<List<string>> GetKeysAsync(string scope, CancellationToken ct = default) => new([]);
-        public ValueTask<List<string>> GetAllKeysAsync(CancellationToken ct = default) => new([]);
-        public ValueTask RemoveAsync(string scope) { _store.Clear(); return ValueTask.CompletedTask; }
-        public ValueTask ClearAsync() { _store.Clear(); return ValueTask.CompletedTask; }
+        public ValueTask<ValueResult<List<string>>> GetKeysAsync(string scope, CancellationToken ct = default) => new(ValueResult<List<string>>.FromValue([]));
+        public ValueTask<ValueResult<List<string>>> GetAllKeysAsync(CancellationToken ct = default) => new(ValueResult<List<string>>.FromValue([]));
+        public ValueTask<Result> RemoveAsync(string scope) { _store.Clear(); return new(Result.Success); }
+        public ValueTask<Result> ClearAsync() { _store.Clear(); return new(Result.Success); }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

@@ -109,7 +109,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic
                 _ = engine.GetGenerator(WordPoolMode.FullDictionary);
             }
 
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             var created = engine.CreateStateAsync(host).GetAwaiter().GetResult();
             Assert.IsTrue(created.TryGetSuccess(out var s));
             var state = (TraceryGameState)s!;

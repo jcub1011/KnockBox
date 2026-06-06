@@ -1,7 +1,9 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
+using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -28,16 +30,16 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartGameAsync(
             StubWordListService words, int playerCount = 2, char? banned = null)
         {
             var engine = new AlphaChainGameEngine(
-                words, new FixedRandomNumberService(), new ScoreCalculator(),
+                words, new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -47,6 +49,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // Tutorials off so the game starts directly in RoundState.
             state.UpdateSettings(s => s with { EnableTutorials = false });
             await engine.StartAsync(_host, state);
+            DrainCountdown(engine, state);
 
             if (banned is { } b)
                 state.Execute(() => state.BannedLetter = b);
@@ -54,10 +57,17 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             return (engine, state);
         }
 
-        private static void GiveModifier(AlphaChainGameState state, string playerId, string cardId) =>
-            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(ModifierLibrary.FindById(cardId)!));
+        /// <summary>Ticks past the pre-round "Get Ready" countdown so the FSM lands in RoundState.</summary>
+        private static void DrainCountdown(AlphaChainGameEngine engine, AlphaChainGameState state)
+        {
+            if (state.Phase == AlphaChainGamePhase.Countdown)
+                engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
+        }
 
-        private static void SetScore(AlphaChainGameState state, string playerId, int score) =>
+        private static void GiveModifier(AlphaChainGameState state, Guid playerId, string cardId) =>
+            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create(cardId)));
+
+        private static void SetScore(AlphaChainGameState state, Guid playerId, int score) =>
             state.Execute(() => state.GamePlayers[playerId].Score = score);
 
         // ── Flak Cannon (time-shave at higher-scored players) ────────────────
@@ -69,7 +79,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // queued shave would be debited into the clock (and cleared) before we can observe it.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 3, banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var ahead = state.TurnManager.TurnOrder[2];
 
             GiveModifier(state, submitter, "flak-cannon");
@@ -78,7 +88,28 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             await engine.SubmitWordAsync(submitter, "cat", state);
 
             Assert.AreEqual(3, state.GamePlayers[submitter].Score, "Flak Cannon grants 0 points → just the length 3.");
-            Assert.AreEqual(2, state.GamePlayers[ahead].QueuedTimePenaltySeconds, "Higher-scored player is shaved 2s.");
+            Assert.AreEqual(2, RoomStateProbe.QueuedTimePenalty(state, ahead),
+                "Higher-scored player is shaved 10% of their 20s clock = 2s.");
+        }
+
+        [TestMethod]
+        public async Task FlakCannon_ShavesAPercentageOfTheVictimsClock()
+        {
+            // The shave is now 10% of the victim's armed clock, so a longer clock loses more: at a 40s
+            // shot clock the shave is round(40 × 0.10) = 4s, not the legacy flat 2s.
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 3, banned: 'z');
+            using var _ = state;
+            state.UpdateSettings(s => s with { ShotClockSeconds = 40 });
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
+            var ahead = state.TurnManager.TurnOrder[2];
+
+            GiveModifier(state, submitter, "flak-cannon");
+            SetScore(state, ahead, 100);
+
+            await engine.SubmitWordAsync(submitter, "cat", state);
+
+            Assert.AreEqual(4, RoomStateProbe.QueuedTimePenalty(state, ahead),
+                "10% of the 40s clock = 4s (the shave scales with the victim's clock length).");
         }
 
         [TestMethod]
@@ -86,7 +117,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 3, banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var behind = state.TurnManager.TurnOrder[2];
 
             GiveModifier(state, submitter, "flak-cannon");
@@ -95,7 +126,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
-            Assert.AreEqual(0, state.GamePlayers[behind].QueuedTimePenaltySeconds, "A lower-scored player is not shaved.");
+            Assert.AreEqual(0, RoomStateProbe.QueuedTimePenalty(state, behind), "A lower-scored player is not shaved.");
         }
 
         [TestMethod]
@@ -106,7 +137,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // verifies the shave is actually consumed, not merely queued forever.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var victim = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, submitter, "flak-cannon");
@@ -116,7 +147,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             await engine.SubmitWordAsync(submitter, "cat", state, t0);
 
             Assert.AreEqual(victim, state.TurnManager.CurrentPlayer, "Turn advanced to the shaved next-seat player.");
-            Assert.AreEqual(0, state.GamePlayers[victim].QueuedTimePenaltySeconds, "Queued shave was consumed, not left pending.");
+            Assert.AreEqual(0, RoomStateProbe.QueuedTimePenalty(state, victim), "Queued shave was consumed, not left pending.");
 
             // The freshly-armed clock is the base shot clock minus the 2s shave. Assert the duration
             // (tolerant of the sub-ms gap between t0 and the arm's own timestamp) — an un-shaved clock
@@ -133,11 +164,11 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("ee"), playerCount: 2, banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
 
             await engine.SubmitWordAsync(submitter, "ee", state);
 
-            Assert.IsTrue(state.GamePlayers[submitter].PlayedDoubleLetterWordThisEra,
+            Assert.IsTrue(RoomStateProbe.PlayedDoubleLetterWordThisEra(state, submitter),
                 "A word with a double letter flags the player for the rest of the era.");
         }
 
@@ -149,7 +180,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // Fresh game: all scores 0, so the round leader is the opening player (the submitter).
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
             using var _ = state;
-            var leader = state.TurnManager.CurrentPlayer!;
+            var leader = state.TurnManager.CurrentPlayer!.Value;
             var owner = state.TurnManager.TurnOrder[1];
             Assert.AreEqual(leader, state.RoundLeaderUserId, "Opening player is the marked leader.");
 
@@ -165,7 +196,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("bridge"), playerCount: 2, banned: 'z');
             using var _ = state;
-            var leader = state.TurnManager.CurrentPlayer!;
+            var leader = state.TurnManager.CurrentPlayer!.Value;
             var owner = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, owner, "bounty-hunter");
@@ -175,23 +206,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.AreEqual(6, state.GamePlayers[leader].Score, "A 6-letter word meets the threshold — no dock.");
         }
 
-        // ── Tracer Round (end-letter hijack) ─────────────────────────────────
-
-        [TestMethod]
-        public async Task TracerRound_BansNextPlayersStart_WithTheWordEndingLetter()
-        {
-            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
-            using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
-            var next = state.TurnManager.TurnOrder[1];
-
-            GiveModifier(state, submitter, "tracer-round");
-
-            await engine.SubmitWordAsync(submitter, "cat", state); // ends 't'
-
-            Assert.AreEqual('t', state.GamePlayers[next].PersonalBannedLetter, "Next player is banned from 't'.");
-        }
-
         // ── The Titanium Mirror (block, reflect, decay) ──────────────────────
 
         [TestMethod]
@@ -199,7 +213,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             var ahead = state.TurnManager.TurnOrder[1];
 
             GiveModifier(state, submitter, "flak-cannon");
@@ -208,9 +222,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             await engine.SubmitWordAsync(submitter, "cat", state);
 
-            Assert.AreEqual(0, state.GamePlayers[ahead].QueuedTimePenaltySeconds, "Mirror blocks the shave.");
-            Assert.AreEqual(2, state.GamePlayers[submitter].QueuedTimePenaltySeconds, "The shave is reflected at the caster.");
-            Assert.AreEqual(0.9, state.GamePlayers[ahead].ShieldMultiplier, 1e-9, "Mirror decays 1.0 → 0.9 per block.");
+            Assert.AreEqual(0, RoomStateProbe.QueuedTimePenalty(state, ahead), "Mirror blocks the shave.");
+            Assert.AreEqual(2, RoomStateProbe.QueuedTimePenalty(state, submitter), "The shave is reflected at the caster.");
+            Assert.AreEqual(0.9, RoomStateProbe.ShieldMultiplier(state, ahead), 1e-9, "Mirror decays 1.0 → 0.9 per block.");
         }
 
         [TestMethod]
@@ -220,10 +234,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // factor IS that multiplier, folds into the pipeline as a no-op ×1.0 — length 10 → 10.
             var (engine, state) = await StartGameAsync(new StubWordListService("basketball"), banned: 'z');
             using var _ = state;
-            var submitter = state.TurnManager.CurrentPlayer!;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
             GiveModifier(state, submitter, "titanium-mirror");
 
-            Assert.AreEqual(1.0, state.GamePlayers[submitter].ShieldMultiplier, 1e-9, "Shield seeds at 1.0 at game start.");
+            Assert.AreEqual(1.0, RoomStateProbe.ShieldMultiplier(state, submitter), 1e-9, "Shield seeds at 1.0 at game start.");
 
             await engine.SubmitWordAsync(submitter, "basketball", state);
 
@@ -237,7 +251,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 3, banned: 'z');
             using var _ = state;
-            string p0 = "p0-id", p1 = "p1-id", p2 = "p2-id";
+            var p0 = state.TurnManager.TurnOrder[0];
+            var p1 = state.TurnManager.TurnOrder[1];
+            var p2 = state.TurnManager.TurnOrder[2];
             SetScore(state, p0, 5);
             SetScore(state, p1, 5);
             SetScore(state, p2, 9);
@@ -254,7 +270,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (_, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 3, banned: 'z');
             using var _ = state;
-            string p0 = "p0-id", p1 = "p1-id";
+            var p0 = state.TurnManager.TurnOrder[0];
+            var p1 = state.TurnManager.TurnOrder[1];
             SetScore(state, p1, 7);
 
             Assert.AreEqual(p1, EngineEffectResolver.LeaderUserId(state));
@@ -262,6 +279,115 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // Tie at the top → earliest turn order wins.
             SetScore(state, p0, 7);
             Assert.AreEqual(p0, EngineEffectResolver.LeaderUserId(state));
+        }
+
+        [TestMethod]
+        public async Task LastPlaceUserId_IsLowestScorer_TiesByTurnOrder()
+        {
+            var (_, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 3, banned: 'z');
+            using var _ = state;
+            var p0 = state.TurnManager.TurnOrder[0];
+            var p1 = state.TurnManager.TurnOrder[1];
+            var p2 = state.TurnManager.TurnOrder[2];
+            SetScore(state, p0, 5);
+            SetScore(state, p1, 2);
+            SetScore(state, p2, 2);
+
+            // Lowest score is last; the 2–2 tie breaks to the earlier turn-order index.
+            Assert.AreEqual(p1, EngineEffectResolver.LastPlaceUserId(state));
+
+            SetScore(state, p1, 9);
+            Assert.AreEqual(p2, EngineEffectResolver.LastPlaceUserId(state), "p2 is now alone at the bottom.");
+        }
+
+        // ── Era banned letter exempts the current last-place player ──────────
+
+        [TestMethod]
+        public async Task LastPlaceSubmitter_IsExemptFromEraBan()
+        {
+            // Submitter is in last place (0 vs the rival's 100), so the banned 'a' does NOT tax their
+            // word — it scores its normal length 3.
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
+            using var _ = state;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
+            var rival = state.TurnManager.TurnOrder[1];
+            SetScore(state, rival, 100);
+
+            var outcome = await engine.SubmitWordAsync(submitter, "cat", state);
+
+            Assert.IsTrue(outcome.TryGetSuccess(out var result));
+            Assert.IsInstanceOfType<SubmitWordResult.Accepted>(result, "Last place is exempt → not taxed.");
+            Assert.AreEqual(3, state.GamePlayers[submitter].Score, "Untaxed length-3 word.");
+        }
+
+        [TestMethod]
+        public async Task NonLastSubmitter_IsTaxedByEraBan()
+        {
+            // Submitter is NOT last (100 vs the rival's 0), so the banned 'a' taxes the word to 0.
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'a');
+            using var _ = state;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
+            SetScore(state, submitter, 100);
+
+            var outcome = await engine.SubmitWordAsync(submitter, "cat", state);
+
+            Assert.IsTrue(outcome.TryGetSuccess(out var result));
+            Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(result, "Not last → the banned letter taxes them.");
+            Assert.AreEqual(100, state.GamePlayers[submitter].Score, "Taxed word adds 0 → unchanged.");
+        }
+
+        [TestMethod]
+        public async Task EraBanExemption_FollowsCurrentLastPlace()
+        {
+            // chain: cat →(t) tic →(c) car ; banned 'a' throughout.
+            var (engine, state) = await StartGameAsync(
+                new StubWordListService("cat", "tic", "car"), playerCount: 2, banned: 'a');
+            using var _ = state;
+            var a = state.TurnManager.CurrentPlayer!.Value; // turn 0
+            var b = state.TurnManager.TurnOrder[1];
+
+            // Round 1: A is in last place → the banned 'a' does NOT tax them.
+            SetScore(state, a, 0);
+            SetScore(state, b, 5);
+            var r1 = await engine.SubmitWordAsync(a, "cat", state);
+            Assert.IsTrue(r1.TryGetSuccess(out var o1));
+            Assert.IsInstanceOfType<SubmitWordResult.Accepted>(o1, "Last place A is exempt → 'cat' scores normally.");
+            Assert.AreEqual(3, state.GamePlayers[a].Score);
+
+            // A climbs clear of last; B drops to last. The exemption must move to B.
+            SetScore(state, a, 100);
+            SetScore(state, b, 0);
+
+            // B chains a banned-letter-free word to hand the turn back to A.
+            await engine.SubmitWordAsync(b, "tic", state);
+            Assert.AreEqual(a, state.TurnManager.CurrentPlayer, "Back to A for round 2.");
+
+            // Round 2: A is no longer last → the same banned 'a' now taxes them.
+            var r2 = await engine.SubmitWordAsync(a, "car", state);
+            Assert.IsTrue(r2.TryGetSuccess(out var o2));
+            Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(o2, "A left last place → 'a' now taxes A.");
+            Assert.AreEqual(100, state.GamePlayers[a].Score, "Taxed word adds 0.");
+        }
+
+        [TestMethod]
+        public async Task LastPlace_StillTaxedByPersonalCardBan()
+        {
+            // The exemption covers only the era ban. A is last (era ban 'z' wouldn't tax 'cat' anyway),
+            // but their own Roulette Wheel card-ban 't' is a personal ban that still taxes the word.
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat"), playerCount: 2, banned: 'z');
+            using var _ = state;
+            var submitter = state.TurnManager.CurrentPlayer!.Value;
+            var rival = state.TurnManager.TurnOrder[1];
+            SetScore(state, rival, 100); // submitter is last → exempt from the era ban only
+
+            GiveModifier(state, submitter, "roulette-wheel");
+            state.Execute(() => RoomStateProbe.SetCardBan(state, submitter, ModifierId.RouletteWheel, 't'));
+
+            var outcome = await engine.SubmitWordAsync(submitter, "cat", state);
+
+            Assert.IsTrue(outcome.TryGetSuccess(out var result));
+            Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(result, "Personal card-bans still tax the last-place player.");
+            Assert.AreEqual(0, state.GamePlayers[submitter].Score, "Taxed despite the era-ban exemption.");
         }
     }
 }

@@ -16,11 +16,11 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         /// The creators of both entrants are excluded; every other player in
         /// <paramref name="allPlayerIds"/> is considered eligible.
         /// </summary>
-        public static IReadOnlySet<string> GetEligibleVoterIds(
+        public static IReadOnlySet<Guid> GetEligibleVoterIds(
             SwissMatchup matchup,
-            IEnumerable<string> allPlayerIds)
+            IEnumerable<Guid> allPlayerIds)
         {
-            var excluded = new HashSet<string>
+            var excluded = new HashSet<Guid>
             {
                 matchup.EntrantAId.PlayerId,
                 matchup.EntrantBId.PlayerId,
@@ -35,7 +35,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         /// vote on <paramref name="matchup"/> — that is, when the voter is not the creator
         /// of either entrant.
         /// </summary>
-        public static bool IsEligibleToVote(string voterId, SwissMatchup matchup)
+        public static bool IsEligibleToVote(Guid voterId, SwissMatchup matchup)
         {
             return voterId != matchup.EntrantAId.PlayerId && voterId != matchup.EntrantBId.PlayerId;
         }

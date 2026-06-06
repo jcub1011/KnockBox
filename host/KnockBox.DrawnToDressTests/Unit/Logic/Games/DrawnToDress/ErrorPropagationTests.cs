@@ -27,7 +27,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             _randomMock = new Mock<IRandomNumberService>();
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.Parse("00000000-0000-0000-0000-000000000001"));
 
             _engine = new DrawnToDressGameEngine(
                 _engineLoggerMock.Object,
@@ -47,10 +47,10 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
             // Add a player so we can advance through ready.
-            state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
+            state.GamePlayers[Guid.Parse("11111111-1111-1111-1111-111111111111")] = new DrawnToDressPlayerState { PlayerId = Guid.Parse("11111111-1111-1111-1111-111111111111") };
 
             // Mark ready to advance through drawing → pool reveal.
-            _engine.ProcessCommand(context, new MarkReadyCommand("p1"));
+            _engine.ProcessCommand(context, new MarkReadyCommand(Guid.Parse("11111111-1111-1111-1111-111111111111")));
             Assert.IsInstanceOfType<PoolRevealState>(context.Fsm.CurrentState);
 
             // Tick past pool reveal → outfit building.
@@ -70,7 +70,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var item = new DrawnClothingItem
             {
                 ClothingTypeId = ClothingType.Hat,
-                CreatorPlayerId = "p1",
+                CreatorPlayerId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
                 SvgContent = "<svg>hat</svg>",
                 IsInPool = true,
             };
@@ -78,7 +78,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
 
             // Act: player tries to claim their own item.
             var result = _engine.ProcessCommand(context,
-                new ClaimPoolItemCommand("p1", item.Id));
+                new ClaimPoolItemCommand(Guid.Parse("11111111-1111-1111-1111-111111111111"), item.Id));
 
             // Assert
             Assert.IsTrue(result.IsFailure);
@@ -99,12 +99,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
+            state.GamePlayers[Guid.Parse("11111111-1111-1111-1111-111111111111")] = new DrawnToDressPlayerState { PlayerId = Guid.Parse("11111111-1111-1111-1111-111111111111") };
             Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
 
             // Act
             var result = _engine.ProcessCommand(context,
-                new SubmitDrawingCommand("p1", ClothingType.Hat, "<svg>valid drawing</svg>"));
+                new SubmitDrawingCommand(Guid.Parse("11111111-1111-1111-1111-111111111111"), ClothingType.Hat, "<svg>valid drawing</svg>"));
 
             // Assert
             Assert.IsTrue(result.IsSuccess);
@@ -119,7 +119,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var item = new DrawnClothingItem
             {
                 ClothingTypeId = ClothingType.Hat,
-                CreatorPlayerId = "p1",
+                CreatorPlayerId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
                 SvgContent = "<svg>hat</svg>",
                 IsInPool = true,
             };
@@ -127,7 +127,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
 
             // Act: unknown player tries to claim an item.
             _engine.ProcessCommand(context,
-                new ClaimPoolItemCommand("unknown-player", item.Id));
+                new ClaimPoolItemCommand(Guid.NewGuid(), item.Id));
 
             // Assert: the item was not claimed.
             Assert.IsNull(item.ClaimedByPlayerId);
@@ -146,12 +146,12 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
+            state.GamePlayers[Guid.Parse("11111111-1111-1111-1111-111111111111")] = new DrawnToDressPlayerState { PlayerId = Guid.Parse("11111111-1111-1111-1111-111111111111") };
             Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
 
             // Act: submit a drawing for a clothing type that isn't in the config.
             _engine.ProcessCommand(context,
-                new SubmitDrawingCommand("p1", ClothingType.Top, "<svg>drawing</svg>"));
+                new SubmitDrawingCommand(Guid.Parse("11111111-1111-1111-1111-111111111111"), ClothingType.Top, "<svg>drawing</svg>"));
 
             // Assert: no item was added to the pool for the unconfigured type.
             Assert.DoesNotContain(i => i.ClothingTypeId == ClothingType.Top, context.ClothingPool.Values);
@@ -170,15 +170,15 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var context = state.Context!;
             _engine.Tick(context, DateTimeOffset.UtcNow.AddHours(1));
 
-            state.GamePlayers["p1"] = new DrawnToDressPlayerState { PlayerId = "p1" };
+            state.GamePlayers[Guid.Parse("11111111-1111-1111-1111-111111111111")] = new DrawnToDressPlayerState { PlayerId = Guid.Parse("11111111-1111-1111-1111-111111111111") };
             Assert.IsInstanceOfType<DrawingRoundState>(context.Fsm.CurrentState);
 
             // Act: attempt to submit a customization while still in the drawing phase.
             _engine.ProcessCommand(context,
-                new SubmitCustomizationCommand("p1", "My Outfit"));
+                new SubmitCustomizationCommand(Guid.Parse("11111111-1111-1111-1111-111111111111"), "My Outfit"));
 
             // Assert: the command was ignored (wrong state), player not marked ready.
-            Assert.IsFalse(state.GamePlayers["p1"].IsReady);
+            Assert.IsFalse(state.GamePlayers[Guid.Parse("11111111-1111-1111-1111-111111111111")].IsReady);
         }
     }
 }

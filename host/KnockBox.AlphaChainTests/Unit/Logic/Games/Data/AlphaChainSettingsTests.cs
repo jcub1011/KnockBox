@@ -109,6 +109,31 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Data
         public void SniperBanTimer_AtMin_IsValid()
             => Assert.IsTrue(new AlphaChainSettings { SniperBanSeconds = AlphaChainSettings.MinSniperBanSeconds }.Validate().IsValid);
 
+        // ── Get Ready countdown ─────────────────────────────────────────────
+
+        [TestMethod]
+        public void Countdown_DefaultsToFiveSeconds()
+            => Assert.AreEqual(5, new AlphaChainSettings().PreRoundCountdownSeconds);
+
+        [TestMethod]
+        public void Countdown_BelowMin_IsInvalid()
+        {
+            var result = new AlphaChainSettings { PreRoundCountdownSeconds = AlphaChainSettings.MinCountdownSeconds - 1 }.Validate();
+            Assert.IsFalse(result.IsValid);
+            Assert.IsTrue(result.Summary.Contains("Get Ready"));
+        }
+
+        [TestMethod]
+        public void Countdown_AboveMax_IsInvalid()
+            => Assert.IsFalse(new AlphaChainSettings { PreRoundCountdownSeconds = AlphaChainSettings.MaxCountdownSeconds + 1 }.Validate().IsValid);
+
+        [TestMethod]
+        public void Countdown_AtBoundaries_IsValid()
+        {
+            Assert.IsTrue(new AlphaChainSettings { PreRoundCountdownSeconds = AlphaChainSettings.MinCountdownSeconds }.Validate().IsValid);
+            Assert.IsTrue(new AlphaChainSettings { PreRoundCountdownSeconds = AlphaChainSettings.MaxCountdownSeconds }.Validate().IsValid);
+        }
+
         // ── Cards dealt per era ─────────────────────────────────────────────
 
         [TestMethod]

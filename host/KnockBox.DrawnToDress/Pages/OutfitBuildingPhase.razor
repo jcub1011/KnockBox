@@ -6,8 +6,8 @@
 @{
     bool isHost = UserService.CurrentUser?.Id == GameState.Host.Id;
 
-    string? myId = UserService.CurrentUser?.Id;
-    var myPlayer = myId is not null && GameState.GamePlayers.TryGetValue(myId, out var pOut) ? pOut : null;
+    var myId = UserService.CurrentUser?.Id;
+    var myPlayer = myId is { } myIdVal && GameState.GamePlayers.TryGetValue(myIdVal, out var pOut) ? pOut : null;
     // Capture submitted outfit once so its value stays consistent throughout this render pass
     // even if the FSM updates player state concurrently from the timer loop.
     var mySubmittedOutfit = myPlayer?.GetOutfit(OutfitRound);
@@ -144,10 +144,10 @@
                                                         @((MarkupString)safeSvg)
                                                     </svg>
                                                 }
-                                                <div class="dtd-pool-item-creator-name">by @(item.CreatorPlayerId != null && GameState.GamePlayers.TryGetValue(item.CreatorPlayerId, out var c) ? c.DisplayName : "Unknown")</div>
+                                                <div class="dtd-pool-item-creator-name">by @(GameState.GamePlayers.TryGetValue(item.CreatorPlayerId, out var c) ? c.DisplayName : "Unknown")</div>
                                                 @if (taken)
                                                 {
-                                                    <span class="dtd-pool-item-badge dtd-badge-taken">Taken by @(item.ClaimedByPlayerId != null && GameState.GamePlayers.TryGetValue(item.ClaimedByPlayerId, out var cl) ? cl.DisplayName : "Unknown")</span>
+                                                    <span class="dtd-pool-item-badge dtd-badge-taken">Taken by @(item.ClaimedByPlayerId is { } clId && GameState.GamePlayers.TryGetValue(clId, out var cl) ? cl.DisplayName : "Unknown")</span>
                                                 }
                                             </div>
                                         }

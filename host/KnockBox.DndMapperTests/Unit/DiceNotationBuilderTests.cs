@@ -8,7 +8,7 @@ namespace KnockBox.DndMapperTests.Unit
     public class DiceNotationBuilderTests
     {
         private static RollResult MakeRoll(params DieRoll[] dice) => new(
-            Guid.NewGuid(), "u", null, dice, 0, RollMode.Normal, 0, null, "", DateTime.UtcNow, "");
+            Guid.NewGuid(), Guid.NewGuid(), null, dice, 0, RollMode.Normal, 0, null, "", DateTime.UtcNow, "");
 
         [TestMethod]
         public void Build_SingleD20()

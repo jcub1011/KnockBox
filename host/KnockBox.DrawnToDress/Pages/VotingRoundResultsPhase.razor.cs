@@ -17,7 +17,7 @@ namespace KnockBox.DrawnToDress.Pages
         protected string GetEntrantLabel(EntrantId entrantId)
         {
             var player = GameState.GamePlayers.GetValueOrDefault(entrantId.PlayerId);
-            return player?.DisplayName ?? entrantId.PlayerId;
+            return player?.DisplayName ?? entrantId.PlayerId.ToString();
         }
 
         protected (double AScore, double BScore) CalculateCriterionScores(SwissMatchup matchup, VotingCriterionDefinition criterion)

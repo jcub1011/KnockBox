@@ -1,0 +1,299 @@
+using KnockBox.AlphaChain.Services.Logic.Games.Data;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
+
+namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
+{
+    /// <summary>Tax Collector — inert in scoring; collects a cut when an opponent's word is era-taxed.</summary>
+    public sealed class TaxCollectorCard : MultiplicativeCardBase
+    {
+        /// <summary>Fraction of an opponent's taxed-away score this card collects.</summary>
+        public const double Rate = 0.5;
+
+        public override ModifierId GetId() => ModifierId.TaxCollector;
+        public override string GetName() => "Tax Collector";
+        public override string GetDescription(EngineEvaluationContext context)
+            => "When an opponent plays a banned-letter word, collect half the points it would have scored.";
+        protected override string? MagnitudeLabel => "FX";
+
+        public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
+
+        public override EngineEvaluationContext OnOpponentWordResolved(EngineEvaluationContext context, IModifierCard self)
+        {
+            var res = context.Resolution;
+            if (res is null || !res.Taxed || res.SiphonSuppressed || res.WouldBeScore <= 0)
+                return context;
+
+            var owner = context.GetPlayer(context.PlayerIndex);
+            if (owner is null || owner.UserId == res.SubmitterUserId)
+                return context;
+
+            int amount = ModifierMath.ClampScore(res.WouldBeScore * Rate * GetMagnification(context));
+            if (amount <= 0) return context;
+
+            owner.Score += amount;
+            context.Service<IEngineEffects>()?.RecordEraTaxSiphon(owner.DisplayName, amount);
+            return context;
+        }
+    }
+
+    /// <summary>The Toll Booth — inert in scoring; rolls a personal ban each era and tolls opponents who use it.</summary>
+    public sealed class TollBoothCard : MultiplicativeCardBase, IContributesRoomServices
+    {
+        /// <summary>Fraction of an opponent's earned score this card mints when they use its rolled ban letter.</summary>
+        public const double Rate = 0.20;
+
+        public override ModifierId GetId() => ModifierId.TollBooth;
+        public override string GetName() => "The Toll Booth";
+        public override string GetDescription(EngineEvaluationContext context)
+            => "Each era, rolls you a personal banned letter (Zero-Point Tax if you use it). Toll: bank 20% of any opponent's score when their word uses that letter.";
+        protected override string? MagnitudeLabel => "FX";
+
+        public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
+
+        public override EngineEvaluationContext OnEraStart(EngineEvaluationContext context, IModifierCard self)
+        {
+            var owner = context.GetPlayer(context.PlayerIndex);
+            if (owner is not null && context.Service<IBanLetterService>()?.RollPersonalBan() is { } ban)
+                context.Service<ICardBanService>()?.Roll(owner, GetId(), ban);
+            return context;
+        }
+
+        public override EngineEvaluationContext OnOpponentWordResolved(EngineEvaluationContext context, IModifierCard self)
+        {
+            var res = context.Resolution;
+            if (res is null || res.Taxed || res.EarnedScore <= 0)
+                return context;
+
+            var owner = context.GetPlayer(context.PlayerIndex);
+            if (owner is null || owner.UserId == res.SubmitterUserId)
+                return context;
+
+            if (context.Service<ICardBanService>()?.BanFor(owner, GetId()) is { } banned && res.Word.Contains(banned))
+            {
+                int amount = ModifierMath.ClampScore(res.EarnedScore * Rate * GetMagnification(context));
+                if (amount > 0) owner.Score += amount;
+            }
+            return context;
+        }
+
+        public IEnumerable<RoomServiceDescriptor> GetRoomServices()
+            => [new(typeof(ICardBanService), static _ => new CardBanService())];
+    }
+
+    /// <summary>The Roulette Wheel — ×1.75 on every clean word; rolls a personal ban each era.</summary>
+    public sealed class RouletteWheelCard : MultiplicativeCardBase, IContributesRoomServices
+    {
+        public override ModifierId GetId() => ModifierId.RouletteWheel;
+        public override string GetName() => "The Roulette Wheel";
+        public override string GetDescription(EngineEvaluationContext context)
+            => "Each era, rolls you a personal banned letter (Zero-Point Tax if you use it). Reward: ×1.75 on every word you keep clean.";
+        protected override string? MagnitudeLabel => "×1.75";
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.75 * GetMagnification(context);
+
+        public override EngineEvaluationContext OnEraStart(EngineEvaluationContext context, IModifierCard self)
+        {
+            var owner = context.GetPlayer(context.PlayerIndex);
+            if (owner is not null && context.Service<IBanLetterService>()?.RollPersonalBan() is { } ban)
+                context.Service<ICardBanService>()?.Roll(owner, GetId(), ban);
+            return context;
+        }
+
+        public IEnumerable<RoomServiceDescriptor> GetRoomServices()
+            => [new(typeof(ICardBanService), static _ => new CardBanService())];
+    }
+
+    /// <summary>The Bounty Hunter — inert (×1.0); docks the round leader on a too-short word.</summary>
+    public sealed class BountyHunterCard : MultiplicativeCardBase
+    {
+        /// <summary>Words shorter than this length expose the leader to the penalty.</summary>
+        public const int MinLength = 6;
+
+        /// <summary>Points docked from the leader on a too-short word.</summary>
+        public const int Penalty = 15;
+
+        public override ModifierId GetId() => ModifierId.BountyHunter;
+        public override string GetName() => "The Bounty Hunter";
+        public override string GetDescription(EngineEvaluationContext context)
+            => "Grants 0 points. Marks the leader each round — if they play a word shorter than 6 letters, they lose 15 points.";
+        protected override string? MagnitudeLabel => "FX";
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self) => 1.0;
+
+        public override EngineEvaluationContext OnOpponentWordResolved(EngineEvaluationContext context, IModifierCard self)
+        {
+            var res = context.Resolution;
+            var effects = context.Service<IEngineEffects>();
+            if (res is null || effects is null) return context;
+            if (res.SubmitterUserId != effects.RoundLeaderUserId || res.Word.Length >= MinLength)
+                return context;
+
+            var owner = context.GetPlayer(context.PlayerIndex);
+            var leader = context.GetPlayer(context.GetPlayerIndex(res.SubmitterUserId));
+            if (owner is null || leader is null || owner.UserId == leader.UserId)
+                return context;
+
+            effects.Drain(self, owner, leader, (int)Math.Round(Penalty * GetMagnification(context), MidpointRounding.AwayFromZero));
+            return context;
+        }
+    }
+
+    /// <summary>Flak Cannon — 0 points; shaves the next clock of every player scoring higher than the owner.</summary>
+    public sealed class FlakCannonCard : AdditiveCardBase, IContributesRoomServices
+    {
+        /// <summary>Fraction of each higher-scoring opponent's next armed clock shaved off (10% — equal
+        /// to the legacy flat 2 s at the 20 s default clock, but now scaling with their clock length).</summary>
+        public const double ShaveFraction = 0.10;
+
+        public override ModifierId GetId() => ModifierId.FlakCannon;
+        public override string GetName() => "Flak Cannon";
+        public override string GetDescription(EngineEvaluationContext context)
+            => "Grants 0 points. Takes 10% off the next shot clock of every player scoring higher than you.";
+        protected override string? MagnitudeLabel => "FX";
+
+        public override EngineEvaluationContext OnTurnEnded(EngineEvaluationContext context, IModifierCard self)
+        {
+            var owner = context.GetPlayer(context.PlayerIndex);
+            var effects = context.Service<IEngineEffects>();
+            if (owner is null || effects is null) return context;
+
+            double magnification = GetMagnification(context);
+            var clock = context.Service<IShotClockService>();
+            foreach (var opp in effects.OrderedActivePlayers())
+                if (opp.UserId != owner.UserId && opp.Score > owner.Score)
+                {
+                    // Shave a percentage of the victim's own armed clock, so a longer clock loses more.
+                    int oppClock = clock?.ComputeArmedSeconds(opp) ?? (int)context.ShotClockDuration;
+                    int shave = Math.Max(1, (int)Math.Round(oppClock * ShaveFraction * magnification, MidpointRounding.AwayFromZero));
+                    effects.TimeShave(self, owner, opp, shave);
+                }
+
+            return context;
+        }
+
+        // The time-shave it fires lands on a victim who doesn't hold this card, so the service must
+        // exist room-wide regardless of who's dealt the cannon (the catalogue-union guarantees that).
+        public IEnumerable<RoomServiceDescriptor> GetRoomServices()
+            => [new(typeof(ITimePenaltyService), static _ => new TimePenaltyService())];
+    }
+
+    /// <summary>Bait &amp; Switch — inert; on a taxed word, curses the next player with the offending letter.</summary>
+    public sealed class BaitAndSwitchCard : MultiplicativeCardBase, IContributesRoomServices
+    {
+        public override ModifierId GetId() => ModifierId.BaitAndSwitch;
+        public override string GetName() => "Bait & Switch";
+        public override string GetDescription(EngineEvaluationContext context)
+            => "When your word is hit by the Zero-Point Tax, curse the next player with that exact banned letter for their next turn.";
+        protected override string? MagnitudeLabel => "FX";
+
+        public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
+
+        public override EngineEvaluationContext OnTurnEnded(EngineEvaluationContext context, IModifierCard self)
+        {
+            var res = context.Resolution;
+            if (res is null || !res.Taxed || res.OffendingLetter is not { } letter)
+                return context;
+
+            var owner = context.GetPlayer(context.PlayerIndex);
+            var effects = context.Service<IEngineEffects>();
+            if (owner is null || effects is null) return context;
+
+            var next = effects.PeekNextActivePlayer(owner.UserId);
+            if (next is not null)
+                effects.LetterHijack(self, owner, next, letter);
+
+            return context;
+        }
+
+        // The hijack ban it inflicts lands on the next player, who doesn't hold this card, so the
+        // service must exist room-wide regardless of who's dealt Bait & Switch.
+        public IEnumerable<RoomServiceDescriptor> GetRoomServices()
+            => [new(typeof(IHijackBanService), static _ => new HijackBanService())];
+    }
+
+    /// <summary>Chrono Syphon — inert in scoring; banks a point for every second left on an opponent's
+    /// clock when they submit.</summary>
+    public sealed class ChronoSyphonCard : MultiplicativeCardBase
+    {
+        public override ModifierId GetId() => ModifierId.ChronoSyphon;
+        public override string GetName() => "Chrono Syphon";
+        public override string GetDescription(EngineEvaluationContext context)
+            => "Grants 0 points. Banks +1 for every whole second left on an opponent's shot clock when they submit.";
+        protected override string? MagnitudeLabel => "FX";
+
+        public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
+
+        public override EngineEvaluationContext OnOpponentWordResolved(EngineEvaluationContext context, IModifierCard self)
+        {
+            var res = context.Resolution;
+            if (res is null || res.RemainingSeconds <= 0)
+                return context;
+
+            var owner = context.GetPlayer(context.PlayerIndex);
+            if (owner is null || owner.UserId == res.SubmitterUserId)
+                return context;
+
+            int amount = ModifierMath.ClampScore(res.RemainingSeconds * GetMagnification(context));
+            if (amount > 0) owner.Score += amount;
+            return context;
+        }
+    }
+
+    /// <summary>Tax Write-Off — inert in scoring; salvages a self-taxed word by scoring its first letter
+    /// clean and adding it on top.</summary>
+    public sealed class TaxWriteOffCard : MultiplicativeCardBase, ITaxWriteOffPolicy
+    {
+        public override ModifierId GetId() => ModifierId.TaxWriteOff;
+        public override string GetName() => "Tax Write-Off";
+        public override string GetDescription(EngineEvaluationContext context)
+            => "When your word is hit by the Zero-Point Tax, score its first letter through your engine as a clean submission and add that on top.";
+        protected override string? MagnitudeLabel => "FX";
+
+        public override bool CheckIfTriggered(EngineEvaluationContext context) => false;
+
+        public int GetWriteOffBonus(EngineEvaluationContext context, IEngineEvaluator evaluator)
+        {
+            if (context.Word.Length == 0) return 0;
+            // Re-score just the first letter as an untaxed submission through the full bay. This card is
+            // inert (CheckIfTriggered is false), so the re-entry never recurses through this policy.
+            var sub = context with { Word = context.Word[..1] };
+            return evaluator.Calculate(sub);
+        }
+    }
+
+    /// <summary>Booster Pack — +2 for every card placed to the right of it in the bay.</summary>
+    public sealed class BoosterPackCard : AdditiveCardBase
+    {
+        /// <summary>Points granted per card to the right.</summary>
+        public const int PerCard = 2;
+
+        public override ModifierId GetId() => ModifierId.BoosterPack;
+        public override string GetName() => "Booster Pack";
+        public override string GetDescription(EngineEvaluationContext context) => "Adds +2 for every card placed to the right of this one.";
+        protected override string? MagnitudeLabel => "+2 / card→";
+
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
+            => PerCard * Math.Max(0, context.Bay.Count - context.ModifierCardIndex - 1) * GetMagnification(context);
+    }
+
+    /// <summary>Scavenger — +1 for every previously submitted word this match that contains your word's
+    /// starting letter.</summary>
+    public sealed class ScavengerCard : AdditiveCardBase
+    {
+        public override ModifierId GetId() => ModifierId.Scavenger;
+        public override string GetName() => "Scavenger";
+        public override string GetDescription(EngineEvaluationContext context)
+            => "Adds +1 for every previously submitted word that contains your word's starting letter.";
+        protected override string? MagnitudeLabel => "+1 / find";
+
+        public override bool CheckIfTriggered(EngineEvaluationContext context) => context.Word.Length > 0;
+
+        protected override double GetMagnitude(EngineEvaluationContext context, IModifierCard self)
+        {
+            char start = context.Word[0];
+            int count = 0;
+            foreach (var submission in context.SubmissionHistory)
+                if (submission.Word.Contains(start))
+                    count++;
+            return count * GetMagnification(context);
+        }
+    }
+}

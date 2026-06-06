@@ -54,9 +54,6 @@ public class SetupState : IOperatorGameState, ITimedGameState<OperatorGameContex
                     context.DealCards(player, context.State.Settings.MaxHandSize);
                 }
 
-                // Initialize TurnManager
-                context.State.TurnManager.SetTurnOrder(context.GamePlayers.Keys);
-                
                 context.State.Phase = OperatorGamePhase.Play;
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new PlayPhaseState());
             }
@@ -102,7 +99,6 @@ public class SetupState : IOperatorGameState, ITimedGameState<OperatorGameContex
                     context.DealCards(player, context.State.Settings.MaxHandSize);
                 }
 
-                context.State.TurnManager.SetTurnOrder(context.GamePlayers.Keys);
                 context.State.Phase = OperatorGamePhase.Play;
                 return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new PlayPhaseState());
             }

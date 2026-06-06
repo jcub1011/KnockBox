@@ -416,11 +416,13 @@ namespace KnockBox.DndMapper.Services.Library
                 return (mapId, imageId, null, null);
             }
 
-            IBlobShare share;
-            try { share = await blob.PublishForSharingAsync(options: null, ct); }
-            catch (Exception ex)
+            var shareResult = await blob.PublishForSharingAsync(options: null, ct);
+            if (!shareResult.TryGetSuccess(out var share))
             {
-                _logger.LogWarning(ex, "Reconnect: failed to republish image {ImageId}.", imageId);
+                if (shareResult.TryGetFailure(out var serr))
+                    _logger.LogWarning("Reconnect: failed to republish image {ImageId}: {Kind} {Error}", imageId, serr.Kind, serr.Message);
+                else
+                    _logger.LogWarning("Reconnect: republish of image {ImageId} was canceled.", imageId);
                 await SafeDisposeAsync(blob);
                 return (mapId, imageId, null, null);
             }
@@ -537,9 +539,26 @@ namespace KnockBox.DndMapper.Services.Library
                 IndexedDbBlob blob = item.Blob;
                 int pxW, pxH, originalPxW, originalPxH;
                 bool wasDownscaled;
+
+                // Object-URL creation now returns a domain result. A failure
+                // here takes the same rollback path the decode catch below
+                // does (drop the IDB row, dispose the handle, record a
+                // per-file failure, move on); cancellation propagates exactly
+                // like the catch (OperationCanceledException) rethrow.
+                var urlResult = await blob.CreateObjectUrlAsync(ct);
+                if (urlResult.IsCanceled) throw new OperationCanceledException(ct);
+                if (!urlResult.TryGetSuccess(out var url))
+                {
+                    urlResult.TryGetFailure(out var uerr);
+                    _logger.LogInformation("Image decode/downscale failed for {File} (object URL: {Kind} {Error}); rolling back.", item.Filename, uerr.Kind, uerr.Message);
+                    await SafeDeleteAsync(IndexedDbKey.String(keyString));
+                    await SafeDisposeAsync(blob);
+                    outcomes.Add(new UploadOutcome(item.Filename, null, "not a decodable image"));
+                    continue;
+                }
+
                 try
                 {
-                    var url = await blob.CreateObjectUrlAsync(ct);
                     var decode = await dimsModule.InvokeAsync<DecodeOutcomeDto>(
                         "decodeAndMaybeDownscale", ct,
                         url,
@@ -651,14 +670,16 @@ namespace KnockBox.DndMapper.Services.Library
 
             var key = IndexedDbKey.String(imageId.ToString("D"));
 
-            IBlobShare share;
-            try
+            // Publish now returns a domain result. Preserve the prior behavior:
+            // cancellation propagates (the old code let OperationCanceledException
+            // escape); any other failure logs, rolls back the IDB row + blob
+            // handle, and surfaces a user-facing error.
+            var shareResult = await adoptedBlob.PublishForSharingAsync(options: null, ct);
+            if (shareResult.IsCanceled) throw new OperationCanceledException(ct);
+            if (!shareResult.TryGetSuccess(out var share))
             {
-                share = await adoptedBlob.PublishForSharingAsync(options: null, ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.LogError(ex, "Failed to publish blob share for image {ImageId}.", imageId);
+                shareResult.TryGetFailure(out var serr);
+                _logger.LogError("Failed to publish blob share for image {ImageId}: {Kind} {Error}", imageId, serr.Kind, serr.Message);
                 await SafeDeleteAsync(key);
                 await SafeDisposeAsync(adoptedBlob);
                 return ValueResult<MapImage>.FromError("Failed to publish image share.");
@@ -813,15 +834,18 @@ namespace KnockBox.DndMapper.Services.Library
         {
             if (_disposed) return null;
             if (!_blobCache.TryGetValue(imageId, out var blob)) return null;
-            try
-            {
-                return await blob.CreateObjectUrlAsync(ct).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.LogWarning(ex, "Failed to create local object URL for image {ImageId}; caller will fall back to /blob-share.", imageId);
-                return null;
-            }
+
+            // Non-throwing by design: a storage/interop failure returns null so
+            // the caller falls back to the /blob-share URL (the old catch did
+            // the same). Cancellation propagates exactly as before — the prior
+            // catch filter excluded OperationCanceledException.
+            var urlResult = await blob.CreateObjectUrlAsync(ct).ConfigureAwait(false);
+            if (urlResult.IsCanceled) throw new OperationCanceledException(ct);
+            if (urlResult.TryGetSuccess(out var url)) return url;
+
+            urlResult.TryGetFailure(out var uerr);
+            _logger.LogWarning("Failed to create local object URL for image {ImageId} ({Kind} {Error}); caller will fall back to /blob-share.", imageId, uerr.Kind, uerr.Message);
+            return null;
         }
 
         /// <summary>
@@ -1057,11 +1081,16 @@ namespace KnockBox.DndMapper.Services.Library
                 return new ImageHydrationResult(imgSnap.Id, null, null, null);
             }
 
-            IBlobShare share;
-            try { share = await blob.PublishForSharingAsync(options: null, ct).ConfigureAwait(false); }
-            catch (Exception ex)
+            // Publish now returns a domain result. The prior catch-all swallowed
+            // both failures and cancellation into a skipped image, so fold both
+            // into the same "dispose + return empty" path here.
+            var shareResult = await blob.PublishForSharingAsync(options: null, ct).ConfigureAwait(false);
+            if (!shareResult.TryGetSuccess(out var share))
             {
-                _logger.LogWarning(ex, "Failed to republish share for hydrated image {ImageId}.", imgSnap.Id);
+                if (shareResult.TryGetFailure(out var serr))
+                    _logger.LogWarning("Failed to republish share for hydrated image {ImageId}: {Kind} {Error}", imgSnap.Id, serr.Kind, serr.Message);
+                else
+                    _logger.LogWarning("Republish of share for hydrated image {ImageId} was canceled.", imgSnap.Id);
                 await SafeDisposeAsync(blob).ConfigureAwait(false);
                 return new ImageHydrationResult(imgSnap.Id, null, null, null);
             }
@@ -1960,7 +1989,19 @@ namespace KnockBox.DndMapper.Services.Library
                     }
                     try
                     {
-                        var bytes = await blob.ReadAllBytesAsync(ct);
+                        // ReadAllBytesAsync no longer throws on storage/interop
+                        // failure. A read failure previously bubbled to the
+                        // outer catch and aborted the whole export with
+                        // "Export failed."; mirror that here. Cancellation maps
+                        // to the outer catch (OperationCanceledException) path.
+                        var bytesResult = await blob.ReadAllBytesAsync(ct);
+                        if (bytesResult.IsCanceled) return ValueResult<VtfExportResult>.FromCancellation();
+                        if (!bytesResult.TryGetSuccess(out var bytes))
+                        {
+                            bytesResult.TryGetFailure(out var rerr);
+                            _logger.LogWarning("Export: failed to read bytes for image {ImageId}: {Kind} {Error}", imageId, rerr.Kind, rerr.Message);
+                            return ValueResult<VtfExportResult>.FromError("Export failed.");
+                        }
                         var contentType = !string.IsNullOrWhiteSpace(blob.ContentType)
                             ? blob.ContentType
                             : (string.IsNullOrWhiteSpace(declaredType) ? "application/octet-stream" : declaredType);
@@ -1999,17 +2040,26 @@ namespace KnockBox.DndMapper.Services.Library
                 }
 
                 // Wrap as an IndexedDbBlob (allocates on the JS side); the
-                // CreateBlobAsync impl disposes ms when leaveOpen is false.
-                IndexedDbBlob blobResultBlob;
-                try
-                {
-                    blobResultBlob = await _indexedDb.CreateBlobAsync(
-                        ms, ms.Length, "application/zip", leaveOpen: false, ct);
-                }
-                catch
+                // CreateBlobAsync impl disposes ms on the success path when
+                // leaveOpen is false. CreateBlobAsync now returns a domain
+                // result instead of throwing on storage/interop failure; on
+                // failure or cancellation we dispose ms ourselves (idempotent)
+                // and surface the same outcomes the outer catch used to
+                // produce. Argument-validation exceptions still throw and are
+                // still caught by the outer catch.
+                var createResult = await _indexedDb.CreateBlobAsync(
+                    ms, ms.Length, "application/zip", leaveOpen: false, ct);
+                if (createResult.IsCanceled)
                 {
                     await ms.DisposeAsync();
-                    throw;
+                    return ValueResult<VtfExportResult>.FromCancellation();
+                }
+                if (!createResult.TryGetSuccess(out var blobResultBlob))
+                {
+                    createResult.TryGetFailure(out var cerr);
+                    _logger.LogWarning("Export: failed to create archive blob for slot {SlotId}: {Kind} {Error}", slotId, cerr.Kind, cerr.Message);
+                    await ms.DisposeAsync();
+                    return ValueResult<VtfExportResult>.FromError("Export failed.");
                 }
 
                 return ValueResult<VtfExportResult>.FromValue(
@@ -2050,9 +2100,19 @@ namespace KnockBox.DndMapper.Services.Library
                 // requires seeking back to the central directory at the end
                 // of the stream, which IndexedDbBlob.OpenReadAsync does not
                 // support (forward-only async stream).
+                // ReadAllBytesAsync no longer throws on storage/interop failure.
+                // Cancellation maps to the cancellation result (as the old
+                // catch did); any other read failure previously bubbled to the
+                // outer catch and returned "Import failed." — mirror that.
                 byte[] archiveBytes;
-                try { archiveBytes = await vtfBlob.ReadAllBytesAsync(ct); }
-                catch (OperationCanceledException) { return ValueResult<string>.FromCancellation(); }
+                var archiveResult = await vtfBlob.ReadAllBytesAsync(ct);
+                if (archiveResult.IsCanceled) return ValueResult<string>.FromCancellation();
+                if (!archiveResult.TryGetSuccess(out archiveBytes))
+                {
+                    archiveResult.TryGetFailure(out var rerr);
+                    _logger.LogWarning("DnD Mapper VTF import: failed to read archive bytes: {Kind} {Error}", rerr.Kind, rerr.Message);
+                    return ValueResult<string>.FromError("Import failed.");
+                }
 
                 VtfPackager.UnpackResult unpacked;
                 try
@@ -2122,7 +2182,19 @@ namespace KnockBox.DndMapper.Services.Library
                     IndexedDbBlob? created = null;
                     try
                     {
-                        created = await _indexedDb.CreateBlobAsync(asset.Bytes, asset.ContentType, ct);
+                        // CreateBlobAsync now returns a domain result. A create
+                        // failure aborts the import with an error (matching both
+                        // the sibling put-failure path below and the outer
+                        // catch's "Import failed."); cancellation maps to the
+                        // cancellation result. `created` stays null on failure,
+                        // so the finally's null-guarded dispose is still correct.
+                        var createResult = await _indexedDb.CreateBlobAsync(asset.Bytes, asset.ContentType, ct);
+                        if (createResult.IsCanceled) return ValueResult<string>.FromCancellation();
+                        if (!createResult.TryGetSuccess(out created))
+                        {
+                            createResult.TryGetFailure(out var cerr);
+                            return ValueResult<string>.FromError($"Failed to write image to library: {cerr.Message}");
+                        }
                         var put = await _db.BlobPutSingleAsync(
                             DndMapperLibrarySchema.ImagesStore,
                             created,

@@ -1,8 +1,10 @@
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM.States;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
 using KnockBox.AlphaChain.Services.State.Games;
+using KnockBox.AlphaChain.Services.State.Games.Data;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
@@ -27,7 +29,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
     public class AlphaChainGameEngine(
         IWordListService wordList,
         IRandomNumberService rng,
-        IScoreCalculator scoreCalculator,
+        IEngineEvaluator evaluator,
+        IModifierCardFactory modifierFactory,
         ILogger<AlphaChainGameEngine> logger,
         ILogger<AlphaChainGameState> stateLogger) : AbstractGameEngine<AlphaChainGameState>(2, 8)
     {
@@ -69,13 +72,15 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
         protected override void ResetForLobby(AlphaChainGameState state)
         {
             // SetupState re-snapshots GamePlayers from the roster on the next start, so
-            // clearing the per-match state here is sufficient. Settings are preserved.
+            // clearing the per-match state here is sufficient. Settings are preserved. Dropping the
+            // Context also drops its EvaluationServices (the room-scoped card-state services); the next
+            // StartAsyncCore builds a fresh Context + services, so no card state leaks across matches.
             state.Context = null;
             state.GamePlayers.Clear();
             state.TurnManager.TurnOrder.Clear();
             state.OptimizationSubmissions.Clear();
             state.PlayedWords.Clear();
-            state.PlayLog.Clear();
+            state.SubmissionHistory = System.Collections.Immutable.ImmutableList<AlphaChainSubmission>.Empty;
             state.CurrentRound = 0;
             state.CurrentEra = 0;
             state.IntermissionPhase = default;
@@ -110,7 +115,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
                     "AlphaChainSettings.Validate reported: " + validation.Summary));
             }
 
-            var context = new AlphaChainGameContext(gameState, this, wordList, rng, scoreCalculator, logger);
+            var context = new AlphaChainGameContext(gameState, this, wordList, rng, evaluator, modifierFactory, logger);
             var fsm = new FiniteStateMachine<AlphaChainGameContext, AlphaChainCommand>(logger);
             context.Fsm = fsm;
 
@@ -165,19 +170,19 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
         }
 
         /// <summary>Convenience wrapper for the UI: advances the active player's turn.</summary>
-        public Task<Result> AdvanceTurnAsync(string actorUserId, AlphaChainGameState state)
+        public Task<Result> AdvanceTurnAsync(Guid actorUserId, AlphaChainGameState state)
             => ProcessCommandAsync(state, new AdvanceTurnCommand(actorUserId));
 
         /// <summary>Convenience wrapper for the UI: commits an Engine Bay ordering during Intermission Optimization.</summary>
-        public Task<Result> SubmitOptimizationAsync(string actorUserId, IReadOnlyList<string> modifierBayIds, AlphaChainGameState state)
+        public Task<Result> SubmitOptimizationAsync(Guid actorUserId, IReadOnlyList<string> modifierBayIds, AlphaChainGameState state)
             => ProcessCommandAsync(state, new SubmitOptimizationCommand(actorUserId, modifierBayIds));
 
         /// <summary>Convenience wrapper for the UI: the last-place player picks the next era's banned letter.</summary>
-        public Task<Result> SelectSniperBanAsync(string actorUserId, char letter, AlphaChainGameState state)
+        public Task<Result> SelectSniperBanAsync(Guid actorUserId, char letter, AlphaChainGameState state)
             => ProcessCommandAsync(state, new SelectSniperBanCommand(actorUserId, letter));
 
         /// <summary>Convenience wrapper for the UI: the host skips the currently-showing tutorial.</summary>
-        public Task<Result> SkipTutorialAsync(string actorUserId, AlphaChainGameState state)
+        public Task<Result> SkipTutorialAsync(Guid actorUserId, AlphaChainGameState state)
             => ProcessCommandAsync(state, new SkipTutorialCommand(actorUserId));
 
         /// <summary>
@@ -187,7 +192,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
         /// it on the context; this reads it back out after the dispatch completes.
         /// </summary>
         public async Task<ValueResult<SubmitWordResult>> SubmitWordAsync(
-            string actorUserId, string wordRaw, AlphaChainGameState state, DateTimeOffset? now = null)
+            Guid actorUserId, string wordRaw, AlphaChainGameState state, DateTimeOffset? now = null)
         {
             if (state.Context is null)
                 return ValueResult<SubmitWordResult>.FromError("The game has not been started yet.");
@@ -262,7 +267,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
                 }
 
                 // If the departing player held the turn, advance past them.
-                if (state.TurnManager.CurrentPlayer == user.Id)
+                if (state.TurnManager.CurrentPlayer.GetValueOrDefault() == user.Id)
                     state.TurnManager.NextTurn();
 
                 // End the match when no one is left to play: an empty field ends it in any mode

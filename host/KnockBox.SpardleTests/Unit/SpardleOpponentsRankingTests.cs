@@ -528,7 +528,7 @@ public class SpardleOpponentsRankingTests
         //   2. .Where(r => state.Players.Select(p => p.User.Id).Contains(r.User.Id))
         // With HostIsParticipant=true, the host IS in ComputeRanked's roster — the
         // razor's State.Players filter is what drops them from the observer panel.
-        var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
+        var host = UserFactory.Create("Host", Guid.NewGuid());
         var state = new SpardleState(host, NullLogger.Instance);
         state.Execute(() => state.SetJoinable(true));
         state.UpdateSettings(s => s with { WinCondition = WinConditionMode.Sprinter });
@@ -577,7 +577,7 @@ public class SpardleOpponentsRankingTests
 
     private static SpardleState MakeState(WinConditionMode mode, string targetWord)
     {
-        var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
+        var host = UserFactory.Create("Host", Guid.NewGuid());
         var state = new SpardleState(host, NullLogger.Instance);
         state.Execute(() => state.SetJoinable(true));
         state.UpdateSettings(s => s with { WinCondition = mode });
@@ -590,7 +590,7 @@ public class SpardleOpponentsRankingTests
 
     private static User AddPlayer(SpardleState state, string name)
     {
-        var user = UserFactory.Create(name, Guid.NewGuid().ToString());
+        var user = UserFactory.Create(name, Guid.NewGuid());
         var reg = state.RegisterPlayer(user);
         Assert.IsTrue(reg.IsSuccess, $"RegisterPlayer({name}) failed");
         return user;

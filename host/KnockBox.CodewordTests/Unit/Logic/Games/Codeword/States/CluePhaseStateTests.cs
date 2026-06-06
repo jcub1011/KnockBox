@@ -19,9 +19,19 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         private CodewordGameState _state = default!;
         private CodewordGameContext _context = default!;
 
+        private Guid _p0Id = default!;
+        private Guid _p1Id = default!;
+        private Guid _p2Id = default!;
+        private Guid _p3Id = default!;
+
         [TestInitialize]
         public void Setup()
         {
+            _p0Id = Guid.NewGuid();
+            _p1Id = Guid.NewGuid();
+            _p2Id = Guid.NewGuid();
+            _p3Id = Guid.NewGuid();
+
             _rng = new Mock<IRandomNumberService>();
             _rng.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>()))
                 .Returns(0);
@@ -30,19 +40,19 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             _logger = new Mock<ILogger>();
             _stateLogger = new Mock<ILogger<CodewordGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new CodewordGameState(host, _stateLogger.Object);
             _context = new CodewordGameContext(_state, _rng.Object, _logger.Object);
 
             // Add 4 players with roles assigned.
-            AddPlayer("p0", "Player 0", Role.Agent, "Ocean");
-            AddPlayer("p1", "Player 1", Role.Agent, "Ocean");
-            AddPlayer("p2", "Player 2", Role.Agent, "Ocean");
-            AddPlayer("p3", "Player 3", Role.Insider, "Lake");
+            AddPlayer(_p0Id, "Player 0", Role.Agent, "Ocean");
+            AddPlayer(_p1Id, "Player 1", Role.Agent, "Ocean");
+            AddPlayer(_p2Id, "Player 2", Role.Agent, "Ocean");
+            AddPlayer(_p3Id, "Player 3", Role.Insider, "Lake");
             _state.CurrentWordPair = ["Ocean", "Lake"];
         }
 
-        private void AddPlayer(string id, string name, Role role, string? secretWord)
+        private void AddPlayer(Guid id, string name, Role role, string? secretWord)
         {
             var ps = new CodewordPlayerState
             {
@@ -66,15 +76,15 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         [TestMethod]
         public void OnEnter_ResetsCycleState()
         {
-            _state.GamePlayers["p0"].HasSubmittedClue = true;
-            _state.GamePlayers["p0"].CurrentClue = "wave";
-            _state.LastElimination = new EliminationResult("", "", default, WasTie: true);
+            _state.GamePlayers[_p0Id].HasSubmittedClue = true;
+            _state.GamePlayers[_p0Id].CurrentClue = "wave";
+            _state.LastElimination = new EliminationResult(Guid.Empty, "", default, WasTie: true);
 
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            Assert.IsFalse(_state.GamePlayers["p0"].HasSubmittedClue);
-            Assert.IsNull(_state.GamePlayers["p0"].CurrentClue);
+            Assert.IsFalse(_state.GamePlayers[_p0Id].HasSubmittedClue);
+            Assert.IsNull(_state.GamePlayers[_p0Id].CurrentClue);
             Assert.IsNull(_state.LastElimination);
         }
 
@@ -82,14 +92,14 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         public void OnEnter_AdvancesToAlivePlayer()
         {
             // Eliminate p0 so the first alive player is p1.
-            _state.GamePlayers["p0"].IsEliminated = true;
+            _state.GamePlayers[_p0Id].IsEliminated = true;
             _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
-            Assert.AreNotEqual("p0", currentPlayer, "Should skip eliminated player.");
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Assert.AreNotEqual(_p0Id, currentPlayer, "Should skip eliminated player.");
         }
 
         [TestMethod]
@@ -111,7 +121,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, "wave"));
 
             Assert.IsTrue(result.IsSuccess);
@@ -127,7 +137,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, "two words"));
 
             Assert.IsTrue(result.IsSuccess);
@@ -142,7 +152,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var player = _context.GetPlayer(currentPlayer)!;
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, player.SecretWord!));
 
@@ -157,7 +167,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, "wave"));
 
             Assert.IsFalse(result.IsSuccess);
@@ -169,8 +179,8 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
-            string wrongPlayer = _state.TurnManager.TurnOrder[(_state.TurnManager.CurrentPlayerIndex + 1) % _state.TurnManager.TurnOrder.Count];
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Guid wrongPlayer = _state.TurnManager.TurnOrder[(_state.TurnManager.CurrentPlayerIndex + 1) % _state.TurnManager.TurnOrder.Count];
 
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(wrongPlayer, "wave"));
             Assert.IsFalse(result.IsSuccess);
@@ -186,7 +196,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             string[] clues = ["wave", "splash", "tide", "fish"];
             for (int i = 0; i < 4; i++)
             {
-                string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+                Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
                 var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, clues[i]));
                 Assert.IsTrue(result.IsSuccess);
 
@@ -201,19 +211,19 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         public void HandleCommand_SkipsEliminatedPlayers()
         {
             // Eliminate p1 (index 1 in turn order).
-            _state.GamePlayers["p1"].IsEliminated = true;
+            _state.GamePlayers[_p1Id].IsEliminated = true;
             _state.TurnManager.SetCurrentPlayerIndex(0);
 
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
             // Submit clue for p0.
-            var result = clueState.HandleCommand(_context, new SubmitClueCommand("p0", "wave"));
+            var result = clueState.HandleCommand(_context, new SubmitClueCommand(_p0Id, "wave"));
             Assert.IsTrue(result.IsSuccess);
 
             // Next player should be p2, not p1 (eliminated).
-            string next = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
-            Assert.AreEqual("p2", next, "Should skip eliminated p1.");
+            Guid next = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Assert.AreEqual(_p2Id, next, "Should skip eliminated p1.");
         }
 
         [TestMethod]
@@ -223,7 +233,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
 
             // Tick after timeout.
             var result = clueState.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
@@ -245,7 +255,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             Assert.IsTrue(result.IsSuccess);
             Assert.IsNull(result.Value);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var player = _context.GetPlayer(currentPlayer)!;
             Assert.IsFalse(player.HasSubmittedClue);
         }
@@ -256,7 +266,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             // Secret word is "Ocean"; try lowercase.
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, "ocean"));
             Assert.IsFalse(result.IsSuccess);
@@ -270,7 +280,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var result = clueState.HandleCommand(_context, new SubmitClueCommand(currentPlayer, "wave"));
             Assert.IsFalse(result.IsSuccess);
         }
@@ -284,7 +294,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var player = _context.GetPlayer(currentPlayer)!;
             player.PendingClue = "my pending clue";
 
@@ -301,7 +311,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var player = _context.GetPlayer(currentPlayer)!;
             player.PendingClue = "   "; // whitespace-only
 
@@ -318,7 +328,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var player = _context.GetPlayer(currentPlayer)!;
             player.PendingClue = player.SecretWord; // "Ocean"
 
@@ -337,7 +347,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var player = _context.GetPlayer(currentPlayer)!;
             player.PendingClue = "wave";
 
@@ -354,7 +364,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var clueState = new CluePhaseState();
             clueState.OnEnter(_context);
 
-            string currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
+            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var player = _context.GetPlayer(currentPlayer)!;
             player.PendingClue = null;
 

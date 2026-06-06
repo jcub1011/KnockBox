@@ -18,7 +18,7 @@ namespace KnockBox.Codeword.Pages
 
         [Parameter] public EventCallback<string> OnError { get; set; }
 
-        private string? _selectedTargetId;
+        private Guid? _selectedTargetId;
 
         private CodewordPlayerState? GetMyPlayer()
         {
@@ -26,7 +26,7 @@ namespace KnockBox.Codeword.Pages
             return GameState.GamePlayers.TryGetValue(UserService.CurrentUser.Id, out var state) ? state : null;
         }
 
-        private void SelectTarget(string targetId)
+        private void SelectTarget(Guid targetId)
         {
             _selectedTargetId = targetId;
         }
@@ -38,9 +38,9 @@ namespace KnockBox.Codeword.Pages
 
         private void ConfirmVote()
         {
-            if (UserService.CurrentUser == null || _selectedTargetId == null) return;
+            if (UserService.CurrentUser == null || _selectedTargetId is not { } target) return;
 
-            var result = GameEngine.CastVote(UserService.CurrentUser, GameState, _selectedTargetId);
+            var result = GameEngine.CastVote(UserService.CurrentUser, GameState, target);
             if (result.TryGetFailure(out var error))
             {
                 Logger.LogError("Failed to cast vote: {Error}", error);

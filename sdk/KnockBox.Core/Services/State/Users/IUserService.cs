@@ -1,3 +1,5 @@
+using KnockBox.Core.Primitives.Returns;
+
 namespace KnockBox.Core.Services.State.Users
 {
     public record class UserNameChangedArgs(string PreviousName, string NewName);
@@ -13,7 +15,7 @@ namespace KnockBox.Core.Services.State.Users
     /// </summary>
     public class User
     {
-        internal User(string name, string id)
+        internal User(string name, Guid id)
         {
             Name = name;
             Id = id;
@@ -31,7 +33,7 @@ namespace KnockBox.Core.Services.State.Users
         /// <summary>
         /// The unique id of the user. Immutable once the user is constructed.
         /// </summary>
-        public string Id { get; }
+        public Guid Id { get; }
     }
 
     /// <summary>
@@ -52,7 +54,7 @@ namespace KnockBox.Core.Services.State.Users
         /// shape; reach for <see cref="CreateUnchecked"/> only when the test
         /// explicitly needs an un-normalized value.
         /// </summary>
-        public static User Create(string name, string id)
+        public static User Create(string name, Guid id)
         {
             name = (name ?? string.Empty).Trim();
             if (name.Length > MaxNameLength) name = name[..MaxNameLength];
@@ -65,7 +67,7 @@ namespace KnockBox.Core.Services.State.Users
         /// paths (e.g. verifying that upstream layers do reject a 13-character
         /// input). Production code should never call this.
         /// </summary>
-        public static User CreateUnchecked(string name, string id) => new(name, id);
+        public static User CreateUnchecked(string name, Guid id) => new(name, id);
     }
 
     public interface IUserService
@@ -90,18 +92,21 @@ namespace KnockBox.Core.Services.State.Users
         event Action<UserNameChangedArgs>? UserNameChanged;
 
         /// <summary>
-        /// Initializes the current user.
+        /// Initializes the current user. A <see cref="User"/> is always produced (a
+        /// fallback identity is used if the session token can't be obtained); the
+        /// returned result is a failure in that degraded case so callers may surface it.
         /// </summary>
         /// <param name="ct"></param>
-        /// <returns></returns>
-        Task InitializeCurrentUserAsync(CancellationToken ct = default);
+        /// <returns>Success when a real session was established; failure on the degraded
+        /// fallback path; cancellation is reported as a failure result.</returns>
+        Task<Result> InitializeCurrentUserAsync(CancellationToken ct = default);
 
         /// <summary>
         /// Resets the user's identity, generating a new unique id.
         /// </summary>
         /// <param name="ct"></param>
-        /// <returns></returns>
-        Task ResetIdentityAsync(CancellationToken ct = default);
+        /// <returns>The result of re-initializing the current user.</returns>
+        Task<Result> ResetIdentityAsync(CancellationToken ct = default);
 
         /// <summary>
         /// Updates <see cref="CurrentUser"/>'s name. Trims whitespace and caps at

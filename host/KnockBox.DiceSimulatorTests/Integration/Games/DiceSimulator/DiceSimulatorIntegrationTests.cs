@@ -23,8 +23,8 @@ namespace KnockBox.DiceSimulator.Tests.Integration
             var engineLogger = Mock.Of<ILogger<DiceSimulatorGameEngine>>();
             var stateLogger = Mock.Of<ILogger<DiceSimulatorGameState>>();
             var engine = new DiceSimulatorGameEngine(randomSvc, engineLogger, stateLogger);
-            var host = UserFactory.Create("Host", "host");
-            var player1 = UserFactory.Create("P1", "p1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
+            var player1 = UserFactory.Create("P1", Guid.NewGuid());
 
             // Act: Create State
             var stateResult = await engine.CreateStateAsync(host);
@@ -55,15 +55,15 @@ namespace KnockBox.DiceSimulator.Tests.Integration
             Assert.HasCount(1, state.RollHistory);
             
             var rollEntry = state.RollHistory.Last();
-            Assert.AreEqual("p1", rollEntry.PlayerId); // Correct assertion using ID or Name
+            Assert.AreEqual(player1.Id, rollEntry.PlayerId); // Correct assertion using ID or Name
             Assert.AreEqual("P1", rollEntry.PlayerName);
             Assert.AreEqual(3, rollEntry.DiceCount);
             Assert.AreEqual(DiceType.D6, rollEntry.DiceType);
-            
+
             // Expected Result range: 3*1 + 2 = 5 to 3*6 + 2 = 20
             Assert.IsTrue(rollEntry.Result >= 5 && rollEntry.Result <= 20);
 
-            var p1Stats = state.PlayerStats["p1"];
+            var p1Stats = state.PlayerStats[player1.Id];
             Assert.AreEqual(1, p1Stats.TotalRolls);
             Assert.AreEqual(3, p1Stats.RollCountByDie[DiceType.D6]);
             Assert.AreEqual(rollEntry.Result, p1Stats.HighestResult); 
@@ -83,7 +83,7 @@ namespace KnockBox.DiceSimulator.Tests.Integration
             var engineLogger = Mock.Of<ILogger<DiceSimulatorGameEngine>>();
             var stateLogger = Mock.Of<ILogger<DiceSimulatorGameState>>();
             var engine = new DiceSimulatorGameEngine(randomSvc, engineLogger, stateLogger);
-            var host = UserFactory.Create("Host", "host");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
 
             var stateResult = await engine.CreateStateAsync(host);
             var state = (DiceSimulatorGameState)stateResult.Value!;

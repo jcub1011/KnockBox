@@ -15,7 +15,7 @@ namespace KnockBox.DndMapper.Services.Logic.Visibility
     /// </summary>
     public static class SheetVisibilityHelper
     {
-        public static bool CanSeeNotesAndHp(CharacterSheet sheet, string viewerUserId, bool viewerIsHost)
+        public static bool CanSeeNotesAndHp(CharacterSheet sheet, Guid viewerUserId, bool viewerIsHost)
         {
             ArgumentNullException.ThrowIfNull(sheet);
             return viewerIsHost || sheet.OwnerUserId == viewerUserId;
@@ -30,7 +30,7 @@ namespace KnockBox.DndMapper.Services.Logic.Visibility
         /// </summary>
         public static bool CanSeeSheet(
             CharacterSheet sheet,
-            string viewerUserId,
+            Guid viewerUserId,
             bool viewerIsHost,
             bool playersCanSeeOtherSheets)
         {
@@ -43,7 +43,7 @@ namespace KnockBox.DndMapper.Services.Logic.Visibility
 
         public static bool CanEdit(
             CharacterSheet sheet,
-            string viewerUserId,
+            Guid viewerUserId,
             bool viewerIsHost,
             SheetEditPolicy policy)
         {

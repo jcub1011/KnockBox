@@ -60,8 +60,8 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     // Player tracking. Writes are owned by SpardleEngine and only ever happen inside
     // Execute/ExecuteAsync. Render-thread callers read via TryGetPlayerState — they must
     // never invoke CreatePlayerState, which would mutate the dictionary unlocked.
-    private readonly ConcurrentDictionary<string, PlayerState> _playerStates = new();
-    public IReadOnlyDictionary<string, PlayerState> PlayerStates => _playerStates;
+    private readonly ConcurrentDictionary<Guid, PlayerState> _playerStates = new();
+    public IReadOnlyDictionary<Guid, PlayerState> PlayerStates => _playerStates;
 
     // The participant roster captured at game start, frozen for the match. Used by
     // the final standings screen so players who disconnect (and are dropped from the
@@ -85,7 +85,7 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     /// Creates (or returns the existing) <see cref="PlayerState"/> for <paramref name="userId"/>.
     /// Mutates <see cref="PlayerStates"/>; callers MUST be inside <c>Execute</c>/<c>ExecuteAsync</c>.
     /// </summary>
-    internal PlayerState CreatePlayerState(string userId)
+    internal PlayerState CreatePlayerState(Guid userId)
     {
         if (!_playerStates.TryGetValue(userId, out var state))
         {
@@ -99,7 +99,7 @@ public class SpardleState(User host, ILogger logger) : AbstractGameState(host, l
     /// Read-only lookup for render-thread callers. Returns false when no entry exists
     /// (e.g., an observing host, or a spectator who joined mid-round).
     /// </summary>
-    public bool TryGetPlayerState(string userId, out PlayerState state)
+    public bool TryGetPlayerState(Guid userId, out PlayerState state)
         => _playerStates.TryGetValue(userId, out state!);
 
     /// <summary>

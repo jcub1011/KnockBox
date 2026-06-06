@@ -195,16 +195,16 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         /// Rolls up entrant-level scores to player-level totals.
         /// Player total = sum of all entrant scores + player BonusPoints.
         /// </summary>
-        public static Dictionary<string, double> CalculatePlayerTotals(
+        public static Dictionary<Guid, double> CalculatePlayerTotals(
             IReadOnlyList<VotingRound> rounds,
             IReadOnlyList<VotingCriterionDefinition> criteria,
             IEnumerable<VoteSubmission> votes,
             IReadOnlyList<CriterionCoinFlipResult> coinFlipResults,
-            IReadOnlyDictionary<string, DrawnToDressPlayerState> players,
+            IReadOnlyDictionary<Guid, DrawnToDressPlayerState> players,
             DrawnToDressSettings config)
         {
             var voteList = votes.AsReadOnlyList();
-            var playerTotals = new Dictionary<string, double>();
+            var playerTotals = new Dictionary<Guid, double>();
 
             // Sum entrant scores across all rounds.
             foreach (var round in rounds)
@@ -229,13 +229,13 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         /// Builds the final ranked leaderboard. Ranking: total points (desc) → matchup wins (desc).
         /// Returns the leaderboard entries and a list of ties that may need coin flip resolution.
         /// </summary>
-        public static (List<LeaderboardEntry> Entries, List<(string PlayerA, string PlayerB)> TiedPairs)
+        public static (List<LeaderboardEntry> Entries, List<(Guid PlayerA, Guid PlayerB)> TiedPairs)
             BuildLeaderboard(
                 IReadOnlyList<VotingRound> rounds,
                 IReadOnlyList<VotingCriterionDefinition> criteria,
                 IEnumerable<VoteSubmission> votes,
                 IReadOnlyList<CriterionCoinFlipResult> coinFlipResults,
-                IReadOnlyDictionary<string, DrawnToDressPlayerState> players,
+                IReadOnlyDictionary<Guid, DrawnToDressPlayerState> players,
                 DrawnToDressSettings config)
         {
             var voteList = votes.AsReadOnlyList();
@@ -243,7 +243,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             var entrantMatchupWins = CalculateMatchupWins(rounds, criteria, voteList, coinFlipResults);
 
             // Roll up matchup wins to player level.
-            var playerMatchupWins = new Dictionary<string, double>();
+            var playerMatchupWins = new Dictionary<Guid, double>();
             foreach (var (entrantId, mw) in entrantMatchupWins)
             {
                 playerMatchupWins[entrantId.PlayerId] = playerMatchupWins.GetValueOrDefault(entrantId.PlayerId) + mw;
@@ -251,8 +251,8 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
 
             // Calculate Swiss W/L from SwissTournamentService for display.
             var swissWins = SwissTournamentService.CalculateWins(rounds, voteList);
-            var playerSwissWins = new Dictionary<string, double>();
-            var playerSwissLosses = new Dictionary<string, double>();
+            var playerSwissWins = new Dictionary<Guid, double>();
+            var playerSwissLosses = new Dictionary<Guid, double>();
             // Count total matchups per entrant to derive losses.
             var totalMatchupsPerEntrant = new Dictionary<EntrantId, int>();
             foreach (var round in rounds)
@@ -279,7 +279,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             }
 
             // Count byes per player.
-            var playerByeCount = new Dictionary<string, int>();
+            var playerByeCount = new Dictionary<Guid, int>();
             foreach (var round in rounds)
             {
                 foreach (var byeEntrant in round.Byes)
@@ -310,10 +310,10 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             entries = [.. entries
                 .OrderByDescending(e => e.TotalScore)
                 .ThenByDescending(e => e.MatchupWins)
-                .ThenBy(e => e.PlayerId, StringComparer.Ordinal)];
+                .ThenBy(e => e.PlayerId)];
 
             // Assign ranks (tied players share the same rank).
-            var tiedPairs = new List<(string, string)>();
+            var tiedPairs = new List<(Guid, Guid)>();
             for (int i = 0; i < entries.Count; i++)
             {
                 if (i == 0)
@@ -353,7 +353,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
             if (standingsFlips.Count == 0) return;
 
             // Build a set of winners and losers from the flips.
-            var flipWinners = new Dictionary<(string, string), string>();
+            var flipWinners = new Dictionary<(Guid, Guid), Guid>();
             foreach (var flip in standingsFlips)
             {
                 flipWinners[(flip.PlayerAId, flip.PlayerBId)] = flip.WinnerPlayerId;
@@ -378,7 +378,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
                     {
                         return winner == a.PlayerId ? -1 : 1;
                     }
-                    return string.Compare(a.PlayerId, b.PlayerId, StringComparison.Ordinal);
+                    return a.PlayerId.CompareTo(b.PlayerId);
                 });
 
                 // Replace the group entries in the list with the sorted order.

@@ -22,7 +22,7 @@ namespace KnockBox.DrawnToDress.Pages
         private bool _submitting;
         private string? _errorMessage;
 
-        private string CurrentPlayerId => UserService.CurrentUser?.Id ?? string.Empty;
+        private Guid CurrentPlayerId => UserService.CurrentUser?.Id ?? Guid.Empty;
 
         protected bool IsCreatorOfEntrant(EntrantId entrantId)
         {
@@ -37,7 +37,7 @@ namespace KnockBox.DrawnToDress.Pages
         protected string GetEntrantDisplayName(EntrantId entrantId)
         {
             var player = GameState.GamePlayers.GetValueOrDefault(entrantId.PlayerId);
-            string name = player?.DisplayName ?? entrantId.PlayerId;
+            string name = player?.DisplayName ?? entrantId.PlayerId.ToString();
             return $"{name} (Outfit {entrantId.Round})";
         }
 

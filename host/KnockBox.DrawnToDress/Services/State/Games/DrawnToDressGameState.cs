@@ -46,7 +46,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games
         /// <summary>
         /// All player states, keyed by player ID.
         /// </summary>
-        public ConcurrentDictionary<string, DrawnToDressPlayerState> GamePlayers { get; } = new();
+        public ConcurrentDictionary<Guid, DrawnToDressPlayerState> GamePlayers { get; } = new();
 
         // ── FSM ───────────────────────────────────────────────────────────────
 
@@ -85,7 +85,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games
         /// Theme texts submitted by players when <see cref="DrawnToDressSettings.ThemeSource"/>
         /// is <see cref="ThemeSource.PlayerWritten"/>.  Keyed by player ID.
         /// </summary>
-        public readonly ConcurrentDictionary<string, string> PlayerThemeSubmissions = new();
+        public readonly ConcurrentDictionary<Guid, string> PlayerThemeSubmissions = new();
 
         /// <summary>
         /// Candidate themes presented to players for voting when
@@ -99,7 +99,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games
         /// Keyed by player ID; value is the <see cref="ThemeDefinition.Id"/> of the chosen
         /// candidate.
         /// </summary>
-        public readonly ConcurrentDictionary<string, string> ThemeVotes = new();
+        public readonly ConcurrentDictionary<Guid, string> ThemeVotes = new();
 
         // ── Drawing round tracking ────────────────────────────────────────────
 

@@ -29,7 +29,7 @@ namespace KnockBox.HiddenAgenda.Components
             return GameState.ReachableSpaces.Any(s => s.Id == spaceId);
         }
 
-        private string GetPlayerColor(string playerId)
+        private string GetPlayerColor(Guid playerId)
         {
             var players = GameState.Players.ToList();
             var index = players.FindIndex(p => p.User.Id == playerId);

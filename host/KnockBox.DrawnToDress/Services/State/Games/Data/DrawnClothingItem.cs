@@ -17,7 +17,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         public ClothingType ClothingTypeId { get; set; }
 
         /// <summary>The player ID of the player who drew this item.</summary>
-        public string CreatorPlayerId { get; set; } = string.Empty;
+        public Guid CreatorPlayerId { get; set; }
 
         /// <summary>
         /// The serialized SVG content of the drawing, or <see langword="null"/> if the
@@ -37,6 +37,6 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         /// The player ID of the player who has claimed this item from the pool, or
         /// <see langword="null"/> when the item is unclaimed.
         /// </summary>
-        public string? ClaimedByPlayerId { get; set; }
+        public Guid? ClaimedByPlayerId { get; set; }
     }
 }

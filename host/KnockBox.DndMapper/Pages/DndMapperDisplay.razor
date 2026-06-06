@@ -272,7 +272,7 @@ else
            treat the display as a player without an owner — same as the
            projection — so the canvas animates exactly the rolls the log
            will reveal. *@
-        <DiceCanvas State="_state!" CurrentUserId="" IsHost="false" />
+        <DiceCanvas State="_state!" CurrentUserId="@Guid.Empty" IsHost="false" />
     </div>
 }
 
@@ -384,7 +384,7 @@ else
     // longer correspond to anyone in the room (e.g., a player left after
     // their roll was logged) so the display still surfaces the entry
     // rather than dropping it.
-    private string RollerName(string rollerUserId)
+    private string RollerName(Guid rollerUserId)
     {
         if (_state is null) return "?";
         if (_state.Host.Id == rollerUserId) return _state.Host.Name;

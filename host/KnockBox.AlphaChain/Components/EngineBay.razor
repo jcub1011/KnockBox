@@ -1,4 +1,5 @@
-@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards
+@using KnockBox.AlphaChain.Services.Logic.Games.Data
+@using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 
 @* A player's Engine Bay: an ordered row of modifier slots, left → right is the scoring
    pipeline order. Reorder is HTML5 drag-and-drop with a keyboard fallback (focus a card,
@@ -34,10 +35,11 @@
                             @ondragstart="() => _dragIndex = index"
                             @ondragend="() => _dragIndex = null"
                             @onkeydown="e => OnKeyDown(e, index)">
-                        <GameCard Name="@card.Name" Description="@card.Description" Icon="@card.Icon"
-                                  Category="CardCategory.Modifier" Kind="card.Kind"
-                                  ValueText="@ShieldValueText(card)"
-                                  Compact="@ReadOnly" Dragging="@(_dragIndex == index)" />
+                        <GameCard Name="@card.GetName()" Description="@card.GetDescription(default)" Card="@card.GetId()"
+                                  Accent="card.GetAccent()"
+                                  Size="CardSize.Small"
+                                  Chips="@card.GetChips(BadgeContext ?? default)"
+                                  Dragging="@(_dragIndex == index)" />
                     </button>
                 }
                 else
@@ -51,7 +53,7 @@
 
 @code {
     /// <summary>The ordered modifier cards in the bay (left → right = pipeline order).</summary>
-    [Parameter] public IReadOnlyList<ModifierCard> Cards { get; set; } = [];
+    [Parameter] public IReadOnlyList<IModifierCard> Cards { get; set; } = [];
 
     /// <summary>How many slots to render (capacity). Empty slots render as placeholders.</summary>
     [Parameter] public int Slots { get; set; } = 3;
@@ -69,15 +71,11 @@
     [Parameter] public string Title { get; set; } = "Engine Bay";
 
     /// <summary>
-    /// The owner's live Titanium Mirror multiplier. When supplied, the shield card in this bay
-    /// shows its current factor (e.g. "×0.7") in place of the bare "×", so the player can see how
-    /// far the mirror has decayed. Null leaves the shield card showing the default operator.
+    /// A display-only evaluation context for this bay's owner (carrying the room state services), so
+    /// each card can surface its own live status chip via <see cref="IModifierCard.GetChips"/> —
+    /// e.g. the Titanium Mirror's "×0.7". Null (e.g. before the game starts) shows no live chips.
     /// </summary>
-    [Parameter] public double? ShieldMultiplier { get; set; }
-
-    /// <summary>The live "×N.N" glyph for the shield card, or null for every other card.</summary>
-    private string? ShieldValueText(ModifierCard card) =>
-        card.Shield is not null && ShieldMultiplier is { } sm ? $"×{sm:0.0}" : null;
+    [Parameter] public EngineEvaluationContext? BadgeContext { get; set; }
 
     /// <summary>Raised with the new ordering of card ids when the player moves a card.</summary>
     [Parameter] public EventCallback<IReadOnlyList<string>> OnReorder { get; set; }
@@ -117,7 +115,7 @@
         to = Math.Clamp(to, 0, count - 1);
         if (from == to) return;
 
-        var ids = Cards.Select(c => c.Id).ToList();
+        var ids = Cards.Select(c => c.GetId().ToString()).ToList();
         var moved = ids[from];
         ids.RemoveAt(from);
         ids.Insert(to, moved);

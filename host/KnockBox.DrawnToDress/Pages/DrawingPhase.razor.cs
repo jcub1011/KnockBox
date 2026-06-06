@@ -183,7 +183,7 @@ namespace KnockBox.DrawnToDress.Pages
                 int myMax = CurrentTypeMaxItems;
                 if (myMax > 0)
                 {
-                    string? myId = UserService.CurrentUser.Id;
+                    Guid myId = UserService.CurrentUser.Id;
                     var myPlayer = GameState.GamePlayers.TryGetValue(myId, out var p) ? p : null;
                     int newCount = myPlayer is not null ? CountSubmittedForCurrentType(myPlayer) : 0;
                     if (newCount >= myMax)
@@ -230,7 +230,7 @@ namespace KnockBox.DrawnToDress.Pages
                         if (!string.IsNullOrWhiteSpace(svgContent))
                         {
                             int myMax = CurrentTypeMaxItems;
-                            string? myId = UserService.CurrentUser.Id;
+                            Guid myId = UserService.CurrentUser.Id;
                             var myPlayer = GameState.GamePlayers.TryGetValue(myId, out var p) ? p : null;
                             int mySubmitted = myPlayer is not null ? CountSubmittedForCurrentType(myPlayer) : 0;
 

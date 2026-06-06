@@ -6,7 +6,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
     [TestClass]
     public class TurnOrderSorterTests
     {
-        private static CombatantEntry Make(string name, int? roll, string? owner = null)
+        private static CombatantEntry Make(string name, int? roll, Guid? owner = null)
             => new() { Id = Guid.NewGuid(), Name = name, InitiativeRoll = roll, OwnerUserId = owner };
 
         [TestMethod]
@@ -21,7 +21,7 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         {
             var sorted = TurnOrderSorter.Sort([
                 Make("Npc", 10, owner: null),
-                Make("Player", 10, owner: "u1"),
+                Make("Player", 10, owner: Guid.NewGuid()),
             ]);
             Assert.AreEqual("Player", sorted[0].Name);
             Assert.AreEqual("Npc", sorted[1].Name);
@@ -31,9 +31,9 @@ namespace KnockBox.DndMapperTests.Unit.Helpers
         public void Sort_TieAlphabeticalWithinGroup()
         {
             var sorted = TurnOrderSorter.Sort([
-                Make("Zelda", 10, "u1"),
-                Make("Alice", 10, "u2"),
-                Make("Mira", 10, "u3"),
+                Make("Zelda", 10, Guid.NewGuid()),
+                Make("Alice", 10, Guid.NewGuid()),
+                Make("Mira", 10, Guid.NewGuid()),
             ]);
             CollectionAssert.AreEqual(new[] { "Alice", "Mira", "Zelda" }, sorted.Select(e => e.Name).ToArray());
         }

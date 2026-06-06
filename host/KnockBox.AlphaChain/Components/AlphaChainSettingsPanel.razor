@@ -1,6 +1,7 @@
 @using System.Globalization
 @using KnockBox.AlphaChain.Services.Logic.Games.Data
 @using KnockBox.AlphaChain.Services.State.Games
+@using KnockBox.Core.Primitives.Returns
 @using KnockBox.Core.Services.Storage.ClientStorage
 @inject ILocalStorageService LocalStorage
 @inject ILogger<AlphaChainSettingsPanel> Logger
@@ -87,6 +88,15 @@
                        @oninput="OnSniperBanChanged" />
             </label>
 
+            <label class="ac-settings-field" title="@CountdownTip">
+                <span>Get Ready Timer (s)</span>
+                <input type="number"
+                       min="@AlphaChainSettings.MinCountdownSeconds"
+                       max="@AlphaChainSettings.MaxCountdownSeconds"
+                       value="@s.PreRoundCountdownSeconds"
+                       @oninput="OnCountdownChanged" />
+            </label>
+
             <label class="ac-settings-field" title="@ModifiersTip">
                 <span>Modifiers / Era</span>
                 <input type="number"
@@ -147,6 +157,7 @@
             <div title="@EraCountTip"><dt>Era Count</dt><dd>@s.EraCount</dd></div>
             <div title="@IntermissionTip"><dt>Intermission Timer</dt><dd>@s.IntermissionCardSelectSeconds s</dd></div>
             <div title="@SniperBanTip"><dt>Sniper Ban Timer</dt><dd>@s.SniperBanSeconds s</dd></div>
+            <div title="@CountdownTip"><dt>Get Ready Timer</dt><dd>@s.PreRoundCountdownSeconds s</dd></div>
             <div title="@ModifiersTip"><dt>Modifiers / Era</dt><dd>@s.ModifiersDealtPerEra</dd></div>
             <div title="@EngineAnimTip"><dt>Engine Animation</dt><dd>@s.EngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture) s</dd></div>
             <div title="@SurvivalTip"><dt>Survival Mode</dt><dd>@(s.SurvivalMode ? "On" : "Off")</dd></div>
@@ -169,6 +180,7 @@
     private const string EraCountTip = "How many Eras are played before the match ends. Highest cumulative score at the end of the final Era wins.";
     private const string IntermissionTip = "Seconds players have during an Intermission to draft and rearrange their Engine Bay modifier cards.";
     private const string SniperBanTip = "Seconds the last-place player has to pick the next Banned Letter. If they don't choose in time, a legal letter is banned at random.";
+    private const string CountdownTip = "Seconds of the \"Get Ready\" countdown shown before a round begins — at the start of the match and again after each Banned Letter is chosen — so players have a beat to prepare before the shot clock starts.";
     private const string ModifiersTip = "Modifier cards dealt to each player every Intermission. Modifiers are persistent engine cards applied left-to-right in bay order (place additives before multipliers to multiply a bigger base) — the only card tier in the game.";
     private const string SurvivalTip = "When on, a player who misses the shot clock is eliminated for good instead of being penalized and staying in.";
     private const string TutorialsTip = "When on, three short non-interactive tutorials play at their cue points (word chain at the start, the scoring engine when the first era ends, and the tax before the first banned letter is chosen). You can skip each one as host.";
@@ -216,6 +228,7 @@
     private void OnEraCountChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { EraCount = v });
     private void OnIntermissionChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { IntermissionCardSelectSeconds = v });
     private void OnSniperBanChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { SniperBanSeconds = v });
+    private void OnCountdownChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { PreRoundCountdownSeconds = v });
     private void OnModifiersChanged(ChangeEventArgs e) => ApplyInt(e, v => s => s with { ModifiersDealtPerEra = v });
 
     // EngineAnimationSeconds is a double (range slider, 0.5 s steps); parsed invariant so the
@@ -244,28 +257,19 @@
 
     private async Task LoadSettingsAsync()
     {
-        try
+        // A failed or canceled read falls through to the built-in defaults.
+        var savedResult = await LocalStorage.GetAsync<AlphaChainSettings>("alpha-chain", "settings", _cts.Token);
+        if (savedResult.TryGetSuccess(out var saved) && saved is not null && !_userHasEdited)
         {
-            var saved = await LocalStorage.GetAsync<AlphaChainSettings>("alpha-chain", "settings", _cts.Token);
-            if (saved is not null && !_userHasEdited)
+            // HostPlays is a start-time choice, never a saved preference — clear any legacy
+            // persisted value so it can't auto-seat the host.
+            saved = saved with { HostPlays = false };
+            if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
             {
-                // HostPlays is a start-time choice, never a saved preference — clear any legacy
-                // persisted value so it can't auto-seat the host.
-                saved = saved with { HostPlays = false };
-                if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
-                {
-                    Logger.LogError("Failed to apply saved Alpha Chain settings: {Error}", error.PublicMessage);
-                    return;
-                }
-                StateHasChanged();
+                Logger.LogError("Failed to apply saved Alpha Chain settings: {Error}", error.PublicMessage);
+                return;
             }
-        }
-        catch (OperationCanceledException) { /* component disposed */ }
-        catch (ObjectDisposedException) { /* circuit gone */ }
-        catch (JSDisconnectedException) { /* circuit gone */ }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error loading Alpha Chain settings.");
+            StateHasChanged();
         }
     }
 
@@ -283,24 +287,16 @@
         {
             try { await prior; } catch { /* prior failure already logged */ }
         }
-        try
-        {
-            await LocalStorage.SetAsync("alpha-chain", "settings", settings, ct);
-        }
-        catch (OperationCanceledException) { /* component disposed */ }
-        catch (ObjectDisposedException) { /* circuit gone */ }
-        catch (JSDisconnectedException) { /* circuit gone */ }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error saving Alpha Chain settings.");
-        }
+        var saveResult = await LocalStorage.SetAsync("alpha-chain", "settings", settings, ct);
+        if (saveResult.TryGetFailure(out var saveError))
+            Logger.LogError("Error saving Alpha Chain settings: {Error}", saveError.InternalMessage);
     }
 
     public async ValueTask DisposeAsync()
     {
         // Flush the last pending save so a change made right before navigating away isn't
-        // lost. A dead circuit makes SetAsync throw JSDisconnectedException, which
-        // SaveSettingsAsync swallows, so this returns promptly rather than hanging.
+        // lost. A dead circuit makes SetAsync return a failure result, which
+        // SaveSettingsAsync logs and swallows, so this returns promptly rather than hanging.
         if (_saveTask is not null)
         {
             try { await _saveTask; } catch { /* best-effort flush */ }

@@ -18,7 +18,7 @@ namespace KnockBox.DndMapper.Pages.Components
     {
         [Parameter, EditorRequired] public RollResult Roll { get; set; } = default!;
         [Parameter, EditorRequired] public DndMapperGameState State { get; set; } = default!;
-        [Parameter] public string CurrentUserId { get; set; } = string.Empty;
+        [Parameter] public Guid CurrentUserId { get; set; }
         [Parameter] public bool IsHost { get; set; }
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
@@ -64,7 +64,7 @@ namespace KnockBox.DndMapper.Pages.Components
             return $"d{d.Sides}";
         }
 
-        private string RollerName(string rollerUserId)
+        private string RollerName(Guid rollerUserId)
         {
             if (State.Host.Id == rollerUserId) return State.Host.Name;
             var entry = State.Players.FirstOrDefault(p => p.User.Id == rollerUserId);
@@ -104,7 +104,7 @@ namespace KnockBox.DndMapper.Pages.Components
         // re-roll feature shipped, so we can't faithfully repeat it.
         private bool CanReRoll(RollResult r) =>
             r.TokenId is null
-            && !string.IsNullOrEmpty(CurrentUserId)
+            && CurrentUserId != Guid.Empty
             && r.RollerUserId == CurrentUserId
             && r.OriginalDice.Length > 0;
 

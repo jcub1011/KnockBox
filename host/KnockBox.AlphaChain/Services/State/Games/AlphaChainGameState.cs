@@ -1,5 +1,5 @@
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
-using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 using KnockBox.Core.Primitives.Returns;
@@ -37,7 +37,7 @@ namespace KnockBox.AlphaChain.Services.State.Games
         public void SetPhase(AlphaChainGamePhase phase) => Phase = phase;
 
         /// <summary>All player states, keyed by <c>User.Id</c>.</summary>
-        public ConcurrentDictionary<string, AlphaChainPlayerState> GamePlayers { get; } = new();
+        public ConcurrentDictionary<Guid, AlphaChainPlayerState> GamePlayers { get; } = new();
 
         /// <summary>Manages turn order and the active player.</summary>
         public TurnManager TurnManager { get; } = new();
@@ -82,24 +82,33 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// player's current bay order (<c>Submitted = false</c>) when Optimization begins;
         /// applied to the live bays only when the sub-phase ends.
         /// </summary>
-        public Dictionary<string, OptimizationSubmission> OptimizationSubmissions { get; } = new(StringComparer.Ordinal);
+        public Dictionary<Guid, OptimizationSubmission> OptimizationSubmissions { get; } = new();
 
         /// <summary>
         /// The player resolved to pick the next era's banned letter (lowest-score active
         /// player; ties broken by earliest turn-order index). Resolved when the Sniper Ban
         /// sub-phase begins; null outside it.
         /// </summary>
-        public string? SniperBanUserId { get; set; }
+        public Guid? SniperBanUserId { get; set; }
 
         /// <summary>
         /// Every word played this match, used for O(1) duplicate rejection. Case-insensitive
         /// (words are normalized to lower-case before insertion, but the comparer keeps the
-        /// check robust). Order is not preserved here — <see cref="PlayLog"/> backs the UI feed.
+        /// check robust). Order is not preserved here — <see cref="SubmissionHistory"/> backs the UI feed.
         /// </summary>
         public HashSet<string> PlayedWords { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Chronological log of accepted plays, backing the UI's submitted-words feed.</summary>
-        public List<AlphaChainWordPlay> PlayLog { get; } = new();
+        /// <summary>
+        /// The match's single chronological record of accepted submissions — the one source of truth
+        /// for the mid-game play feed, the game-over totals, the post-game history screen, and the
+        /// prior-words snapshot handed to scoring. An <see cref="System.Collections.Immutable.ImmutableList{T}"/>
+        /// so the long, frequently-appended feed shares structure cheaply and the evaluation context can
+        /// be handed a stable snapshot: appended after a play is credited, so snapshotting it before the
+        /// append naturally excludes the current word. Each entry carries its
+        /// <see cref="Data.AlphaChainSubmission.Engine"/> scoring trace.
+        /// </summary>
+        public System.Collections.Immutable.ImmutableList<AlphaChainSubmission> SubmissionHistory { get; set; } =
+            System.Collections.Immutable.ImmutableList<AlphaChainSubmission>.Empty;
 
         /// <summary>
         /// The most recent accepted word's scoring trace, for the center-stage score-replay
@@ -148,7 +157,7 @@ namespace KnockBox.AlphaChain.Services.State.Games
         /// earliest turn order), or null before the first mark. The Bounty Hunter docks this player
         /// if they submit a too-short word on their turn this round. Re-snapshotted each round wrap.
         /// </summary>
-        public string? RoundLeaderUserId { get; set; }
+        public Guid? RoundLeaderUserId { get; set; }
 
         // ── Engine-effect notice channel (off-submission automated effects) ───
 
@@ -183,50 +192,45 @@ namespace KnockBox.AlphaChain.Services.State.Games
         }
 
         /// <summary>
-        /// The shot-clock length to arm for <paramref name="player"/>: the configured base (or the
-        /// Hyper-Drive override when latched), then every <see cref="ClockEffect"/> in their Engine
-        /// Bay folded in (fractions first, then flat seconds), floored at
-        /// <see cref="MinShotClockSeconds"/>. Pure function of the player's bay + match settings.
+        /// The shot-clock length to arm for <paramref name="player"/>: the configured base, then every
+        /// <see cref="IShotClockModifier"/> in their Engine Bay folded in (fractions first, then flat
+        /// seconds), then any <see cref="IShotClockCap"/> applied (Hyper-Drive lowers a longer clock to
+        /// its cap but never raises a shorter one), floored at <see cref="MinShotClockSeconds"/>. Pure
+        /// function of the player's bay + match settings.
         /// <para>
-        /// The Anchor Chain's <see cref="ClockOverride"/> short-circuits all of that: it pins the
+        /// The Anchor Chain's <see cref="IShotClockOverride"/> short-circuits all of that: it pins the
         /// clock to a strict, unmodifiable length (the smallest override if several are equipped),
-        /// ignoring every <see cref="ClockEffect"/> and the Hyper-Drive override alike.
+        /// ignoring every clock effect and cap alike.
         /// </para>
         /// </summary>
         public int ComputeArmedShotClockSeconds(AlphaChainPlayerState player)
         {
-            // The Anchor Chain pins the clock: unmodifiable, ignores ClockEffects + Hyper-Drive.
-            int? fixedSeconds = null;
-            foreach (var card in player.EngineBay)
-                if (card.ClockOverride is { } co && (fixedSeconds is null || co.Seconds < fixedSeconds))
-                    fixedSeconds = co.Seconds;
-            if (fixedSeconds is { } pinned)
+            // A single-player context so the clock capabilities can read this owner via
+            // ctx.GetPlayer(PlayerIndex) and resolve room state services. Services is null only outside
+            // a started game, where this is never called.
+            var ctx = new EngineEvaluationContext(string.Empty, Array.Empty<char>(), new[] { player })
+            {
+                Services = Context?.EvaluationServices,
+                PlayerIndex = 0,
+            }.WithBay(player.EngineBay);
+            var bay = (IReadOnlyList<IModifierCard>)player.EngineBay;
+
+            // The Anchor Chain pins the clock: unmodifiable, ignores clock effects + Hyper-Drive.
+            if (bay.FixedShotClockSeconds(ctx) is { } pinned)
                 return Math.Max(MinShotClockSeconds, pinned);
 
-            double seconds = Settings.ShotClockSeconds;
-
-            // A latched Hyper-Drive overrides the base clock for the rest of the era.
-            if (player.HyperDriveActive)
-                foreach (var card in player.EngineBay)
-                    if (card.Hyperdrive is { } hd)
-                    {
-                        seconds = hd.ClockOverrideSeconds;
-                        break;
-                    }
-
-            // Permanent per-owner clock effects: apply all fractions, then all flat seconds.
-            double fraction = 0;
-            int flat = 0;
-            foreach (var card in player.EngineBay)
-                if (card.Clock is { } ce)
-                {
-                    fraction += ce.DeltaFraction;
-                    flat += ce.DeltaSeconds;
-                }
-
+            // The base clock — or a latched Hyper-Drive's replacement — then per-owner clock effects:
+            // all fractions, then all flat seconds.
+            double seconds = bay.BaseShotClockSeconds(ctx) ?? Settings.ShotClockSeconds;
+            var (fraction, flat) = bay.ShotClockEffect(ctx);
             seconds = seconds * (1 + fraction) + flat;
 
             int armed = (int)Math.Round(seconds, MidpointRounding.AwayFromZero);
+
+            // A shot-clock cap (Hyper-Drive's 5s) lowers a longer clock but never raises a shorter one.
+            if (bay.ShotClockCapSeconds(ctx) is { } cap)
+                armed = Math.Min(armed, cap);
+
             return Math.Max(MinShotClockSeconds, armed);
         }
 
