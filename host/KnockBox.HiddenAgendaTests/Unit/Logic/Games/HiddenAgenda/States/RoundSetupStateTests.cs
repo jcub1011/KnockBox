@@ -35,15 +35,22 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             _logger = new Mock<ILogger>();
             _stateLogger = new Mock<ILogger<HiddenAgendaGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.Parse("00000000-0000-0000-0000-000000000001"));
             _state = new HiddenAgendaGameState(host, _stateLogger.Object);
             _state.BoardGraph = BoardDefinitions.CreateGrandCircuit();
             _context = new HiddenAgendaGameContext(_state, _rng.Object, _logger.Object);
 
             // Add 4 players
+            var playerIds = new[]
+            {
+                Guid.Parse("10000000-0000-0000-0000-000000000000"),
+                Guid.Parse("20000000-0000-0000-0000-000000000000"),
+                Guid.Parse("30000000-0000-0000-0000-000000000000"),
+                Guid.Parse("40000000-0000-0000-0000-000000000000"),
+            };
             for (int i = 0; i < 4; i++)
             {
-                var pid = $"p{i}";
+                var pid = playerIds[i];
                 _state.GamePlayers[pid] = new HiddenAgendaPlayerState
                 {
                     PlayerId = pid,
@@ -123,7 +130,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         {
             var state = new RoundSetupState();
             state.OnEnter(_context);
-            var result = state.HandleCommand(_context, new SpinCommand("p0"));
+            var result = state.HandleCommand(_context, new SpinCommand(Guid.Parse("10000000-0000-0000-0000-000000000000")));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsNull(result.Value);
         }

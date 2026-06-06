@@ -32,7 +32,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
                 new RandomNumberService(),
                 NullLogger<TraceryGameEngine>.Instance,
                 NullLogger<TraceryGameState>.Instance);
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
         // ── Unique vs shared ────────────────────────────────────────────────
@@ -126,8 +126,8 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
             Assert.IsTrue(create.TryGetSuccess(out var created));
             var state = (TraceryGameState)created!;
 
-            var p1 = UserFactory.Create("P1", "p1");
-            var p2 = UserFactory.Create("P2", "p2");
+            var p1 = UserFactory.Create("P1", Guid.NewGuid());
+            var p2 = UserFactory.Create("P2", Guid.NewGuid());
             Assert.IsTrue(state.RegisterPlayer(p1).IsSuccess);
             Assert.IsTrue(state.RegisterPlayer(p2).IsSuccess);
 

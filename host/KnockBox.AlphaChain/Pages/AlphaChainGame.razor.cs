@@ -1,7 +1,8 @@
 using KnockBox.AlphaChain.Components;
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
-using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM.States;
 using KnockBox.AlphaChain.Services.State.Games;
@@ -65,7 +66,7 @@ namespace KnockBox.AlphaChain.Pages
         protected SubmitWordResult? LastResult { get; private set; }
 
         /// <summary>The local player's id, or null before user init.</summary>
-        protected string? CurrentUserId => UserService.CurrentUser?.Id;
+        protected Guid? CurrentUserId => UserService.CurrentUser?.Id;
 
         /// <summary>Whether it is the local player's turn (input is enabled only then).</summary>
         protected bool IsMyTurn =>
@@ -88,7 +89,7 @@ namespace KnockBox.AlphaChain.Pages
             get
             {
                 var id = GameState.TurnManager.CurrentPlayer;
-                if (id is not null && GameState.GamePlayers.TryGetValue(id, out var ps))
+                if (id is { } pid && GameState.GamePlayers.TryGetValue(pid, out var ps))
                     return ps.DisplayName;
                 return "—";
             }
@@ -102,11 +103,51 @@ namespace KnockBox.AlphaChain.Pages
         protected string BannedLetterDisplay =>
             GameState.BannedLetter is { } c ? char.ToUpperInvariant(c).ToString() : "—";
 
+        /// <summary>True when the local player is currently in last place and so is exempt from the era
+        /// banned letter (they pick it — it can't tax them). Tracks the live standings, so it turns off
+        /// the moment they climb out of last place. Drives the crossed-out banned-letter indicator.</summary>
+        protected bool ExemptFromEraBan =>
+            GameState.BannedLetter is not null
+            && CurrentUserId is { } me
+            && EngineEffectResolver.LastPlaceUserId(GameState) == me;
+
         /// <summary>The personal hijack letter forced onto the local player (Tracer Round / Bait &amp;
         /// Switch) as an upper-case string, or null when none. Shown beside the banned letter so the
         /// cursed player can see it (it is personal — only the affected player sees their own).</summary>
         protected string? PersonalBannedLetterDisplay =>
-            MyPlayer?.PersonalBannedLetter is { } c ? char.ToUpperInvariant(c).ToString() : null;
+            MyPlayer is { } me && RoomService<IHijackBanService>()?.Peek(me) is { } c
+                ? char.ToUpperInvariant(c).ToString()
+                : null;
+
+        /// <summary>The local player's era-rolled personal banned letters (The Roulette Wheel, The Toll
+        /// Booth) as distinct upper-case strings. Like <see cref="PersonalBannedLetterDisplay"/> these
+        /// are personal — only the owner sees their own — and are shown beside the era ban in their own
+        /// colour so the player understands why those letters tax them.</summary>
+        protected IReadOnlyList<string> CardBannedLetterDisplays =>
+            MyPlayer is { } me && RoomService<ICardBanService>() is { } bans
+                ? bans.BansFor(me)
+                    .Select(c => char.ToUpperInvariant(c).ToString())
+                    .Distinct()
+                    .OrderBy(s => s, StringComparer.Ordinal)
+                    .ToList()
+                : [];
+
+        /// <summary>Resolves a room-scoped card-state service from the running game's context, or null
+        /// before the game starts. Used for the personal/card ban displays above.</summary>
+        private T? RoomService<T>() where T : class => GameState.Context?.EvaluationServices.Get<T>();
+
+        /// <summary>A display-only evaluation context for <paramref name="player"/>'s Engine Bay,
+        /// carrying the room state services so each card can render its own live badge (e.g. the
+        /// Titanium Mirror's decayed "×0.7"). Null before the game starts.</summary>
+        protected EngineEvaluationContext? BadgeContextFor(AlphaChainPlayerState player)
+            => GameState.Context is { } context
+                ? new EngineEvaluationContext(string.Empty, Array.Empty<char>(), new[] { player })
+                {
+                    Bay = player.EngineBay,
+                    Services = context.EvaluationServices,
+                    PlayerIndex = 0,
+                }
+                : null;
 
         /// <summary>Total duration of the per-turn shot clock (for the countdown ring).</summary>
         protected TimeSpan ShotClockDuration => TimeSpan.FromSeconds(GameState.Settings.ShotClockSeconds);
@@ -128,15 +169,24 @@ namespace KnockBox.AlphaChain.Pages
                 .ThenBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-        /// <summary>The play feed, newest first.</summary>
-        protected IReadOnlyList<AlphaChainWordPlay> PlayFeed =>
-            GameState.PlayLog.AsEnumerable().Reverse().ToList();
+        /// <summary>The play feed (recent-words list), newest first.</summary>
+        protected IReadOnlyList<AlphaChainSubmission> PlayFeed =>
+            GameState.SubmissionHistory.AsEnumerable().Reverse().ToList();
 
-        /// <summary>Most recent accepted words, oldest→newest, for the chain trail.</summary>
-        protected IReadOnlyList<AlphaChainWordPlay> ChainTrail =>
-            GameState.PlayLog.Count <= 7
-                ? GameState.PlayLog
-                : GameState.PlayLog.Skip(GameState.PlayLog.Count - 7).ToList();
+        /// <summary>The word as shown in the recent-words list. Tunnel Vision masks the newest word's
+        /// first &amp; last letter for its holder only — they must remember it (or read the required
+        /// start letter); the chain rule stays server-enforced regardless.</summary>
+        protected string DisplayWord(AlphaChainSubmission play, bool isNewest)
+        {
+            var word = play.Word.ToUpperInvariant();
+            if (!isNewest || !LocalPlayerHasTunnelVision || word.Length == 0)
+                return word;
+
+            var chars = word.ToCharArray();
+            chars[0] = '·';
+            chars[^1] = '·';
+            return new string(chars);
+        }
 
         /// <summary>The latest accepted word's score replay, shown once in a fixed spot below the
         /// submit box for every player (the strip's subtitle names the submitter). Null when there
@@ -146,18 +196,24 @@ namespace KnockBox.AlphaChain.Pages
             GameState.LatestScoreReplay is { HasAnimation: true } replay ? replay : null;
 
         /// <summary>The newest accepted play, used to flash a score-pop on the leaderboard.</summary>
-        protected AlphaChainWordPlay? LatestPlay =>
-            GameState.PlayLog.Count > 0 ? GameState.PlayLog[^1] : null;
+        protected AlphaChainSubmission? LatestPlay =>
+            GameState.SubmissionHistory.Count > 0 ? GameState.SubmissionHistory[^1] : null;
 
         /// <summary>Changes whenever a new word lands, so the score-pop @key remounts and re-animates.</summary>
-        protected int LatestPlayKey => GameState.PlayLog.Count;
+        protected int LatestPlayKey => GameState.SubmissionHistory.Count;
 
         // ── Leaderboard rank-change tracking (view-only, for the ▲/▼ indicator) ──
-        private List<string> _prevRankOrder = new();
-        private readonly Dictionary<string, int> _rankMovement = new();
+        private List<Guid> _prevRankOrder = new();
+        private readonly Dictionary<Guid, int> _rankMovement = new();
+
+        // ── Mobile leaderboard auto-centre ──
+        // The inline mobile strip scrolls to keep the local player's item centred; we re-centre
+        // only when their rank index actually changes (not on every tick re-render).
+        private ElementReference _mobileLbRef;
+        private int _lastMyRankIndex = -1;
 
         /// <summary>Maps a player to a turn-order accent slot (1-based, wraps at 6).</summary>
-        protected int AccentSlot(string userId)
+        protected int AccentSlot(Guid userId)
         {
             int i = 0;
             foreach (var id in GameState.TurnManager.TurnOrder)
@@ -169,10 +225,14 @@ namespace KnockBox.AlphaChain.Pages
         }
 
         /// <summary>"▲" if the player moved up since the last reorder, "▼" if down, else "".</summary>
-        protected string RankArrow(string userId) =>
+        protected string RankArrow(Guid userId) =>
             _rankMovement.TryGetValue(userId, out var m) ? m < 0 ? "▲" : m > 0 ? "▼" : "" : "";
 
         // ── Intermission (M4) ───────────────────────────────────────────────
+
+        /// <summary>The configured duration of the pre-round "Get Ready" countdown, feeding the
+        /// shared client-side <c>CountdownClock</c> on the Countdown phase overlay.</summary>
+        protected TimeSpan CountdownDuration => TimeSpan.FromSeconds(GameState.Settings.PreRoundCountdownSeconds);
 
         /// <summary>The configured duration of the current Intermission sub-phase, or
         /// <see cref="TimeSpan.Zero"/> when the sub-phase has no countdown. Feeds the shared
@@ -200,7 +260,7 @@ namespace KnockBox.AlphaChain.Pages
 
         /// <summary>Whether the local player is the resolved Sniper Ban picker.</summary>
         protected bool IsSniperBanPicker =>
-            CurrentUserId is not null && CurrentUserId == GameState.SniperBanUserId;
+            CurrentUserId is { } uid && uid == GameState.SniperBanUserId;
 
         /// <summary>Display name of the Sniper Ban picker, for the waiting message.</summary>
         protected string SniperBanPickerName =>
@@ -248,20 +308,20 @@ namespace KnockBox.AlphaChain.Pages
         /// <summary>Whether the local player holds Tunnel Vision — their view masks the first and last
         /// letter of the most recent chain word (owner-only; the chain rule is still server-enforced).</summary>
         protected bool LocalPlayerHasTunnelVision =>
-            MyPlayer?.EngineBay.Any(c => c.MasksPreviousWord) == true;
+            MyPlayer?.EngineBay.Any(c => c is IPreviousWordMask) == true;
 
         /// <summary>Whether the local player holds The Blindfold — their own word-input text is hidden
         /// while they type (a self-inflicted UI penalty traded for a multiplier; input still works).</summary>
         protected bool LocalPlayerHidesInput =>
-            MyPlayer?.EngineBay.Any(c => c.HidesOwnInput) == true;
+            MyPlayer?.EngineBay.Any(c => c is IInputMask) == true;
 
         /// <summary>Whether the local user is the room host (gates the debug "Grant Cards" button).</summary>
-        protected bool IsHost => CurrentUserId is not null && CurrentUserId == GameState.Host.Id;
+        protected bool IsHost => CurrentUserId is { } uid && uid == GameState.Host.Id;
 
         /// <summary>Opponents still in play, for the opponent bay summaries and Time Thief targeting.</summary>
         protected IReadOnlyList<AlphaChainPlayerState> Opponents =>
             GameState.GamePlayers.Values
-                .Where(p => p.UserId != CurrentUserId && !p.HasLeft)
+                .Where(p => p.UserId != CurrentUserId.GetValueOrDefault() && !p.HasLeft)
                 .OrderBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -394,6 +454,23 @@ namespace KnockBox.AlphaChain.Pages
                         await _inputModule.InvokeVoidAsync("clear", _inputId);
                     }
                 }
+
+                // Re-centre the mobile leaderboard strip on the local player whenever their rank
+                // changes (the strip is hidden on desktop, where centerMe is a no-op).
+                if (CurrentUserId is { } myId)
+                {
+                    var board = Leaderboard;
+                    int myIndex = -1;
+                    for (int i = 0; i < board.Count; i++)
+                    {
+                        if (board[i].UserId == myId) { myIndex = i; break; }
+                    }
+                    if (myIndex >= 0 && myIndex != _lastMyRankIndex)
+                    {
+                        _lastMyRankIndex = myIndex;
+                        await _inputModule.InvokeVoidAsync("centerMe", _mobileLbRef);
+                    }
+                }
             }
             else if (_inputRegistered && _inputModule is not null)
             {
@@ -453,8 +530,7 @@ namespace KnockBox.AlphaChain.Pages
         {
             if (IsSubmitting || !IsMyTurn) return;
 
-            var userId = CurrentUserId;
-            if (userId is null) return;
+            if (CurrentUserId is not { } userId) return;
 
             if (string.IsNullOrWhiteSpace(word)) return;
 

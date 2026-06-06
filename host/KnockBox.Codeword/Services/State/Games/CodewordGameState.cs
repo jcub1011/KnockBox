@@ -40,7 +40,7 @@ namespace KnockBox.Codeword.Services.State.Games
         /// <summary>
         /// All player states, keyed by player ID.
         /// </summary>
-        public ConcurrentDictionary<string, CodewordPlayerState> GamePlayers { get; } = new();
+        public ConcurrentDictionary<Guid, CodewordPlayerState> GamePlayers { get; } = new();
 
         /// <summary>
         /// Manages turn order and active player tracking.
@@ -134,7 +134,7 @@ namespace KnockBox.Codeword.Services.State.Games
         /// <summary>
         /// Cumulative scores across games, keyed by player ID.
         /// </summary>
-        public readonly Dictionary<string, int> GameScores = [];
+        public readonly Dictionary<Guid, int> GameScores = [];
     }
 
     #region Enums
@@ -165,22 +165,22 @@ namespace KnockBox.Codeword.Services.State.Games
     public record WordGroup(string[] Words);
 
     /// <summary>A clue submitted by a player during the clue phase.</summary>
-    public record ClueEntry(string PlayerId, string PlayerName, string Clue);
+    public record ClueEntry(Guid PlayerId, string PlayerName, string Clue);
 
     /// <summary>A vote cast by a player during the voting phase.</summary>
-    public record VoteEntry(string VoterId, string VoterName, string TargetId, string TargetName);
+    public record VoteEntry(Guid VoterId, string VoterName, Guid TargetId, string TargetName);
 
     /// <summary>The result of an elimination round.</summary>
-    public record EliminationResult(string PlayerId, string PlayerName, Role Role, bool WasTie);
+    public record EliminationResult(Guid PlayerId, string PlayerName, Role Role, bool WasTie);
 
     /// <summary>The result of the Informant's word guess attempt.</summary>
-    public record InformantGuessResult(string PlayerId, string PlayerName, string GuessedWord, bool WasCorrect);
+    public record InformantGuessResult(Guid PlayerId, string PlayerName, string GuessedWord, bool WasCorrect);
 
     /// <summary>Evaluates whether the game is over and which team won.</summary>
     public record WinConditionResult(bool GameOver, Role? WinningTeam, string Reason);
 
     /// <summary>Tracks player votes to end the game early.</summary>
-    public record EndGameVoteStatus(HashSet<string> VotedToEnd, int RequiredVotes);
+    public record EndGameVoteStatus(HashSet<Guid> VotedToEnd, int RequiredVotes);
 
     #endregion
 }

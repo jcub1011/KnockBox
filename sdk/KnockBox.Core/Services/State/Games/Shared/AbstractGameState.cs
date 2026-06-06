@@ -111,7 +111,7 @@ namespace KnockBox.Core.Services.State.Games.Shared
         // Ids of every user that has successfully registered (and not been kicked).
         // Read & mutated only inside Execute — no concurrent reader, so HashSet's
         // O(1) operations beat ImmutableHashSet's O(log n).
-        private readonly HashSet<string> _everJoinedIds = new(StringComparer.Ordinal);
+        private readonly HashSet<Guid> _everJoinedIds = new();
 
         // Lazily allocated — most states never schedule callbacks.
         private CancellationTokenSource? _disposeCts;
@@ -295,10 +295,10 @@ namespace KnockBox.Core.Services.State.Games.Shared
         public bool IsKicked(User? user) =>
             user is not null && ContainsUserId(_cachedKickedUsers, user.Id);
 
-        private static bool ContainsUserId(ImmutableArray<User> users, string userId)
+        private static bool ContainsUserId(ImmutableArray<User> users, Guid userId)
         {
             for (int i = 0; i < users.Length; i++)
-                if (string.Equals(users[i].Id, userId, StringComparison.Ordinal))
+                if (users[i].Id == userId)
                     return true;
             return false;
         }
@@ -307,12 +307,12 @@ namespace KnockBox.Core.Services.State.Games.Shared
         /// Linear scan over the player snapshot for a player by id. Faster than
         /// a dictionary lookup at the expected 4–8 player count.
         /// </summary>
-        private bool TryFindPlayerIndex(string userId, out int index)
+        private bool TryFindPlayerIndex(Guid userId, out int index)
         {
             var entries = _cachedPlayerEntries;
             for (int i = 0; i < entries.Length; i++)
             {
-                if (string.Equals(entries[i].User.Id, userId, StringComparison.Ordinal))
+                if (entries[i].User.Id == userId)
                 {
                     index = i;
                     return true;

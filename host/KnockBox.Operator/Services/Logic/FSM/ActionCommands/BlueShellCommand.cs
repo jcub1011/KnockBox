@@ -14,7 +14,7 @@ public class BlueShellCommand(
 {
     public override bool RequiresReaction => GetReactionTargetIds().Any();
 
-    public override IEnumerable<string> GetReactionTargetIds() =>
+    public override IEnumerable<Guid> GetReactionTargetIds() =>
         Context.GamePlayers.Values.Where(p => p.CurrentPoints == 0m).Select(p => p.UserId);
 
     public override void Execute()

@@ -13,10 +13,11 @@
     @if (GameState.Phase == AlphaChainGamePhase.GameOver)
     {
         <GameOverPanel Results="GameState.Results" />
+        <SubmissionHistoryPanel Submissions="GameState.SubmissionHistory" />
         @if (IsHost)
         {
             <div class="ac-results-actions">
-                <button class="ac-start-btn ac-start-primary" @onclick="ReturnToLobbyAsync">
+                <button class="ac-results-btn" @onclick="ReturnToLobbyAsync">
                     Return to Lobby
                 </button>
             </div>
@@ -84,6 +85,11 @@
         <TutorialOverlay @key="GameState.CurrentTutorial" Kind="GameState.CurrentTutorial"
                          IsHost="IsHost" OnSkip="SkipTutorialAsync" />
     }
+    else if (GameState.Phase == AlphaChainGamePhase.Countdown)
+    {
+        <CountdownOverlay EndTimeUtc="GameState.SubPhaseEndTime" Duration="CountdownDuration"
+                          Era="GameState.CurrentEra" BannedLetter="GameState.BannedLetter" />
+    }
     else
     {
         <div class="ac-round">
@@ -114,11 +120,24 @@
                     <div class="ac-cmd-cell ac-cmd-banned">
                         <span class="ac-cmd-label">Banned</span>
                         <span class="ac-cmd-letters">
-                            <span class="ac-cmd-letter">@BannedLetterDisplay</span>
+                            @if (ExemptFromEraBan)
+                            {
+                                <span class="ac-cmd-letter ac-cmd-exempt"
+                                      title="You're in last place — the banned letter doesn't tax you (until someone else drops to last).">@BannedLetterDisplay</span>
+                            }
+                            else
+                            {
+                                <span class="ac-cmd-letter">@BannedLetterDisplay</span>
+                            }
                             @if (PersonalBannedLetterDisplay is { } hijack)
                             {
                                 <span class="ac-cmd-letter ac-cmd-jinx"
                                       title="A personal banned letter forced onto your next word (Tracer Round / Bait & Switch)">@hijack</span>
+                            }
+                            @foreach (var cardBan in CardBannedLetterDisplays)
+                            {
+                                <span class="ac-cmd-letter ac-cmd-cardban"
+                                      title="A personal banned letter from one of your own cards (The Roulette Wheel / The Toll Booth)">@cardBan</span>
                             }
                         </span>
                     </div>
@@ -126,7 +145,7 @@
 
                 @* ── Turn spotlight ── *@
                 <div class="ac-turnflag @(IsMyTurn ? "ac-turnflag-me" : "")"
-                     style="--accent: var(--ac-p@(AccentSlot(GameState.TurnManager.CurrentPlayer ?? string.Empty)))">
+                     style="--accent: var(--ac-p@(AccentSlot(GameState.TurnManager.CurrentPlayer ?? Guid.Empty)))">
                     @if (IsMyTurn)
                     {
                         <span class="ac-turnflag-text">YOUR TURN</span>
@@ -137,6 +156,29 @@
                         <span class="ac-turnflag-name">@CurrentPlayerName</span>
                     }
                     <span class="ac-turnflag-meta">Era @GameState.CurrentEra · Round @GameState.CurrentRound</span>
+                </div>
+
+                @* ── Mobile leaderboard: inline horizontal strip (hidden on desktop, which uses the
+                      rail). It sits above the word box and auto-scrolls to centre the local
+                      player's item whenever their rank changes (see centerMe in alpha-chain-input.js). *@
+                <div class="ac-lbm" @ref="_mobileLbRef" aria-label="Leaderboard">
+                    @{ var lbmRank = 0; }
+                    @foreach (var p in Leaderboard)
+                    {
+                        lbmRank++;
+                        var lbmSlot = AccentSlot(p.UserId);
+                        var lbmIsMe = p.UserId == CurrentUserId;
+                        <div class="ac-lbm-item @(p.IsEliminated ? "ac-eliminated" : "") @(lbmIsMe ? "ac-lbm-me" : "")"
+                             style="--accent: var(--ac-p@(lbmSlot))">
+                            <span class="ac-lbm-rank">@lbmRank</span>
+                            <span class="ac-lbm-name">@p.DisplayName</span>
+                            @if (lbmIsMe)
+                            {
+                                <span class="ac-tag ac-tag-you">you</span>
+                            }
+                            <span class="ac-lbm-score">@p.Score</span>
+                        </div>
+                    }
                 </div>
 
                 @* ── Word entry: client-owned input (no @bind — see alpha-chain-input.js) ── *@
@@ -173,24 +215,31 @@
                 <EngineEffectOverlay @key="GameState.EngineNoticeSequence"
                                      Notices="GameState.LatestEngineNotices" CurrentUserId="CurrentUserId" />
 
-                @* ── Chain trail ── *@
-                @if (ChainTrail.Count > 0)
+                @* ── Recent words: newest → oldest, scrolls horizontally. The player mostly cares
+                      about the newest entry (highlighted); older ones scroll off to the right.
+                      Each entry names its submitter. Tunnel Vision masks the newest word's first
+                      & last letter for its holder only. *@
+                @if (PlayFeed.Count > 0)
                 {
-                    int lastTrailIndex = ChainTrail.Count - 1;
-                    <div class="ac-trail" aria-label="Recent chain">
-                        @for (int t = 0; t < ChainTrail.Count; t++)
+                    <div class="ac-recent" aria-label="Recent words">
+                        @for (int t = 0; t < PlayFeed.Count; t++)
                         {
-                            var play = ChainTrail[t];
-                            // Tunnel Vision masks the first & last letter of the most recent word for
-                            // its holder only — you must remember it (or read the required-start letter).
-                            bool maskWord = LocalPlayerHasTunnelVision && t == lastTrailIndex;
-                            <span class="ac-trail-word @(play.ZeroPointTax ? "ac-trail-taxed" : "")">
-                                @for (int i = 0; i < play.Word.Length; i++)
-                                {
-                                    bool hideLetter = maskWord && (i == 0 || i == play.Word.Length - 1);
-                                    <span class="ac-trail-letter @(i == play.Word.Length - 1 ? "ac-trail-link" : "") @(hideLetter ? "ac-trail-hidden" : "")">@(hideLetter ? '·' : char.ToUpperInvariant(play.Word[i]))</span>
-                                }
-                            </span>
+                            var play = PlayFeed[t];
+                            bool isNewest = t == 0;
+                            <div class="ac-recent-item @(isNewest ? "ac-recent-newest" : "") @(play.ZeroPointTax ? "ac-recent-taxed" : "")">
+                                <span class="ac-recent-word">@DisplayWord(play, isNewest)</span>
+                                <span class="ac-recent-meta">
+                                    <span class="ac-recent-by">@play.DisplayName</span>
+                                    @if (play.ZeroPointTax)
+                                    {
+                                        <span class="ac-tag ac-tag-tax">tax</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="ac-recent-score">+@play.Score</span>
+                                    }
+                                </span>
+                            </div>
                         }
                     </div>
                 }
@@ -204,7 +253,7 @@
                            always Locked here, so no OnReorder handler is wired. *@
                         <EngineBay Cards="myCards.EngineBay" Slots="myCards.ModifierSlots"
                                    Locked="true" Title="Your Engine Bay"
-                                   ShieldMultiplier="myCards.ShieldMultiplier" />
+                                   BadgeContext="BadgeContextFor(myCards)" />
                     </div>
                 }
 
@@ -215,7 +264,7 @@
                         @foreach (var opp in Opponents)
                         {
                             <EngineBay Cards="opp.EngineBay" Slots="opp.ModifierSlots" ReadOnly="true"
-                                       Title="@opp.DisplayName" ShieldMultiplier="opp.ShieldMultiplier" />
+                                       Title="@opp.DisplayName" BadgeContext="BadgeContextFor(opp)" />
                         }
                     </div>
                 }
@@ -239,19 +288,19 @@
                                 <span class="ac-lb-rank">@rank</span>
                                 <span class="ac-lb-name">
                                     @p.DisplayName
-                                    @if (isMe)
-                                    {
-                                        <span class="ac-tag ac-tag-you">you</span>
-                                    }
-                                    @if (p.IsEliminated)
-                                    {
-                                        <span class="ac-tag">out</span>
-                                    }
-                                    else if (p.HasLeft)
-                                    {
-                                        <span class="ac-tag">left</span>
-                                    }
                                 </span>
+                                @if (isMe)
+                                {
+                                    <span class="ac-tag ac-tag-you">you</span>
+                                }
+                                @if (p.IsEliminated)
+                                {
+                                    <span class="ac-tag">out</span>
+                                }
+                                else if (p.HasLeft)
+                                {
+                                    <span class="ac-tag">left</span>
+                                }
                                 @if (!string.IsNullOrEmpty(arrow))
                                 {
                                     <span class="ac-lb-arrow @(arrow == "▲" ? "ac-lb-up" : "ac-lb-down")">@arrow</span>
@@ -264,25 +313,6 @@
                             </li>
                         }
                     </ol>
-                </div>
-
-                @* ── Submitted-words log ── *@
-                <div class="ac-panel ac-panel-feed">
-                    <h3 class="ac-panel-title">Words played</h3>
-                    <ul class="ac-feed">
-                        @foreach (var play in PlayFeed)
-                        {
-                            <li class="ac-feed-row @(play.ZeroPointTax ? "ac-feed-taxed" : "")">
-                                <span class="ac-feed-word">@play.Word</span>
-                                <span class="ac-feed-player">@play.DisplayName</span>
-                                @if (play.ZeroPointTax)
-                                {
-                                    <span class="ac-tag ac-tag-tax">tax</span>
-                                }
-                                <span class="ac-feed-score">+@play.Score</span>
-                            </li>
-                        }
-                    </ul>
                 </div>
             </aside>
         </div>

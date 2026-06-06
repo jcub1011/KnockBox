@@ -102,7 +102,7 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
         return ValueResult<IReadOnlyList<DatabaseInfo>, IndexedDbError>.FromValue(infos);
     }
 
-    public ValueTask<IndexedDbBlob> CreateBlobAsync(
+    public ValueTask<ValueResult<IndexedDbBlob, IndexedDbError>> CreateBlobAsync(
         ReadOnlyMemory<byte> bytes, string contentType, CancellationToken ct = default)
     {
         // Small payloads (one chunk) take the single-call createBlobFromBytes
@@ -117,7 +117,7 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
         return CreateBlobAsync(new MemoryStream(arr, writable: false), arr.LongLength, contentType, leaveOpen: false, ct);
     }
 
-    private async ValueTask<IndexedDbBlob> CreateBlobFromBytesAsync(
+    private async ValueTask<ValueResult<IndexedDbBlob, IndexedDbError>> CreateBlobFromBytesAsync(
         ReadOnlyMemory<byte> bytes, string contentType, CancellationToken ct)
     {
         var base64 = Convert.ToBase64String(bytes.Span);
@@ -125,11 +125,11 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
             "createBlobFromBytes", ct, base64, contentType).ConfigureAwait(false);
         if (!result.TryGetSuccess(out var resp))
         {
-            var msg = result.IsCanceled
-                ? "Blob creation was canceled."
-                : $"[{result.Error.Error.Kind}] {result.Error.Error.Message}";
-            _logger.LogError("createBlobFromBytes failed: {Message}", msg);
-            throw new IOException("createBlobFromBytes failed: " + msg);
+            if (result.IsCanceled)
+                return ValueResult<IndexedDbBlob, IndexedDbError>.Canceled;
+            var err = result.Error.Error;
+            _logger.LogError("createBlobFromBytes failed: [{Kind}] {Message}", err.Kind, err.Message);
+            return err;
         }
         return new IndexedDbBlobImpl(
             _interop,
@@ -138,7 +138,7 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
             resp.BlobId, contentType, resp.Length);
     }
 
-    public async ValueTask<IndexedDbBlob> CreateBlobAsync(
+    public async ValueTask<ValueResult<IndexedDbBlob, IndexedDbError>> CreateBlobAsync(
         Stream stream, long length, string contentType, bool leaveOpen = false, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -158,10 +158,11 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
 
             if (!result.TryGetSuccess(out var resp))
             {
-                var msg = result.IsCanceled
-                    ? "Blob stream upload was canceled."
-                    : $"[{result.Error.Error.Kind}] {result.Error.Error.Message}";
-                throw new IOException("createBlobFromDotNetStream failed: " + msg);
+                if (result.IsCanceled)
+                    return ValueResult<IndexedDbBlob, IndexedDbError>.Canceled;
+                var err = result.Error.Error;
+                _logger.LogError("createBlobFromDotNetStream failed: [{Kind}] {Message}", err.Kind, err.Message);
+                return err;
             }
             return new IndexedDbBlobImpl(
                 _interop,

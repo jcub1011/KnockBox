@@ -44,7 +44,7 @@ public class StandardPlayCommand(
             var opResult = opCard.Play(playContext);
             if (opResult.TryGetSuccess(out var opPlayResult) && opPlayResult.Toggled && opPlayResult.OperatorTargetId != null)
             {
-                if (Context.GamePlayers.TryGetValue(opPlayResult.OperatorTargetId, out var opTarget))
+                if (Context.GamePlayers.TryGetValue(opPlayResult.OperatorTargetId.Value, out var opTarget))
                 {
                     string targetNameLog = GetPlayerName(opTarget.UserId);
                     Context.State.ActionLog.Add(new ActionLogEntry(

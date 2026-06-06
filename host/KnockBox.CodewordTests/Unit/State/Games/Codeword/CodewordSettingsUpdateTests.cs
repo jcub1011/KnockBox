@@ -14,7 +14,7 @@ namespace KnockBox.Codeword.Tests.Unit.State.Games.Codeword
         [TestInitialize]
         public void Setup()
         {
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new CodewordGameState(host, NullLogger<CodewordGameState>.Instance);
         }
 

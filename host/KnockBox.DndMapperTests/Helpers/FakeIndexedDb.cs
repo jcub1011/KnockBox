@@ -71,15 +71,15 @@ namespace KnockBox.DndMapperTests.Helpers
         public ValueTask<ValueResult<IReadOnlyList<DatabaseInfo>, IndexedDbError>> ListDatabasesAsync(CancellationToken ct = default)
             => ValueTask.FromResult(ValueResult<IReadOnlyList<DatabaseInfo>, IndexedDbError>.FromValue((IReadOnlyList<DatabaseInfo>)Array.Empty<DatabaseInfo>()));
 
-        public ValueTask<IndexedDbBlob> CreateBlobAsync(ReadOnlyMemory<byte> bytes, string contentType, CancellationToken ct = default)
-            => ValueTask.FromResult<IndexedDbBlob>(new FakeBlob(bytes.ToArray(), contentType));
+        public ValueTask<ValueResult<IndexedDbBlob, IndexedDbError>> CreateBlobAsync(ReadOnlyMemory<byte> bytes, string contentType, CancellationToken ct = default)
+            => ValueTask.FromResult(ValueResult<IndexedDbBlob, IndexedDbError>.FromValue(new FakeBlob(bytes.ToArray(), contentType)));
 
-        public ValueTask<IndexedDbBlob> CreateBlobAsync(Stream stream, long length, string contentType, bool leaveOpen = false, CancellationToken ct = default)
+        public ValueTask<ValueResult<IndexedDbBlob, IndexedDbError>> CreateBlobAsync(Stream stream, long length, string contentType, bool leaveOpen = false, CancellationToken ct = default)
         {
             using var ms = new MemoryStream();
             stream.CopyTo(ms);
             if (!leaveOpen) stream.Dispose();
-            return ValueTask.FromResult<IndexedDbBlob>(new FakeBlob(ms.ToArray(), contentType));
+            return ValueTask.FromResult(ValueResult<IndexedDbBlob, IndexedDbError>.FromValue(new FakeBlob(ms.ToArray(), contentType)));
         }
     }
 

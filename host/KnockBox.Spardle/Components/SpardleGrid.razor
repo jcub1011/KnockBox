@@ -91,7 +91,7 @@
 
 @code {
     [Parameter, EditorRequired] public SpardleState State { get; set; } = default!;
-    [Parameter, EditorRequired] public string CurrentUserId { get; set; } = default!;
+    [Parameter, EditorRequired] public Guid CurrentUserId { get; set; }
     [Parameter] public string CurrentGuess { get; set; } = string.Empty;
     [Parameter] public bool InvalidGuess { get; set; }
     [Parameter] public bool HighContrast { get; set; }

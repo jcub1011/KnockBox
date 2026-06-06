@@ -9,9 +9,9 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
     /// Not My Money effect. The player selects a target to receive the operator,
     /// or cancels to apply it to themselves.
     /// </summary>
-    public sealed class NotMyMoneyState(string playerId, OperatorCard operatorCard) : ITimedCardCounterGameState
+    public sealed class NotMyMoneyState(Guid playerId, OperatorCard operatorCard) : ITimedCardCounterGameState
     {
-        private readonly string _playerId = playerId;
+        private readonly Guid _playerId = playerId;
         private readonly OperatorCard _operatorCard = operatorCard;
         private DateTimeOffset _expiresAt;
 
@@ -64,7 +64,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                 context.State.IsNotMyMoneySelecting = false;
                 context.State.PendingNotMyMoneyOperator = null;
 
-                return new WaitingForReactionState(_playerId, target.PlayerId, new ActionCard(ActionType.NotMyMoney), _operatorCard);
+                return new WaitingForReactionState(_playerId, target.PlayerId, new ActionCard(ActionType.NotMyMoney), _operatorCard); // _playerId and target.PlayerId are both Guid
             }
 
             if (command is NotMyMoneyCancelCommand cancelCmd && cancelCmd.PlayerId == _playerId)

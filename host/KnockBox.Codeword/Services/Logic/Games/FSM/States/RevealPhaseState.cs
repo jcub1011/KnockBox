@@ -22,7 +22,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             context.State.SetPhase(CodewordGamePhase.Reveal);
 
             // Apply per-cycle scoring while vote data is still intact.
-            string? eliminatedId = (elimination is not null && !elimination.WasTie) ? elimination.PlayerId : null;
+            Guid? eliminatedId = (elimination is not null && !elimination.WasTie) ? elimination.PlayerId : null;
             context.ApplyCycleScoring(eliminatedId);
 
             if (elimination is not null && !elimination.WasTie)

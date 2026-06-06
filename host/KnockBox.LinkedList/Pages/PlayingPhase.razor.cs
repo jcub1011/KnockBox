@@ -83,7 +83,7 @@ namespace KnockBox.LinkedList.Pages
             }
         }
 
-        protected string DisplayNameOf(string playerId)
+        protected string DisplayNameOf(Guid playerId)
             => GameState.GamePlayers.TryGetValue(playerId, out var ps) ? ps.DisplayName : "Someone";
 
         // ── Groups (competitive) helpers (§8.2) ──────────────────────────────

@@ -3,7 +3,7 @@
     flex-direction: column;
     gap: 0.85rem;
     align-items: stretch;
-    width: min(34rem, 92vw);
+    width: min(40rem, 94vw);
     padding: 1rem;
     background: var(--ac-panel, rgba(18, 24, 44, 0.72));
     border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
@@ -61,25 +61,45 @@
 
 .ac-im-opt-slot {
     position: relative;
-    width: 9.75rem;
+    width: 11rem;
 }
 
-.ac-im-opt-slot.ac-im-opt-overflow ::deep .gc-card {
+/* The overflow warning tints the front face (the .gc-card root is transparent for the 3D flip). */
+.ac-im-opt-slot.ac-im-opt-overflow ::deep .gc-face {
     border-color: var(--ac-danger, #ff3b5c);
     border-style: dashed;
-    background: color-mix(in srgb, var(--ac-danger) 10%, transparent);
+    background: color-mix(in srgb, var(--ac-danger) 12%, transparent);
 }
 
 /* Slot order number, top-left over the card. */
 .ac-im-opt-pos {
     position: absolute;
-    top: 0.2rem;
-    left: 0.4rem;
+    top: 0.4rem;
+    left: 0.55rem;
     z-index: 1;
     font-family: var(--font-mono, monospace);
-    font-size: 0.62rem;
+    font-size: 0.66rem;
     font-weight: 800;
-    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.5));
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.6));
+    pointer-events: none;
+}
+
+/* NEW marker for freshly-dealt cards — top-center, clear of the pos number and the chips. */
+.ac-im-opt-newmark {
+    position: absolute;
+    top: 0.4rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    padding: 0.05rem 0.4rem;
+    border-radius: 0.3rem;
+    background: var(--ac-mint, #14f195);
+    color: #042418;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    pointer-events: none;
 }
 
 /* Expansion banner — replaces the old dedicated Expansion sub-phase. */

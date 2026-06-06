@@ -14,7 +14,7 @@ namespace KnockBox.CardCounter.Tests.Unit.State.Games.CardCounter
         [TestInitialize]
         public void Setup()
         {
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new CardCounterGameState(host, NullLogger<CardCounterGameState>.Instance);
         }
 

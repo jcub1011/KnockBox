@@ -102,6 +102,10 @@
                     <p class="ac-tut-note ac-tut-reveal" style="--i:4">
                         The chain keeps going — but a banned-letter word scores <strong>0</strong>.
                     </p>
+                    <p class="ac-tut-note ac-tut-reveal" style="--i:5">
+                        Whoever is in <strong>last place</strong> picks the letter — so it never taxes
+                        <strong>them</strong>. Climb out of last and it starts taxing you again.
+                    </p>
                     break;
             }
         </div>
@@ -156,7 +160,7 @@
     {
         TutorialKind.Shiritori => "Each word must start with the previous word's last letter.",
         TutorialKind.Engine => "Modifier cards run left-to-right to build your score; reaction cards auto-fire on events.",
-        TutorialKind.Tax => "A word containing the banned letter still chains, but scores zero — and can feed opponents' Tax Collectors.",
+        TutorialKind.Tax => "A word containing the banned letter still chains, but scores zero — except for the last-place player, who's exempt.",
         _ => ""
     };
 

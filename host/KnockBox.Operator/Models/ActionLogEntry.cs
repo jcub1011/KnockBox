@@ -3,8 +3,8 @@ using System;
 namespace KnockBox.Operator.Models;
 
 public record ActionLogEntry(
-    string Message, 
+    string Message,
     DateTimeOffset Timestamp,
-    string? SourcePlayerId = null,
-    string? TargetPlayerId = null,
+    Guid? SourcePlayerId = null,
+    Guid? TargetPlayerId = null,
     Guid? CardId = null);

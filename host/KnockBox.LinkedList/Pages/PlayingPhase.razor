@@ -1,7 +1,7 @@
 @using KnockBox.LinkedList.Services.State.Games
 
 @{
-    var myId = UserService.CurrentUser?.Id ?? "";
+    var myId = UserService.CurrentUser?.Id ?? Guid.Empty;
     var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
     var isAuditor = myId == GameState.AuditorPlayerId;
     var auditorName = DisplayNameOf(GameState.AuditorPlayerId);
@@ -52,7 +52,7 @@
     @* ════════════════════════════════════════════════════════════════════ *@
     @if (!IsGroups)
     {
-        var activeId = GameState.TurnManager.CurrentPlayer ?? "";
+        var activeId = GameState.TurnManager.CurrentPlayer ?? Guid.Empty;
         var isMyTurn = !isHostSpectator && myId == activeId && !isAuditor;
         var pending = GameState.PendingSubmission;
         var activeName = DisplayNameOf(activeId);
@@ -213,7 +213,7 @@
         else if (MyGroup is { } group)
         {
             var pending = group.PendingSubmission;
-            var activeId = group.TurnManager.CurrentPlayer ?? "";
+            var activeId = group.TurnManager.CurrentPlayer ?? Guid.Empty;
             var isMyTurn = myId == activeId;
             var activeName = DisplayNameOf(activeId);
 

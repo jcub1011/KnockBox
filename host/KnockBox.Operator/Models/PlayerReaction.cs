@@ -1,3 +1,5 @@
+using System;
+
 namespace KnockBox.Operator.Models;
 
-public readonly record struct PlayerReaction(string PlayerId, Card? ReactionCard);
+public readonly record struct PlayerReaction(Guid PlayerId, Card? ReactionCard);

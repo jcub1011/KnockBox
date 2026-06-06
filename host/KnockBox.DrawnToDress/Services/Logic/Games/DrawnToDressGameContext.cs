@@ -43,7 +43,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         public DrawnToDressSettings Settings => State.Settings;
 
         /// <summary>Shortcut to <see cref="DrawnToDressGameState.GamePlayers"/>.</summary>
-        public ConcurrentDictionary<string, DrawnToDressPlayerState> GamePlayers => State.GamePlayers;
+        public ConcurrentDictionary<Guid, DrawnToDressPlayerState> GamePlayers => State.GamePlayers;
 
         /// <summary>Shortcut to <see cref="DrawnToDressGameState.ClothingPool"/>.</summary>
         public ConcurrentDictionary<Guid, DrawnClothingItem> ClothingPool => State.ClothingPool;
@@ -54,7 +54,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         /// Returns the player state for <paramref name="playerId"/>, or
         /// <see langword="null"/> if the player is not in the game.
         /// </summary>
-        public DrawnToDressPlayerState? GetPlayer(string playerId)
+        public DrawnToDressPlayerState? GetPlayer(Guid playerId)
             => GamePlayers.TryGetValue(playerId, out var ps) ? ps : null;
 
         /// <summary>
@@ -95,7 +95,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         public IReadOnlyList<EntrantId> GetTournamentEntrantIds()
         {
             var entrants = new List<EntrantId>();
-            foreach (var p in GamePlayers.Values.OrderBy(p => p.PlayerId, StringComparer.Ordinal))
+            foreach (var p in GamePlayers.Values.OrderBy(p => p.PlayerId))
                 foreach (var (round, _) in p.SubmittedOutfits.OrderBy(kv => kv.Key))
                     entrants.Add(new EntrantId(p.PlayerId, round));
             return entrants;
@@ -105,9 +105,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
         /// Looks up the outfit submission for a given entrant ID.
         /// </summary>
         public OutfitSubmission? GetOutfitByEntrantId(EntrantId entrantId)
-        {
-            return GetPlayer(entrantId.PlayerId)?.GetOutfit(entrantId.Round);
-        }
+            => GetPlayer(entrantId.PlayerId)?.GetOutfit(entrantId.Round);
 
         /// <summary>
         /// Resets the communal pool for the given outfit round: removes picks from all
@@ -139,7 +137,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games
                 foreach (var item in ClothingPool.Values)
                 {
                     if (item.IsInPool &&
-                        string.Equals(item.CreatorPlayerId, player.PlayerId, StringComparison.Ordinal))
+                        item.CreatorPlayerId == player.PlayerId)
                     {
                         player.OwnedClothingItemIds.Add(item.Id);
                     }

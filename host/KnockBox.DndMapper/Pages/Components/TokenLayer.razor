@@ -142,7 +142,7 @@
         // Gold "this is yours" halo rendered only on the viewer's own circuit so
         // each player can locate their token at a glance without exposing ownership
         // to other viewers.
-        if (!string.IsNullOrEmpty(token.OwnerUserId) && token.OwnerUserId == CurrentUserId)
+        if (token.OwnerUserId is not null && token.OwnerUserId == CurrentUserId)
         {
             builder.OpenElement(7, "circle");
             builder.AddAttribute(8, "r", "0.55");

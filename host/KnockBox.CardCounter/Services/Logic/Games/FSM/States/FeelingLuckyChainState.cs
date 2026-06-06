@@ -9,10 +9,10 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
     /// pass the force to the next player with another Feeling Lucky card, or play Comp'd.
     /// Once resolved the game resumes from the originator.
     /// </summary>
-    public sealed class FeelingLuckyChainState(string originatorId, string firstTargetId) : ITimedCardCounterGameState
+    public sealed class FeelingLuckyChainState(Guid originatorId, Guid firstTargetId) : ITimedCardCounterGameState
     {
-        private readonly string _originatorId = originatorId;
-        private string _currentTargetId = firstTargetId;
+        private readonly Guid _originatorId = originatorId;
+        private Guid _currentTargetId = firstTargetId;
         private DateTimeOffset _expiresAt;
 
         public ValueResult<IGameState<CardCounterGameContext, CardCounterCommand>?> OnEnter(CardCounterGameContext context)
@@ -92,7 +92,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games.FSM.States
                 context.RecordActionCardPlay(target, card);
                 int currentIdx = context.TurnOrder.IndexOf(_currentTargetId);
                 int nextIdx = (currentIdx + 1) % context.TurnOrder.Count;
-                string nextTarget = context.TurnOrder[nextIdx];
+                Guid nextTarget = context.TurnOrder[nextIdx];
 
                 // Skip back to originator if the chain wraps all the way around
                 if (nextTarget == _originatorId)

@@ -1,6 +1,7 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -25,16 +26,16 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartGameAsync(
             int playerCount, bool survival)
         {
             var engine = new AlphaChainGameEngine(
-                new StubWordListService(), new FixedRandomNumberService(), new ScoreCalculator(),
+                new StubWordListService(), new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -45,7 +46,15 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
             state.UpdateSettings(s => s with { EnableTutorials = false, SurvivalMode = survival });
 
             await engine.StartAsync(_host, state);
+            DrainCountdown(engine, state);
             return (engine, state);
+        }
+
+        /// <summary>Ticks past the pre-round "Get Ready" countdown so the FSM lands in RoundState.</summary>
+        private static void DrainCountdown(AlphaChainGameEngine engine, AlphaChainGameState state)
+        {
+            if (state.Phase == AlphaChainGamePhase.Countdown)
+                engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
         }
 
         [TestMethod]
@@ -53,7 +62,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
         {
             var (engine, state) = await StartGameAsync(playerCount: 3, survival: false);
             using var _ = state;
-            var leaving = state.TurnManager.CurrentPlayer!;
+            var leaving = state.TurnManager.CurrentPlayer!.Value;
 
             engine.HandlePlayerLeft(UserFactory.Create("dummy", leaving), state);
 
@@ -68,7 +77,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
         {
             var (engine, state) = await StartGameAsync(playerCount: 3, survival: true);
             using var _ = state;
-            var leaving = state.TurnManager.CurrentPlayer!;
+            var leaving = state.TurnManager.CurrentPlayer!.Value;
 
             engine.HandlePlayerLeft(UserFactory.Create("dummy", leaving), state);
 
@@ -99,7 +108,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
         {
             var (engine, state) = await StartGameAsync(playerCount: 2, survival: true);
             using var _ = state;
-            var leaving = state.TurnManager.CurrentPlayer!;
+            var leaving = state.TurnManager.CurrentPlayer!.Value;
 
             engine.HandlePlayerLeft(UserFactory.Create("dummy", leaving), state);
 
@@ -114,7 +123,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
         private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartAndEnterIntermissionAsync()
         {
             var engine = new AlphaChainGameEngine(
-                new StubWordListService("cat", "tea", "ant"), new FixedRandomNumberService(), new ScoreCalculator(),
+                new StubWordListService("cat", "tea", "ant"), new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -125,6 +134,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
             // Tutorials off so round 1 → Intermission directly (no Engine/Tax tutorial detours).
             state.UpdateSettings(s => s with { EraInterval = 1, EraCount = 3, EnableTutorials = false });
             await engine.StartAsync(_host, state);
+            DrainCountdown(engine, state);
 
             // Round 1: every player submits once → the order wraps → Intermission. Era 1 is ban-free,
             // so the first banned letter is set by this Intermission's Sniper Ban.
@@ -162,6 +172,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
             TickAt(engine, state, t0, 60);   // Optimization times out → SniperBan
             TickAt(engine, state, t0, 120);  // SniperBan times out → random draw → complete
 
+            // CompleteIntermission now opens a "Get Ready" countdown before the next era's round.
+            DrainCountdown(engine, state);
             Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
             Assert.IsNotNull(state.BannedLetter);
             Assert.AreEqual(2, state.CurrentEra);
@@ -181,8 +193,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
             Assert.AreEqual(IntermissionSubPhase.SniperBan, state.IntermissionPhase);
 
             // The resolved last-place picker leaves while holding the ban.
-            var picker = state.SniperBanUserId!;
-            Assert.IsNotNull(picker);
+            Assert.IsNotNull(state.SniperBanUserId);
+            var picker = state.SniperBanUserId!.Value;
             engine.HandlePlayerLeft(UserFactory.Create("dummy", picker), state);
             Assert.IsTrue(state.GamePlayers[picker].HasLeft);
 
@@ -190,6 +202,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain
             // the game proceeds — it never hangs waiting on a departed picker.
             TickAt(engine, state, t0, 120);
 
+            // CompleteIntermission now opens a "Get Ready" countdown before the next era's round.
+            DrainCountdown(engine, state);
             Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
             Assert.IsNotNull(state.BannedLetter);
         }

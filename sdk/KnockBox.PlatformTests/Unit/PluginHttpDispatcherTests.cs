@@ -153,7 +153,7 @@ public sealed class PluginHttpDispatcherTests
 
     private static LobbyRegistration MakeRegistration(string roomUri)
     {
-        var host = UserFactory.Create("Host", Guid.NewGuid().ToString());
+        var host = UserFactory.Create("Host", Guid.NewGuid());
         var state = new FakeAbstractGameEngine.FakeState(host);
         return new LobbyRegistration("CODE0001", $"room/{Route}/{roomUri}", "Fake Game", Route, state);
     }

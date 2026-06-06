@@ -325,11 +325,11 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
         // ── Token verbs ───────────────────────────────────────────────────────────
 
-        public ValueResult<Guid> SpawnPlayerTokenAsync(DndMapperGameState state, User caller, string userId)
+        public ValueResult<Guid> SpawnPlayerTokenAsync(DndMapperGameState state, User caller, Guid userId)
         {
             if (state is null) return ValueResult<Guid>.FromError("State is required.");
             if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
-            if (string.IsNullOrWhiteSpace(userId)) return ValueResult<Guid>.FromError("User id is required.");
+            if (userId == Guid.Empty) return ValueResult<Guid>.FromError("User id is required.");
 
             bool isHost = IsHost(state, caller);
             bool isSelf = caller.Id == userId;
@@ -376,7 +376,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             User caller,
             Guid mapId,
             string name,
-            string? representsUserId = null,
+            Guid? representsUserId = null,
             double? atX = null,
             double? atY = null)
         {
@@ -589,13 +589,13 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                         nextSheetCharacterName = token.Name;
                     }
 
-                    string? nextSheetOwner = sheet.OwnerUserId;
-                    string? nextSheetRepresents = sheet.RepresentsUserId;
+                    Guid? nextSheetOwner = sheet.OwnerUserId;
+                    Guid? nextSheetRepresents = sheet.RepresentsUserId;
                     // Attaching a sheet to a player-owned token transfers
                     // sheet ownership to that player so the sheet shows up in
                     // their character-sheet panel. Reject if the target player
                     // already owns a different sheet (one character per player).
-                    if (token.Type == TokenType.PlayerToken && token.OwnerUserId is string ownerId)
+                    if (token.Type == TokenType.PlayerToken && token.OwnerUserId is Guid ownerId)
                     {
                         if (state.Sheets.Values.Any(s => s.OwnerUserId == ownerId && s.Id != sid))
                         {
@@ -633,7 +633,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         /// Not valid on <see cref="TokenType.PlayerToken"/> (player tokens are
         /// auto-managed). Pass <c>null</c> to clear.
         /// </summary>
-        public Result SetTokenRepresentsAsync(DndMapperGameState state, User caller, Guid tokenId, string? representsUserId)
+        public Result SetTokenRepresentsAsync(DndMapperGameState state, User caller, Guid tokenId, Guid? representsUserId)
         {
             if (state is null) return Result.FromError("State is required.");
             if (caller is null) return Result.FromError("Caller is required.");
@@ -684,7 +684,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
         // ── Sheet verbs ───────────────────────────────────────────────────────────
 
-        public ValueResult<Guid> CreateSheetAsync(DndMapperGameState state, User caller, string? ownerUserId, string characterName)
+        public ValueResult<Guid> CreateSheetAsync(DndMapperGameState state, User caller, Guid? ownerUserId, string characterName)
         {
             if (state is null) return ValueResult<Guid>.FromError("State is required.");
             if (caller is null) return ValueResult<Guid>.FromError("Caller is required.");
@@ -1624,8 +1624,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                 if (entry.OwnerUserId is null) { error = "Force-roll is only valid for player combatants."; return; }
                 if (entry.InitiativeRoll is not null) { error = "Player has already rolled."; return; }
 
-                int modifier = ResolveInitiativeModifier(state, entry.OwnerUserId);
-                var (modifiedFace, stamps) = ApplyLoadedDiceToInitiative(state, caller, FindPlayerSheetId(state, entry.OwnerUserId), d20);
+                int modifier = ResolveInitiativeModifier(state, entry.OwnerUserId.Value);
+                var (modifiedFace, stamps) = ApplyLoadedDiceToInitiative(state, caller, FindPlayerSheetId(state, entry.OwnerUserId.Value), d20);
                 int total = modifiedFace + modifier;
                 state.SetActiveCombat(combat with
                 {
@@ -1635,7 +1635,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
                         IsForceRolled = true,
                     }),
                 });
-                state.AppendRoll(BuildInitiativeRollResult(entry.OwnerUserId, caller.Id, modifiedFace, modifier, total, appliedRules: stamps));
+                state.AppendRoll(BuildInitiativeRollResult(entry.OwnerUserId.Value, caller.Id, modifiedFace, modifier, total, appliedRules: stamps));
                 TryTransitionToActive(state);
             });
 
@@ -1960,7 +1960,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             return -1;
         }
 
-        private static int IndexOfCombatantByOwner(CombatState combat, string ownerUserId)
+        private static int IndexOfCombatantByOwner(CombatState combat, Guid ownerUserId)
         {
             for (int i = 0; i < combat.TurnOrder.Length; i++)
                 if (combat.TurnOrder[i].OwnerUserId == ownerUserId) return i;
@@ -1973,7 +1973,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         // through AttributeContributionResolver so active status effects
         // (e.g. "Slowed" with DEX −3) apply the same way they would to a
         // normal roll — §8.5 attribute-value semantics.
-        private static int ResolveInitiativeModifier(DndMapperGameState state, string userId)
+        private static int ResolveInitiativeModifier(DndMapperGameState state, Guid userId)
             => ResolveInitiativeModifierForSheet(state, state.Sheets.Values.FirstOrDefault(s => s.OwnerUserId == userId));
 
         private static int ResolveInitiativeModifierForSheet(DndMapperGameState state, CharacterSheet? sheet)
@@ -2031,8 +2031,8 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             => value >= 0 ? $"+{value}" : $"−{Math.Abs(value)}";
 
         private static RollResult BuildInitiativeRollResult(
-            string rollerUserId,
-            string? forcedByUserId,
+            Guid rollerUserId,
+            Guid? forcedByUserId,
             int d20,
             int dexModifier,
             int total,
@@ -2084,7 +2084,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         // Player's primary character sheet — first sheet they own. Returns
         // null when the player has no sheet attached (e.g. host has not yet
         // generated one). Used to feed RollerSheetId for target-list matches.
-        private static Guid? FindPlayerSheetId(DndMapperGameState state, string userId)
+        private static Guid? FindPlayerSheetId(DndMapperGameState state, Guid userId)
         {
             foreach (var sheet in state.Sheets.Values)
                 if (sheet.OwnerUserId == userId) return sheet.Id;
@@ -2925,7 +2925,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         /// and giving them to a currently-registered player. Also accepts
         /// <see cref="TokenType.NPCToken"/> for arbitrary host-driven reassignment.
         /// </summary>
-        public Result ReassignTokenOwnerAsync(DndMapperGameState state, User caller, Guid tokenId, string? newOwnerUserId, TokenType newType)
+        public Result ReassignTokenOwnerAsync(DndMapperGameState state, User caller, Guid tokenId, Guid? newOwnerUserId, TokenType newType)
         {
             if (state is null) return Result.FromError("State is required.");
             if (caller is null) return Result.FromError("Caller is required.");
@@ -2939,7 +2939,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
 
                 if (newType == TokenType.PlayerToken)
                 {
-                    if (string.IsNullOrWhiteSpace(newOwnerUserId))
+                    if (newOwnerUserId is null || newOwnerUserId == Guid.Empty)
                     {
                         error = "PlayerToken requires an owner user id.";
                         return;
@@ -3006,12 +3006,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         /// on any affected map or already owns a different <see cref="CharacterSheet"/>;
         /// the host must resolve those conflicts first.
         /// </remarks>
-        public Result AssignCharacterToPlayerAsync(DndMapperGameState state, User caller, Guid tokenId, string newOwnerUserId)
+        public Result AssignCharacterToPlayerAsync(DndMapperGameState state, User caller, Guid tokenId, Guid newOwnerUserId)
         {
             if (state is null) return Result.FromError("State is required.");
             if (caller is null) return Result.FromError("Caller is required.");
             if (!IsHost(state, caller)) return Result.FromError("Only the host may assign characters to players.");
-            if (string.IsNullOrWhiteSpace(newOwnerUserId)) return Result.FromError("Target player id is required.");
+            if (newOwnerUserId == Guid.Empty) return Result.FromError("Target player id is required.");
 
             string? error = null;
             var exec = state.Execute(() =>
@@ -3039,12 +3039,12 @@ namespace KnockBox.DndMapper.Services.Logic.Games
         /// (e.g. a sheet built in advance, or an orphaned sheet whose tokens were
         /// already cleaned up).
         /// </summary>
-        public Result AssignSheetToPlayerAsync(DndMapperGameState state, User caller, Guid sheetId, string newOwnerUserId)
+        public Result AssignSheetToPlayerAsync(DndMapperGameState state, User caller, Guid sheetId, Guid newOwnerUserId)
         {
             if (state is null) return Result.FromError("State is required.");
             if (caller is null) return Result.FromError("Caller is required.");
             if (!IsHost(state, caller)) return Result.FromError("Only the host may assign characters to players.");
-            if (string.IsNullOrWhiteSpace(newOwnerUserId)) return Result.FromError("Target player id is required.");
+            if (newOwnerUserId == Guid.Empty) return Result.FromError("Target player id is required.");
 
             string? error = null;
             var exec = state.Execute(() =>
@@ -3071,7 +3071,7 @@ namespace KnockBox.DndMapper.Services.Logic.Games
             DndMapperGameState state,
             CharacterSheet? sheet,
             Token? anchorToken,
-            string newOwnerUserId)
+            Guid newOwnerUserId)
         {
             if (!state.Players.Any(p => p.User.Id == newOwnerUserId))
                 return "Target user is not a registered player.";

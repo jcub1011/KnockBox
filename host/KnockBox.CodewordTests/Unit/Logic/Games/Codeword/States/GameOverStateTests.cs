@@ -19,9 +19,19 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         private CodewordGameState _state = default!;
         private CodewordGameContext _context = default!;
 
+        private Guid _hostId = default!;
+        private Guid _p0Id = default!;
+        private Guid _p1Id = default!;
+        private Guid _p2Id = default!;
+
         [TestInitialize]
         public void Setup()
         {
+            _hostId = Guid.NewGuid();
+            _p0Id = Guid.NewGuid();
+            _p1Id = Guid.NewGuid();
+            _p2Id = Guid.NewGuid();
+
             _rng = new Mock<IRandomNumberService>();
             _rng.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>()))
                 .Returns(0);
@@ -30,17 +40,17 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             _logger = new Mock<ILogger>();
             _stateLogger = new Mock<ILogger<CodewordGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", _hostId);
             _state = new CodewordGameState(host, _stateLogger.Object);
             _context = new CodewordGameContext(_state, _rng.Object, _logger.Object);
 
-            AddPlayer("p0", "Player 0", Role.Agent, "Ocean");
-            AddPlayer("p1", "Player 1", Role.Agent, "Ocean");
-            AddPlayer("p2", "Player 2", Role.Insider, "Lake");
+            AddPlayer(_p0Id, "Player 0", Role.Agent, "Ocean");
+            AddPlayer(_p1Id, "Player 1", Role.Agent, "Ocean");
+            AddPlayer(_p2Id, "Player 2", Role.Insider, "Lake");
             _state.CurrentWordPair = ["Ocean", "Lake"];
         }
 
-        private void AddPlayer(string id, string name, Role role, string? secretWord)
+        private void AddPlayer(Guid id, string name, Role role, string? secretWord)
         {
             _state.GamePlayers[id] = new CodewordPlayerState
             {
@@ -72,7 +82,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             gameOver.OnEnter(_context);
 
             // p0: Agent, alive → +2 survive + +1 winning team = 3.
-            Assert.AreEqual(3, _state.GamePlayers["p0"].Score);
+            Assert.AreEqual(3, _state.GamePlayers[_p0Id].Score);
         }
 
         [TestMethod]
@@ -83,8 +93,8 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var gameOver = new GameOverState();
             gameOver.OnEnter(_context);
 
-            Assert.IsTrue(_state.GameScores.ContainsKey("p0"));
-            Assert.IsGreaterThan(0, _state.GameScores["p0"]);
+            Assert.IsTrue(_state.GameScores.ContainsKey(_p0Id));
+            Assert.IsGreaterThan(0, _state.GameScores[_p0Id]);
         }
 
         [TestMethod]
@@ -96,7 +106,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var gameOver = new GameOverState();
             gameOver.OnEnter(_context);
 
-            var result = gameOver.HandleCommand(_context, new StartNextGameCommand("host-id"));
+            var result = gameOver.HandleCommand(_context, new StartNextGameCommand(_hostId));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<SetupState>(result.Value);
         }
@@ -110,7 +120,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var gameOver = new GameOverState();
             gameOver.OnEnter(_context);
 
-            var result = gameOver.HandleCommand(_context, new StartNextGameCommand("p0"));
+            var result = gameOver.HandleCommand(_context, new StartNextGameCommand(_p0Id));
             Assert.IsFalse(result.IsSuccess);
         }
 
@@ -124,7 +134,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var gameOver = new GameOverState();
             gameOver.OnEnter(_context);
 
-            gameOver.HandleCommand(_context, new StartNextGameCommand("host-id"));
+            gameOver.HandleCommand(_context, new StartNextGameCommand(_hostId));
             Assert.AreEqual(2, _state.CurrentGameNumber);
         }
 
@@ -136,7 +146,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
 
             var gameOver = new GameOverState();
             gameOver.OnEnter(_context);
-            gameOver.HandleCommand(_context, new StartNextGameCommand("host-id"));
+            gameOver.HandleCommand(_context, new StartNextGameCommand(_hostId));
 
             foreach (var ps in _state.GamePlayers.Values)
             {
@@ -157,13 +167,13 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         {
             _state.UpdateSettings(s => s with { TotalGames = 5 });
             _state.UsedClues["test"] = "SomePlayer";
-            _state.CurrentRoundClues.Add(new ClueEntry("p0", "P0", "test"));
-            _state.CurrentRoundVotes.Add(new VoteEntry("p0", "P0", "p1", "P1"));
+            _state.CurrentRoundClues.Add(new ClueEntry(_p0Id, "P0", "test"));
+            _state.CurrentRoundVotes.Add(new VoteEntry(_p0Id, "P0", _p1Id, "P1"));
             _state.WinResult = new WinConditionResult(true, Role.Agent, "Test");
 
             var gameOver = new GameOverState();
             gameOver.OnEnter(_context);
-            gameOver.HandleCommand(_context, new StartNextGameCommand("host-id"));
+            gameOver.HandleCommand(_context, new StartNextGameCommand(_hostId));
 
             Assert.AreEqual(0, _state.CurrentEliminationCycle);
             Assert.AreEqual(0, _state.TurnManager.CurrentPlayerIndex);
@@ -187,7 +197,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
 
             var gameOver = new GameOverState();
             gameOver.OnEnter(_context);
-            gameOver.HandleCommand(_context, new StartNextGameCommand("host-id"));
+            gameOver.HandleCommand(_context, new StartNextGameCommand(_hostId));
 
             Assert.HasCount(2, _context.UsedWordPairIndices);
         }
@@ -202,11 +212,11 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             gameOver.OnEnter(_context);
 
             // Scores accumulated in OnEnter.
-            int p0Score = _state.GameScores.GetValueOrDefault("p0", 0);
+            int p0Score = _state.GameScores.GetValueOrDefault(_p0Id, 0);
 
-            gameOver.HandleCommand(_context, new StartNextGameCommand("host-id"));
+            gameOver.HandleCommand(_context, new StartNextGameCommand(_hostId));
 
-            Assert.AreEqual(p0Score, _state.GameScores["p0"]);
+            Assert.AreEqual(p0Score, _state.GameScores[_p0Id]);
         }
 
         [TestMethod]
@@ -219,7 +229,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var gameOver = new GameOverState();
             gameOver.OnEnter(_context);
 
-            var result = gameOver.HandleCommand(_context, new StartNextGameCommand("host-id"));
+            var result = gameOver.HandleCommand(_context, new StartNextGameCommand(_hostId));
             Assert.IsFalse(result.IsSuccess);
         }
 
@@ -231,7 +241,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var gameOver = new GameOverState();
             gameOver.OnEnter(_context);
 
-            var result = gameOver.HandleCommand(_context, new ReturnToLobbyCommand("host-id"));
+            var result = gameOver.HandleCommand(_context, new ReturnToLobbyCommand(_hostId));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsNull(result.Value); // Null signals lobby transition.
         }
@@ -244,7 +254,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var gameOver = new GameOverState();
             gameOver.OnEnter(_context);
 
-            var result = gameOver.HandleCommand(_context, new ReturnToLobbyCommand("p0"));
+            var result = gameOver.HandleCommand(_context, new ReturnToLobbyCommand(_p0Id));
             Assert.IsFalse(result.IsSuccess);
         }
 
@@ -254,7 +264,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             // WinResult is null; GameOverState should evaluate it.
             _state.WinResult = null;
             // With only 2 alive players (eliminate p2), the game ends.
-            _state.GamePlayers["p2"].IsEliminated = true;
+            _state.GamePlayers[_p2Id].IsEliminated = true;
 
             var gameOver = new GameOverState();
             gameOver.OnEnter(_context);
@@ -273,14 +283,14 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var gameOver1 = new GameOverState();
             gameOver1.OnEnter(_context);
 
-            // p0: Agent, alive → +2 + +1 = 3. GameScores["p0"] = 3.
-            int game1Score = _state.GameScores.GetValueOrDefault("p0", 0);
+            // p0: Agent, alive → +2 + +1 = 3. GameScores[_p0Id] = 3.
+            int game1Score = _state.GameScores.GetValueOrDefault(_p0Id, 0);
             Assert.IsGreaterThan(0, game1Score, "Game 1 score should be > 0.");
 
             // Start next game → resets player Score but preserves GameScores.
-            gameOver1.HandleCommand(_context, new StartNextGameCommand("host-id"));
-            Assert.AreEqual(0, _state.GamePlayers["p0"].Score, "Player score should reset after StartNextGame.");
-            Assert.AreEqual(game1Score, _state.GameScores["p0"], "GameScores should be preserved after StartNextGame.");
+            gameOver1.HandleCommand(_context, new StartNextGameCommand(_hostId));
+            Assert.AreEqual(0, _state.GamePlayers[_p0Id].Score, "Player score should reset after StartNextGame.");
+            Assert.AreEqual(game1Score, _state.GameScores[_p0Id], "GameScores should be preserved after StartNextGame.");
 
             // Simulate Game 2: reassign roles (setup happens via SetupState transition).
             // Manually set WinResult for next GameOver.
@@ -289,7 +299,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var gameOver2 = new GameOverState();
             gameOver2.OnEnter(_context);
 
-            int game2Cumulative = _state.GameScores.GetValueOrDefault("p0", 0);
+            int game2Cumulative = _state.GameScores.GetValueOrDefault(_p0Id, 0);
             Assert.IsGreaterThan(game1Score, game2Cumulative, "Cumulative scores should increase across games.");
         }
     }

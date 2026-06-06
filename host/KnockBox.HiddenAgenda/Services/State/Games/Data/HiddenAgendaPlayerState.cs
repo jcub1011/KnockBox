@@ -5,7 +5,7 @@ namespace KnockBox.HiddenAgenda.Services.State.Games.Data;
 
 public class HiddenAgendaPlayerState
 {
-    public string PlayerId { get; set; } = string.Empty;
+    public Guid PlayerId { get; set; }
     public string DisplayName { get; set; } = string.Empty;
 
     // Position
@@ -19,12 +19,12 @@ public class HiddenAgendaPlayerState
 
     // Detour state
     public bool DetourPending { get; set; }
-    public string? DetourTargetPlayerId { get; set; }
+    public Guid? DetourTargetPlayerId { get; set; }
 
     // Guess submission
     public bool HasSubmittedGuess { get; set; }
     // Key: opponent player ID, Value: list of 3 guessed task IDs
-    public Dictionary<string, List<string>>? GuessSubmission { get; set; }
+    public Dictionary<Guid, List<string>>? GuessSubmission { get; set; }
 
     // Scoring
     public int RoundScore { get; set; }
@@ -37,7 +37,7 @@ public class HiddenAgendaPlayerState
     /// For Rivalry task R6: the randomly assigned player to shadow.
     /// Set at task draw time if R6 is in the player's tasks.
     /// </summary>
-    public string? RivalryTargetPlayerId { get; set; }
+    public Guid? RivalryTargetPlayerId { get; set; }
 
     // Spin/movement history
     public int LastSpinResult { get; set; }

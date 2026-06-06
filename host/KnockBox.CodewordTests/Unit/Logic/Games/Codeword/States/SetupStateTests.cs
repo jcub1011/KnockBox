@@ -18,6 +18,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
         private Mock<ILogger<CodewordGameState>> _stateLogger = default!;
         private CodewordGameState _state = default!;
         private CodewordGameContext _context = default!;
+        private Guid[] _playerIds = default!;
 
         [TestInitialize]
         public void Setup()
@@ -31,19 +32,21 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             _logger = new Mock<ILogger>();
             _stateLogger = new Mock<ILogger<CodewordGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new CodewordGameState(host, _stateLogger.Object);
             _context = new CodewordGameContext(_state, _rng.Object, _logger.Object);
 
             // Add 5 players.
+            _playerIds = new Guid[5];
             for (int i = 0; i < 5; i++)
             {
-                _state.GamePlayers[$"p{i}"] = new CodewordPlayerState
+                _playerIds[i] = Guid.NewGuid();
+                _state.GamePlayers[_playerIds[i]] = new CodewordPlayerState
                 {
-                    PlayerId = $"p{i}",
+                    PlayerId = _playerIds[i],
                     DisplayName = $"Player {i}"
                 };
-                _state.TurnManager.TurnOrder.Add($"p{i}");
+                _state.TurnManager.TurnOrder.Add(_playerIds[i]);
             }
         }
 
@@ -123,7 +126,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             var setupState = new SetupState();
             setupState.OnEnter(_context);
 
-            var result = setupState.HandleCommand(_context, new SubmitClueCommand("p0", "test"));
+            var result = setupState.HandleCommand(_context, new SubmitClueCommand(_playerIds[0], "test"));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsNull(result.Value);
         }
@@ -171,12 +174,13 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             _state.TurnManager.TurnOrder.Clear();
             for (int i = 0; i < playerCount; i++)
             {
-                _state.GamePlayers[$"p{i}"] = new CodewordPlayerState
+                var pid = Guid.NewGuid();
+                _state.GamePlayers[pid] = new CodewordPlayerState
                 {
-                    PlayerId = $"p{i}",
+                    PlayerId = pid,
                     DisplayName = $"Player {i}"
                 };
-                _state.TurnManager.TurnOrder.Add($"p{i}");
+                _state.TurnManager.TurnOrder.Add(pid);
             }
 
             var setupState = new SetupState();

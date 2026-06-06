@@ -37,7 +37,7 @@ namespace KnockBox.Codeword.Pages
             // reference, which is atomic, so the worst case is the timeout grabs
             // the previous keystroke.
             var myId = UserService.CurrentUser?.Id;
-            if (myId is not null && GameState.GamePlayers.TryGetValue(myId, out var player) && !player.HasSubmittedClue)
+            if (myId is { } id && GameState.GamePlayers.TryGetValue(id, out var player) && !player.HasSubmittedClue)
             {
                 player.PendingClue = _clueText;
             }

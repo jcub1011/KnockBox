@@ -1,3 +1,4 @@
+using System;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
@@ -36,7 +37,7 @@ public sealed class CookTheBooksCard()
         return ValueResult<CardPlayResult>.FromValue(CardPlayResult.OkConsumedNumbers());
     }
 
-    public static void Resolve(OperatorGameContext context, string playerId, decimal incomingValue)
+    public static void Resolve(OperatorGameContext context, Guid playerId, decimal incomingValue)
     {
         if (context.GamePlayers.TryGetValue(playerId, out var player))
         {

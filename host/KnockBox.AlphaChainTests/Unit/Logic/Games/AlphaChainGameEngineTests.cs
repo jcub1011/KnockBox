@@ -1,6 +1,7 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -22,16 +23,17 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
             _engine = new AlphaChainGameEngine(
                 new StubWordListService(),
                 new FixedRandomNumberService(),
-                new ScoreCalculator(),
+                new EngineEvaluator(),
+                new ModifierCardFactory(),
                 _engineLoggerMock.Object,
                 _stateLoggerMock.Object);
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<AlphaChainGameState> CreateStateWithPlayersAsync(int count)
         {
@@ -45,11 +47,19 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
         private async Task<AlphaChainGameState> CreateStartedGameAsync(int playerCount = 2, bool hostPlays = false)
         {
             var state = await CreateStateWithPlayersAsync(playerCount);
-            // Tutorials off so the game starts directly in RoundState (these tests assert the
-            // round/turn lifecycle, not the tutorial flow).
+            // Tutorials off so the game starts straight at the pre-round countdown (these tests assert
+            // the round/turn lifecycle, not the tutorial flow); drain the countdown to land in RoundState.
             state.UpdateSettings(s => s with { EnableTutorials = false, HostPlays = hostPlays });
             await _engine.StartAsync(_host, state);
+            DrainCountdown(state);
             return state;
+        }
+
+        /// <summary>Ticks past the pre-round "Get Ready" countdown so the FSM lands in RoundState.</summary>
+        private void DrainCountdown(AlphaChainGameState state)
+        {
+            if (state.Phase == AlphaChainGamePhase.Countdown)
+                _engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
         }
 
         // ── Engine properties ─────────────────────────────────────────────────
@@ -97,6 +107,23 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
         }
 
         [TestMethod]
+        public async Task StartAsync_WithoutTutorials_EntersGetReadyCountdownBeforeRound()
+        {
+            var state = await CreateStateWithPlayersAsync(2);
+            state.UpdateSettings(s => s with { EnableTutorials = false });
+            using var _ = state;
+
+            await _engine.StartAsync(_host, state);
+
+            // A short "Get Ready" countdown precedes the first turn rather than dropping straight in.
+            Assert.AreEqual(AlphaChainGamePhase.Countdown, state.Phase);
+
+            // It ticks into the round once the dwell elapses.
+            _engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
+            Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
+        }
+
+        [TestMethod]
         public async Task StartAsPlayer_IncludesHostInTurnOrder()
         {
             using var state = await CreateStartedGameAsync(2, hostPlays: true);
@@ -124,7 +151,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
         public async Task AdvanceTurn_RotatesPlayerInTurnOrder()
         {
             using var state = await CreateStartedGameAsync(2);
-            var first = state.TurnManager.CurrentPlayer!;
+            var first = state.TurnManager.CurrentPlayer!.Value;
 
             var result = await _engine.AdvanceTurnAsync(first, state);
 
@@ -150,10 +177,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
             Assert.AreEqual(1, state.CurrentRound);
 
             // Two players → two advances complete one round (the second wraps the order).
-            await _engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!, state);
+            await _engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!.Value, state);
             Assert.AreEqual(1, state.CurrentRound, "Mid-round advance must not bump the round.");
 
-            await _engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!, state);
+            await _engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!.Value, state);
             Assert.AreEqual(2, state.CurrentRound, "Wrapping the turn order completes the round.");
             Assert.AreEqual(0, state.TurnManager.CurrentPlayerIndex);
         }
@@ -166,13 +193,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
             state.UpdateSettings(s => s with { EraInterval = 2, EraCount = 1, EnableTutorials = false });
             await _engine.StartAsync(_host, state);
             using var _ = state;
+            DrainCountdown(state); // step past the pre-round "Get Ready" countdown into RoundState
 
             int lastScheduledRound = state.Settings.EraInterval * state.Settings.EraCount; // 2
             // Advance until the game ends: (players × rounds) advances at most.
             for (int i = 0; i < state.TurnManager.TurnOrder.Count * (lastScheduledRound + 1); i++)
             {
                 if (state.Phase == AlphaChainGamePhase.GameOver) break;
-                await _engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!, state);
+                await _engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!.Value, state);
             }
 
             Assert.AreEqual(AlphaChainGamePhase.GameOver, state.Phase);
@@ -186,7 +214,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
         public async Task PlayerLeaves_DuringTheirTurn_AdvancesAutomatically()
         {
             using var state = await CreateStartedGameAsync(3);
-            var leaving = state.TurnManager.CurrentPlayer!;
+            var leaving = state.TurnManager.CurrentPlayer!.Value;
 
             _engine.HandlePlayerLeft(UserFactory.Create("dummy", leaving), state);
 
@@ -254,6 +282,101 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games
             Assert.IsEmpty(state.GamePlayers);
             Assert.IsEmpty(state.TurnManager.TurnOrder);
             Assert.IsNull(state.Results);
+        }
+
+        // ── Start guards ──────────────────────────────────────────────────────
+        // CanStartAsync gates on Participants.Length (host counts when HostPlays) AND IsJoinable,
+        // and StartAsyncCore refuses an invalid config before building any FSM context.
+
+        [TestMethod]
+        public async Task CanStartAsync_BelowMinPlayers_ReturnsFalse()
+        {
+            // One joiner, host not playing → a single participant, below the 2-player minimum.
+            using var state = await CreateStateWithPlayersAsync(1);
+
+            Assert.IsFalse(await _engine.CanStartAsync(state));
+        }
+
+        [TestMethod]
+        public async Task CanStartAsync_AtMinPlayers_ReturnsTrue()
+        {
+            using var state = await CreateStateWithPlayersAsync(2);
+
+            Assert.IsTrue(await _engine.CanStartAsync(state));
+        }
+
+        [TestMethod]
+        public async Task CanStartAsync_AtMaxPlayers_ReturnsTrue()
+        {
+            using var state = await CreateStateWithPlayersAsync(8);
+
+            Assert.IsTrue(await _engine.CanStartAsync(state));
+        }
+
+        [TestMethod]
+        public async Task CanStartAsync_AboveMaxPlayers_ReturnsFalse()
+        {
+            using var state = await CreateStateWithPlayersAsync(9);
+
+            Assert.IsFalse(await _engine.CanStartAsync(state));
+        }
+
+        [TestMethod]
+        public async Task CanStartAsync_HostPlays_CountsHostAsParticipant()
+        {
+            // A single joiner is below the minimum on its own…
+            using var state = await CreateStateWithPlayersAsync(1);
+            Assert.IsFalse(await _engine.CanStartAsync(state));
+
+            // …but flipping HostPlays reflects the host into Participants, reaching the 2-player floor.
+            state.UpdateSettings(s => s with { HostPlays = true });
+            Assert.IsTrue(await _engine.CanStartAsync(state));
+        }
+
+        [TestMethod]
+        public async Task CanStartAsync_WhenAlreadyStarted_ReturnsFalse()
+        {
+            // A started game has a valid participant count but is no longer joinable.
+            using var state = await CreateStartedGameAsync(2);
+
+            Assert.IsFalse(state.IsJoinable);
+            Assert.IsFalse(await _engine.CanStartAsync(state));
+        }
+
+        [TestMethod]
+        public async Task StartAsync_WithInvalidSettings_ReturnsFailureAndDoesNotStart()
+        {
+            using var state = await CreateStateWithPlayersAsync(2);
+            // EraCount = 0 is rejected by AlphaChainSettings.Validate; StartAsyncCore must refuse it.
+            state.UpdateSettings(s => s with { EraCount = 0 });
+
+            var result = await _engine.StartAsync(_host, state);
+
+            Assert.IsTrue(result.IsFailure);
+            Assert.IsTrue(state.IsJoinable, "A refused start must leave the lobby open.");
+            Assert.IsNull(state.Context, "No FSM context should be built for an illegal config.");
+            Assert.AreEqual(AlphaChainGamePhase.Setup, state.Phase);
+        }
+
+        [TestMethod]
+        public async Task AdvanceTurnAsync_BeforeStart_ReturnsFailure()
+        {
+            // No game started → no context → the command gateway refuses rather than NRE-ing.
+            using var state = await CreateStateWithPlayersAsync(2);
+
+            var result = await _engine.AdvanceTurnAsync(_host.Id, state);
+
+            Assert.IsTrue(result.IsFailure);
+        }
+
+        [TestMethod]
+        public async Task SubmitWordAsync_BeforeStart_ReturnsFailure()
+        {
+            using var state = await CreateStateWithPlayersAsync(2);
+
+            var result = await _engine.SubmitWordAsync(_host.Id, "cat", state);
+
+            Assert.IsTrue(result.IsFailure);
         }
     }
 }

@@ -12,25 +12,30 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
     [TestClass]
     public class EntrantIdParsingTests
     {
+        private static readonly Guid _testPlayerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        private static readonly Guid _testPlayerId2 = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
         // ── TryParse ────────────────────────────────────────────────────────
 
         [TestMethod]
         public void TryParse_ValidFormat_ReturnsTrueWithParsedValues()
         {
-            var result = EntrantId.TryParse("player1:1", out var entrantId);
+            var input = $"{_testPlayerId}:1";
+            var result = EntrantId.TryParse(input, out var entrantId);
 
             Assert.IsTrue(result);
-            Assert.AreEqual("player1", entrantId.PlayerId);
+            Assert.AreEqual(_testPlayerId, entrantId.PlayerId);
             Assert.AreEqual(1, entrantId.Round);
         }
 
         [TestMethod]
-        public void TryParse_ComplexPlayerId_ReturnsTrueWithParsedValues()
+        public void TryParse_AnotherValidFormat_ReturnsTrueWithParsedValues()
         {
-            var result = EntrantId.TryParse("abc-def:3", out var entrantId);
+            var input = $"{_testPlayerId2}:3";
+            var result = EntrantId.TryParse(input, out var entrantId);
 
             Assert.IsTrue(result);
-            Assert.AreEqual("abc-def", entrantId.PlayerId);
+            Assert.AreEqual(_testPlayerId2, entrantId.PlayerId);
             Assert.AreEqual(3, entrantId.Round);
         }
 
@@ -87,15 +92,15 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void PlayerId_AfterValidParse_ReturnsPlayerId()
         {
-            EntrantId.TryParse("player1:2", out var entrantId);
+            EntrantId.TryParse($"{_testPlayerId}:2", out var entrantId);
 
-            Assert.AreEqual("player1", entrantId.PlayerId);
+            Assert.AreEqual(_testPlayerId, entrantId.PlayerId);
         }
 
         [TestMethod]
         public void Round_AfterValidParse_ReturnsRound()
         {
-            EntrantId.TryParse("player1:2", out var entrantId);
+            EntrantId.TryParse($"{_testPlayerId}:2", out var entrantId);
 
             Assert.AreEqual(2, entrantId.Round);
         }
@@ -105,17 +110,18 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void ToString_ReturnsCanonicalFormat()
         {
-            var entrantId = new EntrantId("player1", 2);
+            var entrantId = new EntrantId(_testPlayerId, 2);
 
-            Assert.AreEqual("player1:2", entrantId.ToString());
+            Assert.AreEqual($"{_testPlayerId}:2", entrantId.ToString());
         }
 
         [TestMethod]
         public void ToString_AfterParse_RoundTrips()
         {
-            EntrantId.TryParse("abc-def:3", out var entrantId);
+            var input = $"{_testPlayerId2}:3";
+            EntrantId.TryParse(input, out var entrantId);
 
-            Assert.AreEqual("abc-def:3", entrantId.ToString());
+            Assert.AreEqual(input, entrantId.ToString());
         }
 
         // ── Value Equality ──────────────────────────────────────────────────
@@ -123,8 +129,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void Equals_SamePlayerIdAndRound_AreEqual()
         {
-            var a = new EntrantId("player1", 1);
-            var b = new EntrantId("player1", 1);
+            var a = new EntrantId(_testPlayerId, 1);
+            var b = new EntrantId(_testPlayerId, 1);
 
             Assert.AreEqual(a, b);
         }
@@ -132,8 +138,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void Equals_DifferentPlayerId_AreNotEqual()
         {
-            var a = new EntrantId("player1", 1);
-            var b = new EntrantId("player2", 1);
+            var a = new EntrantId(_testPlayerId, 1);
+            var b = new EntrantId(_testPlayerId2, 1);
 
             Assert.AreNotEqual(a, b);
         }
@@ -141,8 +147,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void Equals_DifferentRound_AreNotEqual()
         {
-            var a = new EntrantId("player1", 1);
-            var b = new EntrantId("player1", 2);
+            var a = new EntrantId(_testPlayerId, 1);
+            var b = new EntrantId(_testPlayerId, 2);
 
             Assert.AreNotEqual(a, b);
         }
@@ -150,8 +156,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
         [TestMethod]
         public void Equals_ParsedAndConstructed_AreEqual()
         {
-            EntrantId.TryParse("player1:1", out var parsed);
-            var constructed = new EntrantId("player1", 1);
+            EntrantId.TryParse($"{_testPlayerId}:1", out var parsed);
+            var constructed = new EntrantId(_testPlayerId, 1);
 
             Assert.AreEqual(parsed, constructed);
         }
@@ -168,7 +174,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
             randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
 
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             var engine = new DrawnToDressGameEngine(
                 engineLoggerMock.Object,
                 stateLoggerMock.Object,
@@ -179,7 +185,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress
             var context = state.Context!;
 
             // Act
-            var outfit = context.GetOutfitByEntrantId(new EntrantId("nonexistent", 1));
+            var outfit = context.GetOutfitByEntrantId(new EntrantId(Guid.NewGuid(), 1));
 
             // Assert
             Assert.IsNull(outfit);

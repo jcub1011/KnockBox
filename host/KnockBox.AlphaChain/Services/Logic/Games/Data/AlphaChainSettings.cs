@@ -44,6 +44,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         /// <summary>Upper bound on the sniper-ban timer, in seconds.</summary>
         public const int MaxSniperBanSeconds = 120;
 
+        /// <summary>Minimum "Get Ready" countdown shown before a round begins, in seconds.</summary>
+        public const int MinCountdownSeconds = 3;
+
+        /// <summary>Upper bound on the "Get Ready" countdown shown before a round begins, in seconds.</summary>
+        public const int MaxCountdownSeconds = 15;
+
         /// <summary>Minimum cards dealt per era (0 is legal — "deal none of this type").</summary>
         public const int MinCardsDealtPerEra = 0;
 
@@ -70,6 +76,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
 
         /// <summary>Seconds the Sniper action card grants to choose a banned letter (M3+).</summary>
         public int SniperBanSeconds { get; init; } = 15;
+
+        /// <summary>
+        /// Seconds of the "Get Ready" countdown shown before a round begins — at game start
+        /// (after any opening tutorial) and again after each era's letter ban — so players have
+        /// a beat to prepare before the shot clock starts. The post-ban screen also surfaces the
+        /// freshly-banned letter.
+        /// </summary>
+        public int PreRoundCountdownSeconds { get; init; } = 5;
 
         /// <summary>Rounds per era.</summary>
         public int EraInterval { get; init; } = 4;
@@ -134,6 +148,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
 
             if (SniperBanSeconds < MinSniperBanSeconds || SniperBanSeconds > MaxSniperBanSeconds)
                 violations.Add($"Sniper-ban timer must be between {MinSniperBanSeconds} and {MaxSniperBanSeconds} seconds.");
+
+            if (PreRoundCountdownSeconds < MinCountdownSeconds || PreRoundCountdownSeconds > MaxCountdownSeconds)
+                violations.Add($"Get Ready countdown must be between {MinCountdownSeconds} and {MaxCountdownSeconds} seconds.");
 
             if (ModifiersDealtPerEra < MinCardsDealtPerEra || ModifiersDealtPerEra > MaxCardsDealtPerEra)
                 violations.Add($"Modifiers dealt per era must be between {MinCardsDealtPerEra} and {MaxCardsDealtPerEra}.");

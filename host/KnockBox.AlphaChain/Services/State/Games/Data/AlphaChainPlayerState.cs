@@ -1,4 +1,4 @@
-using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 
 namespace KnockBox.AlphaChain.Services.State.Games.Data
 {
@@ -10,7 +10,7 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
     public class AlphaChainPlayerState
     {
         /// <summary>The player's authoritative <c>User.Id</c>.</summary>
-        public string UserId { get; set; } = string.Empty;
+        public Guid UserId { get; set; } = Guid.Empty;
 
         /// <summary>Per-lobby display name (may differ from <c>User.Name</c> after disambiguation).</summary>
         public string DisplayName { get; set; } = string.Empty;
@@ -50,7 +50,7 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         /// The player's Engine Bay: an ordered list of modifier cards (left → right is the
         /// scoring pipeline order). Bounded by <see cref="ModifierSlots"/>.
         /// </summary>
-        public List<ModifierCard> EngineBay { get; } = new();
+        public List<IModifierCard> EngineBay { get; } = new();
 
         /// <summary>
         /// Ids of the modifier cards dealt to this player in the current Intermission, so the
@@ -58,60 +58,15 @@ namespace KnockBox.AlphaChain.Services.State.Games.Data
         /// Optimization instead of a dedicated sub-phase). Repopulated each deal, cleared when
         /// the Intermission completes.
         /// </summary>
-        public HashSet<string> NewlyDealtModifierIds { get; } = new(StringComparer.Ordinal);
+        public HashSet<ModifierId> NewlyDealtModifierIds { get; } = new();
 
-        /// <summary>
-        /// A transient personal banned letter (lower-case) forced onto this player by an opponent's
-        /// automated letter-hijack modifier (Tracer Round's end-letter, Bait &amp; Switch's taxed
-        /// letter), or null when none is active. Like the match's banned letter it triggers the
-        /// Zero-Point Tax, but it affects only this player and is consumed by their next accepted submission.
-        /// </summary>
-        public char? PersonalBannedLetter { get; set; } = null;
-
-        /// <summary>
-        /// Shot-clock seconds owed to this player from automated time-shave modifiers (Flak Cannon,
-        /// Scattershot) that fired while they were not the active player. Applied (and cleared) the
-        /// next time they take a turn — see <c>RoundState.ApplyQueuedTimePenalty</c>.
-        /// </summary>
-        public int QueuedTimePenaltySeconds { get; set; } = 0;
-
-        // ── Card-capability state (feedback cards) ──────────────────────────────
-
-        /// <summary>
-        /// Personal banned letters (lower-case) rolled at era start by this player's
-        /// <c>RollsPersonalBanAtEraStart</c> modifier cards (Roulette Wheel, Smuggler's Toll),
-        /// keyed by the card id that rolled them. Like the match's banned letter they trigger the
-        /// Zero-Point Tax for this player; re-rolled each era. Separate from
-        /// <see cref="PersonalBannedLetter"/> (the transient Jinx/Bait &amp; Switch ban).
-        /// </summary>
-        public Dictionary<string, char> CardBannedLetters { get; } = new(StringComparer.Ordinal);
-
-        /// <summary>
-        /// True once Hyper-Drive has latched this era: the owner's shot clock is overridden short
-        /// and every multiplicative card is scaled up for the rest of the era. Reset at each era
-        /// boundary.
-        /// </summary>
-        public bool HyperDriveActive { get; set; } = false;
-
-        /// <summary>
-        /// The owner's live Titanium Mirror multiplier. Starts at 1.0 (a passive ×1.0 placeholder)
-        /// and drops by the shield's decay per attack it blocks and reflects, possibly below 1.0
-        /// into a scoring burden. Feeds the Titanium Mirror card's scoring factor via
-        /// <c>WordContext.ShieldMultiplier</c>. The decay persists across eras; it returns to 1.0
-        /// only when a fresh mirror is dealt to the player (a replacement) — see DealCards.
-        /// </summary>
-        public double ShieldMultiplier { get; set; } = 1.0;
-
-        /// <summary>
-        /// True once this player has played a word containing a double letter this era — the target
-        /// test for an opponent's Scattershot. Reset at each era boundary.
-        /// </summary>
-        public bool PlayedDoubleLetterWordThisEra { get; set; } = false;
-
-        /// <summary>
-        /// True once this player's The Prism has already refilled the clock on a failed submission
-        /// this turn (the once-per-turn cap). Reset whenever a fresh turn arms for this player.
-        /// </summary>
-        public bool PrismUsedThisTurn { get; set; } = false;
+        // ── Card state ──────────────────────────────────────────────────────────
+        //
+        // Per-player card state (the Titanium Mirror shield multiplier, the Hyper-Drive latch, the
+        // Prism's once-per-era guard, the Roulette Wheel / Toll Booth era-rolled bans, the Flak
+        // Cannon time-shave queue, the Bait & Switch hijack ban, the Scattershot double-letter fact)
+        // does NOT live here. Each card owns its state in a room-scoped, player-keyed service it
+        // contributes (see IContributesRoomServices / the services in RoomStateServices.cs), so adding
+        // a stateful card never widens this class or the FSM's reset sites.
     }
 }

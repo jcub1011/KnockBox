@@ -2,7 +2,8 @@ using System.Text;
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM.States;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -29,16 +30,16 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         private async Task<(AlphaChainGameEngine Engine, AlphaChainGameState State)> StartGameAsync(
             IWordListService words, int playerCount, Action<AlphaChainGameState>? configure = null)
         {
             var engine = new AlphaChainGameEngine(
-                words, new FixedRandomNumberService(), new ScoreCalculator(),
+                words, new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -65,14 +66,19 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         }
 
         [TestMethod]
-        public async Task Start_WithoutTutorials_GoesStraightToRound_AndEraOneIsBanFree()
+        public async Task Start_WithoutTutorials_EntersGetReadyCountdownThenRound_AndEraOneIsBanFree()
         {
-            var (_, state) = await StartGameAsync(new StubWordListService(), playerCount: 3,
+            var (engine, state) = await StartGameAsync(new StubWordListService(), playerCount: 3,
                 configure: s => s.UpdateSettings(c => c with { EnableTutorials = false }));
             using var _ = state;
 
-            Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
+            // With tutorials off the game opens on the "Get Ready" countdown rather than the round itself.
+            Assert.AreEqual(AlphaChainGamePhase.Countdown, state.Phase);
             Assert.IsNull(state.BannedLetter, "era 1 is ban-free");
+
+            // The countdown drains into the round once its dwell elapses.
+            engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
+            Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
         }
 
         // ── Auto-advance + host skip ────────────────────────────────────────────
@@ -88,20 +94,28 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             engine.Tick(state.Context!, t0.AddSeconds(1));
             Assert.AreEqual(AlphaChainGamePhase.Tutorial, state.Phase);
 
-            // Past the dwell → the round begins.
+            // Past the dwell → the "Get Ready" countdown opens (not the round directly).
             engine.Tick(state.Context!, t0.AddSeconds(TutorialState.DurationFor(TutorialKind.Shiritori).TotalSeconds + 1));
+            Assert.AreEqual(AlphaChainGamePhase.Countdown, state.Phase);
+
+            // The countdown then drains into the round.
+            engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
             Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
         }
 
         [TestMethod]
-        public async Task ShiritoriTutorial_HostSkip_EntersRoundImmediately()
+        public async Task ShiritoriTutorial_HostSkip_EntersGetReadyCountdownThenRound()
         {
             var (engine, state) = await StartGameAsync(new StubWordListService(), playerCount: 3);
             using var _ = state;
 
             var result = await engine.SkipTutorialAsync(_host.Id, state);
 
+            // Skipping the tutorial advances to the "Get Ready" countdown, which then opens the round.
             Assert.IsTrue(result.IsSuccess);
+            Assert.AreEqual(AlphaChainGamePhase.Countdown, state.Phase);
+
+            engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
             Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
         }
 
@@ -126,8 +140,9 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                 configure: s => s.UpdateSettings(c => c with { EraInterval = 1, EraCount = 3 }));
             using var _ = state;
 
-            // Skip the opening Shiritori tutorial to begin round 1.
+            // Skip the opening Shiritori tutorial, then tick past the "Get Ready" countdown to begin round 1.
             await engine.SkipTutorialAsync(_host.Id, state);
+            engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
             Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
 
             // Round 1: the chain wraps → era 1 ends. With no cards yet there's no replay hold, so
@@ -183,9 +198,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                 {
                     engine.Tick(state.Context!, holdUntil.AddSeconds(1));
                 }
+                else if (state.Phase == AlphaChainGamePhase.Countdown)
+                {
+                    // The pre-round "Get Ready" countdown precedes every round; tick past it.
+                    engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
+                }
                 else
                 {
-                    var actor = state.TurnManager.CurrentPlayer!;
+                    var actor = state.TurnManager.CurrentPlayer!.Value;
                     var word = NextWord(state.RequiredStartLetter, state.BannedLetter, ref counter);
                     var outcome = await engine.SubmitWordAsync(actor, word, state);
                     Assert.IsTrue(outcome.IsSuccess, $"submission '{word}' failed");

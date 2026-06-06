@@ -18,9 +18,22 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         private CodewordGameState _state = default!;
         private CodewordGameContext _context = default!;
 
+        // Stable player IDs used across tests
+        private Guid _hostId = default!;
+        private Guid _p1Id = default!;
+        private Guid _p2Id = default!;
+        private Guid _p3Id = default!;
+        private Guid _p4Id = default!;
+
         [TestInitialize]
         public void Setup()
         {
+            _hostId = Guid.NewGuid();
+            _p1Id = Guid.NewGuid();
+            _p2Id = Guid.NewGuid();
+            _p3Id = Guid.NewGuid();
+            _p4Id = Guid.NewGuid();
+
             _randomMock = new Mock<IRandomNumberService>();
             // Default: always return 0 for single-arg, and 0 for two-arg.
             _randomMock
@@ -32,12 +45,12 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<CodewordGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", _hostId);
             _state = new CodewordGameState(host, _stateLoggerMock.Object);
             _context = new CodewordGameContext(_state, _randomMock.Object, _loggerMock.Object);
         }
 
-        private CodewordPlayerState AddPlayer(string id, string name)
+        private CodewordPlayerState AddPlayer(Guid id, string name)
         {
             var ps = new CodewordPlayerState { PlayerId = id, DisplayName = name };
             _state.GamePlayers[id] = ps;
@@ -81,7 +94,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         public void AssignRoles_AssignsCorrectDistribution(int playerCount)
         {
             for (int i = 0; i < playerCount; i++)
-                AddPlayer($"p{i}", $"Player {i}");
+                AddPlayer(Guid.NewGuid(), $"Player {i}");
 
             // Make the random return a sequence that just yields 1 for word index selection
             // to avoid infinite loop when picking 2 distinct word indices.
@@ -194,23 +207,23 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void GetAlivePlayers_ReturnsOnlyNonEliminatedPlayers()
         {
-            var p1 = AddPlayer("p1", "P1");
-            var p2 = AddPlayer("p2", "P2");
-            var p3 = AddPlayer("p3", "P3");
+            var p1 = AddPlayer(_p1Id, "P1");
+            var p2 = AddPlayer(_p2Id, "P2");
+            var p3 = AddPlayer(_p3Id, "P3");
             p2.IsEliminated = true;
 
             var alive = _context.GetAlivePlayers();
             Assert.HasCount(2, alive);
-            Assert.Contains(p => p.PlayerId == "p1", alive);
-            Assert.Contains(p => p.PlayerId == "p3", alive);
+            Assert.Contains(p => p.PlayerId == _p1Id, alive);
+            Assert.Contains(p => p.PlayerId == _p3Id, alive);
         }
 
         [TestMethod]
         public void GetAlivePlayerCount_ReturnsCorrectCount()
         {
-            AddPlayer("p1", "P1");
-            var p2 = AddPlayer("p2", "P2");
-            AddPlayer("p3", "P3");
+            AddPlayer(_p1Id, "P1");
+            var p2 = AddPlayer(_p2Id, "P2");
+            AddPlayer(_p3Id, "P3");
             p2.IsEliminated = true;
 
             Assert.AreEqual(2, _context.GetAlivePlayerCount());
@@ -221,30 +234,30 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void TallyVotes_ReturnsMajorityTarget()
         {
-            var p1 = AddPlayer("p1", "P1");
-            var p2 = AddPlayer("p2", "P2");
-            var p3 = AddPlayer("p3", "P3");
+            var p1 = AddPlayer(_p1Id, "P1");
+            var p2 = AddPlayer(_p2Id, "P2");
+            var p3 = AddPlayer(_p3Id, "P3");
 
-            p1.HasVoted = true; p1.VoteTargetId = "p3";
-            p2.HasVoted = true; p2.VoteTargetId = "p3";
-            p3.HasVoted = true; p3.VoteTargetId = "p1";
+            p1.HasVoted = true; p1.VoteTargetId = _p3Id;
+            p2.HasVoted = true; p2.VoteTargetId = _p3Id;
+            p3.HasVoted = true; p3.VoteTargetId = _p1Id;
 
             var result = _context.TallyVotes();
-            Assert.AreEqual("p3", result);
+            Assert.AreEqual(_p3Id, result);
         }
 
         [TestMethod]
         public void TallyVotes_ReturnsNullOnTie()
         {
-            var p1 = AddPlayer("p1", "P1");
-            var p2 = AddPlayer("p2", "P2");
-            var p3 = AddPlayer("p3", "P3");
-            var p4 = AddPlayer("p4", "P4");
+            var p1 = AddPlayer(_p1Id, "P1");
+            var p2 = AddPlayer(_p2Id, "P2");
+            var p3 = AddPlayer(_p3Id, "P3");
+            var p4 = AddPlayer(_p4Id, "P4");
 
-            p1.HasVoted = true; p1.VoteTargetId = "p3";
-            p2.HasVoted = true; p2.VoteTargetId = "p4";
-            p3.HasVoted = true; p3.VoteTargetId = "p1";
-            p4.HasVoted = true; p4.VoteTargetId = "p2";
+            p1.HasVoted = true; p1.VoteTargetId = _p3Id;
+            p2.HasVoted = true; p2.VoteTargetId = _p4Id;
+            p3.HasVoted = true; p3.VoteTargetId = _p1Id;
+            p4.HasVoted = true; p4.VoteTargetId = _p2Id;
 
             var result = _context.TallyVotes();
             Assert.IsNull(result);
@@ -253,8 +266,8 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void TallyVotes_ReturnsNullWhenNoVotes()
         {
-            AddPlayer("p1", "P1");
-            AddPlayer("p2", "P2");
+            AddPlayer(_p1Id, "P1");
+            AddPlayer(_p2Id, "P2");
 
             var result = _context.TallyVotes();
             Assert.IsNull(result);
@@ -263,13 +276,13 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void TallyVotes_IgnoresEliminatedPlayers()
         {
-            var p1 = AddPlayer("p1", "P1");
-            var p2 = AddPlayer("p2", "P2");
-            var p3 = AddPlayer("p3", "P3");
+            var p1 = AddPlayer(_p1Id, "P1");
+            var p2 = AddPlayer(_p2Id, "P2");
+            var p3 = AddPlayer(_p3Id, "P3");
             p1.IsEliminated = true;
-            p1.HasVoted = true; p1.VoteTargetId = "p2";
-            p2.HasVoted = true; p2.VoteTargetId = "p3";
-            p3.HasVoted = true; p3.VoteTargetId = "p2";
+            p1.HasVoted = true; p1.VoteTargetId = _p2Id;
+            p2.HasVoted = true; p2.VoteTargetId = _p3Id;
+            p3.HasVoted = true; p3.VoteTargetId = _p2Id;
 
             var result = _context.TallyVotes();
             // Only p2 and p3 are alive. p2 voted for p3, p3 voted for p2 = tie.
@@ -281,9 +294,9 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void CheckWinConditions_GameContinues_WhenMoreThanTwoPlayersAndNoVote()
         {
-            AddPlayer("p1", "P1").Role = Role.Agent;
-            AddPlayer("p2", "P2").Role = Role.Agent;
-            AddPlayer("p3", "P3").Role = Role.Insider;
+            AddPlayer(_p1Id, "P1").Role = Role.Agent;
+            AddPlayer(_p2Id, "P2").Role = Role.Agent;
+            AddPlayer(_p3Id, "P3").Role = Role.Insider;
 
             var result = _context.CheckWinConditions();
             Assert.IsFalse(result.GameOver);
@@ -292,9 +305,9 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void CheckWinConditions_EndsWhenTwoOrFewerAlive()
         {
-            AddPlayer("p1", "P1").Role = Role.Agent;
-            AddPlayer("p2", "P2").Role = Role.Insider;
-            var p3 = AddPlayer("p3", "P3");
+            AddPlayer(_p1Id, "P1").Role = Role.Agent;
+            AddPlayer(_p2Id, "P2").Role = Role.Insider;
+            var p3 = AddPlayer(_p3Id, "P3");
             p3.Role = Role.Agent;
             p3.IsEliminated = true;
 
@@ -305,9 +318,9 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void CheckWinConditions_InformantWins_WhenAlive()
         {
-            AddPlayer("p1", "P1").Role = Role.Agent;
-            AddPlayer("p2", "P2").Role = Role.Informant;
-            var p3 = AddPlayer("p3", "P3");
+            AddPlayer(_p1Id, "P1").Role = Role.Agent;
+            AddPlayer(_p2Id, "P2").Role = Role.Informant;
+            var p3 = AddPlayer(_p3Id, "P3");
             p3.Role = Role.Agent;
             p3.IsEliminated = true;
 
@@ -319,9 +332,9 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void CheckWinConditions_InsiderWins_WhenAliveAndNoInformant()
         {
-            AddPlayer("p1", "P1").Role = Role.Agent;
-            AddPlayer("p2", "P2").Role = Role.Insider;
-            var p3 = AddPlayer("p3", "P3");
+            AddPlayer(_p1Id, "P1").Role = Role.Agent;
+            AddPlayer(_p2Id, "P2").Role = Role.Insider;
+            var p3 = AddPlayer(_p3Id, "P3");
             p3.Role = Role.Informant;
             p3.IsEliminated = true;
 
@@ -333,12 +346,12 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void CheckWinConditions_AgentsWin_WhenNoInformantOrInsiderAlive()
         {
-            AddPlayer("p1", "P1").Role = Role.Agent;
-            AddPlayer("p2", "P2").Role = Role.Agent;
-            var p3 = AddPlayer("p3", "P3");
+            AddPlayer(_p1Id, "P1").Role = Role.Agent;
+            AddPlayer(_p2Id, "P2").Role = Role.Agent;
+            var p3 = AddPlayer(_p3Id, "P3");
             p3.Role = Role.Insider;
             p3.IsEliminated = true;
-            var p4 = AddPlayer("p4", "P4");
+            var p4 = AddPlayer(_p4Id, "P4");
             p4.Role = Role.Informant;
             p4.IsEliminated = true;
 
@@ -351,10 +364,10 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         public void CheckWinConditions_DoesNotAutoEnd_WhenInsidersEliminated()
         {
             // Even though all Insiders are eliminated, game should continue if >2 alive.
-            AddPlayer("p1", "P1").Role = Role.Agent;
-            AddPlayer("p2", "P2").Role = Role.Agent;
-            AddPlayer("p3", "P3").Role = Role.Agent;
-            var p4 = AddPlayer("p4", "P4");
+            AddPlayer(_p1Id, "P1").Role = Role.Agent;
+            AddPlayer(_p2Id, "P2").Role = Role.Agent;
+            AddPlayer(_p3Id, "P3").Role = Role.Agent;
+            var p4 = AddPlayer(_p4Id, "P4");
             p4.Role = Role.Insider;
             p4.IsEliminated = true;
 
@@ -365,14 +378,14 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void CheckWinConditions_EndsOnMajorityVote()
         {
-            AddPlayer("p1", "P1").Role = Role.Agent;
-            AddPlayer("p2", "P2").Role = Role.Agent;
-            AddPlayer("p3", "P3").Role = Role.Insider;
-            AddPlayer("p4", "P4").Role = Role.Agent;
+            AddPlayer(_p1Id, "P1").Role = Role.Agent;
+            AddPlayer(_p2Id, "P2").Role = Role.Agent;
+            AddPlayer(_p3Id, "P3").Role = Role.Insider;
+            AddPlayer(_p4Id, "P4").Role = Role.Agent;
 
             // Set up majority vote: 3 out of 4 voted to end (required = 3).
             _state.EndGameVoteStatus = new EndGameVoteStatus(
-                ["p1", "p2", "p3"], 3);
+                [_p1Id, _p2Id, _p3Id], 3);
 
             var result = _context.CheckWinConditions();
             Assert.IsTrue(result.GameOver);
@@ -383,18 +396,18 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void ResetEliminationCycleState_ClearsPerCycleData()
         {
-            var p1 = AddPlayer("p1", "P1");
+            var p1 = AddPlayer(_p1Id, "P1");
             p1.HasSubmittedClue = true;
             p1.CurrentClue = "test";
-            p1.VoteTargetId = "p2";
+            p1.VoteTargetId = _p2Id;
             p1.HasVoted = true;
             p1.HasVotedToEndGame = true;
 
-            var p2 = AddPlayer("p2", "P2");
+            var p2 = AddPlayer(_p2Id, "P2");
             p2.IsEliminated = true; // Eliminated player should NOT be reset.
 
-            _state.CurrentRoundClues.Add(new ClueEntry("p1", "P1", "test"));
-            _state.CurrentRoundVotes.Add(new VoteEntry("p1", "P1", "p2", "P2"));
+            _state.CurrentRoundClues.Add(new ClueEntry(_p1Id, "P1", "test"));
+            _state.CurrentRoundVotes.Add(new VoteEntry(_p1Id, "P1", _p2Id, "P2"));
             _state.AwaitingInformantGuess = true;
 
             _context.ResetEliminationCycleState();
@@ -415,12 +428,12 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void ApplyCycleScoring_MinusOneForVotingForAgent()
         {
-            var p1 = AddPlayer("p1", "P1");
+            var p1 = AddPlayer(_p1Id, "P1");
             p1.Role = Role.Agent;
             p1.HasVoted = true;
-            p1.VoteTargetId = "p2";
+            p1.VoteTargetId = _p2Id;
 
-            var p2 = AddPlayer("p2", "P2");
+            var p2 = AddPlayer(_p2Id, "P2");
             p2.Role = Role.Agent;
 
             _context.ApplyCycleScoring(null);
@@ -431,12 +444,12 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void ApplyCycleScoring_NoChangeForVotingForNonAgent()
         {
-            var p1 = AddPlayer("p1", "P1");
+            var p1 = AddPlayer(_p1Id, "P1");
             p1.Role = Role.Agent;
             p1.HasVoted = true;
-            p1.VoteTargetId = "p2";
+            p1.VoteTargetId = _p2Id;
 
-            var p2 = AddPlayer("p2", "P2");
+            var p2 = AddPlayer(_p2Id, "P2");
             p2.Role = Role.Insider;
 
             _context.ApplyCycleScoring(null);
@@ -449,10 +462,10 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void ApplyEndOfGameScoring_Plus2ForSurvival()
         {
-            var p1 = AddPlayer("p1", "P1");
+            var p1 = AddPlayer(_p1Id, "P1");
             p1.Role = Role.Agent;
 
-            var p2 = AddPlayer("p2", "P2");
+            var p2 = AddPlayer(_p2Id, "P2");
             p2.Role = Role.Insider;
             p2.IsEliminated = true;
 
@@ -466,10 +479,10 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void ApplyEndOfGameScoring_Plus1ForWinningTeam()
         {
-            var p1 = AddPlayer("p1", "P1");
+            var p1 = AddPlayer(_p1Id, "P1");
             p1.Role = Role.Agent;
 
-            var p2 = AddPlayer("p2", "P2");
+            var p2 = AddPlayer(_p2Id, "P2");
             p2.Role = Role.Agent;
             p2.IsEliminated = true;
 
@@ -485,11 +498,11 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void ApplyEndOfGameScoring_Plus3ForInformantCorrectGuess()
         {
-            var p1 = AddPlayer("p1", "P1");
+            var p1 = AddPlayer(_p1Id, "P1");
             p1.Role = Role.Informant;
             p1.IsEliminated = true;
 
-            _state.LastInformantGuess = new InformantGuessResult("p1", "P1", "Ocean", true);
+            _state.LastInformantGuess = new InformantGuessResult(_p1Id, "P1", "Ocean", true);
 
             var winResult = new WinConditionResult(true, Role.Agent, "Test");
             _context.ApplyEndOfGameScoring(winResult);
@@ -501,7 +514,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void ApplyEndOfGameScoring_PersistsToGameScores()
         {
-            var p1 = AddPlayer("p1", "P1");
+            var p1 = AddPlayer(_p1Id, "P1");
             p1.Role = Role.Agent;
             p1.Score = 5; // Pre-existing score from cycles.
 
@@ -510,17 +523,17 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
 
             // p1: +2 survived + +1 winning team = +3 added to existing 5 → Score = 8, GameScores = 8
             Assert.AreEqual(8, p1.Score);
-            Assert.AreEqual(8, _state.GameScores["p1"]);
+            Assert.AreEqual(8, _state.GameScores[_p1Id]);
         }
 
         [TestMethod]
         public void ApplyEndOfGameScoring_AccumulatesAcrossMultipleGames()
         {
-            var p1 = AddPlayer("p1", "P1");
+            var p1 = AddPlayer(_p1Id, "P1");
             p1.Role = Role.Agent;
 
             // Simulate Game 1 result persisted to GameScores.
-            _state.GameScores["p1"] = 5;
+            _state.GameScores[_p1Id] = 5;
 
             // Game 2: player scores +2 survived + +1 winning team.
             var winResult = new WinConditionResult(true, Role.Agent, "Test");
@@ -528,7 +541,7 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
 
             // Score this game = 3, cumulative GameScores = 5 + 3 = 8.
             Assert.AreEqual(3, p1.Score);
-            Assert.AreEqual(8, _state.GameScores["p1"]);
+            Assert.AreEqual(8, _state.GameScores[_p1Id]);
         }
 
         // ── Command types ─────────────────────────────────────────────────────
@@ -536,21 +549,23 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword
         [TestMethod]
         public void AllCommandTypes_InheritFromBase()
         {
+            var pId = Guid.NewGuid();
+            var p2Id = Guid.NewGuid();
             CodewordCommand[] commands =
             [
-                new SubmitClueCommand("p1", "clue"),
-                new AdvanceToVoteCommand("p1"),
-                new VoteToEndGameCommand("p1"),
-                new CastVoteCommand("p1", "p2"),
-                new InformantGuessCommand("p1", "word"),
-                new StartNextGameCommand("p1"),
-                new ReturnToLobbyCommand("p1"),
+                new SubmitClueCommand(pId, "clue"),
+                new AdvanceToVoteCommand(pId),
+                new VoteToEndGameCommand(pId),
+                new CastVoteCommand(pId, p2Id),
+                new InformantGuessCommand(pId, "word"),
+                new StartNextGameCommand(pId),
+                new ReturnToLobbyCommand(pId),
             ];
 
             foreach (var cmd in commands)
             {
                 Assert.IsInstanceOfType<CodewordCommand>(cmd);
-                Assert.AreEqual("p1", cmd.PlayerId);
+                Assert.AreEqual(pId, cmd.PlayerId);
             }
         }
 

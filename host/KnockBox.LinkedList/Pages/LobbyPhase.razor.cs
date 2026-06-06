@@ -1,10 +1,10 @@
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Core.Services.Storage.ClientStorage;
 using KnockBox.LinkedList.Services.Logic;
 using KnockBox.LinkedList.Services.Logic.Games;
 using KnockBox.LinkedList.Services.State.Games;
 using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 
 namespace KnockBox.LinkedList.Pages
 {
@@ -77,7 +77,7 @@ namespace KnockBox.LinkedList.Pages
 
         // ── Group assignment (Groups mode, §8.2) ─────────────────────────────
 
-        protected IReadOnlyList<string> ParticipantIds =>
+        protected IReadOnlyList<Guid> ParticipantIds =>
             [.. GameState.Participants.Select(p => p.User.Id)];
 
         /// <summary>The number of teams; at least 2 in Groups mode.</summary>
@@ -103,7 +103,7 @@ namespace KnockBox.LinkedList.Pages
             => PersistAssignments(LinkedListGameEngine.AutoBalanceGroups(ParticipantIds, GroupCount));
 
         /// <summary>Reassigns a player to a different team, keeping the team count fixed.</summary>
-        protected void AssignPlayerToGroup(string playerId, int groupIndex)
+        protected void AssignPlayerToGroup(Guid playerId, int groupIndex)
         {
             var teams = ReconcileTeams();
             foreach (var t in teams) t.Remove(playerId);
@@ -114,7 +114,7 @@ namespace KnockBox.LinkedList.Pages
 
         protected static string GroupLabel(int index) => $"Group {(char)('A' + index)}";
 
-        protected string DisplayNameOf(string playerId)
+        protected string DisplayNameOf(Guid playerId)
         {
             var entry = GameState.Participants.FirstOrDefault(e => e.User.Id == playerId);
             return entry.User is not null ? entry.DisplayName : "Player";
@@ -132,7 +132,7 @@ namespace KnockBox.LinkedList.Pages
             return ValidateTeams(teams);
         }
 
-        private static (bool Ok, string? Message) ValidateTeams(List<List<string>> teams)
+        private static (bool Ok, string? Message) ValidateTeams(List<List<Guid>> teams)
         {
             if (teams.Count < 2) return (false, "Need at least 2 groups.");
             if (teams.Any(t => t.Count < 2)) return (false, "Each group needs at least 2 players.");
@@ -142,11 +142,11 @@ namespace KnockBox.LinkedList.Pages
         /// <summary>Pure (no-persist) view of the teams, reconciled against the current
         /// roster: members who left are dropped and players with no team join the
         /// smallest one. Safe to call during render.</summary>
-        protected List<List<string>> ReconcileTeams()
+        protected List<List<Guid>> ReconcileTeams()
         {
             var ids = ParticipantIds.ToHashSet();
             var teams = GameState.GroupAssignments.Count > 0
-                ? GameState.GroupAssignments.Select(t => new List<string>(t)).ToList()
+                ? GameState.GroupAssignments.Select(t => new List<Guid>(t)).ToList()
                 : LinkedListGameEngine.AutoBalanceGroups(ParticipantIds, 2);
 
             foreach (var t in teams) t.RemoveAll(id => !ids.Contains(id));
@@ -161,7 +161,7 @@ namespace KnockBox.LinkedList.Pages
             return teams;
         }
 
-        private void PersistAssignments(List<List<string>> teams)
+        private void PersistAssignments(List<List<Guid>> teams)
             => SetState(() => GameState.GroupAssignments = teams);
 
         protected int RejectionCap
@@ -210,8 +210,8 @@ namespace KnockBox.LinkedList.Pages
 
         protected string AuditorPlayerId
         {
-            get => GameState.AuditorPlayerId;
-            set => SetState(() => GameState.AuditorPlayerId = value ?? "");
+            get => GameState.AuditorPlayerId == Guid.Empty ? "" : GameState.AuditorPlayerId.ToString();
+            set => SetState(() => GameState.AuditorPlayerId = Guid.TryParse(value, out var g) ? g : Guid.Empty);
         }
 
         /// <summary>Restores every host-configurable rule to its out-of-the-box value by
@@ -239,9 +239,9 @@ namespace KnockBox.LinkedList.Pages
                 Logger.LogError("Failed to update Linked List lobby state: {Error}", error.PublicMessage);
         }
 
-        protected void KickPlayer(string userId)
+        protected void KickPlayer(Guid userId)
         {
-            if (!IsHost || string.IsNullOrWhiteSpace(userId) || userId == GameState.Host.Id) return;
+            if (!IsHost || userId == Guid.Empty || userId == GameState.Host.Id) return;
 
             var player = GameState.Players.FirstOrDefault(e => e.User.Id == userId);
             if (player.User is null) return;
@@ -294,33 +294,24 @@ namespace KnockBox.LinkedList.Pages
 
         private async Task LoadSettingsAsync()
         {
-            try
+            var savedResult = await LocalStorage.GetAsync<LinkedListSettings>("linked-list", "settings", _cts.Token);
+            // A failed or canceled read is a non-success result that simply falls through to
+            // the built-in defaults. If the host already edited a setting while the load was in
+            // flight, the user's edit wins — the saved snapshot would clobber it.
+            if (savedResult.TryGetSuccess(out var saved) && saved is not null && !_userHasEdited)
             {
-                var saved = await LocalStorage.GetAsync<LinkedListSettings>("linked-list", "settings", _cts.Token);
-                // If the host already edited a setting while the load was in flight,
-                // the user's edit wins — the saved snapshot would clobber it.
-                if (saved is not null && !_userHasEdited)
+                // Host-plays is no longer a persisted toggle — it's decided by the start
+                // button — so force it off here. This also stops a value saved by the old
+                // checkbox from making the host show up as a participant in the lobby.
+                saved = saved with { HostPlays = false };
+                // Apply through GameState directly (not the local UpdateSettings) so the
+                // load doesn't flip _userHasEdited or re-persist the just-loaded value.
+                if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
                 {
-                    // Host-plays is no longer a persisted toggle — it's decided by the start
-                    // button — so force it off here. This also stops a value saved by the old
-                    // checkbox from making the host show up as a participant in the lobby.
-                    saved = saved with { HostPlays = false };
-                    // Apply through GameState directly (not the local UpdateSettings) so the
-                    // load doesn't flip _userHasEdited or re-persist the just-loaded value.
-                    if (GameState.UpdateSettings(_ => saved).TryGetFailure(out var error))
-                    {
-                        Logger.LogError("Failed to apply saved Linked List settings: {Error}", error.PublicMessage);
-                        return;
-                    }
-                    StateHasChanged();
+                    Logger.LogError("Failed to apply saved Linked List settings: {Error}", error.PublicMessage);
+                    return;
                 }
-            }
-            catch (OperationCanceledException) { /* component disposed */ }
-            catch (ObjectDisposedException) { /* circuit gone */ }
-            catch (JSDisconnectedException) { /* circuit gone */ }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error loading Linked List settings.");
+                StateHasChanged();
             }
         }
 
@@ -336,24 +327,17 @@ namespace KnockBox.LinkedList.Pages
             {
                 try { await prior; } catch { /* prior failure already logged */ }
             }
-            try
-            {
-                await LocalStorage.SetAsync("linked-list", "settings", settings, ct);
-            }
-            catch (OperationCanceledException) { /* component disposed */ }
-            catch (ObjectDisposedException) { /* circuit gone */ }
-            catch (JSDisconnectedException) { /* circuit gone */ }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error saving Linked List settings.");
-            }
+            var saveResult = await LocalStorage.SetAsync("linked-list", "settings", settings, ct);
+            // Cancellation is silently ignored; a genuine storage failure is logged.
+            if (saveResult.TryGetFailure(out var saveError))
+                Logger.LogError("Error saving Linked List settings: {Error}", saveError.InternalMessage);
         }
 
         public async ValueTask DisposeAsync()
         {
             // Flush the last pending save before tearing down so a change made right before
-            // navigating away isn't lost. A dead circuit makes SetAsync throw
-            // JSDisconnectedException, which SaveSettingsAsync swallows.
+            // navigating away isn't lost. A dead circuit makes SetAsync return a failure
+            // Result, which SaveSettingsAsync logs.
             if (_saveTask is not null)
             {
                 try { await _saveTask; } catch { /* best-effort flush */ }

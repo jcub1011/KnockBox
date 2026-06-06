@@ -124,7 +124,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
 
             // Players may not claim items they drew themselves (unless the config allows it).
             if (!context.Settings.AllowSelectOwnDrawings
-                && string.Equals(item.CreatorPlayerId, cmd.PlayerId, StringComparison.Ordinal))
+                && item.CreatorPlayerId == cmd.PlayerId)
             {
                 context.Logger.LogWarning(
                     "ClaimPoolItem: player [{id}] attempted to claim their own item [{itemId}].",
@@ -170,7 +170,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
             }
 
             // Only the player who claimed the item may unclaim it.
-            if (!string.Equals(item.ClaimedByPlayerId, cmd.PlayerId, StringComparison.Ordinal))
+            if (item.ClaimedByPlayerId != cmd.PlayerId)
             {
                 context.Logger.LogWarning(
                     "UnclaimPoolItem: player [{id}] does not own the claim on item [{itemId}].",
@@ -355,8 +355,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
                     {
                         // Prefer items drawn by other players (claimed) over self-drawn items.
                         var preferred = candidates
-                            .FirstOrDefault(i => !string.Equals(
-                                i.CreatorPlayerId, player.PlayerId, StringComparison.Ordinal));
+                            .FirstOrDefault(i => i.CreatorPlayerId != player.PlayerId);
                         var chosen = preferred ?? candidates[0];
                         selectedItems[clothingType.Id] = chosen.Id;
                     }

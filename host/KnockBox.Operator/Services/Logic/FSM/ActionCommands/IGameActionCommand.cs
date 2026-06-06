@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using KnockBox.Operator.Models;
 
@@ -17,7 +18,7 @@ public interface IGameActionCommand
     /// <summary>
     /// Returns the IDs of the players who are targeted and must respond.
     /// </summary>
-    IEnumerable<string> GetReactionTargetIds();
+    IEnumerable<Guid> GetReactionTargetIds();
 
     /// <summary>
     /// Prepares the game state for the pending reaction (e.g., removing number cards from discard).
@@ -37,12 +38,12 @@ public interface IGameActionCommand
     /// <summary>
     /// Updates the target of the command (used for redirection).
     /// </summary>
-    void UpdateTarget(string newTargetId);
+    void UpdateTarget(Guid newTargetId);
 
     /// <summary>
     /// The ID of the player who initiated the action.
     /// </summary>
-    string InitiatorPlayerId { get; }
+    Guid InitiatorPlayerId { get; }
 
     /// <summary>
     /// The cards that were played to generate this command.

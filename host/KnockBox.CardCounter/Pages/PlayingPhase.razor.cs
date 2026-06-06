@@ -27,14 +27,14 @@ namespace KnockBox.CardCounter.Pages
 
         // ── Target selection state ────────────────────────────────────────────
         private int? _pendingActionCardIndex;
-        private string? _selectedTargetId;
+        private Guid? _selectedTargetId;
 
         // ── Skim digit selection state ────────────────────────────────────────
         private int? _pendingSkimSourceDigit;
         private int? _pendingSkimTargetDigit;
 
         // ── Not My Money target selection state ───────────────────────────────
-        private string? _notMyMoneyTargetId;
+        private Guid? _notMyMoneyTargetId;
 
         // ── Operator result overlay state ─────────────────────────────────────
         private OperatorResultInfo? _cachedOperatorResult;
@@ -53,7 +53,7 @@ namespace KnockBox.CardCounter.Pages
         private HashSet<int> _selectedDiscardIndices = [];
 
         // ── Mobile opponent popover state ─────────────────────────────────────
-        private string? _expandedOpponentId;
+        private Guid? _expandedOpponentId;
 
         protected TimeSpan GameTime => GameState != null ? DateTime.UtcNow - GameState.CreatedAt : TimeSpan.Zero;
 
@@ -232,7 +232,7 @@ namespace KnockBox.CardCounter.Pages
             }
         }
 
-        protected void SelectTarget(string playerId)
+        protected void SelectTarget(Guid playerId)
         {
             if (IsSharedDisplay()) return; // the shared display cannot target
             _selectedTargetId = playerId;
@@ -241,14 +241,14 @@ namespace KnockBox.CardCounter.Pages
         protected void ConfirmPlayWithTarget()
         {
             if (GameState == null || UserService.CurrentUser == null) return;
-            if (_pendingActionCardIndex == null || _selectedTargetId == null) return;
+            if (_pendingActionCardIndex == null || _selectedTargetId is not { } selectedTarget) return;
             var me = GetMyPlayer();
             if (me == null) return;
             var card = me.ActionHand.ElementAtOrDefault(_pendingActionCardIndex.Value);
             if (card == null) return;
 
             // For Skim, validation happens in the engine; we just send the card play command
-            GameEngine.PlayActionCard(UserService.CurrentUser, GameState, _pendingActionCardIndex.Value, _selectedTargetId);
+            GameEngine.PlayActionCard(UserService.CurrentUser, GameState, _pendingActionCardIndex.Value, selectedTarget);
             _pendingActionCardIndex = null;
             _selectedTargetId = null;
             _pendingSkimSourceDigit = null;
@@ -296,11 +296,11 @@ namespace KnockBox.CardCounter.Pages
             if (GameState == null || UserService.CurrentUser == null) return false;
             // Show Not My Money target selection to the active player when the state is waiting for their choice
             if (!GameState.IsNotMyMoneySelecting) return false;
-            var activeId = GameState.TurnManager.CurrentPlayer ?? "";
+            var activeId = GameState.TurnManager.CurrentPlayer ?? Guid.Empty;
             return activeId == UserService.CurrentUser.Id;
         }
 
-        protected void SelectNotMyMoneyTarget(string playerId)
+        protected void SelectNotMyMoneyTarget(Guid playerId)
         {
             _notMyMoneyTargetId = playerId;
         }
@@ -308,8 +308,8 @@ namespace KnockBox.CardCounter.Pages
         protected void ConfirmNotMyMoneyTarget()
         {
             if (GameState == null || UserService.CurrentUser == null) return;
-            if (_notMyMoneyTargetId == null) return;
-            GameEngine.NotMyMoneySelectTarget(UserService.CurrentUser, GameState, _notMyMoneyTargetId);
+            if (_notMyMoneyTargetId is not { } nmTarget) return;
+            GameEngine.NotMyMoneySelectTarget(UserService.CurrentUser, GameState, nmTarget);
             _notMyMoneyTargetId = null;
         }
 
@@ -405,7 +405,7 @@ namespace KnockBox.CardCounter.Pages
             return GameState.GamePlayers.TryGetValue(nextId, out var ps) ? ps : null;
         }
 
-        protected void ToggleOpponentPopover(string playerId)
+        protected void ToggleOpponentPopover(Guid playerId)
         {
             _expandedOpponentId = _expandedOpponentId == playerId ? null : playerId;
         }

@@ -9,6 +9,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
     /// </summary>
     /// <param name="ActorUserId">The id of the player committing their ordering.</param>
     /// <param name="ModifierBayIds">The new ordering of modifier-card ids.</param>
-    public record SubmitOptimizationCommand(string ActorUserId, IReadOnlyList<string> ModifierBayIds)
+    public record SubmitOptimizationCommand(Guid ActorUserId, IReadOnlyList<string> ModifierBayIds)
         : AlphaChainCommand(ActorUserId);
 }

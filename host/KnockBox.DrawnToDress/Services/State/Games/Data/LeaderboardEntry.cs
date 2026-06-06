@@ -6,7 +6,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
     public class LeaderboardEntry
     {
         /// <summary>The player's unique identifier.</summary>
-        public string PlayerId { get; set; } = string.Empty;
+        public Guid PlayerId { get; set; }
 
         /// <summary>The player's display name.</summary>
         public string DisplayName { get; set; } = string.Empty;

@@ -17,7 +17,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
 
         // Snapshot hand at turn start so the Draw phase can diff against it for new-card animation
         var playerId = context.State.TurnManager.CurrentPlayer;
-        if (playerId != null && context.GamePlayers.TryGetValue(playerId, out var currentPlayer))
+        if (playerId != null && context.GamePlayers.TryGetValue(playerId.Value, out var currentPlayer))
         {
             currentPlayer.PreDrawCardIds = [.. currentPlayer.Hand.Select(c => c.Id)];
         }
@@ -48,7 +48,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
 
     public ValueResult<IGameState<OperatorGameContext, OperatorCommand>?> HandleCommand(OperatorGameContext context, OperatorCommand command)
     {
-        if (command.PlayerId != context.State.TurnManager.CurrentPlayer)
+        if (context.State.TurnManager.CurrentPlayer == null || command.PlayerId != context.State.TurnManager.CurrentPlayer.Value)
             return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromError("Not your turn.");
 
         if (command is SkipTurnCommand skip)
@@ -136,8 +136,8 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             else
             {
                 var opCard = playedCards.OfType<OperatorCard>().FirstOrDefault();
-                if (opCard != null && !string.IsNullOrEmpty(play.TargetPlayerId)
-                    && play.TargetPlayerId != play.PlayerId)
+                if (opCard != null && play.TargetPlayerId != null
+                    && play.TargetPlayerId.Value != play.PlayerId)
                 {
                     actionCommand = new OperatorCardCommand(context, play, playedCards, opCard);
                 }
@@ -200,7 +200,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
         return ValueResult<IGameState<OperatorGameContext, OperatorCommand>?>.FromValue(new DrawPhaseState());
     }
 
-    private static OperatorPlayerState? GetPlayerState(OperatorGameContext context, string playerId)
+    private static OperatorPlayerState? GetPlayerState(OperatorGameContext context, Guid playerId)
     {
         return context.GamePlayers.TryGetValue(playerId, out var pState) ? pState : null;
     }
@@ -208,7 +208,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
     private static void AutoPlayOnTimeout(OperatorGameContext context)
     {
         var playerId = context.State.TurnManager.CurrentPlayer;
-        if (playerId == null || !context.GamePlayers.TryGetValue(playerId, out var pState))
+        if (playerId == null || !context.GamePlayers.TryGetValue(playerId.Value, out var pState))
             return;
 
         if (pState.Hand.Count == 0)
@@ -227,7 +227,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             pState.Hand.Remove(numberCard);
             context.State.DiscardPile.Add(numberCard);
 
-            var playCommand = new PlayCardsCommand(playerId, [numberCard.Id], null);
+            var playCommand = new PlayCardsCommand(playerId.Value, [numberCard.Id], null);
             new StandardPlayCommand(context, playCommand, [numberCard]).Execute();
         }
         else if (operatorCard != null)
@@ -235,7 +235,7 @@ public class PlayPhaseState : IOperatorGameState, ITimedGameState<OperatorGameCo
             pState.Hand.Remove(operatorCard);
             context.State.DiscardPile.Add(operatorCard);
 
-            var playCommand = new PlayCardsCommand(playerId, [operatorCard.Id], null);
+            var playCommand = new PlayCardsCommand(playerId.Value, [operatorCard.Id], null);
             new StandardPlayCommand(context, playCommand, [operatorCard]).Execute();
         }
         else

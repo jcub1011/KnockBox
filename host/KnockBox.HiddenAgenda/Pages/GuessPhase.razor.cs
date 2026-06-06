@@ -16,7 +16,7 @@ namespace KnockBox.HiddenAgenda.Pages
         private int _errorKey;
 
         private bool IsCurrentPlayer => UserService.CurrentUser?.Id == GameState.TurnManager.CurrentPlayer;
-        private string CurrentPlayerName => GameState.TurnManager.CurrentPlayer != null && GameState.GamePlayers.TryGetValue(GameState.TurnManager.CurrentPlayer, out var p) ? p.DisplayName : "Unknown";
+        private string CurrentPlayerName => GameState.TurnManager.CurrentPlayer is { } cp && GameState.GamePlayers.TryGetValue(cp, out var p) ? p.DisplayName : "Unknown";
         private List<HiddenAgendaPlayerState> Opponents => GameState.GamePlayers.Values.Where(p => p.PlayerId != UserService.CurrentUser?.Id).ToList();
 
         private void ShowError(string message)
@@ -26,7 +26,7 @@ namespace KnockBox.HiddenAgenda.Pages
             StateHasChanged();
         }
 
-        private void HandleSubmit(Dictionary<string, List<string>> guesses)
+        private void HandleSubmit(Dictionary<Guid, List<string>> guesses)
         {
             if (UserService.CurrentUser == null) return;
             var result = Engine.SubmitGuess(UserService.CurrentUser, GameState, guesses);

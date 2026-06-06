@@ -33,14 +33,21 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             _logger = new Mock<ILogger>();
             _stateLogger = new Mock<ILogger<HiddenAgendaGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.Parse("00000000-0000-0000-0000-000000000001"));
             _state = new HiddenAgendaGameState(host, _stateLogger.Object);
             _state.BoardGraph = BoardDefinitions.CreateGrandCircuit();
             _context = new HiddenAgendaGameContext(_state, _rng.Object, _logger.Object);
 
+            var playerIds = new[]
+            {
+                Guid.Parse("10000000-0000-0000-0000-000000000000"),
+                Guid.Parse("20000000-0000-0000-0000-000000000000"),
+                Guid.Parse("30000000-0000-0000-0000-000000000000"),
+                Guid.Parse("40000000-0000-0000-0000-000000000000"),
+            };
             for (int i = 0; i < 4; i++)
             {
-                var pid = $"p{i}";
+                var pid = playerIds[i];
                 _state.GamePlayers[pid] = new HiddenAgendaPlayerState
                 {
                     PlayerId = pid,
@@ -48,7 +55,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
                     CurrentSpaceId = 0
                 };
             }
-            _state.TurnManager.SetTurnOrder(["p0", "p1", "p2", "p3"]);
+            _state.TurnManager.SetTurnOrder(playerIds);
             
             // Set up a basic task pool
             _state.CurrentTaskPool = TaskPool.AllTasks.Take(10).ToList();
@@ -67,14 +74,14 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         [TestMethod]
         public void OnEnter_PlayerAlreadyGuessed_SkipState()
         {
-            _state.GamePlayers["p0"].HasSubmittedGuess = true;
+            _state.GamePlayers[Guid.Parse("10000000-0000-0000-0000-000000000000")].HasSubmittedGuess = true;
             
             var state = new GuessPhaseState();
             var result = state.OnEnter(_context);
 
             Assert.IsNotNull(result.Value);
             Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
-            Assert.AreEqual("p1", _state.TurnManager.CurrentPlayer);
+            Assert.AreEqual(Guid.Parse("20000000-0000-0000-0000-000000000000"), (Guid?)_state.TurnManager.CurrentPlayer);
         }
 
         [TestMethod]
@@ -84,18 +91,18 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             state.OnEnter(_context);
 
             var poolIds = _state.CurrentTaskPool.Select(t => t.Id).Take(3).ToList();
-            var guesses = new Dictionary<string, List<string>>
+            var guesses = new Dictionary<Guid, List<string>>
             {
-                { "p1", [.. poolIds] },
-                { "p2", [.. poolIds] },
-                { "p3", [.. poolIds] }
+                { Guid.Parse("20000000-0000-0000-0000-000000000000"), [.. poolIds] },
+                { Guid.Parse("30000000-0000-0000-0000-000000000000"), [.. poolIds] },
+                { Guid.Parse("40000000-0000-0000-0000-000000000000"), [.. poolIds] }
             };
 
-            var result = state.HandleCommand(_context, new SubmitGuessCommand("p0", guesses));
+            var result = state.HandleCommand(_context, new SubmitGuessCommand(Guid.Parse("10000000-0000-0000-0000-000000000000"), guesses));
 
             Assert.IsNotNull(result.Value);
-            Assert.IsTrue(_state.GamePlayers["p0"].HasSubmittedGuess);
-            Assert.AreEqual(guesses, _state.GamePlayers["p0"].GuessSubmission);
+            Assert.IsTrue(_state.GamePlayers[Guid.Parse("10000000-0000-0000-0000-000000000000")].HasSubmittedGuess);
+            Assert.AreEqual(guesses, _state.GamePlayers[Guid.Parse("10000000-0000-0000-0000-000000000000")].GuessSubmission);
         }
 
         [TestMethod]
@@ -104,12 +111,12 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new GuessPhaseState();
             state.OnEnter(_context);
 
-            var guesses = new Dictionary<string, List<string>>
+            var guesses = new Dictionary<Guid, List<string>>
             {
-                { "invalid_id", ["T1", "T2", "T3"] }
+                { Guid.NewGuid(), ["T1", "T2", "T3"] }
             };
 
-            var result = state.HandleCommand(_context, new SubmitGuessCommand("p0", guesses));
+            var result = state.HandleCommand(_context, new SubmitGuessCommand(Guid.Parse("10000000-0000-0000-0000-000000000000"), guesses));
 
             Assert.IsFalse(result.IsSuccess);
             Assert.IsNotNull(result.Error);
@@ -121,14 +128,14 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new GuessPhaseState();
             state.OnEnter(_context);
 
-            var guesses = new Dictionary<string, List<string>>
+            var guesses = new Dictionary<Guid, List<string>>
             {
-                { "p1", ["T1", "T2"] }, // Only 2 tasks
-                { "p2", ["T1", "T2", "T3"] },
-                { "p3", ["T1", "T2", "T3"] }
+                { Guid.Parse("20000000-0000-0000-0000-000000000000"), ["T1", "T2"] }, // Only 2 tasks
+                { Guid.Parse("30000000-0000-0000-0000-000000000000"), ["T1", "T2", "T3"] },
+                { Guid.Parse("40000000-0000-0000-0000-000000000000"), ["T1", "T2", "T3"] }
             };
 
-            var result = state.HandleCommand(_context, new SubmitGuessCommand("p0", guesses));
+            var result = state.HandleCommand(_context, new SubmitGuessCommand(Guid.Parse("10000000-0000-0000-0000-000000000000"), guesses));
 
             Assert.IsFalse(result.IsSuccess);
         }
@@ -139,14 +146,14 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new GuessPhaseState();
             state.OnEnter(_context);
 
-            var guesses = new Dictionary<string, List<string>>
+            var guesses = new Dictionary<Guid, List<string>>
             {
-                { "p1", ["T1", "T1", "T2"] }, // Duplicate T1
-                { "p2", ["T1", "T2", "T3"] },
-                { "p3", ["T1", "T2", "T3"] }
+                { Guid.Parse("20000000-0000-0000-0000-000000000000"), ["T1", "T1", "T2"] }, // Duplicate T1
+                { Guid.Parse("30000000-0000-0000-0000-000000000000"), ["T1", "T2", "T3"] },
+                { Guid.Parse("40000000-0000-0000-0000-000000000000"), ["T1", "T2", "T3"] }
             };
 
-            var result = state.HandleCommand(_context, new SubmitGuessCommand("p0", guesses));
+            var result = state.HandleCommand(_context, new SubmitGuessCommand(Guid.Parse("10000000-0000-0000-0000-000000000000"), guesses));
 
             Assert.IsFalse(result.IsSuccess);
         }
@@ -157,11 +164,11 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new GuessPhaseState();
             state.OnEnter(_context);
 
-            var result = state.HandleCommand(_context, new SkipGuessCommand("p0"));
+            var result = state.HandleCommand(_context, new SkipGuessCommand(Guid.Parse("10000000-0000-0000-0000-000000000000")));
 
             Assert.IsNotNull(result.Value);
             Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
-            Assert.IsFalse(_state.GamePlayers["p0"].HasSubmittedGuess);
+            Assert.IsFalse(_state.GamePlayers[Guid.Parse("10000000-0000-0000-0000-000000000000")].HasSubmittedGuess);
         }
 
         [TestMethod]

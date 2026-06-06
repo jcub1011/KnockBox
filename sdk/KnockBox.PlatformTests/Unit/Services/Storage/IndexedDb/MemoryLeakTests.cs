@@ -129,9 +129,9 @@ public sealed class MemoryLeakTests
         using var registry = IndexedDbTestHelpers.NewRegistry();
         var blob = new IndexedDbBlobImpl(interop.Object, NullLogger<IndexedDbBlobImpl>.Instance, registry, 1, "application/octet-stream", 4);
 
-        var s1 = await blob.PublishForSharingAsync();
-        var s2 = await blob.PublishForSharingAsync();
-        var s3 = await blob.PublishForSharingAsync();
+        Assert.IsTrue((await blob.PublishForSharingAsync()).TryGetSuccess(out var s1));
+        Assert.IsTrue((await blob.PublishForSharingAsync()).TryGetSuccess(out var s2));
+        Assert.IsTrue((await blob.PublishForSharingAsync()).TryGetSuccess(out var s3));
 
         await blob.DisposeAsync();
 

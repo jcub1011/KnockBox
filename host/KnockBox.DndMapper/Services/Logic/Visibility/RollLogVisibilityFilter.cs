@@ -6,7 +6,7 @@ namespace KnockBox.DndMapper.Services.Logic.Visibility
     {
         public static IEnumerable<RollResult> VisibleTo(
             IEnumerable<RollResult> log,
-            string viewerUserId,
+            Guid viewerUserId,
             bool viewerIsHost,
             bool rollsVisibleToPlayers)
         {

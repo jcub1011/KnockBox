@@ -216,7 +216,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             if (voter.VoteTargetId is null)
                 return new ResultError("You must select a target before locking in.");
 
-            var target = context.GetPlayer(voter.VoteTargetId);
+            var target = context.GetPlayer(voter.VoteTargetId.Value);
             if (target is null || target.IsEliminated)
                 return new ResultError("Your selected target is no longer valid.");
 
@@ -255,11 +255,11 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
                     "DiscussionPhase: [{pid}] abstained.", player.PlayerId);
             }
 
-            string? eliminatedId = context.TallyVotes();
+            Guid? eliminatedId = context.TallyVotes();
 
             if (eliminatedId is not null)
             {
-                var eliminated = context.GetPlayer(eliminatedId)!;
+                var eliminated = context.GetPlayer(eliminatedId.Value)!;
                 eliminated.IsEliminated = true;
                 context.State.LastElimination = new EliminationResult(
                     eliminated.PlayerId, eliminated.DisplayName, eliminated.Role, WasTie: false);
@@ -271,7 +271,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             {
                 // Tie — no one eliminated.
                 context.State.LastElimination = new EliminationResult(
-                    string.Empty, string.Empty, default, WasTie: true);
+                    Guid.Empty, string.Empty, default, WasTie: true);
 
                 context.Logger.LogDebug("DiscussionPhase: vote resulted in a tie.");
             }

@@ -1,3 +1,4 @@
+using System;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
@@ -40,11 +41,11 @@ public sealed class LiabilityTransferCard()
             return ValueResult<CardPlayResult>.FromValue(CardPlayResult.Ok());
         if (ctx.ActionBlocked || ctx.TargetPlayerId == null)
             return ValueResult<CardPlayResult>.FromValue(CardPlayResult.OkConsumedNumbers());
-        Resolve(ctx.GameContext, ctx.TargetPlayerId, [.. ctx.PairedNumbers.Cast<Card>()]);
+        Resolve(ctx.GameContext, ctx.TargetPlayerId.Value, [.. ctx.PairedNumbers.Cast<Card>()]);
         return ValueResult<CardPlayResult>.FromValue(CardPlayResult.OkConsumedNumbers());
     }
 
-    public static void Resolve(OperatorGameContext context, string targetPlayerId, List<Card> numberCards)
+    public static void Resolve(OperatorGameContext context, Guid targetPlayerId, List<Card> numberCards)
     {
         if (context.GamePlayers.TryGetValue(targetPlayerId, out var target))
         {

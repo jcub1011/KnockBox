@@ -1,5 +1,6 @@
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
-using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 using KnockBox.Core.Primitives.Returns;
@@ -173,7 +174,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
             // Every id must be a card the player currently holds. The dealt cards were already
             // appended to the bay in the Deal sub-phase, so "current bay" is the full candidate set.
-            var heldIds = player.EngineBay.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
+            var heldIds = player.EngineBay.Select(c => c.GetId().ToString()).ToHashSet(StringComparer.Ordinal);
             foreach (var id in ids)
                 if (!heldIds.Contains(id))
                     return new ResultError("That card isn't in your Engine Bay.",
@@ -195,7 +196,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                 return new ResultError("It's not time to pick the banned letter.",
                     $"SelectSniperBanCommand outside SniperBan (phase {state.IntermissionPhase}) from [{cmd.ActorUserId}].");
 
-            if (cmd.ActorUserId != state.SniperBanUserId)
+            if (cmd.ActorUserId != state.SniperBanUserId.GetValueOrDefault())
                 return new ResultError("Only the last-place player picks the banned letter.",
                     $"Non-picker [{cmd.ActorUserId}] tried to pick (picker is [{state.SniperBanUserId}]).");
 
@@ -229,25 +230,25 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
                 // Distinct modifiers the player doesn't already hold (bay ids must stay unique). A
                 // player may hold at most one shield, so shields are excluded once they hold one.
-                var heldIds = player.EngineBay.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
-                bool hasShield = player.EngineBay.Any(c => c.Shield is not null);
-                var pool = ModifierLibrary.All.Where(c => !heldIds.Contains(c.Id)).ToList();
+                var heldIds = player.EngineBay.Select(c => c.GetId()).ToHashSet();
+                bool hasShield = player.EngineBay.Any(c => ModifierCardFactory.ShieldIds.Contains(c.GetId()));
+                var pool = ModifierCardFactory.AllDealableIds.Where(id => !heldIds.Contains(id)).ToList();
                 if (hasShield)
-                    pool.RemoveAll(c => c.Shield is not null);
+                    pool.RemoveAll(id => ModifierCardFactory.ShieldIds.Contains(id));
 
                 for (int i = 0; i < modCount && pool.Count > 0; i++)
                 {
                     int idx = context.Rng.GetRandomInt(pool.Count);
-                    var dealt = pool[idx];
-                    player.EngineBay.Add(dealt); // append-to-right; resequenced in Optimization.
-                    player.NewlyDealtModifierIds.Add(dealt.Id);
+                    var dealtId = pool[idx];
+                    player.EngineBay.Add(context.ModifierFactory.CreateCard(default, dealtId)); // append-to-right; resequenced in Optimization.
+                    player.NewlyDealtModifierIds.Add(dealtId);
                     pool.RemoveAt(idx);
-                    if (dealt.Shield is not null)
+                    if (ModifierCardFactory.ShieldIds.Contains(dealtId))
                     {
                         // A freshly dealt shield is the player's replacement mirror: it starts
                         // un-decayed, and no further shield may be dealt in this same deal.
-                        player.ShieldMultiplier = 1.0;
-                        pool.RemoveAll(c => c.Shield is not null);
+                        context.EvaluationServices.Get<IShieldService>()?.GrantFresh(player);
+                        pool.RemoveAll(id => ModifierCardFactory.ShieldIds.Contains(id));
                     }
                 }
             }
@@ -270,7 +271,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.OptimizationSubmissions.Clear();
             foreach (var player in ActivePlayers(state))
             {
-                var ids = player.EngineBay.Select(c => c.Id).ToList();
+                var ids = player.EngineBay.Select(c => c.GetId().ToString()).ToList();
                 state.OptimizationSubmissions[player.UserId] =
                     new OptimizationSubmission(player.UserId, ids, Submitted: false);
             }
@@ -315,7 +316,7 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.SubPhaseEndTime = now.AddSeconds(state.Settings.SniperBanSeconds);
 
             context.Logger.LogDebug("Alpha Chain Intermission → SniperBan (picker [{picker}]).",
-                state.SniperBanUserId ?? "—");
+                state.SniperBanUserId.HasValue ? state.SniperBanUserId.Value.ToString() : "—");
         }
 
         /// <summary>
@@ -331,8 +332,8 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
 
                 if (state.OptimizationSubmissions.TryGetValue(player.UserId, out var sub) && sub.Submitted)
                 {
-                    var byId = player.EngineBay.ToDictionary(c => c.Id, StringComparer.Ordinal);
-                    var reordered = new List<ModifierCard>(sub.ModifierBayIds.Count);
+                    var byId = player.EngineBay.ToDictionary(c => c.GetId().ToString(), StringComparer.Ordinal);
+                    var reordered = new List<IModifierCard>(sub.ModifierBayIds.Count);
                     foreach (var id in sub.ModifierBayIds)
                         if (byId.TryGetValue(id, out var card))
                             reordered.Add(card);
@@ -351,13 +352,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             }
         }
 
-        /// <summary>Lowest-score active player; ties broken by earliest turn-order index. Null if none active.</summary>
-        private static string? ResolveSniperBanPicker(AlphaChainGameState state)
-            => ActivePlayers(state)
-                .OrderBy(p => p.Score)
-                .ThenBy(p => TurnIndex(state, p.UserId))
-                .Select(p => p.UserId)
-                .FirstOrDefault();
+        /// <summary>Lowest-score active player; ties broken by earliest turn-order index. Null if none
+        /// active. Shares the canonical last-place ordering with the era-ban exemption.</summary>
+        private static Guid? ResolveSniperBanPicker(AlphaChainGameState state)
+            => EngineEffectResolver.LastPlaceUserId(state);
 
         // ── Completion ───────────────────────────────────────────────────────
 
@@ -379,59 +377,56 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             state.SniperBanUserId = null;
             state.OptimizationSubmissions.Clear();
 
-            // Drop the deal-reveal markers so they don't bleed into the next era's round UI, and
-            // reset the era-scoped card state so each era starts clean: the Hyper-Drive latch, the
-            // Scattershot double-letter flag, any transient hijack ban, and the per-turn Prism flag.
-            // The Titanium Mirror's decayed multiplier is NOT reset here — it persists across eras
-            // and only returns to 1.0 when a fresh mirror is dealt (see DealCards).
+            // Drop the deal-reveal markers so they don't bleed into the next era's round UI, then fire
+            // the era-start boundary across every room state service so each owns its own era reset:
+            // the Hyper-Drive latch, the Scattershot double-letter flag, any transient hijack ban, and
+            // the era-rolled card bans all clear here. The Titanium Mirror's decayed multiplier is NOT
+            // reset (no OnEraStarted) — it persists across eras and only returns to 1.0 when a fresh
+            // mirror is dealt (see DealCards). This runs before FireEraStartHooks so cards re-roll
+            // their bans into a freshly-cleared slate.
             foreach (var player in state.GamePlayers.Values)
             {
                 player.NewlyDealtModifierIds.Clear();
-                player.HyperDriveActive = false;
-                player.PlayedDoubleLetterWordThisEra = false;
-                player.PersonalBannedLetter = null;
-                player.PrismUsedThisTurn = false;
+                context.EvaluationServices.FireEraStarted(player);
             }
             state.RoundLeaderUserId = null;
 
             if (state.CurrentEra > state.Settings.EraCount)
                 return new GameOverState();
 
-            // Roll fresh personal banned letters for the new era now that the bay is final and the
-            // Sniper Ban has set the era letter (so the personal ban can dodge it).
-            RollPersonalBans(context);
-            return new RoundState();
+            // Fire the era-start hooks now that the bay is final and the Sniper Ban has set the era
+            // letter (so a card's personal-ban roll can dodge it). Roulette Wheel / Toll Booth roll
+            // their personal banned letters here via OnEraStart.
+            FireEraStartHooks(context);
+
+            // A short "Get Ready" countdown precedes the next era's first turn so players have a beat
+            // to absorb the freshly-banned letter before the shot clock starts.
+            return new CountdownState(new RoundState());
         }
 
         /// <summary>
-        /// Rolls a fresh personal banned letter for every active player's
-        /// <c>RollsPersonalBanAtEraStart</c> modifier cards (Roulette Wheel, Smuggler's Toll), keyed
-        /// by card id. Drawn from the match's legal ban pool, avoiding the era banned letter so the
-        /// personal ban is a distinct hazard. Stale rolls are cleared first (a re-roll each era).
+        /// Fires every card's <see cref="IModifierCard.OnEraStart"/> hook (Roulette Wheel / Toll Booth
+        /// roll a personal banned letter through the per-room <c>IBanLetterService</c> into
+        /// <c>ICardBanService</c>). The era-rolled bans were already cleared by the era-start boundary
+        /// in <see cref="CompleteIntermission"/>, so each card rolls into a clean slate.
         /// </summary>
-        private static void RollPersonalBans(AlphaChainGameContext context)
+        private static void FireEraStartHooks(AlphaChainGameContext context)
         {
             var state = context.State;
+            var services = context.EvaluationServices;
+            services.BeginResolution(DateTimeOffset.UtcNow);
+
             foreach (var player in ActivePlayers(state))
             {
-                player.CardBannedLetters.Clear();
+                var ctx = new EngineEvaluationContext(string.Empty, Array.Empty<char>(), new[] { player })
+                {
+                    Bay = player.EngineBay,
+                    Services = services,
+                    PlayerIndex = 0,
+                };
                 foreach (var card in player.EngineBay)
-                    if (card.RollsPersonalBanAtEraStart)
-                        player.CardBannedLetters[card.Id] = DrawPersonalBan(context, state.BannedLetter);
+                    ctx = card.OnEraStart(ctx, card);
             }
-        }
-
-        /// <summary>Draws a legal personal banned letter, nudging off the era ban if it collides.</summary>
-        private static char DrawPersonalBan(AlphaChainGameContext context, char? eraBan)
-        {
-            string pool = BanLetterPool.For(context.State.Settings.BanMode);
-            char letter = BanLetterPool.Draw(context.State.Settings.BanMode, context.Rng);
-            if (eraBan is { } e && letter == e && pool.Length > 1)
-            {
-                int idx = pool.IndexOf(letter);
-                letter = pool[(idx + 1) % pool.Length];
-            }
-            return letter;
         }
 
         // ── Shared helpers ───────────────────────────────────────────────────
@@ -442,11 +437,5 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
         private static bool AllSubmitted(AlphaChainGameState state)
             => state.OptimizationSubmissions.Count > 0
                && state.OptimizationSubmissions.Values.All(s => s.Submitted);
-
-        private static int TurnIndex(AlphaChainGameState state, string userId)
-        {
-            int idx = state.TurnManager.TurnOrder.IndexOf(userId);
-            return idx < 0 ? int.MaxValue : idx;
-        }
     }
 }

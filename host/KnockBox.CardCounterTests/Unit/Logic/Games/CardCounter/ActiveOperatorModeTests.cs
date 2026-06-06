@@ -32,14 +32,15 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<CardCounterGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new CardCounterGameState(host, _stateLoggerMock.Object);
             _state.UpdateSettings(s => s with { ActiveOperatorMode = true });
             _context = new CardCounterGameContext(_state, _randomMock.Object, _loggerMock.Object);
         }
 
-        private PlayerState MakePlayer(string id, string name, double balance = 0, Operator activeOperator = Operator.Add)
+        private PlayerState MakePlayer(string name, double balance = 0, Operator activeOperator = Operator.Add)
         {
+            var id = Guid.NewGuid();
             var player = new PlayerState
             {
                 PlayerId = id,
@@ -57,7 +58,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyNumberCard_ActiveOperatorMode_Add_AddsToBalance()
         {
-            var player = MakePlayer("p1", "P1", balance: 100, activeOperator: Operator.Add);
+            var player = MakePlayer("P1", balance: 100, activeOperator: Operator.Add);
 
             _context.ApplyNumberCard(player, new NumberCard(5));
 
@@ -68,7 +69,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyNumberCard_ActiveOperatorMode_Subtract_SubtractsFromBalance()
         {
-            var player = MakePlayer("p1", "P1", balance: 100, activeOperator: Operator.Subtract);
+            var player = MakePlayer("P1", balance: 100, activeOperator: Operator.Subtract);
 
             _context.ApplyNumberCard(player, new NumberCard(7));
 
@@ -79,7 +80,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyNumberCard_ActiveOperatorMode_Multiply_MultipliesBalance()
         {
-            var player = MakePlayer("p1", "P1", balance: 50, activeOperator: Operator.Multiply);
+            var player = MakePlayer("P1", balance: 50, activeOperator: Operator.Multiply);
 
             _context.ApplyNumberCard(player, new NumberCard(3));
 
@@ -89,7 +90,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyNumberCard_ActiveOperatorMode_Divide_DividesBalance()
         {
-            var player = MakePlayer("p1", "P1", balance: 100, activeOperator: Operator.Divide);
+            var player = MakePlayer("P1", balance: 100, activeOperator: Operator.Divide);
 
             _context.ApplyNumberCard(player, new NumberCard(4));
 
@@ -99,7 +100,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyNumberCard_ActiveOperatorMode_Multiply_RoundsResult()
         {
-            var player = MakePlayer("p1", "P1", balance: 10, activeOperator: Operator.Multiply);
+            var player = MakePlayer("P1", balance: 10, activeOperator: Operator.Multiply);
 
             _context.ApplyNumberCard(player, new NumberCard(3)); // 10 * 3 = 30
 
@@ -109,12 +110,12 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyNumberCard_ActiveOperatorMode_RecordsOperatorResult()
         {
-            var player = MakePlayer("p1", "P1", balance: 50, activeOperator: Operator.Add);
+            var player = MakePlayer("P1", balance: 50, activeOperator: Operator.Add);
 
             _context.ApplyNumberCard(player, new NumberCard(8));
 
             Assert.IsNotNull(_state.LastOperatorResult);
-            Assert.AreEqual("p1", _state.LastOperatorResult.PlayerId);
+            Assert.AreEqual(player.PlayerId, _state.LastOperatorResult.PlayerId);
             Assert.AreEqual(50.0, _state.LastOperatorResult.BalanceBefore);
             Assert.AreEqual(58.0, _state.LastOperatorResult.BalanceAfter);
             Assert.AreEqual(Operator.Add, _state.LastOperatorResult.Op);
@@ -123,7 +124,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyNumberCard_ActiveOperatorMode_DivideByZero_TriggersRandomEvent()
         {
-            var player = MakePlayer("p1", "P1", balance: 100, activeOperator: Operator.Divide);
+            var player = MakePlayer("P1", balance: 100, activeOperator: Operator.Divide);
             player.PassesRemaining = 2;
             _randomMock.Setup(r => r.GetRandomInt(0, 4, RandomType.Secure)).Returns(0); // gain a pass
 
@@ -137,13 +138,12 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         public void ApplyNumberCard_NormalMode_StillAppendsToPot()
         {
             _state.UpdateSettings(s => s with { ActiveOperatorMode = false });
-            var player = new PlayerState { PlayerId = "p1", DisplayName = "P1", Balance = 100 };
-            player.Pot.Add(1);
-            _state.GamePlayers["p1"] = player;
+            var normalPlayer = MakePlayer("P1", balance: 100);
+            normalPlayer.Pot.Add(1);
 
-            _context.ApplyNumberCard(player, new NumberCard(9));
+            _context.ApplyNumberCard(normalPlayer, new NumberCard(9));
 
-            CollectionAssert.AreEqual(new[] { 1, 9 }, player.Pot, "Normal mode should still append digit to pot.");
+            CollectionAssert.AreEqual(new[] { 1, 9 }, normalPlayer.Pot, "Normal mode should still append digit to pot.");
         }
 
         // ── ApplyOperatorCard in Active Operator Mode ─────────────────────────
@@ -151,7 +151,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyOperatorCard_ActiveOperatorMode_SetsActiveOperator()
         {
-            var player = MakePlayer("p1", "P1", balance: 100, activeOperator: Operator.Add);
+            var player = MakePlayer("P1", balance: 100, activeOperator: Operator.Add);
 
             _context.ApplyOperatorCard(player, new OperatorCard(Operator.Multiply));
 
@@ -162,7 +162,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void ApplyOperatorCard_ActiveOperatorMode_DoesNotApplyToPot()
         {
-            var player = MakePlayer("p1", "P1", balance: 50, activeOperator: Operator.Add);
+            var player = MakePlayer("P1", balance: 50, activeOperator: Operator.Add);
             player.Pot.Add(3); // should not be consumed
 
             _context.ApplyOperatorCard(player, new OperatorCard(Operator.Subtract));
@@ -175,14 +175,13 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         public void ApplyOperatorCard_NormalMode_StillAppliesFromPot()
         {
             _state.UpdateSettings(s => s with { ActiveOperatorMode = false });
-            var player = new PlayerState { PlayerId = "p1", DisplayName = "P1", Balance = 100 };
-            player.Pot.AddRange([2, 5]); // pot = 25
-            _state.GamePlayers["p1"] = player;
+            var normalPlayer = MakePlayer("P1", balance: 100);
+            normalPlayer.Pot.AddRange([2, 5]); // pot = 25
 
-            _context.ApplyOperatorCard(player, new OperatorCard(Operator.Add));
+            _context.ApplyOperatorCard(normalPlayer, new OperatorCard(Operator.Add));
 
-            Assert.AreEqual(125.0, player.Balance, "Normal mode should still compute balance from pot.");
-            Assert.IsEmpty(player.Pot, "Pot should be cleared after operator in normal mode.");
+            Assert.AreEqual(125.0, normalPlayer.Balance, "Normal mode should still compute balance from pot.");
+            Assert.IsEmpty(normalPlayer.Pot, "Pot should be cleared after operator in normal mode.");
         }
 
         // ── Action card pool filtering ────────────────────────────────────────
@@ -308,7 +307,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
 
             _randomMock.Setup(r => r.GetRandomInt(0, It.IsAny<int>(), RandomType.Secure)).Returns(0);
 
-            var p1 = MakePlayer("p1", "P1");
+            var p1 = MakePlayer("P1");
             _context.DealActionCards();
 
             Assert.IsTrue(p1.ActionHand.All(c => c.Action == ActionType.Burn),
@@ -331,7 +330,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             _state.UpdateSettings(s => s with { HedgeYourBetWeight = 0 });
             _state.UpdateSettings(s => s with { LetItRideWeight = 0 });
 
-            var p1 = MakePlayer("p1", "P1");
+            var p1 = MakePlayer("P1");
             _context.DealActionCards();
 
             Assert.IsEmpty(p1.ActionHand, "No cards should be dealt when all weights are 0.");
@@ -381,16 +380,16 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void TurnTheTable_ActiveOperatorMode_TargetAccepts_ReversesBalanceDigits()
         {
-            var source = MakePlayer("src", "Source");
-            var target = MakePlayer("tgt", "Target");
+            var source = MakePlayer("Source");
+            var target = MakePlayer("Target");
             target.Balance = 321;
             _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1));
 
-            var fsmState = new WaitingForReactionState("src", "tgt", new ActionCard(ActionType.TurnTheTable));
+            var fsmState = new WaitingForReactionState(source.PlayerId, target.PlayerId, new ActionCard(ActionType.TurnTheTable));
             fsmState.OnEnter(_context);
 
-            var next = fsmState.HandleCommand(_context, new AcceptPendingCommand("tgt"));
+            var next = fsmState.HandleCommand(_context, new AcceptPendingCommand(target.PlayerId));
 
             Assert.IsNotNull(next.Value);
             Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));
@@ -400,16 +399,16 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void TurnTheTable_ActiveOperatorMode_TargetBlocks_BalanceUnchanged()
         {
-            var source = MakePlayer("src", "Source");
-            var target = MakePlayer("tgt", "Target");
+            var source = MakePlayer("Source");
+            var target = MakePlayer("Target");
             target.Balance = 321;
             _state.TurnManager.SetCurrentPlayerIndex(0);
             target.ActionHand.Add(new ActionCard(ActionType.Compd));
 
-            var fsmState = new WaitingForReactionState("src", "tgt", new ActionCard(ActionType.TurnTheTable));
+            var fsmState = new WaitingForReactionState(source.PlayerId, target.PlayerId, new ActionCard(ActionType.TurnTheTable));
             fsmState.OnEnter(_context);
 
-            fsmState.HandleCommand(_context, new PlayActionCardCommand("tgt", 0));
+            fsmState.HandleCommand(_context, new PlayActionCardCommand(target.PlayerId, 0));
 
             Assert.AreEqual(321.0, target.Balance, "Blocked TurnTheTable should not change balance.");
         }
@@ -417,15 +416,15 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void TurnTheTable_ActiveOperatorMode_NegativeBalance_ReversesAndPreservesSign()
         {
-            var source = MakePlayer("src", "Source");
-            var target = MakePlayer("tgt", "Target");
+            var source = MakePlayer("Source");
+            var target = MakePlayer("Target");
             target.Balance = -42;
             _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1));
 
-            var fsmState = new WaitingForReactionState("src", "tgt", new ActionCard(ActionType.TurnTheTable));
+            var fsmState = new WaitingForReactionState(source.PlayerId, target.PlayerId, new ActionCard(ActionType.TurnTheTable));
             fsmState.OnEnter(_context);
-            fsmState.HandleCommand(_context, new AcceptPendingCommand("tgt"));
+            fsmState.HandleCommand(_context, new AcceptPendingCommand(target.PlayerId));
 
             Assert.AreEqual(-24.0, target.Balance);
         }
@@ -435,16 +434,16 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void Launder_ActiveOperatorMode_TargetAccepts_SwapsBalances()
         {
-            var source = MakePlayer("src", "Source");
-            var target = MakePlayer("tgt", "Target");
+            var source = MakePlayer("Source");
+            var target = MakePlayer("Target");
             source.Balance = 100;
             target.Balance = -50;
             _state.TurnManager.SetCurrentPlayerIndex(0);
             _state.CurrentShoe.Push(new NumberCard(1));
 
-            var fsmState = new WaitingForReactionState("src", "tgt", new ActionCard(ActionType.Launder));
+            var fsmState = new WaitingForReactionState(source.PlayerId, target.PlayerId, new ActionCard(ActionType.Launder));
             fsmState.OnEnter(_context);
-            fsmState.HandleCommand(_context, new AcceptPendingCommand("tgt"));
+            fsmState.HandleCommand(_context, new AcceptPendingCommand(target.PlayerId));
 
             Assert.AreEqual(-50.0, source.Balance, "Source should have target's old balance.");
             Assert.AreEqual(100.0, target.Balance, "Target should have source's old balance.");
@@ -453,16 +452,16 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void Launder_ActiveOperatorMode_TargetBlocks_BalancesUnchanged()
         {
-            var source = MakePlayer("src", "Source");
-            var target = MakePlayer("tgt", "Target");
+            var source = MakePlayer("Source");
+            var target = MakePlayer("Target");
             source.Balance = 100;
             target.Balance = -50;
             _state.TurnManager.SetCurrentPlayerIndex(0);
             target.ActionHand.Add(new ActionCard(ActionType.Compd));
 
-            var fsmState = new WaitingForReactionState("src", "tgt", new ActionCard(ActionType.Launder));
+            var fsmState = new WaitingForReactionState(source.PlayerId, target.PlayerId, new ActionCard(ActionType.Launder));
             fsmState.OnEnter(_context);
-            fsmState.HandleCommand(_context, new PlayActionCardCommand("tgt", 0));
+            fsmState.HandleCommand(_context, new PlayActionCardCommand(target.PlayerId, 0));
 
             Assert.AreEqual(100.0, source.Balance, "Source balance should be unchanged when blocked.");
             Assert.AreEqual(-50.0, target.Balance, "Target balance should be unchanged when blocked.");
@@ -473,8 +472,8 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
         [TestMethod]
         public void TurnTheTable_SelfTarget_ActiveOperatorMode_ReversesOwnBalance()
         {
-            var p1 = MakePlayer("p1", "Player 1");
-            var p2 = MakePlayer("p2", "Player 2");
+            var p1 = MakePlayer("Player 1");
+            var p2 = MakePlayer("Player 2");
             p1.Balance = 321;
             p1.ActiveOperator = Operator.Add;
             p1.ActionHand.Add(new ActionCard(ActionType.TurnTheTable));
@@ -484,7 +483,7 @@ namespace KnockBox.CardCounter.Tests.Unit.Logic.Games.CardCounter
             var fsmState = new PlayerTurnState();
             fsmState.OnEnter(_context);
             var next = fsmState.HandleCommand(_context,
-                new PlayActionCardCommand("p1", 0, TargetPlayerId: "p1"));
+                new PlayActionCardCommand(p1.PlayerId, 0, TargetPlayerId: p1.PlayerId));
 
             Assert.IsNotNull(next.Value);
             Assert.IsInstanceOfType(next.Value, typeof(PlayerTurnState));

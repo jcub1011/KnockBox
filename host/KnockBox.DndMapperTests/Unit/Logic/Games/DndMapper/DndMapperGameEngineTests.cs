@@ -23,7 +23,7 @@ namespace KnockBox.DndMapper.Tests.Unit.Logic
             _engineLoggerMock = new Mock<ILogger<DndMapperGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<DndMapperGameState>>();
             _rngMock = new Mock<IRandomNumberService>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
 
             _engine = new DndMapperGameEngine(
                 _engineLoggerMock.Object,

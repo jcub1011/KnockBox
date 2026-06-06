@@ -24,7 +24,7 @@ namespace KnockBox.Operator.Pages
         private Card? _pendingAction;
         private Guid? _selectedOperatorId;
         private readonly List<Guid> _selectedNumberIds = [];
-        private string? _targetPlayerId;
+        private Guid? _targetPlayerId;
         private bool _waitingForTarget;
         private bool _showDiscardHistory;
 
@@ -241,7 +241,7 @@ namespace KnockBox.Operator.Pages
         private static bool ActionNeedsTarget(Card card) =>
             card is ITargetableCard;
 
-        protected bool IsPlayerTargetable(string targetPlayerId, OperatorPlayerState targetState)
+        protected bool IsPlayerTargetable(Guid targetPlayerId, OperatorPlayerState targetState)
         {
             if (!IsMyTurn || CurrentPlayerState == null || GameState.Context == null) return false;
 
@@ -342,7 +342,7 @@ namespace KnockBox.Operator.Pages
             }
         }
 
-        protected void SelectTarget(string playerId)
+        protected void SelectTarget(Guid playerId)
         {
             if (!IsMyTurn || GameState.Context == null) return;
 

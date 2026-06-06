@@ -7,26 +7,26 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
     /// Every command carries the ID of the player who issued it so that states can
     /// validate permissions (host-only commands, active-player restrictions, etc.).
     /// </summary>
-    public abstract record DrawnToDressCommand(string PlayerId);
+    public abstract record DrawnToDressCommand(Guid PlayerId);
 
     // ── Lobby ─────────────────────────────────────────────────────────────────
 
     /// <summary>Host starts the game, triggering the transition out of the lobby.</summary>
-    public record StartGameCommand(string PlayerId) : DrawnToDressCommand(PlayerId);
+    public record StartGameCommand(Guid PlayerId) : DrawnToDressCommand(PlayerId);
 
     // ── Theme selection ───────────────────────────────────────────────────────
 
     /// <summary>
     /// Host explicitly picks the theme (used when <c>ThemeSource.HostPick</c> is configured).
     /// </summary>
-    public record SelectThemeCommand(string PlayerId, string ThemeId) : DrawnToDressCommand(PlayerId);
+    public record SelectThemeCommand(Guid PlayerId, string ThemeId) : DrawnToDressCommand(PlayerId);
 
     /// <summary>
     /// Player submits a theme text during the theme-selection phase when
     /// <c>ThemeSource.PlayerWritten</c> is configured.
     /// </summary>
     public record SubmitPlayerThemeCommand(
-        string PlayerId,
+        Guid PlayerId,
         string ThemeText) : DrawnToDressCommand(PlayerId);
 
     /// <summary>
@@ -34,7 +34,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
     /// <c>ThemeSource.RandomVoting</c> is configured.
     /// </summary>
     public record VoteForThemeCommand(
-        string PlayerId,
+        Guid PlayerId,
         string ThemeId) : DrawnToDressCommand(PlayerId);
 
     // ── Drawing round ─────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
     /// Player submits their completed SVG drawing for a specific clothing type.
     /// </summary>
     public record SubmitDrawingCommand(
-        string PlayerId,
+        Guid PlayerId,
         ClothingType ClothingTypeId,
         string SvgContent) : DrawnToDressCommand(PlayerId);
 
@@ -51,25 +51,25 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
     /// Player signals they are done with the current phase and ready to advance.
     /// Used in timed phases to allow early progression when all players are ready.
     /// </summary>
-    public record MarkReadyCommand(string PlayerId) : DrawnToDressCommand(PlayerId);
+    public record MarkReadyCommand(Guid PlayerId) : DrawnToDressCommand(PlayerId);
 
     // ── Outfit building ───────────────────────────────────────────────────────
 
     /// <summary>Player claims a clothing item from the communal pool.</summary>
-    public record ClaimPoolItemCommand(string PlayerId, Guid ItemId) : DrawnToDressCommand(PlayerId);
+    public record ClaimPoolItemCommand(Guid PlayerId, Guid ItemId) : DrawnToDressCommand(PlayerId);
 
     /// <summary>
     /// Player releases a previously claimed clothing item back to the communal pool.
     /// Only items claimed via <see cref="ClaimPoolItemCommand"/> may be unclaimed; a player
     /// cannot unclaim an item they drew themselves.
     /// </summary>
-    public record UnclaimPoolItemCommand(string PlayerId, Guid ItemId) : DrawnToDressCommand(PlayerId);
+    public record UnclaimPoolItemCommand(Guid PlayerId, Guid ItemId) : DrawnToDressCommand(PlayerId);
 
     /// <summary>
     /// Player submits their assembled outfit, selecting one item per clothing type.
     /// </summary>
     public record SubmitOutfitCommand(
-        string PlayerId,
+        Guid PlayerId,
         Dictionary<ClothingType, Guid> SelectedItemsByType) : DrawnToDressCommand(PlayerId);
 
     // ── Outfit customization ──────────────────────────────────────────────────
@@ -80,7 +80,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
     /// optional unless <see cref="DrawnToDressSettings.SketchingRequired"/> is enabled.
     /// </summary>
     public record SubmitCustomizationCommand(
-        string PlayerId,
+        Guid PlayerId,
         string? OutfitName,
         string? SketchSvgContent = null,
         Dictionary<ClothingType, ItemPositionOverride>? ItemPositionOverrides = null,
@@ -89,7 +89,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
 
     /// <summary>Updates the draft outfit name for the player while they are typing.</summary>
     public record UpdateDraftOutfitNameCommand(
-        string PlayerId,
+        Guid PlayerId,
         string DraftName) : DrawnToDressCommand(PlayerId);
 
     // ── Outfit distinctness resolution ────────────────────────────────────────
@@ -99,20 +99,20 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
     /// different one.
     /// </summary>
     public record ResolveDistinctnessCommand(
-        string PlayerId,
+        Guid PlayerId,
         Guid ReplacementItemId) : DrawnToDressCommand(PlayerId);
 
     // ── Voting ────────────────────────────────────────────────────────────────
 
     /// <summary>Player casts a vote for one entrant in a head-to-head matchup.</summary>
     public record CastVoteCommand(
-        string PlayerId,
+        Guid PlayerId,
         Guid MatchupId,
         string CriterionId,
         EntrantId ChosenEntrantId) : DrawnToDressCommand(PlayerId)
     {
         /// <summary>Player ID of the chosen entrant.</summary>
-        public string ChosenPlayerId => ChosenEntrantId.PlayerId;
+        public Guid ChosenPlayerId => ChosenEntrantId.PlayerId;
     }
 
     // ── Coin flip ─────────────────────────────────────────────────────────────
@@ -122,14 +122,14 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
     /// Typically issued by the game engine when a voting round ends with a tie.
     /// </summary>
     public record RequestCoinFlipCommand(
-        string PlayerId,
+        Guid PlayerId,
         Guid MatchupId) : DrawnToDressCommand(PlayerId);
 
     /// <summary>
     /// The designated caller chooses heads or tails for the current coin flip.
     /// </summary>
     public record CoinFlipCallCommand(
-        string PlayerId,
+        Guid PlayerId,
         bool ChoseHeads) : DrawnToDressCommand(PlayerId);
 
     // ── Final results ────────────────────────────────────────────────────────
@@ -137,18 +137,18 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM
     /// <summary>
     /// Host requests a new game with the same players (returns to lobby).
     /// </summary>
-    public record PlayAgainCommand(string PlayerId) : DrawnToDressCommand(PlayerId);
+    public record PlayAgainCommand(Guid PlayerId) : DrawnToDressCommand(PlayerId);
 
     /// <summary>
     /// Player exits to the main menu.
     /// </summary>
-    public record ReturnToMenuCommand(string PlayerId) : DrawnToDressCommand(PlayerId);
+    public record ReturnToMenuCommand(Guid PlayerId) : DrawnToDressCommand(PlayerId);
 
     // ── Game control ──────────────────────────────────────────────────────────
 
     /// <summary>Host pauses the game, saving the current state for later resumption.</summary>
-    public record PauseGameCommand(string PlayerId) : DrawnToDressCommand(PlayerId);
+    public record PauseGameCommand(Guid PlayerId) : DrawnToDressCommand(PlayerId);
 
     /// <summary>Host resumes a previously paused game.</summary>
-    public record ResumeGameCommand(string PlayerId) : DrawnToDressCommand(PlayerId);
+    public record ResumeGameCommand(Guid PlayerId) : DrawnToDressCommand(PlayerId);
 }

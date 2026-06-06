@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using KnockBox.Core.Primitives.Returns;
@@ -20,13 +21,13 @@ public class OperatorGameState(
 {
     public OperatorGameContext? Context { get; set; }
 
-    public ConcurrentDictionary<string, OperatorPlayerState> GamePlayers { get; } = new();
+    public ConcurrentDictionary<Guid, OperatorPlayerState> GamePlayers { get; } = new();
     
     public List<Card> Deck { get; set; } = [];
     public List<Card> DiscardPile { get; set; } = [];
     public List<ActionLogEntry> ActionLog { get; set; } = [];
     public string? LastBlockedActionMessage { get; set; }
-    public string? BlockedAttackerId { get; set; }
+    public Guid? BlockedAttackerId { get; set; }
     
     public OperatorGamePhase Phase { get; set; } = OperatorGamePhase.Setup;
     
@@ -54,10 +55,10 @@ public class OperatorGameState(
     public TurnManager TurnManager { get; } = new();
 
     public IGameActionCommand? PendingGameActionCommand { get; set; }
-    public HashSet<string> ReactionTargetPlayerIds { get; set; } = [];
+    public HashSet<Guid> ReactionTargetPlayerIds { get; set; } = [];
     public List<PlayerReaction> PlayerReactions { get; set; } = [];
 
     public int TurnCount { get; set; }
 
-    public string? WinnerPlayerId { get; set; }
+    public Guid? WinnerPlayerId { get; set; }
 }

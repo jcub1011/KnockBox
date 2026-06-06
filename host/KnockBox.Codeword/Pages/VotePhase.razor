@@ -2,7 +2,7 @@
 @using KnockBox.Codeword.Services.State.Games
 
 @{
-    var myId = UserService.CurrentUser?.Id ?? "";
+    var myId = UserService.CurrentUser?.Id ?? Guid.Empty;
     var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
     int aliveCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated);
     int votedCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated && p.HasVoted);
@@ -89,7 +89,7 @@ else
 
                 @if (_selectedTargetId is not null)
                 {
-                    var targetName = GameState.GamePlayers.TryGetValue(_selectedTargetId, out var tp) ? tp.DisplayName : "...";
+                    var targetName = _selectedTargetId is { } vtId && GameState.GamePlayers.TryGetValue(vtId, out var tp) ? tp.DisplayName : "...";
                     <div class="ctc-vote-confirm">
                         <p>Designate <strong>@targetName</strong> for termination?</p>
                         <button class="ctc-btn ctc-btn-danger" @onclick="ConfirmVote">

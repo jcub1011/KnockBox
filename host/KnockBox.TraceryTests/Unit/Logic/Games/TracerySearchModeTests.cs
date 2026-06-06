@@ -41,7 +41,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         [TestMethod]
         public async Task EnterPlaying_SearchMode_BuildsListOfConfiguredSize_FromBoardWords()
         {
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             var state = await StartGeneratedSearchAsync(host, listSize: 5);
 
             Assert.IsTrue(state.BoardFindableWords.Count >= 5, "Test assumes the board offers ≥5 words.");
@@ -54,7 +54,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         [TestMethod]
         public async Task EnterPlaying_SearchMode_ClampsListToFindableCount()
         {
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             // Ask for far more words than any board can offer.
             var state = await StartGeneratedSearchAsync(host, listSize: 100_000);
 
@@ -64,7 +64,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         [TestMethod]
         public async Task EnterPlaying_StandardMode_LeavesSearchListEmpty()
         {
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             var created = await _engine.CreateStateAsync(host);
             var state = (TraceryGameState)created.Value!;
             state.UpdateSettings(s => s with
@@ -84,7 +84,7 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         [TestMethod]
         public async Task SubmitTrace_SearchMode_BanksListedWord_RejectsUnlistedWord()
         {
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             var (state, list, offList) = await StartPinnedSearchAsync(host, listWords: 2);
 
             // A valid word that isn't a target is ignored — rejected and not banked.
@@ -107,9 +107,9 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         [TestMethod]
         public async Task SubmitTrace_SearchMode_AssignsRanksInOrder_AndEndsRoundWhenAllComplete()
         {
-            var host = UserFactory.Create("Host", "host1");
-            var p1 = UserFactory.Create("P1", "p1");
-            var p2 = UserFactory.Create("P2", "p2");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
+            var p1 = UserFactory.Create("P1", Guid.NewGuid());
+            var p2 = UserFactory.Create("P2", Guid.NewGuid());
             // Two players + host-observer → both are the participants.
             var (state, list, _) = await StartPinnedSearchAsync(host, listWords: 2, others: [p1, p2]);
 
@@ -132,10 +132,10 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         [TestMethod]
         public async Task CompleteRound_SearchMode_ScoresFlatWords_AndPlacementBonusByRank()
         {
-            var host = UserFactory.Create("Host", "host1");
-            var p1 = UserFactory.Create("P1", "p1");
-            var p2 = UserFactory.Create("P2", "p2");
-            var p3 = UserFactory.Create("P3", "p3");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
+            var p1 = UserFactory.Create("P1", Guid.NewGuid());
+            var p2 = UserFactory.Create("P2", Guid.NewGuid());
+            var p3 = UserFactory.Create("P3", Guid.NewGuid());
             const int unit = 10;
             var (state, list, _) = await StartPinnedSearchAsync(host, listWords: 2, others: [p1, p2, p3], placementUnit: unit);
             int listLengthSum = list.Sum(w => w.Word.Length);
@@ -180,9 +180,9 @@ namespace KnockBox.Tracery.Tests.Unit.Logic.Games
         [TestMethod]
         public async Task PlayerDisconnect_SearchMode_EndsRoundEarly_WhenRemainingPlayersAllCompleted()
         {
-            var host = UserFactory.Create("Host", "host1");
-            var p1 = UserFactory.Create("P1", "p1");
-            var p2 = UserFactory.Create("P2", "p2");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
+            var p1 = UserFactory.Create("P1", Guid.NewGuid());
+            var p2 = UserFactory.Create("P2", Guid.NewGuid());
 
             var created = await _engine.CreateStateAsync(host);
             var state = (TraceryGameState)created.Value!;

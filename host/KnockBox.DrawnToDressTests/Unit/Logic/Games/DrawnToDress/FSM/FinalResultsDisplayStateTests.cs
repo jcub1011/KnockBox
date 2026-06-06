@@ -27,7 +27,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             _randomMock = new Mock<IRandomNumberService>();
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
             _randomMock.Setup(r => r.GetRandomInt(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<RandomType>())).Returns(0);
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.Parse("00000000-0000-0000-0000-000000000001"));
             _engine = new DrawnToDressGameEngine(
                 _engineLoggerMock.Object,
                 _stateLoggerMock.Object,
@@ -39,8 +39,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var stateResult = await _engine.CreateStateAsync(_host);
             var state = (DrawnToDressGameState)stateResult.Value!;
             await _engine.StartAsync(_host, state);
-            state.GamePlayers["pA"] = new() { PlayerId = "pA", DisplayName = "Player A" };
-            state.GamePlayers["pB"] = new() { PlayerId = "pB", DisplayName = "Player B" };
+            state.GamePlayers[Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")] = new() { PlayerId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), DisplayName = "Player A" };
+            state.GamePlayers[Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")] = new() { PlayerId = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), DisplayName = "Player B" };
             return (state, state.Context!);
         }
 
@@ -50,8 +50,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var (state, context) = await CreateGameAsync();
             state.Leaderboard =
             [
-                new LeaderboardEntry { PlayerId = "pA", DisplayName = "Player A", TotalScore = 10, Rank = 1 },
-                new LeaderboardEntry { PlayerId = "pB", DisplayName = "Player B", TotalScore = 5, Rank = 2 },
+                new LeaderboardEntry { PlayerId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), DisplayName = "Player A", TotalScore = 10, Rank = 1 },
+                new LeaderboardEntry { PlayerId = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), DisplayName = "Player B", TotalScore = 5, Rank = 2 },
             ];
             state.PendingCoinFlipQueue = [];
 
@@ -69,20 +69,20 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             var (state, context) = await CreateGameAsync();
             state.Leaderboard =
             [
-                new LeaderboardEntry { PlayerId = "pA", DisplayName = "Player A", TotalScore = 10, MatchupWins = 2, Rank = 1 },
-                new LeaderboardEntry { PlayerId = "pB", DisplayName = "Player B", TotalScore = 10, MatchupWins = 2, Rank = 1 },
+                new LeaderboardEntry { PlayerId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"), DisplayName = "Player A", TotalScore = 10, MatchupWins = 2, Rank = 1 },
+                new LeaderboardEntry { PlayerId = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"), DisplayName = "Player B", TotalScore = 10, MatchupWins = 2, Rank = 1 },
             ];
             state.PendingCoinFlipQueue =
             [
                 new PendingCoinFlipEntry
                 {
                     Context = CoinFlipContext.FinalStandingsTie,
-                    PlayerAId = "pA",
-                    PlayerBId = "pB",
-                    CallerPlayerId = "pA",
+                    PlayerAId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"),
+                    PlayerBId = Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"),
+                    CallerPlayerId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"),
                     CallerChoseHeads = true,
                     ResultIsHeads = true,
-                    WinnerPlayerId = "pA",
+                    WinnerPlayerId = Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"),
                     IsResolved = true,
                 }
             ];
@@ -91,8 +91,8 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
 
             Assert.IsInstanceOfType<FinalResultsDisplayState>(context.Fsm.CurrentState);
             // Winner should have a better rank.
-            var winnerEntry = state.Leaderboard.First(e => e.PlayerId == "pA");
-            var loserEntry = state.Leaderboard.First(e => e.PlayerId == "pB");
+            var winnerEntry = state.Leaderboard.First(e => e.PlayerId == Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"));
+            var loserEntry = state.Leaderboard.First(e => e.PlayerId == Guid.Parse("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB"));
             Assert.IsLessThan(loserEntry.Rank, winnerEntry.Rank,
                 "Coin flip winner should have a better (lower) rank.");
             Assert.AreEqual("coin_flip", winnerEntry.TiebreakMethod);
@@ -107,7 +107,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.PendingCoinFlipQueue = [];
 
             context.Fsm.TransitionTo(context, new FinalResultsDisplayState());
-            _engine.ProcessCommand(context, new PlayAgainCommand("host1"));
+            _engine.ProcessCommand(context, new PlayAgainCommand(Guid.Parse("00000000-0000-0000-0000-000000000001")));
 
             Assert.IsInstanceOfType<LobbyState>(context.Fsm.CurrentState);
             Assert.AreEqual(GamePhase.Lobby, state.Phase);
@@ -121,7 +121,7 @@ namespace KnockBox.DrawnToDress.Tests.Unit.Logic.Games.DrawnToDress.FSM
             state.PendingCoinFlipQueue = [];
 
             context.Fsm.TransitionTo(context, new FinalResultsDisplayState());
-            _engine.ProcessCommand(context, new PlayAgainCommand("pA"));
+            _engine.ProcessCommand(context, new PlayAgainCommand(Guid.Parse("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")));
 
             Assert.IsInstanceOfType<FinalResultsDisplayState>(context.Fsm.CurrentState);
         }

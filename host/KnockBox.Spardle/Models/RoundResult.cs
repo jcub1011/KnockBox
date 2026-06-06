@@ -9,7 +9,7 @@ public class RoundResult
 
 public class PlayerRoundOutcome
 {
-    public string UserId { get; init; } = string.Empty;
+    public Guid UserId { get; init; }
     public string DisplayName { get; init; } = string.Empty;
     public int GuessCount { get; init; }
     public DateTime? FinishedAt { get; init; }

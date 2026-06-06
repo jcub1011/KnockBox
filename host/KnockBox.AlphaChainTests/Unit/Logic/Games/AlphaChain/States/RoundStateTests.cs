@@ -1,7 +1,8 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -22,10 +23,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         /// <summary>
         /// Starts a 2–N player game (host as display) with a stubbed dictionary and an
@@ -36,7 +37,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             StubWordListService words, int playerCount = 2, bool survival = false, char? banned = null)
         {
             var engine = new AlphaChainGameEngine(
-                words, new FixedRandomNumberService(), new ScoreCalculator(),
+                words, new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -48,6 +49,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             state.UpdateSettings(s => s with { EnableTutorials = false, SurvivalMode = survival });
 
             await engine.StartAsync(_host, state);
+            DrainCountdown(engine, state);
 
             if (banned is { } b)
                 state.Execute(() => state.BannedLetter = b);
@@ -55,13 +57,28 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             return (engine, state);
         }
 
+        /// <summary>Ticks past the pre-round "Get Ready" countdown so the FSM lands in RoundState.</summary>
+        private static void DrainCountdown(AlphaChainGameEngine engine, AlphaChainGameState state)
+        {
+            if (state.Phase == AlphaChainGamePhase.Countdown)
+                engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
+        }
+
         private static async Task<SubmitWordResult> SubmitAsync(
-            AlphaChainGameEngine engine, AlphaChainGameState state, string actor, string word)
+            AlphaChainGameEngine engine, AlphaChainGameState state, Guid actor, string word)
         {
             var result = await engine.SubmitWordAsync(actor, word, state);
             Assert.IsTrue(result.TryGetSuccess(out var outcome), "SubmitWordAsync unexpectedly failed.");
             return outcome;
         }
+
+        /// <summary>Score (clear of last place) so the era ban actually taxes this player. The era ban
+        /// no longer taxes whoever is in last place, and on a fresh 0–0 field the tie-broken last-place
+        /// pick is turn-order-0 — so a taxed-submitter test must first park them above the field. The
+        /// taxed word still scores 0, so the player stays at this baseline.</summary>
+        private const int NotLastPlaceScore = 100;
+        private static void ParkClearOfLastPlace(AlphaChainGameState state, Guid playerId) =>
+            state.Execute(() => state.GamePlayers[playerId].Score = NotLastPlaceScore);
 
         // ── Rejections ────────────────────────────────────────────────────────
 
@@ -82,7 +99,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             var outcome = await SubmitAsync(engine, state, current, "   ");
 
@@ -94,7 +111,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             var outcome = await SubmitAsync(engine, state, current, "zzz");
 
@@ -108,10 +125,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             using var _ = state;
 
             // First word establishes RequiredStartLetter = 't'.
-            var first = state.TurnManager.CurrentPlayer!;
+            var first = state.TurnManager.CurrentPlayer!.Value;
             await SubmitAsync(engine, state, first, "cat");
 
-            var second = state.TurnManager.CurrentPlayer!;
+            var second = state.TurnManager.CurrentPlayer!.Value;
             var outcome = await SubmitAsync(engine, state, second, "dog"); // 'd' != 't'
 
             var broken = (SubmitWordResult.RejectedChainBroken)outcome;
@@ -124,13 +141,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
 
-            var first = state.TurnManager.CurrentPlayer!;
+            var first = state.TurnManager.CurrentPlayer!.Value;
             await SubmitAsync(engine, state, first, "cat");
 
             // Free the chain so the duplicate check (not the chain rule) is what fires.
             state.Execute(() => state.RequiredStartLetter = null);
 
-            var second = state.TurnManager.CurrentPlayer!;
+            var second = state.TurnManager.CurrentPlayer!.Value;
             var outcome = await SubmitAsync(engine, state, second, "CAT");
 
             Assert.IsInstanceOfType<SubmitWordResult.RejectedDuplicate>(outcome);
@@ -143,7 +160,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
@@ -158,12 +175,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'a');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
+            ParkClearOfLastPlace(state, current);
 
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
             Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(outcome);
-            Assert.AreEqual(0, state.GamePlayers[current].Score);
+            Assert.AreEqual(NotLastPlaceScore, state.GamePlayers[current].Score, "Taxed word adds 0 → score unchanged.");
             // Banned 'a' is not the last letter, so the chain continues on 't'.
             Assert.AreEqual('t', state.RequiredStartLetter);
         }
@@ -173,12 +191,35 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 't');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
+            ParkClearOfLastPlace(state, current);
 
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
             Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(outcome);
             Assert.IsNull(state.RequiredStartLetter);
+        }
+
+        [TestMethod]
+        public async Task Submit_StampsHistoryWithCommandTime_NotWallClock()
+        {
+            // PlayedAt must come from the command timestamp threaded in, not the wall clock, so
+            // history ordering is deterministic. Times far in the past prove it isn't UtcNow.
+            var (engine, state) = await StartGameAsync(new StubWordListService("cat", "tea"), banned: 'z');
+            using var _ = state;
+
+            var t1 = new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero);
+            var t2 = t1.AddMinutes(5);
+
+            var first = state.TurnManager.CurrentPlayer!.Value;
+            await engine.SubmitWordAsync(first, "cat", state, t1);
+
+            var second = state.TurnManager.CurrentPlayer!.Value;
+            await engine.SubmitWordAsync(second, "tea", state, t2);
+
+            Assert.AreEqual(2, state.SubmissionHistory.Count);
+            Assert.AreEqual(t1, state.SubmissionHistory[0].PlayedAt);
+            Assert.AreEqual(t2, state.SubmissionHistory[1].PlayedAt);
         }
 
         // ── Shot-clock timeout ──────────────────────────────────────────────────
@@ -189,7 +230,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var (engine, state) = await StartGameAsync(
                 new StubWordListService("cat"), playerCount: 3, survival: true, banned: 'z');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             engine.Tick(state.Context!, DateTimeOffset.UtcNow.AddMinutes(1));
 
@@ -203,7 +244,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             engine.Tick(state.Context!, DateTimeOffset.UtcNow.AddMinutes(1));
 
@@ -232,7 +273,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'z');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
 
             // now < PhaseEndTime → nothing happens.
             engine.Tick(state.Context!, DateTimeOffset.UtcNow);
@@ -250,13 +291,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // the chain-clearing effect is independent of the Zero-Point Tax the word incurs.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 't');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
+            ParkClearOfLastPlace(state, current);
 
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
             // 't' is banned and present → Zero-Point Tax (score 0)…
             Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(outcome);
-            Assert.AreEqual(0, state.GamePlayers[current].Score);
+            Assert.AreEqual(NotLastPlaceScore, state.GamePlayers[current].Score, "Taxed word adds 0 → score unchanged.");
             // …but as the LAST letter it still clears the chain for the next player.
             Assert.IsNull(state.RequiredStartLetter);
         }
@@ -268,7 +310,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             // but it still incurs the Zero-Point Tax.
             var (engine, state) = await StartGameAsync(new StubWordListService("cat"), banned: 'a');
             using var _ = state;
-            var current = state.TurnManager.CurrentPlayer!;
+            var current = state.TurnManager.CurrentPlayer!.Value;
+            ParkClearOfLastPlace(state, current);
 
             // No prior play → RequiredStartLetter is null (free choice).
             Assert.IsNull(state.RequiredStartLetter);
@@ -276,7 +319,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var outcome = await SubmitAsync(engine, state, current, "cat");
 
             Assert.IsInstanceOfType<SubmitWordResult.AcceptedZeroPointTax>(outcome);
-            Assert.AreEqual(0, state.GamePlayers[current].Score);
+            Assert.AreEqual(NotLastPlaceScore, state.GamePlayers[current].Score, "Taxed word adds 0 → score unchanged.");
             // 'a' is not the last letter → the chain continues on 't'.
             Assert.AreEqual('t', state.RequiredStartLetter);
         }

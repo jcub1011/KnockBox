@@ -1,4 +1,5 @@
 using System.Text;
+using KnockBox.Core.Primitives.Returns;
 using KnockBox.Platform.Plugins;
 
 namespace KnockBox.PlatformTests.Unit;
@@ -24,6 +25,14 @@ public sealed class DefaultPluginStorageTests
         catch { /* best-effort */ }
     }
 
+    /// <summary>Opens a write stream, asserts success, and closes it immediately.</summary>
+    private static void WriteEmpty(DefaultPluginStorage storage, string relativePath)
+    {
+        var result = storage.OpenWrite(relativePath);
+        Assert.IsTrue(result.TryGetSuccess(out var stream));
+        stream.Dispose();
+    }
+
     // ─── Round-trip ─────────────────────────────────────────────────────────
 
     [TestMethod]
@@ -34,15 +43,19 @@ public sealed class DefaultPluginStorageTests
         {
             var storage = new DefaultPluginStorage(root);
 
-            using (var write = storage.OpenWrite("hello.txt"))
+            var writeResult = storage.OpenWrite("hello.txt");
+            Assert.IsTrue(writeResult.TryGetSuccess(out var write));
+            using (write)
             {
                 var bytes = Encoding.UTF8.GetBytes("world");
                 write.Write(bytes, 0, bytes.Length);
             }
 
-            using var read = storage.OpenRead("hello.txt");
-            using var sr = new StreamReader(read);
-            Assert.AreEqual("world", sr.ReadToEnd());
+            var readResult = storage.OpenRead("hello.txt");
+            Assert.IsTrue(readResult.TryGetSuccess(out var read));
+            using (read)
+            using (var sr = new StreamReader(read))
+                Assert.AreEqual("world", sr.ReadToEnd());
         }
         finally { SafeDelete(root); }
     }
@@ -55,7 +68,9 @@ public sealed class DefaultPluginStorageTests
         {
             var storage = new DefaultPluginStorage(root);
 
-            using (var write = storage.OpenWrite("a/b/c.txt"))
+            var writeResult = storage.OpenWrite("a/b/c.txt");
+            Assert.IsTrue(writeResult.TryGetSuccess(out var write));
+            using (write)
                 write.WriteByte(0x42);
 
             Assert.IsTrue(Directory.Exists(Path.Combine(root, "a", "b")));
@@ -122,7 +137,9 @@ public sealed class DefaultPluginStorageTests
             var storage = new DefaultPluginStorage(root);
 
             // foo/../bar.txt resolves lexically to <root>/bar.txt — inside root.
-            using (var write = storage.OpenWrite("foo/../bar.txt"))
+            var writeResult = storage.OpenWrite("foo/../bar.txt");
+            Assert.IsTrue(writeResult.TryGetSuccess(out var write));
+            using (write)
                 write.WriteByte(0x10);
 
             Assert.IsTrue(File.Exists(Path.Combine(root, "bar.txt")));
@@ -168,13 +185,13 @@ public sealed class DefaultPluginStorageTests
         {
             var storage = new DefaultPluginStorage(root);
 
-            using (storage.OpenWrite("top.txt")) { }
-            using (storage.OpenWrite("sub/inner.txt")) { }
-            using (storage.OpenWrite("sub/deep/leaf.txt")) { }
+            WriteEmpty(storage, "top.txt");
+            WriteEmpty(storage, "sub/inner.txt");
+            WriteEmpty(storage, "sub/deep/leaf.txt");
 
-            var results = storage.EnumerateFiles(relativeDir: "", searchPattern: "*")
-                .OrderBy(s => s)
-                .ToArray();
+            var enumResult = storage.EnumerateFiles(relativeDir: "", searchPattern: "*");
+            Assert.IsTrue(enumResult.TryGetSuccess(out var files));
+            var results = files.OrderBy(s => s).ToArray();
 
             CollectionAssert.AreEqual(
                 new[] { "sub/deep/leaf.txt", "sub/inner.txt", "top.txt" },
@@ -191,7 +208,8 @@ public sealed class DefaultPluginStorageTests
         {
             var storage = new DefaultPluginStorage(root);
 
-            var results = storage.EnumerateFiles("never/existed", "*").ToArray();
+            var enumResult = storage.EnumerateFiles("never/existed", "*");
+            Assert.IsTrue(enumResult.TryGetSuccess(out var results));
 
             Assert.IsEmpty(results);
         }
@@ -208,8 +226,8 @@ public sealed class DefaultPluginStorageTests
         {
             var storage = new DefaultPluginStorage(root);
 
-            // Does not throw.
-            storage.Delete("nothing-here.txt");
+            // Deleting a nonexistent file is a no-op success (does not throw).
+            Assert.IsTrue(storage.Delete("nothing-here.txt").IsSuccess);
         }
         finally { SafeDelete(root); }
     }
@@ -240,7 +258,7 @@ public sealed class DefaultPluginStorageTests
 
             Assert.IsFalse(storage.Exists("missing.txt"));
 
-            using (storage.OpenWrite("missing.txt")) { }
+            WriteEmpty(storage, "missing.txt");
 
             Assert.IsTrue(storage.Exists("missing.txt"));
         }
@@ -377,9 +395,11 @@ public sealed class DefaultPluginStorageTests
 
             var storage = new DefaultPluginStorage(root);
 
-            using var stream = storage.OpenRead("link/ok.txt");
-            using var sr = new StreamReader(stream);
-            Assert.AreEqual("inside", sr.ReadToEnd());
+            var readResult = storage.OpenRead("link/ok.txt");
+            Assert.IsTrue(readResult.TryGetSuccess(out var stream));
+            using (stream)
+            using (var sr = new StreamReader(stream))
+                Assert.AreEqual("inside", sr.ReadToEnd());
         }
         finally { SafeDelete(workspace); }
     }
@@ -502,7 +522,9 @@ public sealed class DefaultPluginStorageTests
 
             var storage = new DefaultPluginStorage(linkedRoot);
 
-            using (var w = storage.OpenWrite("hello.txt"))
+            var writeResult = storage.OpenWrite("hello.txt");
+            Assert.IsTrue(writeResult.TryGetSuccess(out var w));
+            using (w)
             {
                 var bytes = System.Text.Encoding.UTF8.GetBytes("normalized");
                 w.Write(bytes, 0, bytes.Length);
@@ -511,9 +533,11 @@ public sealed class DefaultPluginStorageTests
             // File must exist at the real target, not through the symlink alias.
             Assert.IsTrue(File.Exists(Path.Combine(realRoot, "hello.txt")));
 
-            using var r = storage.OpenRead("hello.txt");
-            using var sr = new StreamReader(r);
-            Assert.AreEqual("normalized", sr.ReadToEnd());
+            var readResult = storage.OpenRead("hello.txt");
+            Assert.IsTrue(readResult.TryGetSuccess(out var r));
+            using (r)
+            using (var sr = new StreamReader(r))
+                Assert.AreEqual("normalized", sr.ReadToEnd());
         }
         finally { SafeDelete(workspace); }
     }
@@ -550,9 +574,11 @@ public sealed class DefaultPluginStorageTests
 
             var storage = new DefaultPluginStorage(root);
 
-            using var stream = storage.OpenRead("link1/target.txt");
-            using var sr = new StreamReader(stream);
-            Assert.AreEqual("reachable", sr.ReadToEnd());
+            var readResult = storage.OpenRead("link1/target.txt");
+            Assert.IsTrue(readResult.TryGetSuccess(out var stream));
+            using (stream)
+            using (var sr = new StreamReader(stream))
+                Assert.AreEqual("reachable", sr.ReadToEnd());
         }
         finally { SafeDelete(workspace); }
     }

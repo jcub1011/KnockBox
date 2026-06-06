@@ -31,14 +31,14 @@ namespace KnockBox.HiddenAgenda.Tests.Unit.Logic.States
             _loggerMock = new Mock<ILogger>();
             _stateLoggerMock = new Mock<ILogger<HiddenAgendaGameState>>();
             
-            var host = UserFactory.Create("Host", "host1");
+            var host = UserFactory.Create("Host", Guid.Parse("00000000-0000-0000-0000-000000000001"));
             _state = new HiddenAgendaGameState(host, _stateLoggerMock.Object);
             _state.BoardGraph = BoardDefinitions.CreateGrandCircuit();
             
             _context = new HiddenAgendaGameContext(_state, _rngMock.Object, _loggerMock.Object);
             _stateLogic = new RevealState();
 
-            _state.GamePlayers["p1"] = new HiddenAgendaPlayerState { PlayerId = "p1", DisplayName = "P1" };
+            _state.GamePlayers[Guid.Parse("11111111-1111-1111-1111-111111111111")] = new HiddenAgendaPlayerState { PlayerId = Guid.Parse("11111111-1111-1111-1111-111111111111"), DisplayName = "P1" };
         }
 
         [TestMethod]

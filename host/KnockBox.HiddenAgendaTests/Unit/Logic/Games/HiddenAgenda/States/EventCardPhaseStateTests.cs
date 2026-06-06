@@ -23,6 +23,8 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         private HiddenAgendaGameState _state = default!;
         private HiddenAgendaGameContext _context = default!;
 
+        private Guid[] _playerIds = default!;
+
         [TestInitialize]
         public void Setup()
         {
@@ -30,27 +32,28 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             _logger = new Mock<ILogger>();
             _stateLogger = new Mock<ILogger<HiddenAgendaGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.NewGuid());
             _state = new HiddenAgendaGameState(host, _stateLogger.Object);
             _state.BoardGraph = BoardDefinitions.CreateGrandCircuit();
             _context = new HiddenAgendaGameContext(_state, _rng.Object, _logger.Object);
 
+            _playerIds = new Guid[4];
             for (int i = 0; i < 4; i++)
             {
-                var pid = $"p{i}";
-                _state.GamePlayers[pid] = new HiddenAgendaPlayerState
+                _playerIds[i] = Guid.NewGuid();
+                _state.GamePlayers[_playerIds[i]] = new HiddenAgendaPlayerState
                 {
-                    PlayerId = pid,
+                    PlayerId = _playerIds[i],
                     DisplayName = $"Player {i}"
                 };
             }
-            _state.TurnManager.SetTurnOrder(["p0", "p1", "p2", "p3"]);
+            _state.TurnManager.SetTurnOrder(_playerIds);
         }
 
         [TestMethod]
         public void OnEnter_NoEventCard_TransitionsToSpinPhase()
         {
-            _state.GamePlayers["p0"].HeldEventCard = null;
+            _state.GamePlayers[_playerIds[0]].HeldEventCard = null;
             var state = new EventCardPhaseState();
             var result = state.OnEnter(_context);
             Assert.IsTrue(result.IsSuccess);
@@ -60,7 +63,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         [TestMethod]
         public void OnEnter_HasEventCard_StaysInState()
         {
-            _state.GamePlayers["p0"].HeldEventCard = EventCardDefinitions.Catalog;
+            _state.GamePlayers[_playerIds[0]].HeldEventCard = EventCardDefinitions.Catalog;
             var state = new EventCardPhaseState();
             var result = state.OnEnter(_context);
             Assert.IsTrue(result.IsSuccess);
@@ -71,11 +74,11 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         [TestMethod]
         public void PlayCatalog_Valid_RevealsCardsAndEndsTurn()
         {
-            var p0 = _state.GamePlayers["p0"];
-            var p1 = _state.GamePlayers["p1"];
+            var p0 = _state.GamePlayers[_playerIds[0]];
+            var p1 = _state.GamePlayers[_playerIds[1]];
             p0.HeldEventCard = EventCardDefinitions.Catalog;
-            
-            var drawn = new List<CurationCard> { 
+
+            var drawn = new List<CurationCard> {
                 new(CurationCardType.Acquire, "C1", []),
                 new(CurationCardType.Acquire, "C2", []),
                 new(CurationCardType.Acquire, "C3", [])
@@ -85,46 +88,46 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new EventCardPhaseState();
             state.OnEnter(_context);
 
-            var result = state.HandleCommand(_context, new PlayCatalogCommand("p0", "p1"));
-            
+            var result = state.HandleCommand(_context, new PlayCatalogCommand(_playerIds[0], _playerIds[1]));
+
             Assert.IsTrue(result.IsSuccess);
             Assert.IsNotNull(_state.CatalogRevealedCards);
             Assert.HasCount(3, _state.CatalogRevealedCards);
             Assert.IsNull(p0.HeldEventCard);
-            
+
             // AdvanceToNextPlayer returns EventCardPhaseState for next player
             Assert.IsInstanceOfType<EventCardPhaseState>(result.Value);
-            Assert.AreEqual("p1", _state.TurnManager.CurrentPlayer);
+            Assert.AreEqual(_playerIds[1], _state.TurnManager.CurrentPlayer);
         }
 
         [TestMethod]
         public void PlayDetour_Valid_SetsPendingAndTransitionsToSpin()
         {
-            var p0 = _state.GamePlayers["p0"];
-            var p1 = _state.GamePlayers["p1"];
+            var p0 = _state.GamePlayers[_playerIds[0]];
+            var p1 = _state.GamePlayers[_playerIds[1]];
             p0.HeldEventCard = EventCardDefinitions.Detour;
             p1.LastMoveDestination = 5;
 
             var state = new EventCardPhaseState();
             state.OnEnter(_context);
 
-            var result = state.HandleCommand(_context, new PlayDetourCommand("p0", "p1"));
-            
+            var result = state.HandleCommand(_context, new PlayDetourCommand(_playerIds[0], _playerIds[1]));
+
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<SpinPhaseState>(result.Value);
             Assert.IsTrue(p0.DetourPending);
-            Assert.AreEqual("p1", p0.DetourTargetPlayerId);
+            Assert.AreEqual(_playerIds[1], p0.DetourTargetPlayerId);
             Assert.IsNull(p0.HeldEventCard);
         }
 
         [TestMethod]
         public void SkipEventCard_TransitionsToSpinPhase()
         {
-            _state.GamePlayers["p0"].HeldEventCard = EventCardDefinitions.Catalog;
+            _state.GamePlayers[_playerIds[0]].HeldEventCard = EventCardDefinitions.Catalog;
             var state = new EventCardPhaseState();
             state.OnEnter(_context);
 
-            var result = state.HandleCommand(_context, new SkipEventCardCommand("p0"));
+            var result = state.HandleCommand(_context, new SkipEventCardCommand(_playerIds[0]));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<SpinPhaseState>(result.Value);
         }
@@ -133,7 +136,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         public void Tick_AutoSkipsAfterTimeout()
         {
             _state.UpdateSettings(s => s with { EnableTimers = true });
-            _state.GamePlayers["p0"].HeldEventCard = EventCardDefinitions.Catalog;
+            _state.GamePlayers[_playerIds[0]].HeldEventCard = EventCardDefinitions.Catalog;
             var state = new EventCardPhaseState();
             state.OnEnter(_context);
 
@@ -145,7 +148,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         [TestMethod]
         public void Tick_TimersDisabled_DoesNotAutoAdvance()
         {
-            _state.GamePlayers["p0"].HeldEventCard = EventCardDefinitions.Catalog;
+            _state.GamePlayers[_playerIds[0]].HeldEventCard = EventCardDefinitions.Catalog;
             var state = new EventCardPhaseState();
             state.OnEnter(_context);
 
@@ -157,11 +160,11 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
         [TestMethod]
         public void CallVote_AnyPlayer_TransitionsToFinalGuess()
         {
-            _state.GamePlayers["p0"].HeldEventCard = EventCardDefinitions.Catalog;
+            _state.GamePlayers[_playerIds[0]].HeldEventCard = EventCardDefinitions.Catalog;
             var state = new EventCardPhaseState();
             state.OnEnter(_context);
 
-            var result = state.HandleCommand(_context, new CallVoteCommand("p1"));
+            var result = state.HandleCommand(_context, new CallVoteCommand(_playerIds[1]));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<FinalGuessState>(result.Value);
         }

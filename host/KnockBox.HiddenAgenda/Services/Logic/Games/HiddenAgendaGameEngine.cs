@@ -133,13 +133,13 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
             return ProcessCommand(ctx, new SelectTradeOptionCommand(player.Id, useAlternate));
         }
 
-        public Result PlayCatalog(User player, HiddenAgendaGameState state, string targetPlayerId)
+        public Result PlayCatalog(User player, HiddenAgendaGameState state, Guid targetPlayerId)
         {
             if (!TryGetContext(state, out var ctx, out var err)) return err;
             return ProcessCommand(ctx, new PlayCatalogCommand(player.Id, targetPlayerId));
         }
 
-        public Result PlayDetour(User player, HiddenAgendaGameState state, string targetPlayerId)
+        public Result PlayDetour(User player, HiddenAgendaGameState state, Guid targetPlayerId)
         {
             if (!TryGetContext(state, out var ctx, out var err)) return err;
             return ProcessCommand(ctx, new PlayDetourCommand(player.Id, targetPlayerId));
@@ -157,7 +157,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
             return ProcessCommand(ctx, new SelectEventCardActionCommand(player.Id, keepNewCard));
         }
 
-        public Result SubmitGuess(User player, HiddenAgendaGameState state, Dictionary<string, List<string>> guesses)
+        public Result SubmitGuess(User player, HiddenAgendaGameState state, Dictionary<Guid, List<string>> guesses)
         {
             if (!TryGetContext(state, out var ctx, out var err)) return err;
             return ProcessCommand(ctx, new SubmitGuessCommand(player.Id, guesses));
@@ -175,7 +175,7 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
             return ProcessCommand(ctx, new SkipGuessCommand(player.Id));
         }
 
-        public Result SubmitFinalGuess(User player, HiddenAgendaGameState state, Dictionary<string, List<string>> guesses)
+        public Result SubmitFinalGuess(User player, HiddenAgendaGameState state, Dictionary<Guid, List<string>> guesses)
         {
             if (!TryGetContext(state, out var ctx, out var err)) return err;
             return ProcessCommand(ctx, new SubmitFinalGuessCommand(player.Id, guesses));

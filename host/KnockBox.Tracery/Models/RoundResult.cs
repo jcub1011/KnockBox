@@ -18,7 +18,7 @@ namespace KnockBox.Tracery.Models
     /// <summary>One player's outcome within a single round.</summary>
     public sealed record TraceryPlayerRoundOutcome
     {
-        public string UserId { get; init; } = string.Empty;
+        public Guid UserId { get; init; }
         public string DisplayName { get; init; } = string.Empty;
 
         /// <summary>Points earned this round (sum of <see cref="WordScores"/> points).</summary>

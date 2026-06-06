@@ -44,7 +44,7 @@ public class HiddenAgendaGameState(User host, ILogger<HiddenAgendaGameState> log
         Execute(() => { Settings = mutate(Settings); });
 
     // Player state
-    public ConcurrentDictionary<string, HiddenAgendaPlayerState> GamePlayers { get; } = new();
+    public ConcurrentDictionary<Guid, HiddenAgendaPlayerState> GamePlayers { get; } = new();
 
     // Turn management
     public TurnManager TurnManager { get; } = new();
@@ -76,13 +76,13 @@ public class HiddenAgendaGameState(User host, ILogger<HiddenAgendaGameState> log
     public List<CurationCard>? CatalogRevealedCards { get; set; }  // Catalog result for current player
 
     public List<RoundResult> RoundResults { get; } = [];
-    public string? MatchWinner { get; set; }
+    public Guid? MatchWinner { get; set; }
 }
 
-public record RoundResult(int RoundNumber, Dictionary<string, PlayerRoundResult> PlayerResults);
+public record RoundResult(int RoundNumber, Dictionary<Guid, PlayerRoundResult> PlayerResults);
 
 public record PlayerRoundResult(
-    string PlayerId,
+    Guid PlayerId,
     string DisplayName,
     List<TaskResult> TaskResults,
     int TaskPoints,
@@ -108,7 +108,7 @@ public enum GamePhase
 
 public record TurnRecord(
     int TurnNumber,
-    string PlayerId,
+    Guid PlayerId,
     CardPlayRecord? CardPlay,
     int SpaceId,
     Wing Wing

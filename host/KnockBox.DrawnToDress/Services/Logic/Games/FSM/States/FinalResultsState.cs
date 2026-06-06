@@ -24,8 +24,7 @@ namespace KnockBox.DrawnToDress.Services.Logic.Games.FSM.States
         {
             context.Logger.LogDebug("FSM → FinalResultsState. Computing leaderboard.");
 
-            var players = context.GamePlayers.ToDictionary(
-                kv => kv.Key, kv => kv.Value) as IReadOnlyDictionary<string, DrawnToDressPlayerState>;
+            var players = (IReadOnlyDictionary<Guid, DrawnToDressPlayerState>)context.GamePlayers;
 
             // 1. Calculate player totals (before tournament winner bonus).
             var playerTotals = DrawnToDressScoringService.CalculatePlayerTotals(

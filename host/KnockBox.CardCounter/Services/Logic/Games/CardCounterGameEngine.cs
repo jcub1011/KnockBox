@@ -144,7 +144,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
         }
 
         /// <summary>Active player plays an action card from their hand.</summary>
-        public Result PlayActionCard(User player, CardCounterGameState state, int cardIndex, string? targetPlayerId = null)
+        public Result PlayActionCard(User player, CardCounterGameState state, int cardIndex, Guid? targetPlayerId = null)
         {
             if (!TryGetContext(state, out var ctx, out var err)) return err;
             return ProcessCommand(ctx, new PlayActionCardCommand(player.Id, cardIndex, targetPlayerId));
@@ -187,7 +187,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
         /// <summary>
         /// Active player selects the target for a Not My Money operator redirect.
         /// </summary>
-        public Result NotMyMoneySelectTarget(User player, CardCounterGameState state, string targetPlayerId)
+        public Result NotMyMoneySelectTarget(User player, CardCounterGameState state, Guid targetPlayerId)
         {
             if (!TryGetContext(state, out var ctx, out var err)) return err;
             return ProcessCommand(ctx, new NotMyMoneySelectTargetCommand(player.Id, targetPlayerId));
@@ -315,7 +315,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
             // Register every participant. When the host is configured as a participant,
             // state.Participants includes the host (at index 0) alongside the joined players;
             // otherwise it equals state.Players (non-host only), preserving prior behavior.
-            var playerIds = new List<string>();
+            var playerIds = new List<Guid>();
             foreach (var entry in state.Participants)
             {
                 var ps = new PlayerState

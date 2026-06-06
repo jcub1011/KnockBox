@@ -2,10 +2,10 @@
 @using KnockBox.Codeword.Services.State.Games
 
 @{
-    var myId = UserService.CurrentUser?.Id ?? string.Empty;
+    var myId = UserService.CurrentUser?.Id ?? Guid.Empty;
     var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
     GameState.GamePlayers.TryGetValue(myId, out var playerState);
-    var activeId = GameState.TurnManager.CurrentPlayer ?? "";
+    var activeId = GameState.TurnManager.CurrentPlayer ?? Guid.Empty;
     var isMyTurn = !isHostSpectator && myId == activeId;
     var activePlayerName = GameState.GamePlayers.TryGetValue(activeId, out var activePs) ? activePs.DisplayName : "...";
 }

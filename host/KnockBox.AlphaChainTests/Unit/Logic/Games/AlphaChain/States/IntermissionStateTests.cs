@@ -1,8 +1,9 @@
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards;
+using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
+using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM.States;
-using KnockBox.AlphaChain.Services.Logic.Scoring;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Tests.Unit.Support;
 using KnockBox.Core.Services.State.Users;
@@ -28,10 +29,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         {
             _engineLoggerMock = new Mock<ILogger<AlphaChainGameEngine>>();
             _stateLoggerMock = new Mock<ILogger<AlphaChainGameState>>();
-            _host = UserFactory.Create("Host", "host1");
+            _host = UserFactory.Create("Host", Guid.NewGuid());
         }
 
-        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", $"p{index}-id");
+        private static User MakePlayer(int index) => UserFactory.Create($"Player{index}", Guid.NewGuid());
 
         /// <summary>
         /// Starts a host-as-display game with <paramref name="playerCount"/> players and a fixed RNG
@@ -41,7 +42,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             int playerCount = 4, Action<AlphaChainGameState>? configure = null)
         {
             var engine = new AlphaChainGameEngine(
-                new StubWordListService(), new FixedRandomNumberService(), new ScoreCalculator(),
+                new StubWordListService(), new FixedRandomNumberService(), new EngineEvaluator(), new ModifierCardFactory(),
                 _engineLoggerMock.Object, _stateLoggerMock.Object);
 
             var state = (AlphaChainGameState)(await engine.CreateStateAsync(_host)).Value!;
@@ -61,6 +62,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
         /// and opens Optimization directly — no Deal/Expansion dwell sub-phases).</summary>
         private static void EnterIntermission(AlphaChainGameState state)
             => state.Execute(() => state.Context!.Fsm.TransitionTo(state.Context, new IntermissionState()));
+
+        /// <summary>Ticks past the pre-round "Get Ready" countdown so the FSM lands in RoundState.</summary>
+        private static void DrainCountdown(AlphaChainGameEngine engine, AlphaChainGameState state)
+        {
+            if (state.Phase == AlphaChainGamePhase.Countdown)
+                engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
+        }
 
         // ── Deal + Expansion (applied instantly on entry) ──────────────────────
 
@@ -127,21 +135,21 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var clock = AdvanceToOptimization(engine, state);
 
             var playerId = state.TurnManager.TurnOrder[0];
-            var dealt = state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList();
+            var dealt = state.GamePlayers[playerId].EngineBay.Select(c => c.GetId().ToString()).ToList();
             var reversed = dealt.AsEnumerable().Reverse().ToList();
 
             var result = await engine.SubmitOptimizationAsync(playerId, reversed, state);
             Assert.IsTrue(result.IsSuccess, "valid optimization should be accepted");
 
             // Live bay must not change until the sub-phase ends (fog-of-war).
-            CollectionAssert.AreEqual(dealt, state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList());
+            CollectionAssert.AreEqual(dealt, state.GamePlayers[playerId].EngineBay.Select(c => c.GetId().ToString()).ToList());
 
             // Optimization closes → submissions applied.
             clock = clock.AddSeconds(60);
             engine.Tick(state.Context!, clock);
 
             Assert.AreEqual(IntermissionSubPhase.SniperBan, state.IntermissionPhase);
-            CollectionAssert.AreEqual(reversed, state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList());
+            CollectionAssert.AreEqual(reversed, state.GamePlayers[playerId].EngineBay.Select(c => c.GetId().ToString()).ToList());
         }
 
         [TestMethod]
@@ -154,7 +162,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             foreach (var id in state.TurnManager.TurnOrder)
             {
-                var ids = state.GamePlayers[id].EngineBay.Select(c => c.Id).ToList();
+                var ids = state.GamePlayers[id].EngineBay.Select(c => c.GetId().ToString()).ToList();
                 await engine.SubmitOptimizationAsync(id, ids, state);
             }
 
@@ -174,13 +182,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var clock = AdvanceToOptimization(engine, state);
 
             var playerId = state.TurnManager.TurnOrder[0];
-            var dealt = state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList();
+            var dealt = state.GamePlayers[playerId].EngineBay.Select(c => c.GetId().ToString()).ToList();
 
             // No submission; slots (4) >= cards (3) so nothing is discarded.
             clock = clock.AddSeconds(60);
             engine.Tick(state.Context!, clock);
 
-            CollectionAssert.AreEqual(dealt, state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList());
+            CollectionAssert.AreEqual(dealt, state.GamePlayers[playerId].EngineBay.Select(c => c.GetId().ToString()).ToList());
         }
 
         [TestMethod]
@@ -208,7 +216,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
 
             var playerId = state.TurnManager.TurnOrder[0];
             // Slots are 4 after expansion; ask to keep more ids than that.
-            var tooMany = state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList();
+            var tooMany = state.GamePlayers[playerId].EngineBay.Select(c => c.GetId().ToString()).ToList();
             tooMany.AddRange(["x1", "x2", "x3"]); // 6 ids > 4 slots
 
             var result = await engine.SubmitOptimizationAsync(playerId, tooMany, state);
@@ -270,13 +278,15 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             EnterIntermission(state);
             AdvanceToSniperBan(engine, state);
 
-            var picker = state.SniperBanUserId!;
+            var picker = state.SniperBanUserId!.Value;
             var result = await engine.SelectSniperBanAsync(picker, 'q', state);
 
             Assert.IsTrue(result.IsSuccess);
             Assert.AreEqual('q', state.BannedLetter);
-            Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
             Assert.AreEqual(eraBefore + 1, state.CurrentEra);
+            // A "Get Ready" countdown now precedes the next era's round; it drains into RoundState.
+            DrainCountdown(engine, state);
+            Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
         }
 
         [TestMethod]
@@ -288,14 +298,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             AdvanceToSniperBan(engine, state);
 
             // Give the picker a Roulette Wheel before the era completes, so it's in the final bay.
-            var picker = state.SniperBanUserId!;
-            state.Execute(() => state.GamePlayers[picker].EngineBay.Add(ModifierLibrary.FindById("roulette-wheel")!));
+            var picker = state.SniperBanUserId!.Value;
+            state.Execute(() => state.GamePlayers[picker].EngineBay.Add(TestModifierCards.Create("roulette-wheel")));
 
             await engine.SelectSniperBanAsync(picker, 'q', state); // era advances → RollPersonalBans
 
-            var bans = state.GamePlayers[picker].CardBannedLetters;
-            Assert.IsTrue(bans.ContainsKey("roulette-wheel"), "Roulette Wheel rolls a personal ban at era start.");
-            Assert.AreNotEqual('q', bans["roulette-wheel"], "The rolled personal ban dodges the era banned letter.");
+            var rolledBan = RoomStateProbe.CardBan(state, picker, TestModifierCards.ToId("roulette-wheel"));
+            Assert.IsNotNull(rolledBan, "Roulette Wheel rolls a personal ban at era start.");
+            Assert.AreNotEqual('q', rolledBan, "The rolled personal ban dodges the era banned letter.");
         }
 
         [TestMethod]
@@ -306,17 +316,12 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             EnterIntermission(state);
             AdvanceToSniperBan(engine, state);
 
-            var picker = state.SniperBanUserId!;
-            state.Execute(() =>
-            {
-                state.GamePlayers[picker].HyperDriveActive = true;
-                state.GamePlayers[picker].PlayedDoubleLetterWordThisEra = true;
-            });
+            var picker = state.SniperBanUserId!.Value;
+            state.Execute(() => RoomStateProbe.MarkDoubleLetterPlayed(state, picker));
 
             await engine.SelectSniperBanAsync(picker, 'q', state);
 
-            Assert.IsFalse(state.GamePlayers[picker].HyperDriveActive, "Hyper-Drive latch clears across an era.");
-            Assert.IsFalse(state.GamePlayers[picker].PlayedDoubleLetterWordThisEra, "Double-letter flag resets each era.");
+            Assert.IsFalse(RoomStateProbe.PlayedDoubleLetterWordThisEra(state, picker), "Double-letter flag resets each era.");
             // The Titanium Mirror's decayed multiplier is intentionally NOT era-scoped — see
             // Mirror_DecayPersistsAcrossEras_WhenKept and Mirror_ResetsToOne_WhenFreshShieldDealt.
         }
@@ -332,11 +337,11 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             using var _ = state;
 
             var playerId = state.TurnManager.TurnOrder[0];
-            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(ModifierLibrary.FindById("titanium-mirror")!));
+            state.Execute(() => state.GamePlayers[playerId].EngineBay.Add(TestModifierCards.Create("titanium-mirror")));
 
             EnterIntermission(state);
 
-            Assert.AreEqual(1, state.GamePlayers[playerId].EngineBay.Count(c => c.Shield is not null),
+            Assert.AreEqual(1, state.GamePlayers[playerId].EngineBay.Count(c => TestModifierCards.IsShield(c)),
                 "a player who already holds a shield must never be dealt a second one");
         }
 
@@ -349,16 +354,16 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             AdvanceToSniperBan(engine, state);
 
             // Picker keeps a decayed mirror into the next era; nothing deals them a replacement.
-            var picker = state.SniperBanUserId!;
+            var picker = state.SniperBanUserId!.Value;
             state.Execute(() =>
             {
-                state.GamePlayers[picker].EngineBay.Add(ModifierLibrary.FindById("titanium-mirror")!);
-                state.GamePlayers[picker].ShieldMultiplier = 0.6;
+                state.GamePlayers[picker].EngineBay.Add(TestModifierCards.Create("titanium-mirror"));
+                RoomStateProbe.SetShieldMultiplier(state, picker, 0.6);
             });
 
             await engine.SelectSniperBanAsync(picker, 'q', state); // era advances → CompleteIntermission
 
-            Assert.AreEqual(0.6, state.GamePlayers[picker].ShieldMultiplier, 1e-9,
+            Assert.AreEqual(0.6, RoomStateProbe.ShieldMultiplier(state, picker), 1e-9,
                 "a kept mirror carries its decayed multiplier across the era boundary");
         }
 
@@ -376,15 +381,15 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             {
                 var player = state.GamePlayers[playerId];
                 player.EngineBay.Clear();
-                player.EngineBay.AddRange(ModifierLibrary.All.Where(c => c.Shield is null));
-                player.ShieldMultiplier = 0.6; // dormant decay left over from a discarded mirror
+                player.EngineBay.AddRange(ModifierCardFactory.AllDealableIds.Where(id => !ModifierCardFactory.ShieldIds.Contains(id)).Select(id => TestModifierCards.Create(id)));
+                RoomStateProbe.SetShieldMultiplier(state, playerId, 0.6); // dormant decay left over from a discarded mirror
             });
 
             EnterIntermission(state); // DealCards must hand this player the mirror and reset to 1.0
 
             var dealt = state.GamePlayers[playerId];
-            Assert.IsTrue(dealt.EngineBay.Any(c => c.Shield is not null), "the only legal draw is the mirror");
-            Assert.AreEqual(1.0, dealt.ShieldMultiplier, 1e-9,
+            Assert.IsTrue(dealt.EngineBay.Any(c => TestModifierCards.IsShield(c)), "the only legal draw is the mirror");
+            Assert.AreEqual(1.0, RoomStateProbe.ShieldMultiplier(state, playerId), 1e-9,
                 "a freshly dealt (replacement) mirror resets the decayed multiplier to 1.0");
         }
 
@@ -400,6 +405,8 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             clock = clock.AddSeconds(60);
             engine.Tick(state.Context!, clock); // SniperBan timeout
 
+            // A "Get Ready" countdown now precedes the next era's round; it drains into RoundState.
+            DrainCountdown(engine, state);
             Assert.AreEqual(AlphaChainGamePhase.Round, state.Phase);
             Assert.IsTrue(state.BannedLetter is { } b && "aeiou".Contains(b), "timeout letter must be legal under Vowels");
         }
@@ -413,7 +420,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             EnterIntermission(state);
             AdvanceToSniperBan(engine, state);
 
-            var picker = state.SniperBanUserId!;
+            var picker = state.SniperBanUserId!.Value;
             var result = await engine.SelectSniperBanAsync(picker, 'b', state); // consonant, illegal
 
             Assert.IsTrue(result.IsFailure);
@@ -446,7 +453,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var clock = AdvanceToOptimization(engine, state);
 
             var playerId = state.TurnManager.TurnOrder[0];
-            var dealt = state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList();
+            var dealt = state.GamePlayers[playerId].EngineBay.Select(c => c.GetId().ToString()).ToList();
 
             // Optimization times out → the Tax tutorial, NOT the Sniper Ban (era 1, tutorials on).
             clock = clock.AddSeconds(60);
@@ -457,7 +464,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             Assert.IsTrue(state.ShownTutorials.Contains(TutorialKind.Tax));
             Assert.IsNull(state.SniperBanUserId, "ban picker is resolved only when SniperBan opens");
             // The tutorial touches no game state — bays are unchanged.
-            CollectionAssert.AreEqual(dealt, state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList());
+            CollectionAssert.AreEqual(dealt, state.GamePlayers[playerId].EngineBay.Select(c => c.GetId().ToString()).ToList());
         }
 
         [TestMethod]
@@ -470,7 +477,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var clock = AdvanceToOptimization(engine, state);
 
             var playerId = state.TurnManager.TurnOrder[0];
-            var dealt = state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList();
+            var dealt = state.GamePlayers[playerId].EngineBay.Select(c => c.GetId().ToString()).ToList();
             var reversed = dealt.AsEnumerable().Reverse().ToList();
             await engine.SubmitOptimizationAsync(playerId, reversed, state);
 
@@ -479,14 +486,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             engine.Tick(state.Context!, clock);
             Assert.AreEqual(IntermissionSubPhase.TaxTutorial, state.IntermissionPhase);
             // The submission has NOT been applied yet (applied once, when SniperBan opens).
-            CollectionAssert.AreEqual(dealt, state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList());
+            CollectionAssert.AreEqual(dealt, state.GamePlayers[playerId].EngineBay.Select(c => c.GetId().ToString()).ToList());
 
             // TaxTutorial dwell elapses → SniperBan, and the ordering is applied exactly once.
             clock = clock.AddSeconds((int)TutorialState.DurationFor(TutorialKind.Tax).TotalSeconds + 1);
             engine.Tick(state.Context!, clock);
 
             Assert.AreEqual(IntermissionSubPhase.SniperBan, state.IntermissionPhase);
-            CollectionAssert.AreEqual(reversed, state.GamePlayers[playerId].EngineBay.Select(c => c.Id).ToList());
+            CollectionAssert.AreEqual(reversed, state.GamePlayers[playerId].EngineBay.Select(c => c.GetId().ToString()).ToList());
         }
 
         [TestMethod]
@@ -617,9 +624,14 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
                         engine.Tick(state.Context!, clock);
                     }
                 }
+                else if (state.Phase == AlphaChainGamePhase.Countdown)
+                {
+                    // The "Get Ready" countdown precedes each round; tick past it to begin the round.
+                    engine.Tick(state.Context!, state.SubPhaseEndTime.AddSeconds(1));
+                }
                 else
                 {
-                    engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!, state).GetAwaiter().GetResult();
+                    engine.AdvanceTurnAsync(state.TurnManager.CurrentPlayer!.Value, state).GetAwaiter().GetResult();
                 }
             }
 

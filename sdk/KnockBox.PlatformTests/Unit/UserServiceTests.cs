@@ -20,15 +20,15 @@ public sealed class UserServiceTests
     [TestMethod]
     public void User_Constructor_IsInternal()
     {
-        // The (string, string) ctor must exist but be non-public so external
+        // The (string, Guid) ctor must exist but be non-public so external
         // callers can't bypass IUserService to mint arbitrary User instances.
         var ctor = typeof(User).GetConstructor(
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
             binder: null,
-            types: [typeof(string), typeof(string)],
+            types: [typeof(string), typeof(Guid)],
             modifiers: null);
 
-        Assert.IsNotNull(ctor, "User(string, string) ctor must exist.");
+        Assert.IsNotNull(ctor, "User(string, Guid) ctor must exist.");
         Assert.IsFalse(ctor.IsPublic, "User ctor must not be public.");
         Assert.IsTrue(ctor.IsAssembly, "User ctor must be internal (assembly).");
     }
@@ -53,19 +53,20 @@ public sealed class UserServiceTests
     [TestMethod]
     public void UserFactory_Create_BuildsUserWithSuppliedValues()
     {
-        var user = UserFactory.Create("Alice", "alice-id");
+        var id = Guid.NewGuid();
+        var user = UserFactory.Create("Alice", id);
         Assert.AreEqual("Alice", user.Name);
-        Assert.AreEqual("alice-id", user.Id);
+        Assert.AreEqual(id, user.Id);
     }
 
     [TestMethod]
     public void UserFactory_Create_TrimsAndCapsName()
     {
         // Mirrors SetCurrentUserName: trim whitespace, cap at 12 chars.
-        var trimmed = UserFactory.Create("   Bob   ", "id1");
+        var trimmed = UserFactory.Create("   Bob   ", Guid.NewGuid());
         Assert.AreEqual("Bob", trimmed.Name);
 
-        var capped = UserFactory.Create("ThisNameIsWayTooLong", "id2");
+        var capped = UserFactory.Create("ThisNameIsWayTooLong", Guid.NewGuid());
         Assert.AreEqual("ThisNameIsWa", capped.Name);
         Assert.AreEqual(12, capped.Name.Length);
     }
@@ -73,7 +74,7 @@ public sealed class UserServiceTests
     [TestMethod]
     public void UserFactory_CreateUnchecked_LeavesNameAsIs()
     {
-        var user = UserFactory.CreateUnchecked("   ThisNameIsWayTooLong   ", "id");
+        var user = UserFactory.CreateUnchecked("   ThisNameIsWayTooLong   ", Guid.NewGuid());
         Assert.AreEqual("   ThisNameIsWayTooLong   ", user.Name);
     }
 
@@ -243,26 +244,27 @@ public sealed class UserServiceTests
             lock (_lock) _store.Clear();
         }
 
-        public ValueTask<TType> GetAsync<TType>(string scope, string key, CancellationToken ct = default)
+        public ValueTask<ValueResult<TType?>> GetAsync<TType>(string scope, string key, CancellationToken ct = default)
         {
             lock (_lock)
             {
-                if (_store.TryGetValue((scope, key), out var v) && v is TType t) return new(t);
+                if (_store.TryGetValue((scope, key), out var v) && v is TType t)
+                    return new(ValueResult<TType?>.FromValue(t));
             }
-            return new(default(TType)!);
+            return new(ValueResult<TType?>.FromValue(default));
         }
 
-        public ValueTask SetAsync<TType>(string scope, string key, TType value, CancellationToken ct = default)
+        public ValueTask<Result> SetAsync<TType>(string scope, string key, TType value, CancellationToken ct = default)
         {
             lock (_lock) _store[(scope, key)] = value;
-            return ValueTask.CompletedTask;
+            return new(Result.Success);
         }
 
-        public ValueTask<List<string>> GetKeysAsync(string scope, CancellationToken ct = default) => new(new List<string>());
-        public ValueTask<List<string>> GetAllKeysAsync(CancellationToken ct = default) => new(new List<string>());
-        public ValueTask RemoveAsync(string scope, string key) => ValueTask.CompletedTask;
-        public ValueTask RemoveAsync(string scope) => ValueTask.CompletedTask;
-        public ValueTask ClearAsync() => ValueTask.CompletedTask;
+        public ValueTask<ValueResult<List<string>>> GetKeysAsync(string scope, CancellationToken ct = default) => new(ValueResult<List<string>>.FromValue([]));
+        public ValueTask<ValueResult<List<string>>> GetAllKeysAsync(CancellationToken ct = default) => new(ValueResult<List<string>>.FromValue([]));
+        public ValueTask<Result> RemoveAsync(string scope, string key) => new(Result.Success);
+        public ValueTask<Result> RemoveAsync(string scope) => new(Result.Success);
+        public ValueTask<Result> ClearAsync() => new(Result.Success);
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 

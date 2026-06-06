@@ -24,7 +24,7 @@ public class HostPlaysStartTests
             NullLogger<OperatorGameEngine>.Instance,
             NullLogger<OperatorGameState>.Instance,
             new Mock<IRandomNumberService>().Object);
-        _host = UserFactory.Create("Host", "host-id");
+        _host = UserFactory.Create("Host", Guid.NewGuid());
     }
 
     private async Task<OperatorGameState> CreateStateWithPlayersAsync(params string[] playerIds)
@@ -35,7 +35,7 @@ public class HostPlaysStartTests
 
         foreach (var id in playerIds)
         {
-            var reg = state.RegisterPlayer(UserFactory.Create(id, id));
+            var reg = state.RegisterPlayer(UserFactory.Create(id, Guid.NewGuid()));
             Assert.IsTrue(reg.TryGetSuccess(out _), $"Failed to register player [{id}].");
         }
 

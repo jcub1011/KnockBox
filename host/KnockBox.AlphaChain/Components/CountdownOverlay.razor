@@ -1,0 +1,54 @@
+@using System.Globalization
+@using KnockBox.Core.Components.Shared
+
+@* The "Get Ready" transition screen shown before a round begins (at game start and after each
+   era's letter ban). A non-interactive full-screen dwell: the server FSM owns the countdown and
+   the auto-advance into the round; this only renders the prep info and the shared client-side
+   CountdownClock so the seconds tick smoothly off the circuit. *@
+
+<div class="ac-ready">
+    <div class="ac-ready-card">
+        <span class="ac-ready-eyebrow">Era @Era</span>
+        <h2 class="ac-ready-title">Get Ready</h2>
+
+        @if (BannedLetter is { } banned)
+        {
+            <div class="ac-ready-banned">
+                <span class="ac-ready-banned-label">Banned letter</span>
+                <span class="ac-ready-banned-letter">@char.ToUpperInvariant(banned)</span>
+            </div>
+            <p class="ac-ready-hint">Your first word is a free choice — but any word containing this letter scores <strong>zero</strong>.</p>
+        }
+        else
+        {
+            <p class="ac-ready-hint">Your first word is a free choice. Build the chain!</p>
+        }
+
+        <CountdownClock EndTimeUtc="EndTimeUtc" Duration="Duration" Context="cd">
+            @{
+                int secs = (int)Math.Ceiling(Math.Max(0, cd.RemainingSeconds));
+                float frac = Math.Clamp(cd.Fraction, 0f, 1f);
+            }
+            <div class="ac-ready-clock @(cd.RemainingSeconds <= 3 ? "ac-ready-urgent" : "")">
+                <span class="ac-ready-num">@secs</span>
+                <span class="ac-ready-bar">
+                    <span class="ac-ready-bar-fill" style="width:@((frac * 100).ToString("0.#", CultureInfo.InvariantCulture))%"></span>
+                </span>
+            </div>
+        </CountdownClock>
+    </div>
+</div>
+
+@code {
+    /// <summary>UTC time the countdown expires (the round begins). Feeds the shared CountdownClock.</summary>
+    [Parameter, EditorRequired] public DateTimeOffset EndTimeUtc { get; set; }
+
+    /// <summary>Total countdown duration, for the progress bar.</summary>
+    [Parameter, EditorRequired] public TimeSpan Duration { get; set; }
+
+    /// <summary>The era about to begin (1-based), shown as the eyebrow label.</summary>
+    [Parameter] public int Era { get; set; }
+
+    /// <summary>The era's banned letter, or null on the opening (era 1, ban-free) countdown.</summary>
+    [Parameter] public char? BannedLetter { get; set; }
+}

@@ -21,10 +21,10 @@ namespace KnockBox.Tracery.Components
         [Parameter, EditorRequired] public TraceryGameState State { get; set; } = default!;
 
         /// <summary>The viewer's user id, used only to tag their row with "YOU". Optional.</summary>
-        [Parameter] public string? CurrentUserId { get; set; }
+        [Parameter] public Guid? CurrentUserId { get; set; }
 
         // null = "show every word"; set = show only this player's words.
-        private string? _selectedUserId;
+        private Guid? _selectedUserId;
 
         // The spotlighted word, toggled by clicking a row in the word list. Click-to-toggle (rather
         // than hover) is the single source of truth so it behaves identically on touch and desktop —
@@ -112,7 +112,7 @@ namespace KnockBox.Tracery.Components
         // ── Selection / spotlight state ───────────────────────────────────────
         // Switching the player narrows the word list, so any pinned word might vanish from it —
         // clear the spotlight on every player change so the two panes never disagree.
-        private void SelectPlayer(string userId)
+        private void SelectPlayer(Guid userId)
         {
             _selectedUserId = _selectedUserId == userId ? null : userId;
             _selectedWord = null;
@@ -129,7 +129,7 @@ namespace KnockBox.Tracery.Components
         private HashSet<string>? SelectedWords
             => _selectedUserId is null
                 ? null
-                : _playerRows.FirstOrDefault(p => p.UserId == _selectedUserId)?.Words;
+                : _playerRows.FirstOrDefault(p => p.UserId == _selectedUserId.Value)?.Words;
 
         // The paths drawn on the board right now: all words, or just the selected player's.
         private IEnumerable<ScoredWord> VisibleWords()
@@ -226,6 +226,6 @@ namespace KnockBox.Tracery.Components
         private sealed record ScoredWord(string Word, int Points, IReadOnlyList<int> Path);
 
         private sealed record PlayerRow(
-            string UserId, string DisplayName, int RoundPoints, HashSet<string> Words);
+            Guid UserId, string DisplayName, int RoundPoints, HashSet<string> Words);
     }
 }

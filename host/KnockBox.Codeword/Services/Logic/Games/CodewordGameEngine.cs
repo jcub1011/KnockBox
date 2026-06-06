@@ -139,7 +139,7 @@ namespace KnockBox.Codeword.Services.Logic.Games
         }
 
         /// <summary>Player casts a vote to eliminate the targeted player (not yet locked in).</summary>
-        public Result CastVote(User player, CodewordGameState state, string targetPlayerId)
+        public Result CastVote(User player, CodewordGameState state, Guid targetPlayerId)
         {
             if (!TryGetContext(state, out var ctx, out var err)) return err;
             return ProcessCommand(ctx, new CastVoteCommand(player.Id, targetPlayerId));

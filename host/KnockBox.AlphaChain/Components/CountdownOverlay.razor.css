@@ -1,0 +1,152 @@
+/* "Get Ready" transition overlay — a centered neon card with the pre-round countdown. Mirrors the
+   TutorialOverlay backdrop/card aesthetic so the two transition screens feel like one family. The
+   resting state is fully readable, so the global prefers-reduced-motion guard (which strips ac-*
+   animations) leaves everything legible. */
+
+.ac-ready {
+    position: fixed;
+    inset: 0;
+    z-index: 70; /* same layer as the tutorial overlay */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    background: rgba(6, 8, 15, 0.82);
+    backdrop-filter: blur(3px);
+    animation: ac-ready-backdrop-in 0.28s ease-out both;
+}
+
+@keyframes ac-ready-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.ac-ready-card {
+    width: min(520px, 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.1rem;
+    padding: 2rem 1.6rem;
+    text-align: center;
+    border-radius: 1rem;
+    background: var(--ac-panel, rgba(18, 24, 44, 0.72));
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    box-shadow: var(--ac-shadow-lift, 7px 7px 0 #000), var(--ac-glow-cyan, 0 0 18px rgba(0, 229, 255, 0.45));
+    backdrop-filter: blur(6px);
+    animation: ac-ready-pop 0.4s ease-out both;
+}
+
+@keyframes ac-ready-pop {
+    from { opacity: 0; transform: scale(0.94) translateY(8px); }
+    to { opacity: 1; transform: none; }
+}
+
+.ac-ready-eyebrow {
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    opacity: 0.75;
+}
+
+.ac-ready-title {
+    margin: 0;
+    font-size: 2.2rem;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    text-shadow: var(--ac-glow-cyan, 0 0 18px rgba(0, 229, 255, 0.45));
+}
+
+/* ── Banned-letter callout (era 2+) ── */
+.ac-ready-banned {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.ac-ready-banned-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    opacity: 0.7;
+}
+
+.ac-ready-banned-letter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3rem;
+    min-height: 3rem;
+    padding: 0.25rem 0.6rem;
+    font-size: 2.4rem;
+    font-weight: 800;
+    line-height: 1;
+    border-radius: 0.6rem;
+    color: var(--ac-danger, #ff5470);
+    border: 2px solid var(--ac-danger, #ff5470);
+    box-shadow: 0 0 14px rgba(255, 84, 112, 0.5);
+}
+
+.ac-ready-hint {
+    margin: 0;
+    max-width: 38ch;
+    font-size: 0.92rem;
+    opacity: 0.85;
+}
+
+/* ── Countdown clock ── */
+.ac-ready-clock {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.ac-ready-num {
+    font-size: 3.4rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.ac-ready-bar {
+    display: block;
+    width: min(280px, 80%);
+    height: 0.5rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+    overflow: hidden;
+}
+
+.ac-ready-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--ac-accent-cyan, #00e5ff);
+    transition: width 0.2s linear;
+}
+
+/* Final seconds — pulse the number and flip the bar to the danger colour. */
+.ac-ready-urgent .ac-ready-num {
+    color: var(--ac-danger, #ff5470);
+    animation: ac-ready-pulse 0.6s ease-in-out infinite;
+}
+
+.ac-ready-urgent .ac-ready-bar-fill {
+    background: var(--ac-danger, #ff5470);
+}
+
+@keyframes ac-ready-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ac-ready,
+    .ac-ready-card,
+    .ac-ready-urgent .ac-ready-num {
+        animation: none;
+    }
+}

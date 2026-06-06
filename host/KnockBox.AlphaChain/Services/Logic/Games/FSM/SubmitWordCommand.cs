@@ -13,6 +13,6 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM
     /// from the wall clock inside the FSM) so time-aware scoring — remaining shot-clock seconds for
     /// Sprinter/Panic Button and the Hyper-Drive elapsed check — is deterministic under test.
     /// </param>
-    public record SubmitWordCommand(string ActorUserId, string WordRaw, DateTimeOffset Now)
+    public record SubmitWordCommand(Guid ActorUserId, string WordRaw, DateTimeOffset Now)
         : AlphaChainCommand(ActorUserId);
 }

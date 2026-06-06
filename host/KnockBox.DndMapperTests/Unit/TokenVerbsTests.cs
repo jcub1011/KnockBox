@@ -348,7 +348,7 @@ namespace KnockBox.DndMapperTests.Unit
         {
             var mapA = CreateAndActivateMap("A");
             // Register player + auto-spawn on A
-            var player = UserFactory.Create("Alice", Guid.NewGuid().ToString());
+            var player = UserFactory.Create("Alice", Guid.NewGuid());
             var reg = _state.RegisterPlayer(player);
             Assert.IsTrue(reg.TryGetSuccess(out var token));
 
@@ -379,7 +379,7 @@ namespace KnockBox.DndMapperTests.Unit
         public void PlayerUnregistered_OrphansPlayerSheetWithAuditTrail()
         {
             CreateAndActivateMap("A");
-            var player = UserFactory.Create("Alice", Guid.NewGuid().ToString());
+            var player = UserFactory.Create("Alice", Guid.NewGuid());
             var reg = _state.RegisterPlayer(player);
             Assert.IsTrue(reg.TryGetSuccess(out var token));
 
@@ -478,7 +478,7 @@ namespace KnockBox.DndMapperTests.Unit
             var mapId = CreateAndActivateMap();
             Assert.IsTrue(_engine.SpawnNpcTokenAsync(_state, _host, mapId, "Goblin").TryGetSuccess(out var npcId));
 
-            var result = _engine.AssignCharacterToPlayerAsync(_state, _host, npcId, "not-a-registered-id");
+            var result = _engine.AssignCharacterToPlayerAsync(_state, _host, npcId, Guid.NewGuid());
             Assert.IsTrue(result.IsFailure);
         }
 
@@ -501,7 +501,7 @@ namespace KnockBox.DndMapperTests.Unit
             // must be promoted on every map atomically — otherwise the new player ends up
             // with one PlayerToken and a bunch of stale orphan NPCs for the same character.
             var mapA = CreateAndActivateMap("A");
-            var alice = UserFactory.Create("Alice", Guid.NewGuid().ToString());
+            var alice = UserFactory.Create("Alice", Guid.NewGuid());
             var aliceReg = _state.RegisterPlayer(alice);
             Assert.IsTrue(aliceReg.TryGetSuccess(out var aliceToken));
             _engine.SetActiveMapAsync(_state, _host, mapA); // spawn for Alice on A
@@ -539,7 +539,7 @@ namespace KnockBox.DndMapperTests.Unit
         public void AssignSheetToPlayerAsync_OrphanedSheetWithTokens_PromotesEverything()
         {
             var mapId = CreateAndActivateMap();
-            var alice = UserFactory.Create("Alice", Guid.NewGuid().ToString());
+            var alice = UserFactory.Create("Alice", Guid.NewGuid());
             var aliceReg = _state.RegisterPlayer(alice);
             Assert.IsTrue(aliceReg.TryGetSuccess(out var aliceToken));
             _engine.SetActiveMapAsync(_state, _host, mapId);
@@ -639,7 +639,7 @@ namespace KnockBox.DndMapperTests.Unit
             // Build a session where Alice spawns and then leaves; Bob (a different player) joins later
             // and the host hands the orphaned character to Bob.
             var mapId = CreateAndActivateMap();
-            var alice = UserFactory.Create("Alice", Guid.NewGuid().ToString());
+            var alice = UserFactory.Create("Alice", Guid.NewGuid());
             var aliceReg = _state.RegisterPlayer(alice);
             Assert.IsTrue(aliceReg.TryGetSuccess(out var aliceToken));
             _engine.SetActiveMapAsync(_state, _host, mapId); // triggers spawn for Alice
@@ -676,7 +676,7 @@ namespace KnockBox.DndMapperTests.Unit
             var startResult = _engine.StartAsync(_host, _state).GetAwaiter().GetResult();
             Assert.IsTrue(startResult.IsSuccess);
 
-            var newcomer = UserFactory.Create("Late", Guid.NewGuid().ToString());
+            var newcomer = UserFactory.Create("Late", Guid.NewGuid());
             var reg = _state.RegisterPlayer(newcomer);
             Assert.IsTrue(reg.IsFailure, "RegisterPlayer must reject after StartAsync flips IsJoinable to false.");
         }
@@ -731,7 +731,7 @@ namespace KnockBox.DndMapperTests.Unit
         public void SpawnPlayerTokenAsync_TargetUserNotRegistered_ReturnsError()
         {
             CreateAndActivateMap();
-            var spawn = _engine.SpawnPlayerTokenAsync(_state, _host, Guid.NewGuid().ToString());
+            var spawn = _engine.SpawnPlayerTokenAsync(_state, _host, Guid.NewGuid());
             Assert.IsTrue(spawn.IsFailure);
         }
 
@@ -739,7 +739,7 @@ namespace KnockBox.DndMapperTests.Unit
         public void SpawnPlayerTokenAsync_EmptyUserId_ReturnsError()
         {
             CreateAndActivateMap();
-            var spawn = _engine.SpawnPlayerTokenAsync(_state, _host, "  ");
+            var spawn = _engine.SpawnPlayerTokenAsync(_state, _host, Guid.NewGuid());
             Assert.IsTrue(spawn.IsFailure);
         }
 
@@ -751,7 +751,7 @@ namespace KnockBox.DndMapperTests.Unit
             var mapId = CreateAndActivateMap();
             _engine.UpdateSettingsAsync(_state, _host, new DndMapperSettings { PlayersCanCreateNPCs = true });
 
-            var stranger = UserFactory.Create("Stranger", Guid.NewGuid().ToString());
+            var stranger = UserFactory.Create("Stranger", Guid.NewGuid());
             var spawn = _engine.SpawnNpcTokenAsync(_state, stranger, mapId, "Goblin");
             Assert.IsTrue(spawn.IsFailure);
         }
@@ -865,7 +865,7 @@ namespace KnockBox.DndMapperTests.Unit
             Assert.IsTrue(_engine.SpawnNpcTokenAsync(_state, _host, mapId, "Doppel")
                 .TryGetSuccess(out var tokenId));
 
-            var result = _engine.SetTokenRepresentsAsync(_state, _host, tokenId, "not-a-real-player-id");
+            var result = _engine.SetTokenRepresentsAsync(_state, _host, tokenId, Guid.NewGuid());
             Assert.IsTrue(result.IsFailure);
         }
 

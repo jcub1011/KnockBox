@@ -48,9 +48,9 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         int RoundNumber)
     {
         /// <summary>Player ID of entrant A.</summary>
-        public string PlayerAId => EntrantAId.PlayerId;
+        public Guid PlayerAId => EntrantAId.PlayerId;
         /// <summary>Player ID of entrant B.</summary>
-        public string PlayerBId => EntrantBId.PlayerId;
+        public Guid PlayerBId => EntrantBId.PlayerId;
     }
 
     /// <summary>
@@ -76,7 +76,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
     public class VoteSubmission
     {
         /// <summary>The player ID of the voter.</summary>
-        public string VoterPlayerId { get; set; } = string.Empty;
+        public Guid VoterPlayerId { get; set; }
 
         /// <summary>The <see cref="SwissMatchup.Id"/> this vote applies to.</summary>
         public Guid MatchupId { get; set; }
@@ -90,7 +90,7 @@ namespace KnockBox.DrawnToDress.Services.State.Games.Data
         public EntrantId ChosenEntrantId { get; set; }
 
         /// <summary>Player ID of the chosen entrant.</summary>
-        public string ChosenPlayerId => ChosenEntrantId.PlayerId;
+        public Guid ChosenPlayerId => ChosenEntrantId.PlayerId;
 
         /// <summary>UTC timestamp when the vote was submitted.</summary>
         public DateTimeOffset SubmittedAt { get; set; } = DateTimeOffset.UtcNow;

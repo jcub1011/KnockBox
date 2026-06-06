@@ -79,7 +79,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM
         // ── Convenience accessors (delegate to State) ─────────────────────────
 
         /// <summary>Shortcut to <see cref="CodewordGameState.GamePlayers"/>.</summary>
-        public ConcurrentDictionary<string, CodewordPlayerState> GamePlayers => State.GamePlayers;
+        public ConcurrentDictionary<Guid, CodewordPlayerState> GamePlayers => State.GamePlayers;
 
         // ── Role assignment ───────────────────────────────────────────────────
 
@@ -90,7 +90,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM
         /// </summary>
         public void AssignRoles()
         {
-            var playerIds = GamePlayers.Keys.ToList();
+            var playerIds = GamePlayers.Keys.ToList(); // List<Guid>
             Shuffle(playerIds);
 
             int count = playerIds.Count;
@@ -211,7 +211,7 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM
         /// Returns the player state for <paramref name="playerId"/>, or
         /// <see langword="null"/> if the player is not in the game.
         /// </summary>
-        public CodewordPlayerState? GetPlayer(string playerId)
+        public CodewordPlayerState? GetPlayer(Guid playerId)
             => GamePlayers.TryGetValue(playerId, out var ps) ? ps : null;
 
         // ── Vote tallying ─────────────────────────────────────────────────────
@@ -220,11 +220,11 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM
         /// Tallies votes from all alive players who have voted.
         /// Returns the player ID with the most votes, or <see langword="null"/> on a tie.
         /// </summary>
-        public string? TallyVotes()
+        public Guid? TallyVotes()
         {
             var votes = GetAlivePlayers()
                 .Where(p => p.HasVoted && p.VoteTargetId is not null)
-                .GroupBy(p => p.VoteTargetId!)
+                .GroupBy(p => p.VoteTargetId!.Value)
                 .Select(g => (TargetId: g.Key, Count: g.Count()))
                 .OrderByDescending(g => g.Count)
                 .ToList();
@@ -318,13 +318,13 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM
         /// Insiders/Informants: +1 for surviving the round.
         /// Must be called <b>before</b> <see cref="ResetEliminationCycleState"/>.
         /// </summary>
-        public void ApplyCycleScoring(string? eliminatedId)
+        public void ApplyCycleScoring(Guid? eliminatedId)
         {
             foreach (var voter in GetAlivePlayers().Where(p => p.HasVoted && p.VoteTargetId is not null))
             {
                 if (voter.Role == Role.Agent)
                 {
-                    var target = GetPlayer(voter.VoteTargetId!);
+                    var target = GetPlayer(voter.VoteTargetId!.Value);
                     if (target is not null)
                     {
                         if (target.Role == Role.Agent)

@@ -1,3 +1,4 @@
+using System;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Operator.Services.Logic.FSM;
 using KnockBox.Operator.Services.Logic.FSM.ActionCommands;
@@ -34,7 +35,7 @@ public sealed class BlueShellCard() : ActionCard(CardAction.BlueShell)
         return ValueResult<CardPlayResult>.FromValue(CardPlayResult.Ok());
     }
 
-    public static void Resolve(OperatorGameContext context, HashSet<string>? blockedPlayerIds = null)
+    public static void Resolve(OperatorGameContext context, HashSet<Guid>? blockedPlayerIds = null)
     {
         foreach (var player in context.GamePlayers.Values)
         {

@@ -30,14 +30,21 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             _logger = new Mock<ILogger>();
             _stateLogger = new Mock<ILogger<HiddenAgendaGameState>>();
 
-            var host = UserFactory.Create("Host", "host-id");
+            var host = UserFactory.Create("Host", Guid.Parse("00000000-0000-0000-0000-000000000001"));
             _state = new HiddenAgendaGameState(host, _stateLogger.Object);
             _state.BoardGraph = BoardDefinitions.CreateGrandCircuit();
             _context = new HiddenAgendaGameContext(_state, _rng.Object, _logger.Object);
 
+            var playerIds = new[]
+            {
+                Guid.Parse("10000000-0000-0000-0000-000000000000"),
+                Guid.Parse("20000000-0000-0000-0000-000000000000"),
+                Guid.Parse("30000000-0000-0000-0000-000000000000"),
+                Guid.Parse("40000000-0000-0000-0000-000000000000"),
+            };
             for (int i = 0; i < 4; i++)
             {
-                var pid = $"p{i}";
+                var pid = playerIds[i];
                 _state.GamePlayers[pid] = new HiddenAgendaPlayerState
                 {
                     PlayerId = pid,
@@ -46,7 +53,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
                     LastSpinResult = 3
                 };
             }
-            _state.TurnManager.SetTurnOrder(["p0", "p1", "p2", "p3"]);
+            _state.TurnManager.SetTurnOrder(playerIds);
         }
 
         [TestMethod]
@@ -68,12 +75,12 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new MovePhaseState();
             state.OnEnter(_context);
 
-            var result = state.HandleCommand(_context, new SelectDestinationCommand("p0", 3));
+            var result = state.HandleCommand(_context, new SelectDestinationCommand(Guid.Parse("10000000-0000-0000-0000-000000000000"), 3));
             
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<DrawPhaseState>(result.Value);
-            Assert.AreEqual(3, _state.GamePlayers["p0"].CurrentSpaceId);
-            Assert.HasCount(1, _state.GamePlayers["p0"].MovementHistory);
+            Assert.AreEqual(3, _state.GamePlayers[Guid.Parse("10000000-0000-0000-0000-000000000000")].CurrentSpaceId);
+            Assert.HasCount(1, _state.GamePlayers[Guid.Parse("10000000-0000-0000-0000-000000000000")].MovementHistory);
         }
 
         [TestMethod]
@@ -82,7 +89,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new MovePhaseState();
             state.OnEnter(_context);
 
-            var result = state.HandleCommand(_context, new SelectDestinationCommand("p0", 10));
+            var result = state.HandleCommand(_context, new SelectDestinationCommand(Guid.Parse("10000000-0000-0000-0000-000000000000"), 10));
             
             Assert.IsTrue(result.IsFailure);
         }
@@ -98,7 +105,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
 
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<DrawPhaseState>(result.Value);
-            Assert.IsNotNull(_state.GamePlayers["p0"].LastMoveDestination);
+            Assert.IsNotNull(_state.GamePlayers[Guid.Parse("10000000-0000-0000-0000-000000000000")].LastMoveDestination);
         }
 
         [TestMethod]
@@ -118,7 +125,7 @@ namespace KnockBox.HiddenAgendaTests.Unit.Logic.Games.HiddenAgenda.States
             var state = new MovePhaseState();
             state.OnEnter(_context);
 
-            var result = state.HandleCommand(_context, new CallVoteCommand("p1"));
+            var result = state.HandleCommand(_context, new CallVoteCommand(Guid.Parse("20000000-0000-0000-0000-000000000000")));
             Assert.IsTrue(result.IsSuccess);
             Assert.IsInstanceOfType<FinalGuessState>(result.Value);
         }

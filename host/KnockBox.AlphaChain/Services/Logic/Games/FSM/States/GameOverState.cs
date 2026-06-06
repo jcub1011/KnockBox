@@ -21,12 +21,12 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             var state = context.State;
             state.SetPhase(AlphaChainGamePhase.GameOver);
 
-            // Words played per player, from the chronological play log.
-            var wordsByPlayer = state.PlayLog
-                .GroupBy(p => p.UserId, StringComparer.Ordinal)
-                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+            // Words played per player, from the chronological submission history.
+            var wordsByPlayer = state.SubmissionHistory
+                .GroupBy(p => p.UserId)
+                .ToDictionary(g => g.Key, g => g.Count());
 
-            int TurnIndex(string userId)
+            int TurnIndex(Guid userId)
             {
                 int idx = state.TurnManager.TurnOrder.IndexOf(userId);
                 return idx < 0 ? int.MaxValue : idx;
@@ -53,14 +53,14 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
                     wordsByPlayer.TryGetValue(p.UserId, out var n) ? n : 0))
                 .ToList();
 
-            string winner = rankings.Count > 0 ? rankings[0].UserId : string.Empty;
+            Guid winner = rankings.Count > 0 ? rankings[0].UserId : Guid.Empty;
             var duration = DateTimeOffset.UtcNow - state.StartedAt;
 
-            state.Results = new GameResults(rankings, winner, state.PlayLog.Count, duration);
+            state.Results = new GameResults(rankings, winner, state.SubmissionHistory.Count, duration);
 
             context.Logger.LogDebug(
                 "Alpha Chain FSM → GameOverState ({count} players ranked, winner [{winner}], {words} words)",
-                rankings.Count, winner, state.PlayLog.Count);
+                rankings.Count, winner, state.SubmissionHistory.Count);
 
             return null;
         }

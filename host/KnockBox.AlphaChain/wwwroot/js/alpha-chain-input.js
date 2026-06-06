@@ -108,6 +108,17 @@ export function getValue(id) {
     return state && state.el ? state.el.value : '';
 }
 
+// Horizontally centre the local player's item (.ac-lbm-me) within the mobile leaderboard strip.
+// Uses scrollTo (not scrollIntoView) so the page never scrolls vertically; a no-op when the
+// container is hidden (display:none on desktop) or the item is absent.
+export function centerMe(container) {
+    if (!container) return;
+    const me = container.querySelector('.ac-lbm-me');
+    if (!me) return;
+    const left = me.offsetLeft - (container.clientWidth - me.clientWidth) / 2;
+    container.scrollTo({ left, behavior: 'smooth' });
+}
+
 export function unregister(id) {
     const state = inputs.get(id);
     if (!state) return;

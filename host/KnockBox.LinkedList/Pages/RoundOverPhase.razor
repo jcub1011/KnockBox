@@ -1,7 +1,7 @@
 @using KnockBox.LinkedList.Services.State.Games
 
 @{
-    var myId = UserService.CurrentUser?.Id ?? "";
+    var myId = UserService.CurrentUser?.Id ?? Guid.Empty;
     var isHost = GameState.Host.Id == myId;
     var result = GameState.LastRoundResult;
 }

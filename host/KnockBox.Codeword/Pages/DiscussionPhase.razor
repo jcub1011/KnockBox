@@ -3,7 +3,7 @@
 @using KnockBox.Codeword.Services.State.Games
 
 @{
-    var myId = UserService.CurrentUser?.Id ?? "";
+    var myId = UserService.CurrentUser?.Id ?? Guid.Empty;
     var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
     int aliveCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated);
     int lockedInCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated && p.HasVoted);
@@ -138,7 +138,7 @@ else
                         string playerRowCss = "ctc-player-row "
                             + (isMe ? "ctc-player-me" : string.Empty)
                             + (ps.IsEliminated ? "ctc-player-eliminated" : string.Empty);
-                        string? voteTargetName = GameState.GamePlayers.TryGetValue(ps.VoteTargetId ?? string.Empty, out var targetPlayer) ? targetPlayer.DisplayName : "N/A";
+                        string? voteTargetName = ps.VoteTargetId is { } vtId && GameState.GamePlayers.TryGetValue(vtId, out var targetPlayer) ? targetPlayer.DisplayName : "N/A";
                         var alivePlayers = GameState.GamePlayers.Values.Where(state => !state.IsEliminated);
 
                         int lockedVotes = alivePlayers.Count(state => state.VoteTargetId == ps.PlayerId && state.HasVoted);
@@ -227,7 +227,7 @@ else
                 else if (myPlayer is not null && !myPlayer.IsEliminated)
                 {
                     CodewordPlayerState? tp = null;
-                    bool targetSelected = myPlayer.VoteTargetId is not null && GameState.GamePlayers.TryGetValue(myPlayer.VoteTargetId, out tp);
+                    bool targetSelected = myPlayer.VoteTargetId is { } myVtId && GameState.GamePlayers.TryGetValue(myVtId, out tp);
 
                     <div class="ctc-vote-confirm">
                         @if (targetSelected)
