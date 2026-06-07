@@ -1,0 +1,91 @@
+@using KnockBox.Core.Services.State.PlayLog
+@inherits DisposableComponent
+
+<section class="pl-panel" aria-label="Recently played games">
+    <h2 class="pl-heading">Recently Played</h2>
+
+    @if (!_loaded)
+    {
+        <div class="pl-state pl-loading" aria-live="polite">
+            <span class="pl-spinner" aria-hidden="true"></span>
+            <span>Loading history…</span>
+        </div>
+    }
+    else if (_loadFailed)
+    {
+        <div class="pl-state pl-error" role="status">
+            <span class="pl-state-icon" aria-hidden="true">&#9888;&#65039;</span>
+            <span>Couldn't load your play history.</span>
+        </div>
+    }
+    else if (_logs.Count == 0)
+    {
+        <div class="pl-state pl-empty" role="status">
+            <span class="pl-state-icon" aria-hidden="true">&#127922;</span>
+            <span class="pl-empty-title">No games played yet</span>
+            <span class="pl-empty-sub">Your match history will show up here.</span>
+        </div>
+    }
+    else
+    {
+        <ol class="pl-list">
+            @for (int i = 0; i < _logs.Count; i++)
+            {
+                var index = i;
+                var entry = _logs[index];
+                var isHost = entry.Role == PlayRole.Host;
+
+                <li class="pl-entry">
+                    <div class="pl-entry-head">
+                        <span class="pl-game">@GameName(entry.GameIdentifier)</span>
+                        <span class="pl-role @(isHost ? "pl-role-host" : "pl-role-player")">
+                            @(isHost ? "Host" : "Player")
+                        </span>
+                    </div>
+
+                    @{
+                        var when = RelativeTime(entry.PlayedAt);
+                    }
+                    @if (!string.IsNullOrEmpty(when))
+                    {
+                        <div class="pl-time">@when</div>
+                    }
+
+                    @if (entry.Metadata.Count > 0)
+                    {
+                        var expanded = _expanded.Contains(index);
+                        var rows = entry.Metadata;
+                        var hiddenCount = rows.Count - MetadataPreviewCount;
+
+                        <table class="pl-meta">
+                            <tbody>
+                                @{
+                                    var shown = 0;
+                                }
+                                @foreach (var kv in rows)
+                                {
+                                    if (!expanded && shown >= MetadataPreviewCount)
+                                    {
+                                        break;
+                                    }
+                                    shown++;
+                                    <tr>
+                                        <td class="pl-meta-key">@kv.Key</td>
+                                        <td class="pl-meta-val">@kv.Value</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+
+                        @if (hiddenCount > 0)
+                        {
+                            <button type="button" class="pl-toggle" @onclick="() => ToggleExpanded(index)">
+                                @(expanded ? "Show less" : $"Show {hiddenCount} more")
+                            </button>
+                        }
+                    }
+                </li>
+            }
+        </ol>
+    }
+</section>

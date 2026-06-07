@@ -94,12 +94,27 @@ public sealed class PlayLogServiceTests
             ["duration"] = "00:12:45",
         };
 
-        await service.StoreLogAsync(GameLog.Create("card-counter", metadata));
+        await service.StoreLogAsync(GameLog.Create("card-counter", metadata: metadata));
 
         var stored = Unwrap(await service.GetLogsAsync()).Single();
         Assert.AreEqual("3", stored.GetMetadata("place"));
         Assert.AreEqual("00:12:45", stored.GetMetadata("duration"));
         Assert.IsNull(stored.GetMetadata("missing"));
+    }
+
+    [TestMethod]
+    public async Task StoreLogAsync_RoundTripsRole()
+    {
+        var service = NewService(out _);
+
+        await service.StoreLogAsync(GameLog.Create("card-counter", PlayRole.Host));
+        await service.StoreLogAsync(GameLog.Create("codeword")); // defaults to Player
+
+        var logs = Unwrap(await service.GetLogsAsync());
+
+        // Newest first: codeword (Player) then card-counter (Host).
+        Assert.AreEqual(PlayRole.Player, logs[0].Role, "Default role must survive the round-trip as Player.");
+        Assert.AreEqual(PlayRole.Host, logs[1].Role, "Host role must survive the JSON round-trip.");
     }
 
     [TestMethod]

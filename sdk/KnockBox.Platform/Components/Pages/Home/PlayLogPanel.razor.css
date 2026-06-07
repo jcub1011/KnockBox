@@ -1,0 +1,219 @@
+/* ── Play Log Rail ──────────────────────────────────────────────────────── */
+
+.pl-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    font-family: var(--font-primary);
+    color: var(--ink);
+}
+
+.pl-heading {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #fff;
+    margin: 0;
+    padding-bottom: 10px;
+    position: relative;
+}
+
+.pl-heading::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 44px;
+    height: 3px;
+    background-color: var(--accent-color);
+    border-radius: 2px;
+}
+
+/* ── States (loading / error / empty) ──────────────────────────────────── */
+
+.pl-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-align: center;
+    padding: 32px 18px;
+    border: 2px dashed var(--canvas-card-border);
+    border-radius: 14px;
+    background: var(--canvas-card);
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+}
+
+.pl-state-icon {
+    font-size: 1.6rem;
+    line-height: 1;
+}
+
+.pl-empty-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--ink);
+    font-size: 0.95rem;
+}
+
+.pl-empty-sub {
+    font-size: 0.8rem;
+}
+
+.pl-loading {
+    flex-direction: row;
+}
+
+.pl-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--canvas-card-border);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: pl-spin 0.7s linear infinite;
+}
+
+@keyframes pl-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Entry list ────────────────────────────────────────────────────────── */
+
+.pl-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.pl-entry {
+    background: var(--canvas-card);
+    border: 3px solid #000;
+    border-radius: 12px;
+    box-shadow: var(--shadow-card-rest);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pl-entry-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.pl-game {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1rem;
+    color: #fff;
+    line-height: 1.15;
+    word-break: break-word;
+}
+
+.pl-role {
+    flex-shrink: 0;
+    font-family: var(--font-display);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 2px solid #000;
+    line-height: 1;
+}
+
+.pl-role-host {
+    background-color: var(--accent-color);
+    color: #fff;
+}
+
+.pl-role-player {
+    background-color: var(--tile-cyan);
+    color: #08231d;
+}
+
+.pl-time {
+    font-size: 0.74rem;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Metadata table ────────────────────────────────────────────────────── */
+
+.pl-meta {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 2px;
+}
+
+.pl-meta td {
+    padding: 5px 0;
+    border-top: 1px solid var(--canvas-card-border);
+    font-size: 0.82rem;
+    vertical-align: top;
+}
+
+.pl-meta tr:first-child td {
+    border-top: none;
+}
+
+.pl-meta-key {
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding-right: 12px;
+    white-space: nowrap;
+}
+
+.pl-meta-val {
+    color: var(--ink);
+    font-weight: 500;
+    text-align: right;
+    width: 100%;
+    word-break: break-word;
+}
+
+.pl-toggle {
+    align-self: flex-start;
+    margin-top: 2px;
+    background: none;
+    border: none;
+    padding: 4px 0;
+    cursor: pointer;
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent-color);
+    transition: color 0.15s ease;
+}
+
+.pl-toggle:hover {
+    color: #ff4d88;
+    text-decoration: underline;
+}
+
+.pl-toggle:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 3px;
+    border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pl-spinner {
+        animation: none;
+    }
+}

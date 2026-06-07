@@ -3,6 +3,20 @@ using System.Collections.ObjectModel;
 namespace KnockBox.Core.Services.State.PlayLog;
 
 /// <summary>
+/// Which side of a game a play-log entry was recorded for. <see cref="Player"/>
+/// is first so it is the enum default — the safe assumption for any legacy or
+/// unstamped entry.
+/// </summary>
+public enum PlayRole
+{
+    /// <summary>The user joined the lobby as a participant.</summary>
+    Player,
+
+    /// <summary>The user created and hosted the lobby.</summary>
+    Host,
+}
+
+/// <summary>
 /// A single entry in a user's <see cref="IPlayLogService">play log</see>: a
 /// record that they played a given game, plus arbitrary game-supplied metadata
 /// (leaderboard position, duration played, score, …). Persisted to the
@@ -36,16 +50,25 @@ public sealed record GameLog
     public DateTimeOffset PlayedAt { get; init; }
 
     /// <summary>
-    /// Convenience factory for the common case: a game id plus optional
-    /// metadata. <see cref="PlayedAt"/> is left default and stamped by the
-    /// service on store.
+    /// Whether the user hosted or merely joined this play session. Defaults to
+    /// <see cref="PlayRole.Player"/> (the enum default), so entries written
+    /// before this field existed deserialize as a player.
+    /// </summary>
+    public PlayRole Role { get; init; }
+
+    /// <summary>
+    /// Convenience factory for the common case: a game id, the user's role, and
+    /// optional metadata. <see cref="PlayedAt"/> is left default and stamped by
+    /// the service on store.
     /// </summary>
     public static GameLog Create(
         string gameIdentifier,
+        PlayRole role = PlayRole.Player,
         IReadOnlyDictionary<string, string>? metadata = null)
         => new()
         {
             GameIdentifier = gameIdentifier,
+            Role = role,
             Metadata = metadata ?? ReadOnlyDictionary<string, string>.Empty,
         };
 }
