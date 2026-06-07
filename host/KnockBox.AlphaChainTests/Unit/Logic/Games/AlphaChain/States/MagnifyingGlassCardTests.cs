@@ -76,11 +76,17 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.AlphaChain.States
             var (_, state) = await StartGameAsync(new StubWordListService("cat"));
             using var _ = state;
             var id = state.TurnManager.CurrentPlayer!.Value;
+            var other = state.TurnManager.TurnOrder[1];
+
+            // Baseline (self-contained): Redline alone arms a 12s clock to 10 (−20% → 12 × 0.8 = 9.6 → 10).
+            GiveModifier(state, other, "redline");
+            Assert.AreEqual(10, state.ComputeArmedShotClockSeconds(state.GamePlayers[other]),
+                "Redline alone: −20% off a 12s clock → 10.");
+
             GiveModifier(state, id, "magnifying-glass"); // index 0
             GiveModifier(state, id, "redline");          // index 1 — immediately to the glass's right
 
             // Redline's −20% behind the glass becomes −30% → 12 × 0.7 = 8.4 → 8 (half-up).
-            // (Redline alone arms to 10; see ClockAndHyperDriveTests.)
             Assert.AreEqual(8, state.ComputeArmedShotClockSeconds(state.GamePlayers[id]));
         }
 

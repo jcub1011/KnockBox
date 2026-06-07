@@ -420,10 +420,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.FSM.States
             {
                 var ctx = new EngineEvaluationContext(string.Empty, Array.Empty<char>(), new[] { player })
                 {
-                    Bay = player.EngineBay,
                     Services = services,
                     PlayerIndex = 0,
-                };
+                }.WithBay(player.EngineBay);
                 foreach (var card in player.EngineBay)
                     ctx = card.OnEraStart(ctx, card);
             }

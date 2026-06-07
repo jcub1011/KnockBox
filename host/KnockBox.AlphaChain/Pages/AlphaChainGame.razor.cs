@@ -143,10 +143,9 @@ namespace KnockBox.AlphaChain.Pages
             => GameState.Context is { } context
                 ? new EngineEvaluationContext(string.Empty, Array.Empty<char>(), new[] { player })
                 {
-                    Bay = player.EngineBay,
                     Services = context.EvaluationServices,
                     PlayerIndex = 0,
-                }
+                }.WithBay(player.EngineBay)
                 : null;
 
         /// <summary>Total duration of the per-turn shot clock (for the countdown ring).</summary>

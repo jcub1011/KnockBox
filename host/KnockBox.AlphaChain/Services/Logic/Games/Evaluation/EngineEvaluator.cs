@@ -51,9 +51,11 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Evaluation
                     // A triggered card that moves the score shows its signed delta; one that fired but
                     // made no direct score change (an effect card — the Magnifying Glass, Flak Cannon, a
                     // ×1 capability card) reads "FX" (the effect-chip convention), distinct from the "—"
-                    // of a card that never triggered.
-                    string magnitude = FormatValue(Math.Abs(delta));
-                    valueText = magnitude == "0" ? "FX" : (delta >= 0 ? "+" : "−") + magnitude;
+                    // of a card that never triggered. The FX decision is on the actual delta, not its
+                    // rounded display string, so a genuine sub-rounding scoring delta is never mislabeled
+                    // as inert.
+                    bool noScoreChange = Math.Abs(delta) < 1e-9;
+                    valueText = noScoreChange ? "FX" : (delta >= 0 ? "+" : "−") + FormatValue(Math.Abs(delta));
                 }
 
                 steps.Add(new ScoreStep(
