@@ -37,6 +37,12 @@ public sealed class SessionServiceProvider : ISessionServiceProvider, IDisposabl
 
     private int _disposed = 0;
     private readonly ConcurrentDictionary<RegistrationKey, Lazy<CacheRegistration>> _services = [];
+
+    // In-flight eviction continuations, tracked only so tests can deterministically
+    // join them (see WaitForPendingEvictionsAsync). Self-removing on completion so
+    // it never grows in production.
+    private readonly ConcurrentDictionary<Task, byte> _evictionTasks = new();
+
     internal TimeSpan EvictionDelay { get; set; } = TimeSpan.FromMinutes(1);
 
     /// <summary>
@@ -112,8 +118,12 @@ public sealed class SessionServiceProvider : ISessionServiceProvider, IDisposabl
                         if (registration.ReferenceCount <= 0 && registration.EvictionCts is null)
                         {
                             registration.EvictionCts = new CancellationTokenSource();
-                            // Pass both the registration and the exact lazy wrapper for safe removal
-                            _ = StartEvictionTimer(key, registration, lazyRegistration, registration.EvictionCts.Token);
+                            // Pass both the registration and the exact lazy wrapper for safe removal.
+                            // Track the task so tests can deterministically await eviction; it removes
+                            // itself on completion so the set stays empty in steady state.
+                            var evictionTask = StartEvictionTimer(key, registration, lazyRegistration, registration.EvictionCts.Token);
+                            _evictionTasks[evictionTask] = 0;
+                            _ = evictionTask.ContinueWith(t => _evictionTasks.TryRemove(t, out _), TaskScheduler.Default);
                         }
                     }
                 });
@@ -159,6 +169,15 @@ public sealed class SessionServiceProvider : ISessionServiceProvider, IDisposabl
             _logger.LogError(ex, "Error handling eviction for session service {Type} with token {Token}.", key.ServiceType.Name, key.SessionToken.Token);
         }
     }
+
+    /// <summary>
+    /// Test seam: awaits any in-flight eviction continuations. Because
+    /// <see cref="StartEvictionTimer"/> disposes the evicted service before its task
+    /// completes (and swallows all exceptions), awaiting this after advancing a
+    /// <c>FakeTimeProvider</c> lets a test observe eviction deterministically without
+    /// real wall-clock waits. Completes immediately when nothing is pending.
+    /// </summary>
+    internal Task WaitForPendingEvictionsAsync() => Task.WhenAll(_evictionTasks.Keys.ToArray());
 
     private CacheRegistration CreateRegistration(RegistrationKey key)
     {

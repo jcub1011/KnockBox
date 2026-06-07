@@ -6,5 +6,7 @@
   "version": "1.0.0",
   "entryAssembly": "KnockBox.DiceSimulator",
   "capabilities": [],
+  "backgroundColor": "#110e1f",
+  "fontColor": "#ede4d3",
   "tileAsset": "tile.svg"
 }

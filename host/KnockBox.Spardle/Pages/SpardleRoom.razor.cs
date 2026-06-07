@@ -1,4 +1,5 @@
 using KnockBox.Core.Components.Shared;
+using KnockBox.Core.Services.State.PlayLog;
 using KnockBox.Spardle.Components;
 using KnockBox.Spardle.Models;
 using Microsoft.AspNetCore.Components;
@@ -70,6 +71,21 @@ public partial class SpardleRoom : LobbyPageBase<SpardleState>
             _currentGuess = string.Empty;
         }
         await base.OnStateChangedAsync();
+    }
+
+    /// <summary>
+    /// Records a match-level play-log entry once the game reaches
+    /// <see cref="GamePhase.GameOver"/>. Returns <c>null</c> while the match is
+    /// still in progress so the base logs the first non-null result exactly once.
+    /// </summary>
+    protected override GameLog? BuildEndOfGamePlayLog()
+    {
+        if (GameState.Phase != GamePhase.GameOver)
+            return null;
+
+        return GameLog.Create(
+            "spardle",
+            SpardlePlayLogMetadata.Build(GameState, UserService.CurrentUser?.Id));
     }
 
     [JSInvokable]

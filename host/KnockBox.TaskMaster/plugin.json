@@ -7,5 +7,7 @@
   "entryAssembly": "KnockBox.TaskMaster",
   "capabilities": [],
   "tileAsset": "tile.svg",
+  "backgroundColor": "#1f2933",
+  "fontColor": "#f4f6f8",
   "workInProgress": true
 }

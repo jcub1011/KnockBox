@@ -1,4 +1,5 @@
 using KnockBox.Core.Components.Shared;
+using KnockBox.Core.Services.State.PlayLog;
 using KnockBox.Tracery.Components;
 using KnockBox.Tracery.Models;
 using KnockBox.Tracery.Services.Logic;
@@ -133,6 +134,20 @@ namespace KnockBox.Tracery.Pages
                 }
             }
             catch (OperationCanceledException) { /* superseded */ }
+        }
+
+        /// <summary>
+        /// Records one play-log entry per user once the match reaches its terminal
+        /// <see cref="GamePhase.FinalStandings"/> phase. Returns null while the match is still in
+        /// progress; the base records the first non-null log exactly once.
+        /// </summary>
+        protected override GameLog? BuildEndOfGamePlayLog()
+        {
+            if (GameState is null || GameState.Phase != GamePhase.FinalStandings)
+                return null;
+
+            var metadata = TraceryPlayLogMetadata.Build(GameState, UserService.CurrentUser?.Id);
+            return GameLog.Create("tracery", metadata);
         }
 
         protected override void OnLobbyDisposing()

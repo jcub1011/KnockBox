@@ -33,9 +33,9 @@
             {
                 var index = i;
                 var entry = _logs[index];
-                var isHost = entry.Role == PlayRole.Host;
+                var isHost = entry.GetMetadata(StandardMetadata.Role) == PlayLogRoles.Host;
 
-                <li class="pl-entry">
+                <li class="pl-entry" style="@EntryStyle(entry.GameIdentifier)">
                     <div class="pl-entry-head">
                         <span class="pl-game">@GameName(entry.GameIdentifier)</span>
                         <span class="pl-role @(isHost ? "pl-role-host" : "pl-role-player")">
@@ -51,10 +51,15 @@
                         <div class="pl-time">@when</div>
                     }
 
-                    @if (entry.Metadata.Count > 0)
+                    @{
+                        // Role renders as the badge above, so exclude it from the generic table.
+                        var rows = entry.Metadata
+                            .Where(kv => kv.Key != StandardMetadata.Role.ToString())
+                            .ToList();
+                    }
+                    @if (rows.Count > 0)
                     {
                         var expanded = _expanded.Contains(index);
-                        var rows = entry.Metadata;
                         var hiddenCount = rows.Count - MetadataPreviewCount;
 
                         <table class="pl-meta">

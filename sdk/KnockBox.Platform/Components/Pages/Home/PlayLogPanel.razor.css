@@ -93,7 +93,9 @@
 }
 
 .pl-entry {
-    background: var(--canvas-card);
+    /* --pl-entry-bg / --pl-entry-fg are set inline per-entry from the owning
+       game's manifest colors; absent → the default theme values below. */
+    background: var(--pl-entry-bg, var(--canvas-card));
     border: 3px solid #000;
     border-radius: 12px;
     box-shadow: var(--shadow-card-rest);
@@ -114,7 +116,7 @@
     font-family: var(--font-display);
     font-weight: 700;
     font-size: 1rem;
-    color: #fff;
+    color: var(--pl-entry-fg, #fff);
     line-height: 1.15;
     word-break: break-word;
 }
@@ -144,7 +146,8 @@
 
 .pl-time {
     font-size: 0.74rem;
-    color: var(--ink-soft);
+    color: var(--pl-entry-fg, var(--ink-soft));
+    opacity: 0.75;
     font-variant-numeric: tabular-nums;
 }
 
@@ -168,7 +171,8 @@
 }
 
 .pl-meta-key {
-    color: var(--ink-soft);
+    color: var(--pl-entry-fg, var(--ink-soft));
+    opacity: 0.7;
     font-family: var(--font-mono);
     font-size: 0.72rem;
     text-transform: uppercase;
@@ -178,7 +182,7 @@
 }
 
 .pl-meta-val {
-    color: var(--ink);
+    color: var(--pl-entry-fg, var(--ink));
     font-weight: 500;
     text-align: right;
     width: 100%;

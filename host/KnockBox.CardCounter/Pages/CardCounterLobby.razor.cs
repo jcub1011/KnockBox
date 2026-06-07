@@ -1,4 +1,5 @@
 using KnockBox.Core.Components.Shared;
+using KnockBox.Core.Services.State.PlayLog;
 using KnockBox.CardCounter.Services.Logic.Games;
 using KnockBox.CardCounter.Services.State.Games;
 using Microsoft.AspNetCore.Components;
@@ -17,6 +18,16 @@ namespace KnockBox.CardCounter.Pages
         {
             _prevShoeIndex = GameState.ShoeIndex;
             return Task.CompletedTask;
+        }
+
+        protected override GameLog? BuildEndOfGamePlayLog()
+        {
+            if (GameState.Phase != GamePhase.GameOver)
+                return null;
+
+            return GameLog.Create(
+                "card-counter",
+                CardCounterPlayLogMetadata.Build(GameState, UserService.CurrentUser?.Id));
         }
 
         protected override bool TryGetHostTick(out Action action, out int tickInterval)

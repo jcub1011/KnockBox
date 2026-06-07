@@ -5,6 +5,8 @@
   "routeIdentifier": "card-counter",
   "version": "1.0.0",
   "entryAssembly": "KnockBox.CardCounter",
+  "backgroundColor": "#061a0c",
+  "fontColor": "#ffffff",
   "capabilities": [],
   "tileAsset": "tile.svg"
 }

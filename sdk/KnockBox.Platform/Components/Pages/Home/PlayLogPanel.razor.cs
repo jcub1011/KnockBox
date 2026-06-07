@@ -31,6 +31,7 @@ namespace KnockBox.Platform.Components.Pages.Home
         private IReadOnlyList<GameLog> _logs = Array.Empty<GameLog>();
         private readonly HashSet<int> _expanded = [];
         private IReadOnlyDictionary<string, string>? _gameNames;
+        private IReadOnlyDictionary<string, (string? Background, string? Font)>? _gameColors;
         private bool _loaded;
         private bool _loadFailed;
 
@@ -84,6 +85,34 @@ namespace KnockBox.Platform.Components.Pages.Home
             var map = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var module in GameModules)
                 map[module.Manifest.RouteIdentifier] = module.Manifest.Name;
+            return map;
+        }
+
+        /// <summary>
+        /// Inline <c>style</c> for an entry that sets the <c>--pl-entry-bg</c> /
+        /// <c>--pl-entry-fg</c> CSS custom properties for whichever theme colors the
+        /// owning game declared. Returns an empty string when the game declared none
+        /// (or is no longer installed), so the entry renders with the default theme.
+        /// </summary>
+        private string EntryStyle(string routeIdentifier)
+        {
+            _gameColors ??= BuildGameColorMap();
+            if (!_gameColors.TryGetValue(routeIdentifier, out var colors))
+                return string.Empty;
+
+            var style = string.Empty;
+            if (!string.IsNullOrEmpty(colors.Background))
+                style += $"--pl-entry-bg:{colors.Background};";
+            if (!string.IsNullOrEmpty(colors.Font))
+                style += $"--pl-entry-fg:{colors.Font};";
+            return style;
+        }
+
+        private IReadOnlyDictionary<string, (string? Background, string? Font)> BuildGameColorMap()
+        {
+            var map = new Dictionary<string, (string?, string?)>(StringComparer.Ordinal);
+            foreach (var module in GameModules)
+                map[module.Manifest.RouteIdentifier] = (module.Manifest.BackgroundColor, module.Manifest.FontColor);
             return map;
         }
 

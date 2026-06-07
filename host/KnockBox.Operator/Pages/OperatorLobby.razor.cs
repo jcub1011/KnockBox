@@ -1,128 +1,47 @@
 using KnockBox.Core.Components.Shared;
-using KnockBox.Core.Services.State.Shared;
-using KnockBox.Core.Services.Navigation;
-using KnockBox.Core.Services.State.Users;
-using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.PlayLog;
+using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.Logic.Games;
 using KnockBox.Operator.Services.State;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Operator.Pages
 {
-    public partial class OperatorLobby : DisposableComponent
+    public partial class OperatorLobby : LobbyPageBase<OperatorGameState>
     {
+        /// <summary>Stable game id for the play log; must match the plugin's route identifier.</summary>
+        private const string RouteIdentifier = "operator";
+
         [Inject] protected OperatorGameEngine GameEngine { get; set; } = default!;
-
-        [Inject] protected IGameSessionService GameSessionService { get; set; } = default!;
-
-        [Inject] protected INavigationService NavigationService { get; set; } = default!;
-
-        [Inject] protected IUserService UserService { get; set; } = default!;
-
-        [Inject] protected ITickService TickService { get; set; } = default!;
-
-        [Inject] protected ILogger<OperatorLobby> Logger { get; set; } = default!;
-
-        [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
-
-        private IDisposable? _stateSubscription;
-        private IDisposable? _stateDisposedSubscription;
-        private IDisposable? _tickSubscription;
-        private bool _kickHandled;
 
         // ── Error toast state ─────────────────────────────────────────────────
         private string? _errorMessage;
         private int _errorKey;
 
-        protected OperatorGameState? GameState { get; set; }
-
-        protected override async Task OnInitializedAsync()
+        /// <summary>
+        /// Records one play-log entry per user once the match reaches
+        /// <see cref="OperatorGamePhase.GameOver"/>. Returns <c>null</c> while the game is
+        /// still in progress so the base hook logs exactly the first terminal result.
+        /// </summary>
+        protected override GameLog? BuildEndOfGamePlayLog()
         {
-            if (UserService.CurrentUser is null)
-                await UserService.InitializeCurrentUserAsync(ComponentDetached);
+            if (GameState.Phase != OperatorGamePhase.GameOver)
+                return null;
 
-            if (!GameSessionService.TryGetCurrentSession(out var session))
-            {
-                ReturnToHome();
-                return;
-            }
-
-            if (session.LobbyRegistration.State is not OperatorGameState gameState)
-            {
-                Logger.LogError("Game state is not of type {Type}", nameof(OperatorGameState));
-                ReturnToHome();
-                return;
-            }
-
-            GameState = gameState;
-
-            _stateDisposedSubscription = GameState.SubscribeStateDisposed(HandleGameStateDisposed);
-
-            _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () =>
-            {
-                await InvokeAsync(StateHasChanged);
-            });
-
-            if (IsHost())
-            {
-                var tickResult = TickService.RegisterTickCallback(() =>
-                {
-                    if (GameState?.Context is not null)
-                        GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
-                }, tickInterval: TickService.TicksPerSecond);
-
-                if (tickResult.TryGetSuccess(out var sub))
-                    _tickSubscription = sub;
-                else
-                    Logger.LogError("Failed to register tick callback: {Error}", tickResult.Error);
-            }
-
-            await base.OnInitializedAsync();
+            return GameLog.Create(
+                RouteIdentifier,
+                OperatorPlayLogMetadata.Build(GameState, UserService.CurrentUser?.Id));
         }
 
-        protected override void OnAfterRender(bool firstRender)
+        protected override bool TryGetHostTick(out Action action, out int tickInterval)
         {
-            if (!_kickHandled && GameState?.IsKicked(UserService.CurrentUser!) == true)
+            action = () =>
             {
-                _kickHandled = true;
-                GameSessionService.LeaveCurrentSession(navigateHome: true);
-            }
-
-            base.OnAfterRender(firstRender);
-        }
-
-        public override void Dispose()
-        {
-            _tickSubscription?.Dispose();
-            _stateDisposedSubscription?.Dispose();
-            _stateSubscription?.Dispose();
-            base.Dispose();
-        }
-
-        private void HandleGameStateDisposed()
-        {
-            try
-            {
-                _ = InvokeAsync(() =>
-                {
-                    GameSessionService.LeaveCurrentSession(navigateHome: false);
-                    ReturnToHome();
-                }).ContinueWith(
-                    t => Logger.LogError(t.Exception, "Error navigating home after game state was disposed."),
-                    System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error handling game state disposal in lobby.");
-            }
-        }
-
-        private void ReturnToHome() => NavigationService.ToHome();
-
-        private bool IsHost()
-        {
-            if (GameState == null || UserService.CurrentUser == null) return false;
-            return GameState.Host.Id == UserService.CurrentUser.Id;
+                if (GameState?.Context is not null)
+                    GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
+            };
+            tickInterval = TickService.TicksPerSecond;
+            return true;
         }
 
         // ── Error toast ───────────────────────────────────────────────────────
@@ -146,4 +65,3 @@ namespace KnockBox.Operator.Pages
         }
     }
 }
-
