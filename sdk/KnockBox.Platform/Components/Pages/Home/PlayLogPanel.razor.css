@@ -3,7 +3,7 @@
 .pl-panel {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 8px;
     font-family: var(--font-primary);
     color: var(--ink);
 }
@@ -16,6 +16,7 @@
     letter-spacing: 0.16em;
     color: #fff;
     margin: 0;
+    padding-left: 1rem;
     padding-bottom: 10px;
     position: relative;
 }
@@ -23,7 +24,7 @@
 .pl-heading::after {
     content: "";
     position: absolute;
-    left: 0;
+    left: 1rem;
     bottom: 0;
     width: 44px;
     height: 3px;
@@ -83,13 +84,66 @@
 
 /* ── Entry list ────────────────────────────────────────────────────────── */
 
+/* Scroll-aware edge fades: the top fade grows in only once you've scrolled away
+   from the top, and the bottom fade shrinks away as you reach the end — so a
+   fully-visible edge is never washed out. Driven entirely by the list's own
+   scroll position (no JS); browsers without scroll-driven animations (e.g.
+   Firefox) fall back to the @property initial values. */
+@property --pl-fade-top {
+    syntax: "<length>";
+    inherits: false;
+    initial-value: 0px;
+}
+
+@property --pl-fade-bottom {
+    syntax: "<length>";
+    inherits: false;
+    initial-value: 24px;
+}
+
 .pl-list {
     list-style: none;
     margin: 0;
-    padding: 0;
+    padding: 1rem;
     display: flex;
     flex-direction: column;
     gap: 14px;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        #000 var(--pl-fade-top),
+        #000 calc(100% - var(--pl-fade-bottom)),
+        transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        #000 var(--pl-fade-top),
+        #000 calc(100% - var(--pl-fade-bottom)),
+        transparent 100%
+    );
+    animation: pl-fade-in-top linear, pl-fade-out-bottom linear;
+    animation-timeline: scroll(self), scroll(self);
+    animation-range: 0 24px, calc(100% - 24px) 100%;
+    animation-fill-mode: both, both;
+}
+
+@keyframes pl-fade-in-top {
+    from { --pl-fade-top: 0px; }
+    to { --pl-fade-top: 24px; }
+}
+
+@keyframes pl-fade-out-bottom {
+    from { --pl-fade-bottom: 24px; }
+    to { --pl-fade-bottom: 0px; }
+}
+
+@media (max-width: 900px) {
+    .pl-list {
+        max-height: 100%;
+    }
 }
 
 .pl-entry {

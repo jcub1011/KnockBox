@@ -339,7 +339,7 @@
     margin: 0 auto;
     display: grid;
     grid-template-columns: minmax(0, 1fr) clamp(280px, 28%, 360px);
-    gap: 36px;
+    gap: 24px;
     align-items: start;
 }
 
@@ -356,6 +356,7 @@
 .home-playlog {
     min-width: 0;
     animation: fade-in-up 0.7s ease-out 0.85s both;
+    padding-bottom: 1rem;
 }
 
 .games-heading {
@@ -571,6 +572,10 @@
         grid-template-columns: 1fr;
         gap: 28px;
         max-width: 960px;
+    }
+
+    .home-playlog {
+        max-height: 100%;
     }
 }
 
