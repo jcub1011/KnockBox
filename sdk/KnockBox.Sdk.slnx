@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="KnockBox.Core/KnockBox.Core.csproj" />
+  <Project Path="KnockBox.Core.Client/KnockBox.Core.Client.csproj" />
   <Project Path="KnockBox.CoreTests/KnockBox.CoreTests.csproj" />
   <Project Path="KnockBox.CoreTests.EmbeddedManifestFixture/KnockBox.CoreTests.EmbeddedManifestFixture.csproj" />
   <Project Path="KnockBox.Platform/KnockBox.Platform.csproj" />

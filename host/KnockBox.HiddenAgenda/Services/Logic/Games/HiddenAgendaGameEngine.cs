@@ -12,8 +12,10 @@ using KnockBox.Core.Services.State.Users;
 using KnockBox.HiddenAgenda.Services.Logic.Games.Data;
 using KnockBox.HiddenAgenda.Services.Logic.Games.FSM;
 using KnockBox.HiddenAgenda.Services.Logic.Games.FSM.States;
+using KnockBox.HiddenAgenda.Services.Projection;
 using KnockBox.HiddenAgenda.Services.State.Games;
 using KnockBox.HiddenAgenda.Services.State.Games.Data;
+using KnockBox.Core.Services.State.Games.Shared.Projection;
 using Microsoft.Extensions.Logging;
 
 namespace KnockBox.HiddenAgenda.Services.Logic.Games
@@ -22,8 +24,38 @@ namespace KnockBox.HiddenAgenda.Services.Logic.Games
         IRandomNumberService randomNumberService,
         ILogger<HiddenAgendaGameEngine> logger,
         ILogger<HiddenAgendaGameState> stateLogger) 
-        : AbstractGameEngine<HiddenAgendaGameState>(minPlayerCount: 3, maxPlayerCount: 6)
+        : AbstractGameEngine<HiddenAgendaGameState>(minPlayerCount: 3, maxPlayerCount: 6),
+          IGameStateProjector,
+          IGameCommandHandler
     {
+        /// <summary>
+        /// Per-recipient projection entry point used by the host's
+        /// <c>GameViewCoordinator</c>. Returns a default-deny <see cref="HiddenAgendaViewDto"/>.
+        /// </summary>
+        public object? ProjectFor(AbstractGameState state, Guid recipientId)
+            => state is HiddenAgendaGameState s ? HiddenAgendaProjector.ProjectFor(s, recipientId) : null;
+
+        /// <summary>
+        /// Maps a hub command name to the same engine method a Razor page used to
+        /// call directly. Host-identity authorization lives in the invoked methods
+        /// (e.g. <see cref="AbstractGameEngine.StartAsync"/>).
+        /// </summary>
+        public async ValueTask<Result> HandleCommandAsync(
+            User caller, AbstractGameState state, string command, string? payloadJson, CancellationToken ct = default)
+        {
+            if (state is not HiddenAgendaGameState s)
+                return Result.FromError("Invalid game state for Hidden Agenda.");
+
+            return command switch
+            {
+                "start" => await StartAsync(caller, s, ct),
+                "spin" => Spin(caller, s),
+                "skip-event" => SkipEventCard(caller, s),
+                "next-round" => StartNextRound(caller, s),
+                _ => Result.FromError($"Unknown command [{command}].")
+            };
+        }
+
         public override Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
             if (host is null)

@@ -1,0 +1,49 @@
+<!--
+  KnockBox.Core.Client — the WASM-safe client SDK seed (Phase 0 spike).
+
+  This is the shared, browser-safe contracts + runtime surface that the Blazor
+  WebAssembly client, every game's *.Client UI assembly, and (server-side) the
+  GameHub all compile against. It deliberately has:
+    - NO reference to KnockBox.Platform (server-only).
+    - NO reference to server KnockBox.Core (drags AbstractGameState / locks /
+      filesystem surface into the browser). The client must bind ONLY this SDK
+      plus a game's *.Contracts DTOs.
+
+  Type identity across the host/plugin boundary in the browser is preserved
+  exactly the way the server's PluginLoader preserves it via contract promotion:
+  both the client and any runtime-loaded plugin UI compile against THIS one
+  assembly, so they agree on the CLR types declared here.
+-->
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.0.0</Version>
+    <Description>WASM-safe client SDK for KnockBox game plugin UIs.</Description>
+    <!-- Third-party plugin DTOs ship without a source-generated JsonSerializer
+         context, so the client must tolerate reflection-based JSON. This flag
+         keeps the reflection serializer linked + active even under trimming. -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- NOTE: do NOT add <FrameworkReference Include="Microsoft.AspNetCore.App" />
+         here. This assembly is consumed by a browser-wasm project, which has no
+         runtime pack for the full shared framework (NETSDK1082). The Razor SDK
+         supplies the Components compile references; SignalR.Client + DI/logging
+         abstractions come from the packages below. -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.0" />
+    <!-- Browser-wasm-friendly component surface (IComponent / ComponentBase /
+         EventCallback) plus transitive DI + logging abstractions. -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="KnockBox.Platform" />
+  </ItemGroup>
+
+</Project>

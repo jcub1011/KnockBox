@@ -55,6 +55,9 @@
     <!-- In-repo project reference; at pack time this is transformed into a
          `KnockBox.Core` package dependency. External consumers get the NuGet. -->
     <ProjectReference Include="..\KnockBox.Core\KnockBox.Core.csproj" />
+    <!-- WASM-safe client SDK — referenced server-side ONLY for the shared hub
+         contract (IGameClient) the GameHub is strongly typed over. -->
+    <ProjectReference Include="..\KnockBox.Core.Client\KnockBox.Core.Client.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -64,6 +67,10 @@
          serialization than the default JSON protocol; transparent to handlers
          and to anything subscribing to StateChangedEventManager. -->
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.0" />
+    <!-- Server-side hosting for the InteractiveWebAssembly render mode
+         (AddInteractiveWebAssemblyComponents / AddInteractiveWebAssemblyRenderMode).
+         Not part of the shared framework. -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.0" />
     <!-- Serilog stack — the platform ships a default request-logging pipeline
          and a bootstrap logger used during plugin discovery (before the host's
          logging is fully wired up). -->

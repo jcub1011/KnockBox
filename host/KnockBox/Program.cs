@@ -137,7 +137,10 @@ namespace KnockBox
             app.UseMiddleware<DefaultPasswordRedirectMiddleware>();
 
             // ── Endpoints ────────────────────────────────────────────────────
-            app.MapKnockBoxPlatformEndpoints<App>();
+            // Pass the WASM client assembly so the Blazor router discovers the
+            // InteractiveWebAssembly-rendered spike page that lives there.
+            app.MapKnockBoxPlatformEndpoints<App>(
+                typeof(KnockBox.Client.KnockBoxClientAssembly).Assembly);
 
             // /blob-share/{token:guid} — capability-URL fetch endpoint for
             // IIndexedDbBlob.PublishForSharingAsync. The host streams bytes

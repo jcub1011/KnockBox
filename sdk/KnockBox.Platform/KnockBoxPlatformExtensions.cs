@@ -16,6 +16,7 @@ using KnockBox.Services.Registrations.States;
 using KnockBox.Services.Registrations.Validators;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -91,6 +92,7 @@ public static class KnockBoxPlatformExtensions
         builder.Services.AddSignalR().AddMessagePackProtocol();
 
         builder.Services.AddRazorComponents()
+            .AddInteractiveWebAssemblyComponents()
             .AddInteractiveServerComponents(o =>
             {
                 // KnockBox owns its own reconnect grace period via
@@ -132,6 +134,14 @@ public static class KnockBoxPlatformExtensions
         // JS module reference stays bound to one Blazor circuit; the impl
         // disposes that reference when the scope ends.
         builder.Services.AddScoped<IIndexedDbService, IndexedDbService>();
+
+        // ── WASM realtime transport (GameHub) ────────────────────────────────
+        // Per-lobby connection bookkeeping, the single per-lobby projection
+        // subscriber/fan-out, and the route→client-DLL asset resolver. All
+        // singletons: the hub is transient per SignalR's model but these back it.
+        builder.Services.AddSingleton<Hubs.GameConnectionRegistry>();
+        builder.Services.AddSingleton<Hubs.GameViewCoordinator>();
+        builder.Services.AddSingleton<Plugins.IPluginClientAssetService, Plugins.PluginClientAssetService>();
 
         // Core service registrations
         builder.Services.RegisterRepositories();
@@ -296,7 +306,8 @@ public static class KnockBoxPlatformExtensions
     /// host provides its own <c>App.razor</c>.
     /// </summary>
     public static WebApplication MapKnockBoxPlatformEndpoints<TRootComponent>(
-        this WebApplication app) where TRootComponent : IComponent
+        this WebApplication app,
+        params Assembly[] additionalClientAssemblies) where TRootComponent : IComponent
     {
         app.MapStaticAssets();
 
@@ -322,18 +333,56 @@ public static class KnockBoxPlatformExtensions
         var gamePluginAssemblies = app.Services.GetRequiredService<GamePluginAssemblies>();
         var additionalAssemblies = gamePluginAssemblies.Assemblies
             .Append(typeof(KnockBoxPlatformExtensions).Assembly)
-            .Append(typeof(KnockBox.Core.Components.Shared.SvgDrawingEngine).Assembly);
+            .Append(typeof(KnockBox.Core.Components.Shared.SvgDrawingEngine).Assembly)
+            // The WASM client assembly carries routable pages rendered under
+            // InteractiveWebAssembly (e.g. the Phase 0 spike page). It is passed in
+            // by the host because Platform must not reference the client project.
+            .Concat(additionalClientAssemblies);
 
         // Plugin HTTP dispatcher — `/api/plugins/{routeIdentifier}/{**subPath}`.
         // Inert until a plugin opts in by implementing IGameEngineHttpHandler;
         // unknown route / missing handler / unknown room all 404.
         app.MapPluginApi();
 
+        // Realtime transport for the WASM client.
+        app.MapHub<Hubs.GameHub>("/hubs/game");
+
+        // Serve runtime-streamed plugin client UI assemblies + their integrity
+        // manifests. This is the path that loads a DLL the trimmed WASM client
+        // never referenced at build time.
+        MapPluginClientAssets(app);
+
         app.MapRazorComponents<TRootComponent>()
             .AddInteractiveServerRenderMode()
+            .AddInteractiveWebAssemblyRenderMode()
             .AddAdditionalAssemblies([.. additionalAssemblies]);
 
         return app;
+    }
+
+    /// <summary>
+    /// Maps <c>GET /_plugins/{routeIdentifier}/client/manifest.json</c> (integrity
+    /// manifest) and <c>GET /_plugins/{routeIdentifier}/client/{assembly}.dll</c>
+    /// (raw IL bytes) so the WASM client can stream + verify + load a game's UI
+    /// assembly at room-entry time.
+    /// </summary>
+    private static void MapPluginClientAssets(WebApplication app)
+    {
+        app.MapGet("/_plugins/{routeIdentifier}/client/manifest.json",
+            (string routeIdentifier, Plugins.IPluginClientAssetService assets) =>
+            {
+                return assets.TryGetManifest(routeIdentifier, out var manifest)
+                    ? Results.Json(manifest)
+                    : Results.NotFound();
+            });
+
+        app.MapGet("/_plugins/{routeIdentifier}/client/{assembly}.dll",
+            (string routeIdentifier, string assembly, Plugins.IPluginClientAssetService assets) =>
+            {
+                return assets.TryGetAssemblyPath(routeIdentifier, assembly, out var path)
+                    ? Results.File(path, "application/octet-stream")
+                    : Results.NotFound();
+            });
     }
 
     /// <summary>

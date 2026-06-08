@@ -1,0 +1,97 @@
+@using System.Text.Json
+@inherits ComponentBase
+
+@*
+   GameRoot — the runtime-loaded UI entry point resolved by RuntimePluginLoader
+   ("{rootNamespace}.GameRoot"). Rendered by the trimmed WASM client via
+   DynamicComponent from an assembly the client never referenced at build time.
+*@
+
+<div style="border:2px dashed #7c5cff;border-radius:10px;padding:16px;font-family:sans-serif;">
+    <h3 style="margin-top:0;">🛰️ Spike plugin UI (loaded at runtime via LoadFromStream)</h3>
+
+    @if (_view is null)
+    {
+        <p><em>Waiting for a projected view from the server…</em></p>
+    }
+    else
+    {
+        <p>
+            <strong>Phase:</strong> @_view.Phase &nbsp;|&nbsp;
+            <strong>Round:</strong> @_view.CurrentRound &nbsp;|&nbsp;
+            <strong>Joinable:</strong> @_view.IsJoinable
+        </p>
+
+        <p><strong>Lobby roster (@_view.Roster.Count):</strong> @string.Join(", ", _view.Roster.Select(r => r.DisplayName))</p>
+
+        <table style="border-collapse:collapse;width:100%;">
+            <thead>
+                <tr>
+                    <th style="text-align:left;border-bottom:1px solid #ccc;">Player</th>
+                    <th style="text-align:left;border-bottom:1px solid #ccc;">Score</th>
+                    <th style="text-align:left;border-bottom:1px solid #ccc;">My secret tasks</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in _view.Players)
+                {
+                    <tr>
+                        <td>@p.DisplayName</td>
+                        <td>@p.CumulativeScore</td>
+                        <td>
+                            @if (p.SecretTasks is { Count: > 0 })
+                            {
+                                <ul style="margin:0;padding-left:18px;">
+                                    @foreach (var t in p.SecretTasks)
+                                    {
+                                        <li>@t.Id — @t.Description</li>
+                                    }
+                                </ul>
+                            }
+                            else
+                            {
+                                <span style="color:#999;">(hidden)</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <div style="margin-top:12px;display:flex;gap:8px;">
+        <button @onclick="@(() => Send("start"))">Start game (host)</button>
+        <button @onclick="@(() => Send("spin"))">Spin</button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(LastCommandResult))
+    {
+        <p style="color:#b00;">@LastCommandResult</p>
+    }
+</div>
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    private SpikeView? _view;
+
+    /// <summary>The recipient-specific projected view JSON pushed by the hub.</summary>
+    [Parameter] public string? ViewJson { get; set; }
+
+    /// <summary>Invoked with a command name; the host page relays it over the hub.</summary>
+    [Parameter] public EventCallback<string> OnCommand { get; set; }
+
+    /// <summary>Optional status/error text from the last command.</summary>
+    [Parameter] public string? LastCommandResult { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrEmpty(ViewJson) && ViewJson != "null")
+        {
+            // Reflection-based deserialize into a type with no source-gen context.
+            _view = JsonSerializer.Deserialize<SpikeView>(ViewJson, JsonOptions);
+        }
+    }
+
+    private Task Send(string command) => OnCommand.InvokeAsync(command);
+}

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Trimmer root descriptor for the WASM client.
+
+  Runtime-loaded third-party plugin UI is, by definition, outside the trimmer's
+  static graph. The plugin's OWN code ships untrimmed (streamed whole), but the
+  FRAMEWORK surface it leans on can be removed by the closed-world trimmer if no
+  first-party code references it. Preserve the promised plugin SDK surface so a
+  runtime-loaded GameRoot renders + (de)serializes correctly in the browser.
+
+  This is the "preserved framework root set" the migration plan calls for; its
+  breadth (preserve="all" across rendering + JSON) is the accepted cost of
+  supporting runtime third-party UI under trimming.
+-->
+<linker>
+  <assembly fullname="Microsoft.AspNetCore.Components" preserve="all" />
+  <assembly fullname="Microsoft.AspNetCore.Components.Web" preserve="all" />
+  <assembly fullname="System.Text.Json" preserve="all" />
+  <assembly fullname="KnockBox.Core.Client" preserve="all" />
+</linker>

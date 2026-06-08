@@ -3,6 +3,7 @@
     <Build />
   </Project>
   <Project Path="../sdk/KnockBox.Core/KnockBox.Core.csproj" />
+  <Project Path="../sdk/KnockBox.Core.Client/KnockBox.Core.Client.csproj" />
   <Project Path="../sdk/KnockBox.Platform/KnockBox.Platform.csproj" />
   <Project Path="../sdk/KnockBox.PlatformTests/KnockBox.PlatformTests.csproj" />
   <Project Path="../sdk/KnockBox.Plugins.Analyzer/KnockBox.Plugins.Analyzer.csproj" />
@@ -10,6 +11,8 @@
   <Project Path="../sdk/KnockBox.Tooling/KnockBox.Tooling.csproj" />
   <Project Path="KnockBox.AlphaChain/KnockBox.AlphaChain.csproj" />
   <Project Path="KnockBox.AlphaChainTests/KnockBox.AlphaChainTests.csproj" />
+  <Project Path="KnockBox.Client/KnockBox.Client.csproj" />
+  <Project Path="KnockBox.SpikePlugin.Client/KnockBox.SpikePlugin.Client.csproj" />
   <Project Path="KnockBox.CardCounter/KnockBox.CardCounter.csproj" />
   <Project Path="KnockBox.CardCounterTests/KnockBox.CardCounterTests.csproj" />
   <Project Path="KnockBox.Codeword/KnockBox.Codeword.csproj" />

@@ -1,0 +1,47 @@
+<!--
+  KnockBox.Client — the Blazor WebAssembly client for the Phase 0 spike.
+
+  Referenced by the host (KnockBox) so the Blazor Web App SDK wires its trimmed
+  _framework payload into the server's static assets. References ONLY the WASM-safe
+  KnockBox.Core.Client SDK — never KnockBox.Platform or any game plugin.
+-->
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Honest closed-world test: trim on publish. The runtime-loaded plugin DLL
+         is never in this graph, so the framework surface it leans on must be
+         force-rooted (see ILLink.Descriptors.xml below). -->
+    <PublishTrimmed>true</PublishTrimmed>
+
+    <!-- Third-party plugin DTOs have no source-gen JsonSerializerContext, so the
+         reflection-based serializer must stay linked + active under trimming. -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\sdk\KnockBox.Core.Client\KnockBox.Core.Client.csproj" />
+  </ItemGroup>
+
+  <!--
+    Trimmer roots. The trimmer is closed-world: DynamicComponent activation,
+    reflection over the runtime-loaded GameRoot, and reflection-based JSON over
+    unknown DTOs are all invisible to it. Preserve the framework surface a plugin
+    is promised so it survives trimming and works in the browser at runtime.
+  -->
+  <ItemGroup>
+    <TrimmerRootDescriptor Include="ILLink.Descriptors.xml" />
+    <TrimmerRootAssembly Include="Microsoft.AspNetCore.Components" />
+    <TrimmerRootAssembly Include="Microsoft.AspNetCore.Components.Web" />
+    <TrimmerRootAssembly Include="System.Text.Json" />
+    <TrimmerRootAssembly Include="KnockBox.Core.Client" />
+  </ItemGroup>
+
+</Project>

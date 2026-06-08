@@ -79,6 +79,20 @@
     <ProjectReference Include="..\..\sdk\KnockBox.Platform\KnockBox.Platform.csproj" />
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
     <!--
+      Blazor WebAssembly client. A NORMAL reference (not ReferenceOutputAssembly=false):
+      the Blazor Web App SDK wires this client's trimmed _framework payload into the
+      host's served static assets. Carries the Phase 0 spike page.
+    -->
+    <ProjectReference Include="..\KnockBox.Client\KnockBox.Client.csproj" />
+    <!--
+      Out-of-build-graph spike UI assembly. ReferenceOutputAssembly="false" so the
+      host (and the client) never link it; it is staged as bytes into
+      games/KnockBox.HiddenAgenda/client/ and streamed to the browser at runtime.
+      Referenced only so the host build transitively builds + stages it.
+    -->
+    <ProjectReference Include="..\KnockBox.SpikePlugin.Client\KnockBox.SpikePlugin.Client.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+    <!--
       Plugin projects are loaded at runtime, not linked at compile time.
       ReferenceOutputAssembly="false" keeps the host from taking a compile-time
       dependency on plugin types (preserving the runtime-discovery architecture);
