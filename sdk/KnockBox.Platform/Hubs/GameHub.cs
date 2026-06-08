@@ -1,7 +1,10 @@
 using KnockBox.Core.Client.Hub;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
+using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Platform.Games;
+using KnockBox.Services.State.Games.Shared;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,35 +16,72 @@ namespace KnockBox.Platform.Hubs;
 /// projections out.
 /// <para>
 /// Identity is established from the handshake, not trusted from a command
-/// envelope: the connection carries the player's self-asserted id/name (KnockBox's
-/// existing localStorage-backed player-identity model) as query string, resolved
-/// once here. Command authorization (<c>caller.Id == state.Host.Id</c>) reuses the
+/// envelope: the connection presents a server-signed, per-tab identity token (via
+/// the SignalR access-token mechanism) which is unprotected here to resolve the
+/// caller's <see cref="User"/> and <see cref="SessionToken"/> without a Blazor
+/// circuit. Command authorization (<c>caller.Id == state.Host.Id</c>) reuses the
 /// sealed checks already in <see cref="AbstractGameEngine"/>.
+/// </para>
+/// <para>
+/// The session lifecycle moves here from the circuit: <see cref="OnConnectedAsync"/>
+/// acquires a session-service reference on the first connection for a token and
+/// <see cref="OnDisconnectedAsync"/> releases it on the last, so reconnect within
+/// the provider's grace window re-attaches the same session. This coexists with
+/// the still-circuit-based <c>GameSessionService</c> used by the unmigrated Blazor
+/// Server pages: those derive identity from <c>UserService</c>/<c>SessionTokenProvider</c>
+/// (a client-generated GUID), a different <see cref="SessionToken"/> than the
+/// signed token used here, so the two acquisition paths never evict each other.
 /// </para>
 /// </summary>
 public sealed class GameHub(
     ILobbyService lobbyService,
     GameConnectionRegistry registry,
     GameViewCoordinator coordinator,
+    ISessionServiceProvider sessionServiceProvider,
+    ISessionIdentityTokenService identityTokens,
     IServiceProvider serviceProvider,
     ILogger<GameHub> logger) : Hub<IGameClient>
 {
+    private static readonly IDisposable NoOpLifecycleToken = new NoOpDisposable();
+
     /// <summary>
-    /// Associates this connection with a lobby, joins its broadcast group,
-    /// installs the per-lobby view subscriber (idempotent), and sends the caller
-    /// an initial projection. Returns <c>null</c> on success or an error message.
+    /// Acquires the caller's session-service reference (keyed on the signed
+    /// token) on the first connection for that token. Aborts the connection if
+    /// identity can't be resolved from the handshake.
+    /// </summary>
+    public override async Task OnConnectedAsync()
+    {
+        if (!TryResolveCaller(out _, out var sessionToken))
+        {
+            Context.Abort();
+            return;
+        }
+
+        registry.AddSession(sessionToken.Token, Context.ConnectionId, () =>
+        {
+            var result = sessionServiceProvider.GetService<GameSessionState>(sessionToken);
+            return result.TryGetSuccess(out var registration)
+                ? registration.LifecycleToken
+                : NoOpLifecycleToken;
+        });
+
+        await base.OnConnectedAsync();
+    }
+
+    /// <summary>
+    /// Associates this connection with a lobby, joins its broadcast group, and
+    /// sends the caller an initial projection. The per-lobby view subscriber is
+    /// installed at lobby creation (<c>LobbyService.CreateLobbyAsync</c>), not
+    /// here, so it lives for the lobby's full lifetime. Returns <c>null</c> on
+    /// success or an error message.
     /// </summary>
     public async Task<string?> JoinRoom(string lobbyUri)
     {
-        if (!TryResolveCaller(out var caller))
+        if (!TryResolveCaller(out var caller, out _))
             return "Could not resolve caller identity from the connection.";
 
         if (!lobbyService.TryGetByUri(lobbyUri, out var registration))
             return $"Lobby [{lobbyUri}] not found.";
-
-        // Install the per-lobby projection subscriber before any registration so
-        // an existing member's view updates when this player joins.
-        coordinator.EnsureSubscribed(registration);
 
         // The host is already in the roster; everyone else registers as a player.
         // The registration mutation fires StateChanged → existing members re-project.
@@ -51,8 +91,8 @@ public sealed class GameHub(
             var joinResult = registration.State.RegisterPlayer(caller);
             if (joinResult.TryGetSuccess(out var token))
                 unregisterToken = token;
-            // A failure here (lobby closed / already registered) is non-fatal for
-            // the spike: the connection still receives projections as a spectator.
+            // A failure here (lobby closed / already registered) is non-fatal:
+            // the connection still receives projections as a spectator.
         }
 
         registry.Add(Context.ConnectionId, lobbyUri, caller.Id, caller.Name, unregisterToken);
@@ -66,12 +106,11 @@ public sealed class GameHub(
 
     /// <summary>
     /// Creates a new lobby for <paramref name="routeIdentifier"/> with the caller as
-    /// host and returns its URI. Lets the WASM spike page be fully self-driving
-    /// (no dependency on the server-rendered home page).
+    /// host and returns its URI.
     /// </summary>
     public async Task<string?> CreateRoom(string routeIdentifier)
     {
-        if (!TryResolveCaller(out var caller))
+        if (!TryResolveCaller(out var caller, out _))
             return null;
 
         var result = await lobbyService.CreateLobbyAsync(caller, routeIdentifier, Context.ConnectionAborted);
@@ -85,7 +124,7 @@ public sealed class GameHub(
     /// </summary>
     public async Task<string?> SubmitCommand(string lobbyUri, string command, string? payloadJson)
     {
-        if (!TryResolveCaller(out var caller))
+        if (!TryResolveCaller(out var caller, out _))
             return "Could not resolve caller identity from the connection.";
 
         if (!lobbyService.TryGetByUri(lobbyUri, out var registration))
@@ -109,30 +148,48 @@ public sealed class GameHub(
 
     public override Task OnDisconnectedAsync(Exception? exception)
     {
-        if (registry.TryRemove(Context.ConnectionId, out var lobbyUri, out var lobbyNowEmpty, out var unregisterToken))
-        {
-            // Unregister the player from the lobby state (fires PlayerUnregistered +
-            // StateChanged → remaining members re-project with the updated roster).
+        // Release the session reference; disposing the lifecycle token starts the
+        // provider's 1-minute eviction grace (a reconnect within it re-acquires).
+        if (registry.RemoveSession(Context.ConnectionId, out var lifecycleToken))
+            lifecycleToken?.Dispose();
+
+        // Remove the connection from its lobby and unregister the player (fires
+        // PlayerUnregistered + StateChanged → remaining members re-project). The
+        // per-lobby view subscription is NOT removed here — it is torn down at
+        // lobby close so an empty-but-open lobby keeps projecting.
+        if (registry.TryRemove(Context.ConnectionId, out _, out _, out var unregisterToken))
             unregisterToken?.Dispose();
-            if (lobbyNowEmpty)
-                coordinator.RemoveSubscription(lobbyUri);
-        }
+
         return base.OnDisconnectedAsync(exception);
     }
 
-    private bool TryResolveCaller(out User caller)
+    /// <summary>
+    /// Resolves the caller from the handshake's signed identity token. The token
+    /// arrives via SignalR's access-token mechanism (the <c>access_token</c> query
+    /// parameter on the negotiate/connect request); the display name is a
+    /// non-authoritative label.
+    /// </summary>
+    private bool TryResolveCaller(out User caller, out SessionToken sessionToken)
     {
         caller = null!;
+        sessionToken = default;
+
         var http = Context.GetHttpContext();
         if (http is null)
             return false;
 
-        var rawId = http.Request.Query["userId"].ToString();
-        var name = http.Request.Query["userName"].ToString();
-        if (!Guid.TryParse(rawId, out var userId))
+        var token = http.Request.Query["access_token"].ToString();
+        if (!identityTokens.TryResolve(token, out var userId))
             return false;
 
+        var name = http.Request.Query["userName"].ToString();
         caller = UserFactory.Create(string.IsNullOrWhiteSpace(name) ? "Player" : name, userId);
+        sessionToken = new SessionToken(userId);
         return true;
+    }
+
+    private sealed class NoOpDisposable : IDisposable
+    {
+        public void Dispose() { }
     }
 }

@@ -113,6 +113,9 @@ public sealed class GameViewCoordinator(
         }
     }
 
+    /// <summary>Test hook: whether a per-lobby subscription is currently installed.</summary>
+    internal bool HasSubscription(string lobbyUri) => _subs.ContainsKey(lobbyUri);
+
     private bool TryGetProjector(string routeIdentifier, out IGameStateProjector projector)
     {
         var engine = serviceProvider.GetKeyedService<AbstractGameEngine>(routeIdentifier);

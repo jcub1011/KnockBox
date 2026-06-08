@@ -24,6 +24,21 @@ public sealed class GameConnectionRegistry
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, Guid>> _byLobby =
         new(StringComparer.OrdinalIgnoreCase);
 
+    // ── Session lifecycle tracking (independent of lobby membership) ──────────
+    // The hub acquires a session-service reference on the FIRST connection for a
+    // session token and releases it when the LAST one leaves, so a single tab's
+    // transient reconnect double-connection doesn't evict the session. Keyed on
+    // the token VALUE (each browser tab has its own token → its own session).
+    private sealed class SessionEntry
+    {
+        public readonly HashSet<string> Connections = [];
+        public IDisposable? LifecycleToken;
+    }
+
+    private readonly Lock _sessionGate = new();
+    private readonly Dictionary<string, SessionEntry> _bySession = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _connectionToken = new(StringComparer.Ordinal);
+
     /// <summary>
     /// Records a connection. <paramref name="unregisterToken"/>, when supplied, is
     /// the player's lobby unregistration token (from <c>RegisterPlayer</c>) and is
@@ -79,4 +94,65 @@ public sealed class GameConnectionRegistry
 
     public int CountForLobby(string lobbyUri)
         => _byLobby.TryGetValue(lobbyUri, out var set) ? set.Count : 0;
+
+    /// <summary>
+    /// Records <paramref name="connectionId"/> against its session
+    /// <paramref name="tokenValue"/>. On the FIRST connection for that token,
+    /// invokes <paramref name="acquireOnFirst"/> once and stashes the returned
+    /// lifecycle token to dispose when the last connection leaves (see
+    /// <see cref="RemoveSession"/>). Subsequent connections for the same token (a
+    /// reconnect or a second hub negotiation for one tab) do not re-acquire.
+    /// </summary>
+    public void AddSession(string tokenValue, string connectionId, Func<IDisposable> acquireOnFirst)
+    {
+        lock (_sessionGate)
+        {
+            _connectionToken[connectionId] = tokenValue;
+
+            if (!_bySession.TryGetValue(tokenValue, out var entry))
+            {
+                entry = new SessionEntry();
+                _bySession[tokenValue] = entry;
+            }
+
+            var wasEmpty = entry.Connections.Count == 0;
+            entry.Connections.Add(connectionId);
+            if (wasEmpty)
+                entry.LifecycleToken = acquireOnFirst();
+        }
+    }
+
+    /// <summary>
+    /// Removes <paramref name="connectionId"/> from its session. Returns
+    /// <see langword="true"/> with the stashed <paramref name="lifecycleToken"/>
+    /// only when this was the LAST connection for that session token (so the
+    /// caller disposes it, starting the eviction grace period); otherwise
+    /// <see langword="false"/> with a null token.
+    /// </summary>
+    public bool RemoveSession(string connectionId, out IDisposable? lifecycleToken)
+    {
+        lifecycleToken = null;
+        lock (_sessionGate)
+        {
+            if (!_connectionToken.Remove(connectionId, out var tokenValue))
+                return false;
+            if (!_bySession.TryGetValue(tokenValue, out var entry))
+                return false;
+
+            entry.Connections.Remove(connectionId);
+            if (entry.Connections.Count > 0)
+                return false;
+
+            _bySession.Remove(tokenValue);
+            lifecycleToken = entry.LifecycleToken;
+            return true;
+        }
+    }
+
+    /// <summary>Test/diagnostic: number of live connections tracked for a session token.</summary>
+    public int CountForSession(string tokenValue)
+    {
+        lock (_sessionGate)
+            return _bySession.TryGetValue(tokenValue, out var entry) ? entry.Connections.Count : 0;
+    }
 }

@@ -16,6 +16,7 @@ using KnockBox.Services.Registrations.States;
 using KnockBox.Services.Registrations.Validators;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -142,6 +143,22 @@ public static class KnockBoxPlatformExtensions
         builder.Services.AddSingleton<Hubs.GameConnectionRegistry>();
         builder.Services.AddSingleton<Hubs.GameViewCoordinator>();
         builder.Services.AddSingleton<Plugins.IPluginClientAssetService, Plugins.PluginClientAssetService>();
+
+        // Per-tab identity for the circuit-free WASM client. Data Protection signs
+        // the identity token the client presents on its hub handshake; persisting
+        // the keys means tokens (and therefore sessions) survive a host restart.
+        // Anchored under the same data root the storage services use so a single
+        // bind-mount covers all persisted state. A host may reconfigure Data
+        // Protection before calling AddKnockBoxPlatform; TryAdd-style here would
+        // not help (AddDataProtection is additive), so this is the platform default.
+        var dpKeysDirectory = Path.Combine(
+            new DefaultStoragePathService().GetAdminDirectory(), "dataprotection-keys");
+        builder.Services.AddDataProtection()
+            .SetApplicationName("KnockBox")
+            .PersistKeysToFileSystem(new DirectoryInfo(dpKeysDirectory));
+        builder.Services.TryAddSingleton<
+            Core.Services.State.Shared.ISessionIdentityTokenService,
+            KnockBox.Services.State.Shared.SessionIdentityTokenService>();
 
         // Core service registrations
         builder.Services.RegisterRepositories();
@@ -346,6 +363,13 @@ public static class KnockBoxPlatformExtensions
 
         // Realtime transport for the WASM client.
         app.MapHub<Hubs.GameHub>("/hubs/game");
+
+        // Mints a per-tab identity token the WASM client stores in sessionStorage
+        // and presents on its hub handshake. Anonymous + no cookie: the token is a
+        // signed, server-minted id that confers no privilege on its own.
+        app.MapPost("/api/session/token",
+            (Core.Services.State.Shared.ISessionIdentityTokenService tokens) =>
+                Results.Json(new { token = tokens.Issue() }));
 
         // Serve runtime-streamed plugin client UI assemblies + their integrity
         // manifests. This is the path that loads a DLL the trimmed WASM client

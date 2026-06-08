@@ -29,17 +29,14 @@
   </ItemGroup>
 
   <!--
-    Stage just the DLL into the HiddenAgenda plugin's client/ folder under the
-    host bin, so the host's /_plugins/hidden-agenda/client/* endpoint can serve
-    it. The destination subfolder is created if absent; this is independent of
-    HiddenAgenda's own games/ staging.
+    Stage the DLL + a build-time SHA-256 sidecar into the HiddenAgenda plugin's
+    client/ folder via the shared client-staging targets. ClientPluginGameAssembly
+    is set explicitly because this spike stages into a DIFFERENT server plugin's
+    folder (HiddenAgenda) than its own project name would derive.
   -->
-  <Target Name="StageClientPluginAssembly" AfterTargets="Build">
-    <PropertyGroup>
-      <ClientDestDir>$(MSBuildThisFileDirectory)..\KnockBox\bin\$(Configuration)\$(TargetFramework)\games\KnockBox.HiddenAgenda\client\</ClientDestDir>
-    </PropertyGroup>
-    <Message Text="Staging spike client UI [$(TargetName).dll] into [$(ClientDestDir)]" Importance="high" />
-    <Copy SourceFiles="$(TargetDir)$(TargetName).dll" DestinationFolder="$(ClientDestDir)" />
-  </Target>
+  <PropertyGroup>
+    <ClientPluginGameAssembly>KnockBox.HiddenAgenda</ClientPluginGameAssembly>
+  </PropertyGroup>
+  <Import Project="..\Directory.Client.targets" />
 
 </Project>

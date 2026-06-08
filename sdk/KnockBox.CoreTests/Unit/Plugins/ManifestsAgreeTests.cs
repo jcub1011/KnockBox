@@ -57,6 +57,8 @@ public sealed class ManifestsAgreeTests
     [DataRow("EntryAssembly")]
     [DataRow("Version")]
     [DataRow("Capabilities")]
+    [DataRow("ClientAssembly")]
+    [DataRow("ClientContracts")]
     public void ManifestsAgree_SingleFieldDiffers_ReturnsFalseWithFieldInDisagreement(string field)
     {
         var onDisk = Baseline();
@@ -66,6 +68,23 @@ public sealed class ManifestsAgreeTests
 
         Assert.IsFalse(agree);
         StringAssert.Contains(disagreement, field);
+    }
+
+    [TestMethod]
+    public void ManifestsAgree_ClientAssetsDiffer_StillAgrees()
+    {
+        // The embedded plugin.json carries no hashes; the on-disk one does. The
+        // cross-check must ignore ClientAssets so this intentional asymmetry does
+        // not reject an otherwise-matching plugin.
+        var onDisk = Baseline() with
+        {
+            ClientAssets = new[] { new ClientAssetEntry("Baseline.Client", new string('a', 64)) },
+        };
+        var fromModule = Baseline(); // no hashes
+
+        var agree = PluginLoader.ManifestsAgree(onDisk, fromModule, out var disagreement);
+
+        Assert.IsTrue(agree, disagreement);
     }
 
     /// <summary>
@@ -83,6 +102,8 @@ public sealed class ManifestsAgreeTests
         {
             Capabilities = new HashSet<PluginCapability> { PluginCapability.Storage },
         },
+        "ClientAssembly"  => source with { ClientAssembly = "Other.Client" },
+        "ClientContracts" => source with { ClientContracts = new[] { "Other.Contracts" } },
         _ => throw new ArgumentOutOfRangeException(nameof(fieldName), fieldName, "Unknown field."),
     };
 }

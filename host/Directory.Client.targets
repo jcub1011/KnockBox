@@ -1,0 +1,99 @@
+<Project>
+
+  <!--
+    Shared MSBuild target for a game plugin's browser-UI ({Game}.Client) project.
+
+    Stages the client UI DLL (and any declared client contracts DLLs) into the
+    host's games/{ServerPlugin}/client/ folder, alongside a build-time integrity
+    sidecar (assets.sha256.json) the server reads to tell the browser which hash
+    to verify before LoadFromStream. Generalizes the hand-rolled staging the
+    Phase 0 spike used.
+
+    A consumer .csproj imports this file and sets ClientPluginGameAssembly to the
+    SERVER plugin's folder name (the games/ subfolder to stage into). It may also
+    list <ClientContractAssembly Include="..." /> items for sibling contracts DLLs
+    that must ship alongside the UI.
+  -->
+
+  <!--
+    Default the staging folder name to the project name minus a trailing
+    ".Client" (e.g. KnockBox.Spardle.Client -> KnockBox.Spardle). Consumers whose
+    server plugin folder differs (the spike stages into KnockBox.HiddenAgenda)
+    set ClientPluginGameAssembly explicitly.
+  -->
+  <PropertyGroup Condition="'$(ClientPluginGameAssembly)' == ''">
+    <ClientPluginGameAssembly>$(MSBuildProjectName.Replace('.Client',''))</ClientPluginGameAssembly>
+  </PropertyGroup>
+
+  <Target Name="StageClientAssets" AfterTargets="Build">
+    <PropertyGroup>
+      <ClientDestDir>$(MSBuildThisFileDirectory)KnockBox\bin\$(Configuration)\$(TargetFramework)\games\$(ClientPluginGameAssembly)\client\</ClientDestDir>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <_ClientStageFiles Include="$(TargetDir)$(TargetName).dll" />
+      <_ClientStageFiles Include="@(ClientContractAssembly)" />
+    </ItemGroup>
+
+    <Message Text="Staging client UI [$(TargetName).dll] for [$(ClientPluginGameAssembly)] into [$(ClientDestDir)]"
+             Importance="high" />
+
+    <Copy SourceFiles="@(_ClientStageFiles)" DestinationFolder="$(ClientDestDir)" />
+
+    <!--
+      Compute SHA-256 at BUILD time over the staged bytes, then emit a flat
+      { "AssemblyName": "hexhash", ... } sidecar. The server reads this instead of
+      hashing on every serve, and the browser verifies downloaded bytes against it.
+    -->
+    <ItemGroup>
+      <_StagedClientAssets Include="$(ClientDestDir)%(_ClientStageFiles.Filename)%(_ClientStageFiles.Extension)" />
+    </ItemGroup>
+
+    <GetFileHash Files="@(_StagedClientAssets)" Algorithm="SHA256" HashEncoding="hex">
+      <Output TaskParameter="Items" ItemName="_HashedClientAssets" />
+    </GetFileHash>
+
+    <PropertyGroup>
+      <_ClientAssetHashJson>{%0A@(_HashedClientAssets->'  "%(Filename)": "%(FileHash)"', ',%0A')%0A}</_ClientAssetHashJson>
+    </PropertyGroup>
+
+    <WriteLinesToFile File="$(ClientDestDir)assets.sha256.json"
+                      Lines="$(_ClientAssetHashJson)"
+                      Overwrite="true" />
+  </Target>
+
+  <!--
+    Re-stage + re-hash the published (potentially R2R) bytes over the IL versions
+    written at Build, so a Release publish carries hashes matching the served
+    bytes. Mirrors PublishPluginAfterPublish in Directory.Plugin.targets.
+  -->
+  <Target Name="StageClientAssetsAfterPublish" AfterTargets="Publish">
+    <PropertyGroup>
+      <ClientDestDir>$(MSBuildThisFileDirectory)KnockBox\bin\$(Configuration)\$(TargetFramework)\games\$(ClientPluginGameAssembly)\client\</ClientDestDir>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <_ClientPublishFiles Include="$(PublishDir)$(TargetName).dll" />
+      <_ClientPublishFiles Include="@(ClientContractAssembly->'$(PublishDir)%(Filename)%(Extension)')" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_ClientPublishFiles)" DestinationFolder="$(ClientDestDir)" OverwriteReadOnlyFiles="true" />
+
+    <ItemGroup>
+      <_StagedClientPublishAssets Include="$(ClientDestDir)%(_ClientPublishFiles.Filename)%(_ClientPublishFiles.Extension)" />
+    </ItemGroup>
+
+    <GetFileHash Files="@(_StagedClientPublishAssets)" Algorithm="SHA256" HashEncoding="hex">
+      <Output TaskParameter="Items" ItemName="_HashedClientPublishAssets" />
+    </GetFileHash>
+
+    <PropertyGroup>
+      <_ClientAssetPublishHashJson>{%0A@(_HashedClientPublishAssets->'  "%(Filename)": "%(FileHash)"', ',%0A')%0A}</_ClientAssetPublishHashJson>
+    </PropertyGroup>
+
+    <WriteLinesToFile File="$(ClientDestDir)assets.sha256.json"
+                      Lines="$(_ClientAssetPublishHashJson)"
+                      Overwrite="true" />
+  </Target>
+
+</Project>

@@ -21,6 +21,7 @@ public static class KnockBoxClientServiceCollectionExtensions
 
         services.AddSingleton<IClientPluginLoader, RuntimePluginLoader>();
         services.AddSingleton(_ => new GameHubConnectionFactory(baseUri));
+        services.AddSingleton<IClientSessionTokenProvider, ClientSessionTokenProvider>();
 
         return services;
     }

@@ -3,6 +3,7 @@
 @rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
 @implements IAsyncDisposable
 @inject GameHubConnectionFactory HubFactory
+@inject IClientSessionTokenProvider TokenProvider
 @inject IClientPluginLoader PluginLoader
 @inject NavigationManager Nav
 
@@ -45,7 +46,6 @@ else
 
     private HubConnection? _hub;
     private string _lobbyUri = "";
-    private Guid _userId;
     private string _userName = "";
     private bool _connected;
     private string _status = "Initializing…";
@@ -58,12 +58,13 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        // Self-asserted per-tab identity (mirrors KnockBox's existing player model;
-        // a real deployment resolves this from localStorage / the auth cookie).
-        _userId = Guid.NewGuid();
-        _userName = $"Player-{_userId.ToString()[..4]}";
+        // Per-tab identity: a server-signed token persisted in sessionStorage so a
+        // reload is the same player but a fresh tab is a distinct one. The hub
+        // resolves the user id from the signed token; the name is a display label.
+        var token = await TokenProvider.GetOrIssueAsync();
+        _userName = $"Player-{token[^4..]}";
 
-        _hub = HubFactory.Create(_userId, _userName);
+        _hub = HubFactory.Create(token, _userName);
         _hub.On<string, long, string>(nameof(IGameClient.ReceiveView), OnReceiveView);
 
         await _hub.StartAsync();

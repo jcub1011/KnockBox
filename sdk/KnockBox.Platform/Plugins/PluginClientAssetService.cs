@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using KnockBox.Core.Client.Plugins;
 using KnockBox.Core.Plugins;
@@ -26,9 +27,16 @@ public interface IPluginClientAssetService
 public sealed partial class PluginClientAssetService : IPluginClientAssetService
 {
     private const string ClientSubfolder = "client";
+    private const string HashSidecarFile = "assets.sha256.json";
 
     // route -> absolute plugin folder containing plugin.json
     private readonly ConcurrentDictionary<string, string> _routeToFolder =
+        new(StringComparer.OrdinalIgnoreCase);
+    // route -> declared client entry assembly (from plugin.json), if any
+    private readonly ConcurrentDictionary<string, string> _routeToClientAssembly =
+        new(StringComparer.OrdinalIgnoreCase);
+    // client dir -> build-time hash map (null sentinel: no sidecar present)
+    private readonly ConcurrentDictionary<string, IReadOnlyDictionary<string, string>?> _sidecarByDir =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly ILogger<PluginClientAssetService> _logger;
 
@@ -56,7 +64,11 @@ public sealed partial class PluginClientAssetService : IPluginClientAssetService
                     continue;
 
                 if (Directory.Exists(Path.Combine(folder, ClientSubfolder)))
+                {
                     _routeToFolder[manifest.RouteIdentifier] = Path.GetFullPath(folder);
+                    if (!string.IsNullOrEmpty(manifest.ClientAssembly))
+                        _routeToClientAssembly[manifest.RouteIdentifier] = manifest.ClientAssembly;
+                }
             }
         }
     }
@@ -68,18 +80,79 @@ public sealed partial class PluginClientAssetService : IPluginClientAssetService
             return false;
 
         var clientDir = Path.Combine(folder, ClientSubfolder);
-        var dll = Directory.EnumerateFiles(clientDir, "*.dll").FirstOrDefault();
-        if (dll is null)
-            return false;
 
-        var entryAssembly = Path.GetFileNameWithoutExtension(dll);
-        var sha = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(dll)));
+        // Entry assembly: prefer the plugin.json-declared clientAssembly; fall back
+        // to the lone staged DLL (the Phase 0 spike convention).
+        string entryAssembly;
+        if (_routeToClientAssembly.TryGetValue(routeIdentifier, out var declared))
+        {
+            entryAssembly = declared;
+        }
+        else
+        {
+            var dll = Directory.EnumerateFiles(clientDir, "*.dll").FirstOrDefault();
+            if (dll is null)
+                return false;
+            entryAssembly = Path.GetFileNameWithoutExtension(dll);
+        }
 
-        // Convention for the spike: the GameRoot lives in the entry assembly's
-        // root namespace (== assembly simple name).
+        // Integrity hash: read the BUILD-TIME sidecar (no per-serve hashing). Only
+        // when no sidecar exists at all (a plugin staged without the client
+        // targets) do we fall back to computing it on serve.
+        string sha;
+        var sidecar = LoadSidecar(clientDir);
+        if (sidecar is not null)
+        {
+            if (!sidecar.TryGetValue(entryAssembly, out var declaredSha))
+            {
+                _logger.LogError(
+                    "Client assembly [{Assembly}] has no build-time hash in [{Sidecar}] for route [{Route}].",
+                    entryAssembly, HashSidecarFile, routeIdentifier);
+                return false;
+            }
+            sha = declaredSha;
+        }
+        else
+        {
+            var dllPath = Path.Combine(clientDir, entryAssembly + ".dll");
+            if (!File.Exists(dllPath))
+                return false;
+            _logger.LogDebug(
+                "No [{Sidecar}] for route [{Route}]; computing client hash at serve time.",
+                HashSidecarFile, routeIdentifier);
+            sha = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(dllPath)));
+        }
+
+        // Convention: the GameRoot lives in the entry assembly's root namespace
+        // (== assembly simple name).
         manifest = new ClientPluginManifest(routeIdentifier, entryAssembly, entryAssembly, sha);
         return true;
     }
+
+    /// <summary>
+    /// Loads + caches the build-time hash sidecar for a client dir. Returns
+    /// <see langword="null"/> (and caches that) when no sidecar exists.
+    /// </summary>
+    private IReadOnlyDictionary<string, string>? LoadSidecar(string clientDir)
+        => _sidecarByDir.GetOrAdd(clientDir, dir =>
+        {
+            var path = Path.Combine(dir, HashSidecarFile);
+            if (!File.Exists(path))
+                return null;
+
+            try
+            {
+                var map = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(path));
+                return map is null
+                    ? null
+                    : new Dictionary<string, string>(map, StringComparer.OrdinalIgnoreCase);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to read client hash sidecar [{Path}].", path);
+                return null;
+            }
+        });
 
     public bool TryGetAssemblyPath(string routeIdentifier, string assemblyName, [NotNullWhen(true)] out string? path)
     {

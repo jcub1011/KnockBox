@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using KnockBox.Core.Plugins;
 using KnockBox.Platform.Games;
+using KnockBox.Platform.Hubs;
 
 namespace KnockBox.Services.Logic.Games.Shared
 {
@@ -16,6 +17,7 @@ namespace KnockBox.Services.Logic.Games.Shared
     {
         private readonly ILobbyCodeService _lobbyCodeService;
         private readonly IGameAvailabilityService _gameAvailability;
+        private readonly GameViewCoordinator _viewCoordinator;
         private readonly ILogger<LobbyService> _logger;
         private readonly ConcurrentDictionary<string, LobbyRegistration> _lobbies = [];
         // Secondary index keyed by the full lobby URI (`room/{routeIdentifier}/{guidA}-{guidB}`)
@@ -30,10 +32,12 @@ namespace KnockBox.Services.Logic.Games.Shared
             ILobbyCodeService lobbyCodeService,
             IGameAvailabilityService gameAvailability,
             IEnumerable<IGameModule> gameModules,
+            GameViewCoordinator viewCoordinator,
             ILogger<LobbyService> logger)
         {
             _lobbyCodeService = lobbyCodeService;
             _gameAvailability = gameAvailability;
+            _viewCoordinator = viewCoordinator;
             _logger = logger;
             _gamesByRoute = new(StringComparer.OrdinalIgnoreCase);
 
@@ -65,6 +69,11 @@ namespace KnockBox.Services.Logic.Games.Shared
                 return Result.FromError($"Lobby with code [{registration.Code}] not found.");
 
             _lobbiesByUri.TryRemove(removed.Uri, out _);
+
+            // Tear down the per-lobby projection subscriber. Idempotent and also
+            // triggered by the state-disposed callback below, but done explicitly
+            // here so the subscription is gone the moment the lobby closes.
+            _viewCoordinator.RemoveSubscription(removed.Uri);
 
             removed.State.Dispose();
 
@@ -149,6 +158,12 @@ namespace KnockBox.Services.Logic.Games.Shared
                 // and a fresh GUID pair, so collision is not a real concern; if
                 // it ever fires we'd see it as a missed dispatcher lookup.
                 _lobbiesByUri.TryAdd(lobbyUri, lobbyRegistration);
+
+                // Install the single per-lobby projection subscriber for the
+                // lobby's whole lifetime — not lazily on first hub join — so an
+                // open lobby with no connected players still projects on the next
+                // join. Idempotent; torn down in CloseLobbyAsync.
+                _viewCoordinator.EnsureSubscribed(lobbyRegistration);
 
                 return lobbyRegistration;
             }

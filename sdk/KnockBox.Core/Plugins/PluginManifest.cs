@@ -28,6 +28,15 @@ public sealed partial record PluginManifest(
     public IReadOnlyList<string> ExportedContracts { get; init; } =
         ExportedContracts ?? Array.Empty<string>();
 
+    /// <inheritdoc/>
+    public string? ClientAssembly { get; init; }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<string> ClientContracts { get; init; } = Array.Empty<string>();
+
+    /// <inheritdoc/>
+    public IReadOnlyList<ClientAssetEntry> ClientAssets { get; init; } = Array.Empty<ClientAssetEntry>();
+
     /// <summary>
     /// The one supported <c>plugin.json</c> schema version. Bump (and add
     /// migration handling) if the on-disk shape changes.
@@ -47,6 +56,9 @@ public sealed partial record PluginManifest(
 
     [GeneratedRegex(@"^[A-Za-z0-9._-]+$")]
     private static partial Regex ExportedContractNamePattern();
+
+    [GeneratedRegex(@"^[0-9a-fA-F]{64}$")]
+    private static partial Regex Sha256HexPattern();
 
     [GeneratedRegex(@"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")]
     private static partial Regex HexColorPattern();
@@ -325,6 +337,56 @@ public sealed partial record PluginManifest(
                 exportedContracts = collected.ToArray();
             }
 
+            // ── Client (browser UI) fields — optional, additive within schema v1 ──
+            // A game plugin may ship a browser UI assembly (clientAssembly), the
+            // contracts DLLs that UI binds (clientContracts), and build-time
+            // integrity hashes for the runtime-streamed DLLs (clientAssets). All
+            // three are absent on every server-only plugin written so far, so they
+            // default to null/empty and existing manifests keep parsing unchanged.
+            string? clientAssembly = null;
+            if (root.TryGetProperty("clientAssembly", out var clientAssemblyElement)
+                && clientAssemblyElement.ValueKind != JsonValueKind.Null)
+            {
+                if (clientAssemblyElement.ValueKind != JsonValueKind.String)
+                {
+                    return ValueResult<PluginManifest>.FromError(
+                        "plugin.json 'clientAssembly' must be a string.");
+                }
+
+                var raw = clientAssemblyElement.GetString();
+                if (string.IsNullOrWhiteSpace(raw))
+                {
+                    return ValueResult<PluginManifest>.FromError(
+                        "plugin.json 'clientAssembly' must not be empty or whitespace.");
+                }
+
+                if (!ExportedContractNamePattern().IsMatch(raw))
+                {
+                    return ValueResult<PluginManifest>.FromError(
+                        $"plugin.json 'clientAssembly' [{raw}] must match ^[A-Za-z0-9._-]+$ " +
+                        "(an assembly simple name with no '.dll').");
+                }
+
+                clientAssembly = raw;
+            }
+
+            if (!TryReadAssemblyNameList(root, "clientContracts", out var clientContracts, out var clientContractsError))
+                return ValueResult<PluginManifest>.FromError(clientContractsError);
+
+            if (!TryReadClientAssets(root, out var clientAssets, out var clientAssetsError))
+                return ValueResult<PluginManifest>.FromError(clientAssetsError);
+
+            // A declared clientAssembly with no matching clientAssets entry means
+            // the build staged the UI DLL without recording its hash — fail loudly
+            // so a broken staging pipeline can't ship an unverifiable assembly.
+            if (clientAssembly is not null
+                && !clientAssets.Any(a => string.Equals(a.Name, clientAssembly, StringComparison.OrdinalIgnoreCase)))
+            {
+                return ValueResult<PluginManifest>.FromError(
+                    $"plugin.json declares clientAssembly [{clientAssembly}] but no matching " +
+                    "entry exists in 'clientAssets'; every streamed client DLL needs an integrity hash.");
+            }
+
             // Cross-field rules:
             //   - exportedContracts is library-only. Games declaring contracts is almost
             //     always an authoring mistake (the contract type should live in a sibling
@@ -368,7 +430,12 @@ public sealed partial record PluginManifest(
                 Kind: kind,
                 ExportedContracts: exportedContracts,
                 BackgroundColor: backgroundColor,
-                FontColor: fontColor);
+                FontColor: fontColor)
+            {
+                ClientAssembly = clientAssembly,
+                ClientContracts = clientContracts,
+                ClientAssets = clientAssets,
+            };
 
             return ValueResult<PluginManifest>.FromValue(manifest);
         }
@@ -450,6 +517,141 @@ public sealed partial record PluginManifest(
         }
 
         color = raw;
+        return true;
+    }
+
+    /// <summary>
+    /// Reads an optional array-of-assembly-simple-names field (e.g.
+    /// <c>clientContracts</c>). Absent or JSON <c>null</c> → empty list and
+    /// success. Each entry must be a non-empty string matching
+    /// <c>^[A-Za-z0-9._-]+$</c>, deduplicated case-insensitively.
+    /// </summary>
+    private static bool TryReadAssemblyNameList(
+        JsonElement root, string propertyName, out IReadOnlyList<string> names, out string error)
+    {
+        names = Array.Empty<string>();
+        error = string.Empty;
+
+        if (!root.TryGetProperty(propertyName, out var element)
+            || element.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        if (element.ValueKind != JsonValueKind.Array)
+        {
+            error = $"plugin.json '{propertyName}' must be an array of strings.";
+            return false;
+        }
+
+        var collected = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in element.EnumerateArray())
+        {
+            if (entry.ValueKind != JsonValueKind.String)
+            {
+                error = $"plugin.json '{propertyName}' entries must be strings.";
+                return false;
+            }
+
+            var raw = entry.GetString();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                error = $"plugin.json '{propertyName}' entries must not be empty or whitespace.";
+                return false;
+            }
+
+            if (!ExportedContractNamePattern().IsMatch(raw))
+            {
+                error = $"plugin.json '{propertyName}' entry [{raw}] must match ^[A-Za-z0-9._-]+$.";
+                return false;
+            }
+
+            if (!seen.Add(raw))
+            {
+                error = $"plugin.json '{propertyName}' entry [{raw}] is listed more than once.";
+                return false;
+            }
+
+            collected.Add(raw);
+        }
+
+        names = collected;
+        return true;
+    }
+
+    /// <summary>
+    /// Reads the optional <c>clientAssets</c> array. Absent or JSON <c>null</c> →
+    /// empty list and success. Each entry must be an object with a string
+    /// <c>name</c> (assembly simple name, deduplicated case-insensitively) and a
+    /// string <c>sha256</c> (64 hex characters).
+    /// </summary>
+    private static bool TryReadClientAssets(
+        JsonElement root, out IReadOnlyList<ClientAssetEntry> assets, out string error)
+    {
+        assets = Array.Empty<ClientAssetEntry>();
+        error = string.Empty;
+
+        if (!root.TryGetProperty("clientAssets", out var element)
+            || element.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        if (element.ValueKind != JsonValueKind.Array)
+        {
+            error = "plugin.json 'clientAssets' must be an array of objects.";
+            return false;
+        }
+
+        var collected = new List<ClientAssetEntry>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in element.EnumerateArray())
+        {
+            if (entry.ValueKind != JsonValueKind.Object)
+            {
+                error = "plugin.json 'clientAssets' entries must be objects with 'name' and 'sha256'.";
+                return false;
+            }
+
+            if (!entry.TryGetProperty("name", out var nameElement)
+                || nameElement.ValueKind != JsonValueKind.String)
+            {
+                error = "plugin.json 'clientAssets' entries must have a string 'name'.";
+                return false;
+            }
+
+            var name = nameElement.GetString();
+            if (string.IsNullOrWhiteSpace(name) || !ExportedContractNamePattern().IsMatch(name))
+            {
+                error = $"plugin.json 'clientAssets' entry name [{name}] must match ^[A-Za-z0-9._-]+$.";
+                return false;
+            }
+
+            if (!entry.TryGetProperty("sha256", out var shaElement)
+                || shaElement.ValueKind != JsonValueKind.String)
+            {
+                error = $"plugin.json 'clientAssets' entry [{name}] must have a string 'sha256'.";
+                return false;
+            }
+
+            var sha = shaElement.GetString();
+            if (string.IsNullOrWhiteSpace(sha) || !Sha256HexPattern().IsMatch(sha))
+            {
+                error = $"plugin.json 'clientAssets' entry [{name}] sha256 must be 64 hex characters.";
+                return false;
+            }
+
+            if (!seen.Add(name))
+            {
+                error = $"plugin.json 'clientAssets' entry name [{name}] is listed more than once.";
+                return false;
+            }
+
+            collected.Add(new ClientAssetEntry(name, sha));
+        }
+
+        assets = collected;
         return true;
     }
 

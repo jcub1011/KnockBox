@@ -40,22 +40,59 @@ public sealed class RuntimePluginLoader(HttpClient http, ILogger<RuntimePluginLo
             if (assembly is null)
                 return GameRootLoadResult.Failure($"Failed to load client assembly [{manifest.EntryAssembly}].");
 
-            var rootTypeName = $"{manifest.RootNamespace}.{GameRootTypeName}";
-            var rootType = assembly.GetType(rootTypeName);
+            // Prefer an explicit IGameClientModule declaration if the assembly
+            // ships one; otherwise fall back to the {RootNamespace}.GameRoot name
+            // convention (what the Phase 0 spike uses).
+            var rootType = ResolveFromModule(assembly)
+                ?? assembly.GetType($"{manifest.RootNamespace}.{GameRootTypeName}");
+
             if (rootType is null)
-                return GameRootLoadResult.Failure($"Root component [{rootTypeName}] not found in [{manifest.EntryAssembly}].");
+            {
+                return GameRootLoadResult.Failure(
+                    $"No IGameClientModule and no [{manifest.RootNamespace}.{GameRootTypeName}] " +
+                    $"component found in [{manifest.EntryAssembly}].");
+            }
             if (!typeof(IComponent).IsAssignableFrom(rootType))
-                return GameRootLoadResult.Failure($"Type [{rootTypeName}] does not implement IComponent.");
+                return GameRootLoadResult.Failure($"Type [{rootType.FullName}] does not implement IComponent.");
 
             logger.LogInformation(
                 "Loaded runtime game UI [{Assembly}] for route [{Route}]; root [{Root}].",
-                manifest.EntryAssembly, routeIdentifier, rootTypeName);
+                manifest.EntryAssembly, routeIdentifier, rootType.FullName);
             return GameRootLoadResult.Success(rootType);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to load runtime game UI for route [{Route}].", routeIdentifier);
             return GameRootLoadResult.Failure(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Looks for a public, parameterless <see cref="IGameClientModule"/> in the
+    /// loaded assembly and returns its declared root component type. Returns
+    /// <see langword="null"/> if the assembly ships no module (the spike case).
+    /// </summary>
+    private Type? ResolveFromModule(Assembly assembly)
+    {
+        var moduleType = assembly.GetExportedTypes().FirstOrDefault(t =>
+            !t.IsAbstract
+            && typeof(IGameClientModule).IsAssignableFrom(t)
+            && t.GetConstructor(Type.EmptyTypes) is not null);
+
+        if (moduleType is null)
+            return null;
+
+        try
+        {
+            var module = (IGameClientModule)Activator.CreateInstance(moduleType)!;
+            return module.GameRootComponentType;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Found IGameClientModule [{Module}] but could not activate it; " +
+                "falling back to the GameRoot name convention.", moduleType.FullName);
+            return null;
         }
     }
 

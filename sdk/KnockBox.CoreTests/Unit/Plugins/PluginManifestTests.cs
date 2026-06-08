@@ -865,6 +865,155 @@ public sealed class PluginManifestTests
         Assert.IsTrue(result.TryGetSuccess(out _));
     }
 
+    // ─── TryParse — client (browser UI) fields ─────────────────────────────
+
+    [TestMethod]
+    public void TryParse_ManifestWithoutClientFields_DefaultsToEmpty()
+    {
+        using var stream = StreamFor(ValidManifest);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.IsNull(manifest.ClientAssembly);
+        Assert.AreEqual(0, manifest.ClientContracts.Count);
+        Assert.AreEqual(0, manifest.ClientAssets.Count);
+    }
+
+    [TestMethod]
+    public void TryParse_ValidClientFields_RoundTrip()
+    {
+        var json = AddField(ValidManifest, "clientAssembly", "\"Fixture.Client\"");
+        json = AddField(json, "clientContracts", """["Fixture.Contracts"]""");
+        json = AddField(json, "clientAssets", """
+            [
+                { "name": "Fixture.Client", "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" },
+                { "name": "Fixture.Contracts", "sha256": "FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210" }
+            ]
+            """);
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.AreEqual("Fixture.Client", manifest.ClientAssembly);
+        CollectionAssert.AreEqual(new[] { "Fixture.Contracts" }, manifest.ClientContracts.ToArray());
+        Assert.AreEqual(2, manifest.ClientAssets.Count);
+        Assert.AreEqual("Fixture.Client", manifest.ClientAssets[0].Name);
+        Assert.AreEqual(64, manifest.ClientAssets[0].Sha256.Length);
+    }
+
+    [TestMethod]
+    public void TryParse_ClientAssemblyNotString_Fails()
+    {
+        var json = AddField(ValidManifest, "clientAssembly", "42");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "clientAssembly", "string");
+    }
+
+    [TestMethod]
+    [DataRow("Bad Name")]
+    [DataRow("Bad/Name")]
+    public void TryParse_ClientAssemblyInvalidShape_Fails(string badName)
+    {
+        var json = AddField(ValidManifest, "clientAssembly", $"\"{badName}\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "clientAssembly");
+    }
+
+    [TestMethod]
+    public void TryParse_ClientAssemblyWithoutMatchingAsset_Fails()
+    {
+        var json = AddField(ValidManifest, "clientAssembly", "\"Fixture.Client\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "clientAssembly", "clientAssets");
+    }
+
+    [TestMethod]
+    public void TryParse_ClientContractsContainsDuplicate_Fails()
+    {
+        var json = AddField(ValidManifest, "clientContracts", """["Foo.Contracts", "Foo.Contracts"]""");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "clientContracts", "Foo.Contracts");
+    }
+
+    [TestMethod]
+    public void TryParse_ClientContractsNotArray_Fails()
+    {
+        var json = AddField(ValidManifest, "clientContracts", "\"Foo.Contracts\"");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "clientContracts", "array");
+    }
+
+    [TestMethod]
+    public void TryParse_ClientAssetsEntryNotObject_Fails()
+    {
+        var json = AddField(ValidManifest, "clientAssets", """["not-an-object"]""");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "clientAssets");
+    }
+
+    [TestMethod]
+    public void TryParse_ClientAssetsMissingSha_Fails()
+    {
+        var json = AddField(ValidManifest, "clientAssets", """[ { "name": "Fixture.Client" } ]""");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "clientAssets", "sha256");
+    }
+
+    [TestMethod]
+    [DataRow("0123")]                                                                   // too short
+    [DataRow("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeg")]      // non-hex 'g'
+    public void TryParse_ClientAssetsBadSha_Fails(string badSha)
+    {
+        var json = AddField(ValidManifest, "clientAssets",
+            $$"""[ { "name": "Fixture.Client", "sha256": "{{badSha}}" } ]""");
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "clientAssets", "sha256");
+    }
+
+    [TestMethod]
+    public void TryParse_ClientAssetsDuplicateName_Fails()
+    {
+        var sha = new string('a', 64);
+        var json = AddField(ValidManifest, "clientAssets",
+            $$"""
+            [
+                { "name": "Fixture.Client", "sha256": "{{sha}}" },
+                { "name": "Fixture.Client", "sha256": "{{sha}}" }
+            ]
+            """);
+        using var stream = StreamFor(json);
+
+        var result = PluginManifest.TryParse(stream);
+
+        AssertFailureContains(result, "clientAssets", "Fixture.Client");
+    }
+
     // ─── helpers ────────────────────────────────────────────────────────────
 
     private static string ValidManifestWithCapabilities(string capabilitiesJsonArray) =>

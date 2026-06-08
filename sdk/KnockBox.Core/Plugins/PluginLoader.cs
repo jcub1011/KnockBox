@@ -1129,6 +1129,23 @@ namespace KnockBox.Core.Plugins
                     $"code=[{string.Join(',', fromModule.ExportedContracts)}]";
                 return false;
             }
+            if (!string.Equals(onDisk.ClientAssembly, fromModule.ClientAssembly, StringComparison.Ordinal))
+            { disagreement = $"ClientAssembly disk=[{onDisk.ClientAssembly}] code=[{fromModule.ClientAssembly}]"; return false; }
+            if (!onDisk.ClientContracts
+                .ToHashSet(StringComparer.OrdinalIgnoreCase)
+                .SetEquals(fromModule.ClientContracts))
+            {
+                disagreement =
+                    $"ClientContracts disk=[{string.Join(',', onDisk.ClientContracts)}] " +
+                    $"code=[{string.Join(',', fromModule.ClientContracts)}]";
+                return false;
+            }
+            // NOTE: ClientAssets (SHA-256 hashes) are deliberately NOT compared. The
+            // embedded plugin.json is compiled before the build stages the client
+            // DLLs and computes their hashes, so embedded (code) hashes are empty
+            // while on-disk hashes are populated — an intentional asymmetry. Identity
+            // (ClientAssembly/ClientContracts) is verified here; integrity is verified
+            // by the client against the served hashes.
 
             disagreement = string.Empty;
             return true;

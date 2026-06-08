@@ -3,25 +3,28 @@ using Microsoft.AspNetCore.SignalR.Client;
 namespace KnockBox.Core.Client.Hub;
 
 /// <summary>
-/// Builds a <see cref="HubConnection"/> to the host's <c>GameHub</c>. The
-/// connection is same-origin (the host serves the client), so the browser
-/// automatically attaches any existing auth cookie on the handshake. The
-/// player's self-asserted identity (the localStorage-backed user id/name that
-/// is KnockBox's existing player-identity model) is carried as query string so
-/// the hub can resolve the caller without a Blazor circuit.
+/// Builds a <see cref="HubConnection"/> to the host's <c>GameHub</c>. Identity is
+/// carried as a server-signed, per-tab session token (see
+/// <see cref="IClientSessionTokenProvider"/>) attached via SignalR's access-token
+/// mechanism rather than a visible URL parameter; the hub unprotects it to resolve
+/// the caller without a Blazor circuit. The display name is a non-authoritative
+/// label passed in the query string.
 /// </summary>
 public sealed class GameHubConnectionFactory(Uri baseAddress)
 {
     private readonly Uri _baseAddress = baseAddress;
 
-    public HubConnection Create(Guid userId, string userName)
+    public HubConnection Create(string sessionToken, string userName)
     {
         var hubUri = new Uri(
             _baseAddress,
-            $"hubs/game?userId={Uri.EscapeDataString(userId.ToString())}&userName={Uri.EscapeDataString(userName)}");
+            $"hubs/game?userName={Uri.EscapeDataString(userName)}");
 
         return new HubConnectionBuilder()
-            .WithUrl(hubUri)
+            .WithUrl(hubUri, options =>
+            {
+                options.AccessTokenProvider = () => Task.FromResult<string?>(sessionToken);
+            })
             .WithAutomaticReconnect()
             .Build();
     }

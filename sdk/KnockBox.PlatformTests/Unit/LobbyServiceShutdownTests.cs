@@ -1,11 +1,14 @@
+using KnockBox.Core.Client.Hub;
 using KnockBox.Core.Plugins;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Platform.Games;
+using KnockBox.Platform.Hubs;
 using KnockBox.Services.Logic.Games.Shared;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -79,6 +82,11 @@ public sealed class LobbyServiceShutdownTests
             codeService.Object,
             availability.Object,
             [module],
+            new GameViewCoordinator(
+                new Mock<IHubContext<GameHub, IGameClient>>().Object,
+                new GameConnectionRegistry(),
+                sp,
+                NullLogger<GameViewCoordinator>.Instance),
             NullLogger<LobbyService>.Instance);
 
         return (lobby, codeService);

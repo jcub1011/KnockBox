@@ -1,11 +1,14 @@
+using KnockBox.Core.Client.Hub;
 using KnockBox.Core.Plugins;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Platform.Games;
+using KnockBox.Platform.Hubs;
 using KnockBox.Services.Logic.Games.Shared;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -83,7 +86,30 @@ public sealed class LobbyServiceTests
         Assert.IsNull(lookup);
     }
 
-    private static LobbyService Build()
+    [TestMethod]
+    public async Task CreateLobby_InstallsProjectionSubscriber_RemovedOnClose()
+    {
+        var (service, coordinator) = BuildWithCoordinator();
+
+        var host = UserFactory.Create("Host", Guid.NewGuid());
+        var createResult = await service.CreateLobbyAsync(host, Route);
+        Assert.IsTrue(createResult.TryGetSuccess(out var created));
+
+        // The subscriber is installed at creation — before any hub join — and
+        // lives until the lobby closes.
+        Assert.IsTrue(coordinator.HasSubscription(created.Uri),
+            "CreateLobbyAsync must install the per-lobby projection subscriber.");
+
+        var close = await service.CloseLobbyAsync(host, created);
+        Assert.IsTrue(close.IsSuccess);
+
+        Assert.IsFalse(coordinator.HasSubscription(created.Uri),
+            "CloseLobbyAsync must remove the per-lobby projection subscriber.");
+    }
+
+    private static LobbyService Build() => BuildWithCoordinator().Service;
+
+    private static (LobbyService Service, GameViewCoordinator Coordinator) BuildWithCoordinator()
     {
         var module = new StubModule();
         var engine = new StubEngine();
@@ -106,13 +132,23 @@ public sealed class LobbyServiceTests
         var availability = new Mock<IGameAvailabilityService>();
         availability.Setup(a => a.IsEnabled(It.IsAny<string>())).Returns(true);
 
-        return new LobbyService(
+        var coordinator = BuildCoordinator(sp);
+        var service = new LobbyService(
             sp,
             codeService.Object,
             availability.Object,
             [module],
+            coordinator,
             NullLogger<LobbyService>.Instance);
+        return (service, coordinator);
     }
+
+    private static GameViewCoordinator BuildCoordinator(IServiceProvider sp)
+        => new(
+            new Mock<IHubContext<GameHub, IGameClient>>().Object,
+            new GameConnectionRegistry(),
+            sp,
+            NullLogger<GameViewCoordinator>.Instance);
 
     private sealed class StubModule : IGameModule
     {

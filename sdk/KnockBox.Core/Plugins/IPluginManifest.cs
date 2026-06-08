@@ -110,6 +110,32 @@ public interface IPluginManifest
     string? FontColor => null;
 
     /// <summary>
+    /// For game plugins that ship a browser UI: the simple name (no <c>.dll</c>)
+    /// of the <c>{Game}.Client</c> assembly streamed to the WASM client and loaded
+    /// at runtime. <c>null</c> for server-only plugins (every plugin written so
+    /// far). When set, a matching <see cref="ClientAssets"/> entry is required so
+    /// the streamed DLL can be integrity-verified.
+    /// </summary>
+    string? ClientAssembly => null;
+
+    /// <summary>
+    /// For game plugins that ship a browser UI: the simple names (no <c>.dll</c>)
+    /// of the contracts assemblies the client UI binds (commands + view DTOs).
+    /// These are streamed alongside <see cref="ClientAssembly"/> and loaded into
+    /// the browser's default <see cref="System.Runtime.Loader.AssemblyLoadContext"/>.
+    /// Empty for server-only plugins.
+    /// </summary>
+    IReadOnlyList<string> ClientContracts => Array.Empty<string>();
+
+    /// <summary>
+    /// Build-time SHA-256 integrity hashes for the runtime-streamed client DLLs
+    /// (<see cref="ClientAssembly"/> and each <see cref="ClientContracts"/> entry).
+    /// The client verifies downloaded bytes against these before loading the IL.
+    /// Empty for server-only plugins.
+    /// </summary>
+    IReadOnlyList<ClientAssetEntry> ClientAssets => Array.Empty<ClientAssetEntry>();
+
+    /// <summary>
     /// Returns <c>true</c> if <paramref name="capability"/> was declared in this
     /// manifest.
     /// </summary>
