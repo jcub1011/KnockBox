@@ -132,9 +132,14 @@ export function detach(handle) {
 
 const STORAGE_PREFIX = 'dndm.rail.';
 
+// Rail widths are a non-critical, per-tab UI preference, so they live in
+// sessionStorage rather than localStorage. This keeps them out of the shared,
+// persistent localStorage namespace where a stray key could collide with or
+// overwrite the host's / another plugin's data. Trade-off: widths reset when a
+// new browser session starts instead of persisting across sessions.
 export function load(side, role, fallback) {
     try {
-        const v = window.localStorage.getItem(STORAGE_PREFIX + role + '.' + side);
+        const v = window.sessionStorage.getItem(STORAGE_PREFIX + role + '.' + side);
         if (!v) return fallback;
         const n = parseInt(v, 10);
         return Number.isFinite(n) ? clamp(n) : fallback;
@@ -143,6 +148,6 @@ export function load(side, role, fallback) {
 
 export function save(side, role, px) {
     try {
-        window.localStorage.setItem(STORAGE_PREFIX + role + '.' + side, String(Math.round(px)));
+        window.sessionStorage.setItem(STORAGE_PREFIX + role + '.' + side, String(Math.round(px)));
     } catch { /* ignore quota / privacy errors */ }
 }

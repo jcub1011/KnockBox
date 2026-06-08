@@ -1,5 +1,6 @@
 using KnockBox.Tracery.Components;
 using KnockBox.Tracery.Services.Logic.Games;
+using KnockBox.Tracery.Services.Storage;
 using KnockBox.Core.Plugins;
 using Microsoft.AspNetCore.Components;
 
@@ -11,7 +12,10 @@ namespace KnockBox.Tracery
             PluginManifest.FromEmbeddedResourceOrThrow(typeof(TraceryModule).Assembly);
 
         public void RegisterServices(IPluginRegistration registration)
-            => registration.AddGameEngine<TraceryGameEngine>();
+        {
+            registration.AddGameEngine<TraceryGameEngine>();
+            registration.AddScoped<TraceryStorage, TraceryStorage>();
+        }
 
         public RenderFragment? GetCustomHeader() => builder =>
         {

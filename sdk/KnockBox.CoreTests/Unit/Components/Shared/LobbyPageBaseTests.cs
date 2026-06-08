@@ -4,6 +4,7 @@ using KnockBox.Core.Services.Browser;
 using KnockBox.Core.Services.Logic.Games.Shared;
 using KnockBox.Core.Services.Navigation;
 using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.PlayLog;
 using KnockBox.Core.Services.State.Shared;
 using KnockBox.Core.Services.State.Users;
 using Microsoft.AspNetCore.Components;
@@ -56,6 +57,12 @@ public sealed class LobbyPageBaseTests
 
         public bool LobbyDisposingCalled { get; private set; }
         protected override void OnLobbyDisposing() => LobbyDisposingCalled = true;
+
+        public Func<GameLog?>? EndOfGameLogFactory { get; set; }
+        protected override GameLog? BuildEndOfGamePlayLog() => EndOfGameLogFactory?.Invoke();
+
+        public Func<GameLog?>? OnLeaveLogFactory { get; set; }
+        protected override GameLog? BuildOnLeavePlayLog() => OnLeaveLogFactory?.Invoke();
 
         public TestGameState? PublicGameState => GameState;
         public string PublicRoomCode => RoomCode;
@@ -138,6 +145,25 @@ public sealed class LobbyPageBaseTests
         public void Dispose() => Disposed = true;
     }
 
+    private sealed class StubPlayLogService : IPlayLogService
+    {
+        public List<GameLog> Stored { get; } = [];
+        public ValueTask StoreLogAsync(GameLog log, CancellationToken ct = default)
+        {
+            Stored.Add(log);
+            return ValueTask.CompletedTask;
+        }
+        public ValueTask<ValueResult<IReadOnlyList<GameLog>>> GetLogsAsync(CancellationToken ct = default)
+            => ValueTask.FromResult(ValueResult<IReadOnlyList<GameLog>>.FromValue(Stored));
+        public ValueTask<ValueResult<IReadOnlyList<GameLog>>> GetLogsAsync(string gameIdentifier, CancellationToken ct = default)
+            => ValueTask.FromResult(ValueResult<IReadOnlyList<GameLog>>.FromValue(Stored));
+        public ValueTask<Result> ClearAsync(CancellationToken ct = default)
+        {
+            Stored.Clear();
+            return ValueTask.FromResult(Result.Success);
+        }
+    }
+
     private sealed class StubWakeLockService : IWakeLockService
     {
         public int AcquireCount { get; private set; }
@@ -183,7 +209,8 @@ public sealed class LobbyPageBaseTests
         IGameSessionService sessionService,
         INavigationService navigationService,
         ITickService? tickService = null,
-        IWakeLockService? wakeLockService = null)
+        IWakeLockService? wakeLockService = null,
+        IPlayLogService? playLogService = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton(sessionService);
@@ -191,6 +218,7 @@ public sealed class LobbyPageBaseTests
         services.AddSingleton(userService);
         services.AddSingleton(tickService ?? new StubTickService());
         services.AddSingleton(wakeLockService ?? new StubWakeLockService());
+        services.AddSingleton(playLogService ?? new StubPlayLogService());
         services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
 
         var page = new TestLobbyPage();
@@ -536,6 +564,161 @@ public sealed class LobbyPageBaseTests
         page.Dispose();
 
         Assert.AreEqual(1, wakeLock.ReleaseCount, "Dispose must release the wake lock.");
+    }
+
+    // ── Play-log: end-of-game ────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task EndOfGamePlayLog_LogsOnce_AfterObservingInProgressGame()
+    {
+        var user = MakeUser();
+        using var state = new TestGameState(user, NullLogger.Instance);
+        var registration = MakeUserRegistration(user, state);
+
+        var nav = new StubNavigationService();
+        var session = new StubGameSessionService(registration);
+        var playLog = new StubPlayLogService();
+        var page = MakePage("abc-def", new StubUserService(user), session, nav, playLogService: playLog);
+
+        await page.InvokeOnInitializedAsync();
+
+        // In progress: the hook returns null, so nothing is logged but the
+        // "saw the game running" flag is set.
+        page.EndOfGameLogFactory = () => null;
+        await page.InvokeOnAfterRenderAsync(firstRender: true);
+        Assert.AreEqual(0, playLog.Stored.Count);
+
+        // Game over: the hook now returns a log — recorded exactly once.
+        page.EndOfGameLogFactory = () => GameLog.Create("test");
+        await page.InvokeOnAfterRenderAsync(firstRender: false);
+        await page.InvokeOnAfterRenderAsync(firstRender: false);
+
+        Assert.AreEqual(1, playLog.Stored.Count, "End-of-game entry must be logged exactly once.");
+        Assert.AreEqual("test", playLog.Stored[0].GameIdentifier);
+        // The user is the room host, so the base stamps the Role metadata as Host.
+        Assert.AreEqual(PlayLogRoles.Host, playLog.Stored[0].GetMetadata(StandardMetadata.Role));
+    }
+
+    [TestMethod]
+    public async Task EndOfGamePlayLog_StampsPlayerRole_ForNonHost()
+    {
+        var host = MakeUser("Host");
+        var player = MakeUser("Player");
+        using var state = new TestGameState(host, NullLogger.Instance);
+        state.Execute(() => state.SetJoinable(true));
+        state.RegisterPlayer(player);
+
+        var nav = new StubNavigationService();
+        var session = new StubGameSessionService(new UserRegistration(player, Mock.Of<IDisposable>(), MakeLobby(state)));
+        var playLog = new StubPlayLogService();
+        var page = MakePage("abc-def", new StubUserService(player), session, nav, playLogService: playLog);
+
+        await page.InvokeOnInitializedAsync();
+
+        page.EndOfGameLogFactory = () => null;
+        await page.InvokeOnAfterRenderAsync(firstRender: true);
+        page.EndOfGameLogFactory = () => GameLog.Create("test");
+        await page.InvokeOnAfterRenderAsync(firstRender: false);
+
+        Assert.AreEqual(1, playLog.Stored.Count);
+        Assert.AreEqual(PlayLogRoles.Player, playLog.Stored[0].GetMetadata(StandardMetadata.Role));
+    }
+
+    [TestMethod]
+    public async Task EndOfGamePlayLog_DoesNotLog_WhenGameAlreadyOverOnFirstRender()
+    {
+        // Reconnect guard: a player who re-attaches within the grace window after
+        // the game already ended never observed the in-progress game, so they must
+        // not write a duplicate entry.
+        var user = MakeUser();
+        using var state = new TestGameState(user, NullLogger.Instance);
+        var registration = MakeUserRegistration(user, state);
+
+        var nav = new StubNavigationService();
+        var session = new StubGameSessionService(registration);
+        var playLog = new StubPlayLogService();
+        var page = MakePage("abc-def", new StubUserService(user), session, nav, playLogService: playLog);
+
+        await page.InvokeOnInitializedAsync();
+
+        // Already terminal on the very first render.
+        page.EndOfGameLogFactory = () => GameLog.Create("test");
+        await page.InvokeOnAfterRenderAsync(firstRender: true);
+        await page.InvokeOnAfterRenderAsync(firstRender: false);
+
+        Assert.AreEqual(0, playLog.Stored.Count, "Must not log when the game was already over on arrival.");
+    }
+
+    // ── Play-log: on-leave ───────────────────────────────────────────────────
+
+    [TestMethod]
+    public async Task OnLeavePlayLog_LogsOnce_OnDispose()
+    {
+        var user = MakeUser();
+        using var state = new TestGameState(user, NullLogger.Instance);
+        var registration = MakeUserRegistration(user, state);
+
+        var nav = new StubNavigationService();
+        var session = new StubGameSessionService(registration);
+        var playLog = new StubPlayLogService();
+        var page = MakePage("abc-def", new StubUserService(user), session, nav, playLogService: playLog);
+
+        await page.InvokeOnInitializedAsync();
+
+        page.OnLeaveLogFactory = () => GameLog.Create("test");
+        page.Dispose();
+
+        Assert.AreEqual(1, playLog.Stored.Count, "On-leave entry must be logged once on dispose.");
+        Assert.AreEqual("test", playLog.Stored[0].GameIdentifier);
+        // The user is the room host, so the base stamps the Role metadata as Host.
+        Assert.AreEqual(PlayLogRoles.Host, playLog.Stored[0].GetMetadata(StandardMetadata.Role));
+    }
+
+    [TestMethod]
+    public async Task OnLeavePlayLog_DoesNotLog_WhenNeverInitialized()
+    {
+        // Guard: a page that redirected home before entering the room (no session)
+        // must not write a leave entry.
+        var user = MakeUser();
+        var nav = new StubNavigationService();
+        var session = new StubGameSessionService(null);  // no session → redirect
+        var playLog = new StubPlayLogService();
+        var page = MakePage("abc-def", new StubUserService(user), session, nav, playLogService: playLog);
+
+        await page.InvokeOnInitializedAsync();
+
+        page.OnLeaveLogFactory = () => GameLog.Create("test");
+        page.Dispose();
+
+        Assert.AreEqual(0, playLog.Stored.Count);
+    }
+
+    [TestMethod]
+    public async Task OnLeavePlayLog_DoesNotLog_WhenEndOfGameAlreadyLogged()
+    {
+        // The _playLogged guard is shared: once a terminal entry is written, the
+        // dispose-time leave hook must not add a second entry.
+        var user = MakeUser();
+        using var state = new TestGameState(user, NullLogger.Instance);
+        var registration = MakeUserRegistration(user, state);
+
+        var nav = new StubNavigationService();
+        var session = new StubGameSessionService(registration);
+        var playLog = new StubPlayLogService();
+        var page = MakePage("abc-def", new StubUserService(user), session, nav, playLogService: playLog);
+
+        await page.InvokeOnInitializedAsync();
+
+        page.EndOfGameLogFactory = () => null;
+        await page.InvokeOnAfterRenderAsync(firstRender: true);   // observe in-progress
+        page.EndOfGameLogFactory = () => GameLog.Create("test");
+        await page.InvokeOnAfterRenderAsync(firstRender: false);  // logs end-of-game
+        Assert.AreEqual(1, playLog.Stored.Count);
+
+        page.OnLeaveLogFactory = () => GameLog.Create("test");
+        page.Dispose();
+
+        Assert.AreEqual(1, playLog.Stored.Count, "Leave hook must not double-log after an end-of-game entry.");
     }
 
     [TestMethod]

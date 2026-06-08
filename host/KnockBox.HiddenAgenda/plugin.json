@@ -7,5 +7,7 @@
   "entryAssembly": "KnockBox.HiddenAgenda",
   "capabilities": [],
   "tileAsset": "tile.svg",
+  "backgroundColor": "#1a1626",
+  "fontColor": "#e8e3f0",
   "workInProgress": true
 }

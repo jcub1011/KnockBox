@@ -6,5 +6,7 @@
   "version": "1.0.0",
   "entryAssembly": "KnockBox.DrawnToDress",
   "capabilities": [],
-  "tileAsset": "tile.svg"
+  "tileAsset": "tile.svg",
+  "backgroundColor": "#F8F9FA",
+  "fontColor": "#2B2D42"
 }

@@ -24,6 +24,7 @@ namespace KnockBox.DndMapperTests.Helpers
         public bool MissingStoresOnNextOpen { get; set; }
         public int OpenCallCount { get; private set; }
         public int DeleteDatabaseCallCount { get; private set; }
+        public int MigrateDatabaseCallCount { get; private set; }
 
         // Counts how many times BlobGetSingleAsync was invoked. Used by export
         // tests to assert the server-side path never reads image blobs (the
@@ -70,6 +71,14 @@ namespace KnockBox.DndMapperTests.Helpers
 
         public ValueTask<ValueResult<IReadOnlyList<DatabaseInfo>, IndexedDbError>> ListDatabasesAsync(CancellationToken ct = default)
             => ValueTask.FromResult(ValueResult<IReadOnlyList<DatabaseInfo>, IndexedDbError>.FromValue((IReadOnlyList<DatabaseInfo>)Array.Empty<DatabaseInfo>()));
+
+        // The fake keys its data by store name (not database name), so a
+        // database rename is a no-op: the records are already reachable.
+        public ValueTask<Result<IndexedDbError>> MigrateDatabaseAsync(string fromName, string toName, CancellationToken ct = default)
+        {
+            MigrateDatabaseCallCount++;
+            return ValueTask.FromResult(Result<IndexedDbError>.Success);
+        }
 
         public ValueTask<ValueResult<IndexedDbBlob, IndexedDbError>> CreateBlobAsync(ReadOnlyMemory<byte> bytes, string contentType, CancellationToken ct = default)
             => ValueTask.FromResult(ValueResult<IndexedDbBlob, IndexedDbError>.FromValue(new FakeBlob(bytes.ToArray(), contentType)));

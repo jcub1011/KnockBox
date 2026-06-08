@@ -36,6 +36,23 @@ namespace KnockBox.Core.Services.Storage.IndexedDb
             CancellationToken ct = default);
 
         /// <summary>
+        /// One-time database rename: copies every record from
+        /// <paramref name="fromName"/> into <paramref name="toName"/> (mirroring
+        /// the source's object stores and indexes), then deletes the source.
+        /// <para>
+        /// Guarded so a completed migration never re-copies: it is a no-op when
+        /// <paramref name="fromName"/> does not exist (a fresh install) or when
+        /// <paramref name="toName"/> already exists (already migrated / live
+        /// data that must not be clobbered). Intended for namespacing a legacy
+        /// database under a new name.
+        /// </para>
+        /// </summary>
+        ValueTask<Result<IndexedDbError>> MigrateDatabaseAsync(
+            string fromName,
+            string toName,
+            CancellationToken ct = default);
+
+        /// <summary>
         /// Allocates a JS-side <c>Blob</c> from a contiguous .NET buffer. On
         /// success the returned blob holds a live JS reference and must be
         /// disposed.

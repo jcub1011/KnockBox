@@ -106,7 +106,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library.Vtf
         {
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService();
-            var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
+            var library = new DndMapperLibraryService(new TestPluginContext(),db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             var attach = await library.AttachAsync(state, host);
             Assert.IsTrue(attach.IsSuccess);
             return (db, library);

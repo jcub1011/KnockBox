@@ -5,6 +5,7 @@ using KnockBox.DndMapper.Services.Library;
 using KnockBox.DndMapper.Services.Logic;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.Logic.Visibility;
+using KnockBox.DndMapper.Services.Storage;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.DndMapper
@@ -18,6 +19,7 @@ namespace KnockBox.DndMapper
         {
             registration.AddGameEngine<DndMapperGameEngine>();
             registration.AddScoped<DndMapperLibraryService, DndMapperLibraryService>();
+            registration.AddScoped<DndMapperStorage, DndMapperStorage>();
             registration.AddScoped<TokenFocusService, TokenFocusService>();
             registration.AddScoped<IFogPaintContext, FogPaintContext>();
             registration.AddScoped<IDiceAnimationTracker, DiceAnimationTracker>();

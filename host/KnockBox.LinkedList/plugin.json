@@ -6,5 +6,7 @@
   "version": "1.0.0",
   "entryAssembly": "KnockBox.LinkedList",
   "capabilities": [],
-  "tileAsset": "tile.svg"
+  "tileAsset": "tile.svg",
+  "backgroundColor": "#0d1018",
+  "fontColor": "#eef3f9"
 }

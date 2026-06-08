@@ -3,7 +3,7 @@ using KnockBox.Codeword.Services.Logic.Games;
 using KnockBox.Codeword.Services.State.Games;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
-using KnockBox.Core.Services.Storage.ClientStorage;
+using KnockBox.Codeword.Services.Storage;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Codeword.Pages
@@ -14,7 +14,7 @@ namespace KnockBox.Codeword.Pages
 
         [Inject] protected IUserService UserService { get; set; } = default!;
 
-        [Inject] protected ILocalStorageService LocalStorage { get; set; } = default!;
+        [Inject] protected CodewordStorage Storage { get; set; } = default!;
 
         [Inject] protected ILogger<LobbyPhase> Logger { get; set; } = default!;
 
@@ -174,7 +174,7 @@ namespace KnockBox.Codeword.Pages
 
         private async Task LoadSettingsAsync()
         {
-            var savedResult = await LocalStorage.GetAsync<CodewordSettings>("codeword", "settings", _cts.Token);
+            var savedResult = await Storage.Local.GetAsync<CodewordSettings>("settings", "value", _cts.Token);
             // If the host already edited a setting while the load was in flight,
             // the user's edit wins — the saved snapshot would clobber it. A failed/canceled
             // read is a non-success result that simply falls through to built-in defaults.
@@ -204,7 +204,7 @@ namespace KnockBox.Codeword.Pages
             {
                 try { await prior; } catch { /* prior failure already logged */ }
             }
-            var saveResult = await LocalStorage.SetAsync("codeword", "settings", settings, ct);
+            var saveResult = await Storage.Local.SetAsync("settings", "value", settings, ct);
             if (saveResult.TryGetFailure(out var saveError))
                 Logger.LogError("Error saving Codeword settings: {Error}", saveError.InternalMessage);
         }

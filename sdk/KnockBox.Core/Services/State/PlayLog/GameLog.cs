@@ -3,6 +3,59 @@ using System.Collections.ObjectModel;
 namespace KnockBox.Core.Services.State.PlayLog;
 
 /// <summary>
+/// Well-known keys for <see cref="GameLog.Metadata"/>. The point of the enum is
+/// that <c>.ToString()</c> on a member is the dictionary key, so adding a new
+/// common field across games is just a new member here — no change to the
+/// <see cref="GameLog"/> record and so no breaking change.
+/// <para>
+/// Members MUST be single PascalCase tokens (the displayed key is the member
+/// name verbatim). Game-specific or multi-word keys (e.g. <c>"My Score"</c>,
+/// <c>"Chain Length"</c>) stay as plain string literals at their call site.
+/// </para>
+/// </summary>
+public enum StandardMetadata
+{
+    /// <summary>Whether the user hosted or merely joined; value is one of
+    /// <see cref="PlayLogRoles"/>. Stamped automatically by the lobby page base.</summary>
+    Role,
+
+    /// <summary>Number of players in the session.</summary>
+    Players,
+
+    /// <summary>Display name of the winning player.</summary>
+    Winner,
+
+    /// <summary>The user's finishing position, e.g. <c>"2 / 5"</c>.</summary>
+    Placement,
+
+    /// <summary>How long the session lasted.</summary>
+    Duration,
+
+    /// <summary>The user's outcome, e.g. <c>"Won"</c> / <c>"Eliminated"</c>.</summary>
+    Result,
+
+    /// <summary>Number of rounds played.</summary>
+    Rounds,
+
+    /// <summary>The user's score.</summary>
+    Score,
+}
+
+/// <summary>
+/// Canonical values for the <see cref="StandardMetadata.Role"/> metadata entry,
+/// shared between the writer (the lobby page base, which stamps it) and the
+/// reader (the home-page panel, which renders the badge).
+/// </summary>
+public static class PlayLogRoles
+{
+    /// <summary>The user created and hosted the lobby.</summary>
+    public const string Host = "Host";
+
+    /// <summary>The user joined the lobby as a participant.</summary>
+    public const string Player = "Player";
+}
+
+/// <summary>
 /// A single entry in a user's <see cref="IPlayLogService">play log</see>: a
 /// record that they played a given game, plus arbitrary game-supplied metadata
 /// (leaderboard position, duration played, score, …). Persisted to the
@@ -36,9 +89,10 @@ public sealed record GameLog
     public DateTimeOffset PlayedAt { get; init; }
 
     /// <summary>
-    /// Convenience factory for the common case: a game id plus optional
-    /// metadata. <see cref="PlayedAt"/> is left default and stamped by the
-    /// service on store.
+    /// Convenience factory: a game id plus optional metadata. The user's role
+    /// and any other standard fields live inside <paramref name="metadata"/>
+    /// (see <see cref="StandardMetadata"/>). <see cref="PlayedAt"/> is left
+    /// default and stamped by the service on store.
     /// </summary>
     public static GameLog Create(
         string gameIdentifier,

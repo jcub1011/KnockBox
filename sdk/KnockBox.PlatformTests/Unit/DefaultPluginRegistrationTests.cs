@@ -8,7 +8,9 @@ using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Filtering;
+using KnockBox.Core.Services.Storage.ClientStorage;
 using KnockBox.Platform.Plugins;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -221,6 +223,83 @@ public sealed class DefaultPluginRegistrationTests
 
         protected override Task<Result> StartAsyncCore(AbstractGameState state, CancellationToken ct = default)
             => throw new NotImplementedException();
+    }
+
+    // ─── Per-plugin storage wiring: Create<T> auto-injects the keyed context ──
+
+    [TestMethod]
+    public async Task AddScoped_ContextTakingStorageService_ResolvesRouteScoped()
+    {
+        // Mirrors the runtime wiring the {Plugin}Storage services depend on:
+        // LogicRegistrations registers the plugin's IPluginContext as a keyed
+        // singleton, the plugin registers a context-taking service via
+        // AddScoped<TStore,TStore>(), and Create<T> must inject the right
+        // keyed context. This proves the architecture end-to-end: resolving the
+        // store yields an instance that namespaces writes by the plugin's route.
+        var services = new ServiceCollection();
+        var manifest = Manifest(); // RouteIdentifier "fixture-plugin"
+        var fakeLocal = new RecordingLocalStorage();
+        services.AddSingleton<ILocalStorageService>(fakeLocal);
+        services.AddKeyedSingleton<IPluginContext>(
+            manifest.RouteIdentifier,
+            (_, _) => new StubPluginContext(manifest));
+
+        var reg = new DefaultPluginRegistration(services, manifest, NullLogger.Instance);
+        reg.AddScoped<FixturePluginStorage, FixturePluginStorage>();
+
+        await using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<FixturePluginStorage>();
+
+        await store.Local.SetAsync("settings", "value", 1);
+
+        Assert.ContainsSingle(k => k == "fixture-plugin::settings.value", fakeLocal.WrittenKeys);
+    }
+
+    // Stand-in for a plugin's storage service: ctor takes IPluginContext (so
+    // Create<T> must supply the keyed context) plus the raw ILocalStorageService,
+    // and wraps the latter in the route-scoping wrapper — exactly the pattern
+    // every {Plugin}Storage type uses.
+    private sealed class FixturePluginStorage
+    {
+        public FixturePluginStorage(IPluginContext context, ILocalStorageService localStorage)
+        {
+            Local = new KnockBox.Core.Services.Storage.ClientStorage.ScopedClientStorageService(
+                localStorage, context.Manifest.RouteIdentifier);
+        }
+
+        public IClientStorageService Local { get; }
+    }
+
+    private sealed class StubPluginContext(IPluginManifest manifest) : IPluginContext
+    {
+        public IPluginManifest Manifest { get; } = manifest;
+        public ILogger Logger { get; } = NullLogger.Instance;
+        public IConfiguration Configuration => throw new NotSupportedException();
+        public IPluginStorage Storage => throw new NotSupportedException();
+    }
+
+    // Captures the physical keys written so the test can assert route prefixing.
+    private sealed class RecordingLocalStorage : ILocalStorageService
+    {
+        public List<string> WrittenKeys { get; } = [];
+
+        public ValueTask<Result> SetAsync<T>(string scope, string key, T value, CancellationToken ct = default)
+        {
+            WrittenKeys.Add($"{scope}.{key}");
+            return new(Result.Success);
+        }
+
+        public ValueTask<ValueResult<T?>> GetAsync<T>(string scope, string key, CancellationToken ct = default)
+            => new(ValueResult<T?>.FromValue(default));
+        public ValueTask<Result> RemoveAsync(string scope, string key) => new(Result.Success);
+        public ValueTask<Result> RemoveAsync(string scope) => new(Result.Success);
+        public ValueTask<ValueResult<List<string>>> GetKeysAsync(string scope, CancellationToken ct = default)
+            => new(ValueResult<List<string>>.FromValue([]));
+        public ValueTask<ValueResult<List<string>>> GetAllKeysAsync(CancellationToken ct = default)
+            => new(ValueResult<List<string>>.FromValue([]));
+        public ValueTask<Result> ClearAsync() => new(Result.Success);
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class FakeLogger : ILogger<PluginServiceImpl>, ILogger<DummyEngine>

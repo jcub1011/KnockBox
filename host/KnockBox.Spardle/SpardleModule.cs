@@ -1,5 +1,6 @@
 using KnockBox.Core.Plugins;
 using KnockBox.Spardle.Components;
+using KnockBox.Spardle.Services.Storage;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Spardle;
@@ -15,6 +16,7 @@ public class SpardleModule : IGameModule
         // plugin (a sibling first-party plugin loaded before Spardle). Spardle
         // just consumes it via constructor injection in SpardleEngine.
         registration.AddGameEngine<SpardleEngine>();
+        registration.AddScoped<SpardleStorage, SpardleStorage>();
     }
 
     public RenderFragment? GetCustomHeader() => builder =>

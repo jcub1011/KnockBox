@@ -102,6 +102,19 @@ internal sealed class IndexedDbService : IIndexedDbService, IAsyncDisposable
         return ValueResult<IReadOnlyList<DatabaseInfo>, IndexedDbError>.FromValue(infos);
     }
 
+    public async ValueTask<Result<IndexedDbError>> MigrateDatabaseAsync(
+        string fromName, string toName, CancellationToken ct = default)
+    {
+        var result = await _interop.InvokeVoidAsync("migrateDatabase", ct, fromName, toName).ConfigureAwait(false);
+        if (result.TryGetFailure(out var err))
+        {
+            _logger.LogError(
+                "Migrating IndexedDB '{FromName}' -> '{ToName}' failed: [{Kind}] {Message} (jsName: {JsName}).",
+                fromName, toName, err.Kind, err.Message, err.JsName);
+        }
+        return result;
+    }
+
     public ValueTask<ValueResult<IndexedDbBlob, IndexedDbError>> CreateBlobAsync(
         ReadOnlyMemory<byte> bytes, string contentType, CancellationToken ct = default)
     {

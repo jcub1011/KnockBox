@@ -28,6 +28,12 @@
     <EmbeddedResource Include="Data\words.csv" />
   </ItemGroup>
 
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>KnockBox.LinkedListTests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
   <Import Project="..\Directory.Plugin.targets" />
 
 </Project>

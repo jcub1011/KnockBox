@@ -70,10 +70,10 @@ public sealed class SessionServiceProviderTests
         reg1.LifecycleToken.Dispose();
 
         // Advance past the eviction delay. FakeTimeProvider drives the Task.Delay's
-        // internal timer synchronously, but the eviction continuation runs on the
-        // thread pool — give it a beat to land.
+        // internal timer synchronously; the drain hook joins the eviction continuation
+        // so disposal is observed deterministically (no wall-clock wait).
         time.Advance(TimeSpan.FromMinutes(2));
-        await WaitFor(() => reg1.Service.IsDisposed);
+        await provider.WaitForPendingEvictionsAsync();
 
         var second = provider.GetService<TrackedService>(token);
         Assert.IsTrue(second.TryGetSuccess(out var reg2));
@@ -109,21 +109,10 @@ public sealed class SessionServiceProviderTests
         Assert.IsFalse(reg1.Service.IsDisposed);
 
         // Now advance past the deadline — reconnect already happened, so eviction
-        // timer was cancelled when ReferenceCount went back to 1. The instance
-        // must stay alive.
+        // timer was cancelled when ReferenceCount went back to 1. Draining joins the
+        // (cancelled) continuation; the instance must stay alive.
         time.Advance(TimeSpan.FromMinutes(2));
-        await Task.Delay(50);
+        await provider.WaitForPendingEvictionsAsync();
         Assert.IsFalse(reg1.Service.IsDisposed);
-    }
-
-    private static async Task WaitFor(Func<bool> predicate, int timeoutMs = 2000)
-    {
-        var deadline = Environment.TickCount + timeoutMs;
-        while (!predicate())
-        {
-            if (Environment.TickCount >= deadline)
-                return;
-            await Task.Delay(10);
-        }
     }
 }

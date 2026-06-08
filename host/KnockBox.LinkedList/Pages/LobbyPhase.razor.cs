@@ -1,6 +1,6 @@
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
-using KnockBox.Core.Services.Storage.ClientStorage;
+using KnockBox.LinkedList.Services.Storage;
 using KnockBox.LinkedList.Services.Logic;
 using KnockBox.LinkedList.Services.Logic.Games;
 using KnockBox.LinkedList.Services.State.Games;
@@ -14,7 +14,7 @@ namespace KnockBox.LinkedList.Pages
 
         [Inject] protected IUserService UserService { get; set; } = default!;
 
-        [Inject] protected ILocalStorageService LocalStorage { get; set; } = default!;
+        [Inject] protected LinkedListStorage Storage { get; set; } = default!;
 
         [Inject] protected ILogger<LobbyPhase> Logger { get; set; } = default!;
 
@@ -294,7 +294,7 @@ namespace KnockBox.LinkedList.Pages
 
         private async Task LoadSettingsAsync()
         {
-            var savedResult = await LocalStorage.GetAsync<LinkedListSettings>("linked-list", "settings", _cts.Token);
+            var savedResult = await Storage.Local.GetAsync<LinkedListSettings>("settings", "value", _cts.Token);
             // A failed or canceled read is a non-success result that simply falls through to
             // the built-in defaults. If the host already edited a setting while the load was in
             // flight, the user's edit wins — the saved snapshot would clobber it.
@@ -327,7 +327,7 @@ namespace KnockBox.LinkedList.Pages
             {
                 try { await prior; } catch { /* prior failure already logged */ }
             }
-            var saveResult = await LocalStorage.SetAsync("linked-list", "settings", settings, ct);
+            var saveResult = await Storage.Local.SetAsync("settings", "value", settings, ct);
             // Cancellation is silently ignored; a genuine storage failure is logged.
             if (saveResult.TryGetFailure(out var saveError))
                 Logger.LogError("Error saving Linked List settings: {Error}", saveError.InternalMessage);
