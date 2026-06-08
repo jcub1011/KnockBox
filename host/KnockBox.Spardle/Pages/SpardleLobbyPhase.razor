@@ -4,14 +4,14 @@
 @using KnockBox.Spardle
 @using KnockBox.WordService.Contracts
 @using KnockBox.Core.Primitives.Returns
-@using KnockBox.Core.Services.Storage.ClientStorage
+@using KnockBox.Spardle.Services.Storage
 @using Microsoft.Extensions.Logging
 @using Microsoft.JSInterop
 @inject IUserService UserService
 @inject SpardleEngine GameEngine
 @inject IWordListService WordList
 @inject IJSRuntime JSRuntime
-@inject ILocalStorageService LocalStorage
+@inject SpardleStorage Storage
 @inject ILogger<SpardleLobbyPhase> Logger
 @implements IAsyncDisposable
 
@@ -500,7 +500,7 @@
     // CSV/Host-defined pools start empty and must be re-entered.
     private async Task LoadSettingsAsync()
     {
-        var savedResult = await LocalStorage.GetAsync<SpardleSettings>("spardle", "settings", _cts.Token);
+        var savedResult = await Storage.Local.GetAsync<SpardleSettings>("settings", "value", _cts.Token);
         // If the host already edited a setting while the load was in flight,
         // the user's edit wins — the saved snapshot would clobber it.
         if (savedResult.TryGetSuccess(out var saved) && saved is not null && !_userHasEdited)
@@ -534,7 +534,7 @@
         {
             try { await prior; } catch { /* prior failure already logged */ }
         }
-        var saveResult = await LocalStorage.SetAsync("spardle", "settings", settings, ct);
+        var saveResult = await Storage.Local.SetAsync("settings", "value", settings, ct);
         if (saveResult.TryGetFailure(out var saveError))
             Logger.LogError("Error saving Spardle settings: {Error}", saveError.InternalMessage);
     }

@@ -1,10 +1,10 @@
 @using KnockBox.Core.Primitives.Returns
 @using KnockBox.Core.Services.State.Users
-@using KnockBox.Core.Services.Storage.ClientStorage
 @using KnockBox.Tracery.Services.Logic.Games
+@using KnockBox.Tracery.Services.Storage
 @inject IUserService UserService
 @inject TraceryGameEngine GameEngine
-@inject ILocalStorageService LocalStorage
+@inject TraceryStorage Storage
 @inject ILogger<TraceryLobbyView> Logger
 @implements IAsyncDisposable
 
@@ -156,7 +156,7 @@
     private async Task LoadSettingsAsync()
     {
         // A failed or canceled read falls through to the built-in defaults.
-        var savedResult = await LocalStorage.GetAsync<TracerySettings>("tracery", "settings", _cts.Token);
+        var savedResult = await Storage.Local.GetAsync<TracerySettings>("settings", "value", _cts.Token);
         // If the host already edited a setting while the load was in flight, the user's
         // edit wins — the saved snapshot would clobber it.
         if (savedResult.TryGetSuccess(out var saved) && saved is not null && !_userHasEdited)
@@ -187,7 +187,7 @@
         {
             try { await prior; } catch { /* prior failure already logged */ }
         }
-        var saveResult = await LocalStorage.SetAsync("tracery", "settings", settings, ct);
+        var saveResult = await Storage.Local.SetAsync("settings", "value", settings, ct);
         if (saveResult.TryGetFailure(out var saveError))
             Logger.LogError("Error saving Tracery settings: {Error}", saveError.InternalMessage);
     }

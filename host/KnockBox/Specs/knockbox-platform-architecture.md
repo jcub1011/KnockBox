@@ -601,11 +601,22 @@ Plugins that expose host-configurable rules (round counts, timers, gameplay togg
 - A `sealed record TSettings` with `init`-only properties and defaults. Enum properties carry `[JsonConverter(typeof(JsonStringEnumConverter))]` so persisted snapshots survive enum reordering.
 - The state exposes `public TSettings Settings { get; private set; } = new();` — the **private setter** forces all mutation through a single method.
 - That method is `public Result UpdateSettings(Func<TSettings, TSettings> mutate) => Execute(() => { Settings = mutate(Settings); });` — the `Execute` wrapper makes the swap atomic and fires `StateChanged` once after the lock releases.
-- The lobby Razor page injects `ILocalStorageService` and persists snapshots to the host's browser using key `("{plugin-route-id}", "settings")`. Writes are serialized through a chained `_saveTask`, the load on first render is guarded by a `_userHasEdited` flag so an in-flight load can't clobber a host edit, and `DisposeAsync` flushes the last pending write before circuit teardown.
+- The lobby Razor page injects a **plugin-owned, route-scoped storage service** (e.g. `CodewordStorage`) and persists snapshots to the host's browser using key `("settings", "value")`. Writes are serialized through a chained `_saveTask`, the load on first render is guarded by a `_userHasEdited` flag so an in-flight load can't clobber a host edit, and `DisposeAsync` flushes the last pending write before circuit teardown.
 - Razor inputs use `@bind:get`/`@bind:set` pairs routed through per-property setters that call `state.UpdateSettings(s => s with { ... })`.
 - The settings UI also exposes a host-only, two-step-confirm **"Reset to Defaults"** button that calls `UpdateSettings(_ => new TSettings())`, restoring the record's declared defaults and persisting them through the same path.
 
-The reference implementation is `host/KnockBox.Codeword/CodewordSettings.cs` + `Services/State/Games/CodewordGameState.cs` + `Pages/LobbyPhase.razor{,.cs}`. The same pattern is used by every other plugin with settings (CardCounter, DndMapper, DrawnToDress, HiddenAgenda, Operator, Spardle). LocalStorage stores **per-host preferences for new sessions**; session-internal persistence (e.g., DndMapper's IndexedDB snapshot) is a separate mechanism owned by individual plugins.
+The reference implementation is `host/KnockBox.Codeword/CodewordSettings.cs` + `Services/State/Games/CodewordGameState.cs` + `Pages/LobbyPhase.razor{,.cs}` + `Services/Storage/CodewordStorage.cs`. The same pattern is used by every other plugin with settings (AlphaChain, CardCounter, DndMapper, DrawnToDress, HiddenAgenda, LinkedList, Operator, Spardle, Tracery). LocalStorage stores **per-host preferences for new sessions**; session-internal persistence (e.g., DndMapper's IndexedDB snapshot) is a separate mechanism owned by individual plugins.
+
+##### Storage scope enforcement
+
+Plugins **must not** inject the raw `ILocalStorageService` / `ISessionStorageService` / `IIndexedDbService` directly — those are shared circuit-scoped services whose keys/database-names live in one flat per-origin namespace, so a plugin could otherwise collide with (or clobber) the host's or another plugin's data, and a raw `ClearAsync()` would wipe the entire origin.
+
+Instead, each plugin defines a tiny scoped service whose constructor takes `IPluginContext` and wraps the raw service in a route-scoping wrapper from `KnockBox.Core`:
+
+- `ScopedClientStorageService(inner, context.Manifest.RouteIdentifier)` — prefixes every scope with `"{route}::"`, filters `GetAllKeysAsync` to the plugin's namespace, and makes `ClearAsync` clear only that namespace.
+- `ScopedIndexedDbService(inner, context.Manifest.RouteIdentifier)` — prefixes every database name with `"{route}::"`, filters `ListDatabasesAsync` to the plugin's databases, and scopes `DeleteDatabaseAsync`. It also exposes `MigrateLegacyDatabaseAsync(legacyName, schema)` to one-time import a pre-scoping database into the namespace (see `DndMapperLibraryService`).
+
+The plugin registers the wrapper service via `registration.AddScoped<TStore, TStore>()` (the registration's `Create<T>` path auto-injects the plugin's `IPluginContext`), and components inject `TStore` and use its `Local` / `Session` / IndexedDB members. The host's own services (`UserService`, `PlayLogService`, `SessionTokenProvider`) keep using the raw services with their reserved scopes. This is collision-avoidance, not a sandbox — a plugin can still reach raw browser storage — the goal is to make cross-plugin clobbering hard to do *by accident*.
 
 ### IUserService
 

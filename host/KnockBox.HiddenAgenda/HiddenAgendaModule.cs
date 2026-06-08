@@ -1,6 +1,7 @@
 using KnockBox.Core.Plugins;
 using KnockBox.HiddenAgenda.Components;
 using KnockBox.HiddenAgenda.Services.Logic.Games;
+using KnockBox.HiddenAgenda.Services.Storage;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.HiddenAgenda
@@ -11,7 +12,10 @@ namespace KnockBox.HiddenAgenda
             PluginManifest.FromEmbeddedResourceOrThrow(typeof(HiddenAgendaModule).Assembly);
 
         public void RegisterServices(IPluginRegistration registration)
-            => registration.AddGameEngine<HiddenAgendaGameEngine>();
+        {
+            registration.AddGameEngine<HiddenAgendaGameEngine>();
+            registration.AddScoped<HiddenAgendaStorage, HiddenAgendaStorage>();
+        }
 
         public RenderFragment? GetCustomHeader() => builder =>
         {

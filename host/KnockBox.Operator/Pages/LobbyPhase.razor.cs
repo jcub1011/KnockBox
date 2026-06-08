@@ -4,7 +4,7 @@ using KnockBox.Operator.Services.Logic.Games;
 using KnockBox.Operator.Services.State;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
-using KnockBox.Core.Services.Storage.ClientStorage;
+using KnockBox.Operator.Services.Storage;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Operator.Pages
@@ -15,7 +15,7 @@ namespace KnockBox.Operator.Pages
 
         [Inject] protected IUserService UserService { get; set; } = default!;
 
-        [Inject] protected ILocalStorageService LocalStorage { get; set; } = default!;
+        [Inject] protected OperatorStorage Storage { get; set; } = default!;
 
         [Inject] protected ILogger<LobbyPhase> Logger { get; set; } = default!;
 
@@ -181,7 +181,7 @@ namespace KnockBox.Operator.Pages
 
         private async Task LoadSettingsAsync()
         {
-            var savedResult = await LocalStorage.GetAsync<OperatorSettings>("operator", "settings", _cts.Token);
+            var savedResult = await Storage.Local.GetAsync<OperatorSettings>("settings", "value", _cts.Token);
             // If the host already edited a setting while the load was in flight,
             // the user's edit wins — the saved snapshot would clobber it. A failed/canceled
             // read is a non-success result that simply falls through to built-in defaults.
@@ -208,7 +208,7 @@ namespace KnockBox.Operator.Pages
             {
                 try { await prior; } catch { /* prior failure already logged */ }
             }
-            var saveResult = await LocalStorage.SetAsync("operator", "settings", settings, ct);
+            var saveResult = await Storage.Local.SetAsync("settings", "value", settings, ct);
             if (saveResult.TryGetFailure(out var saveError))
                 Logger.LogError("Error saving Operator settings: {Error}", saveError.InternalMessage);
         }

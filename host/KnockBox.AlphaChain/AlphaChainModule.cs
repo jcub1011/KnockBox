@@ -2,6 +2,7 @@ using KnockBox.AlphaChain.Components;
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
+using KnockBox.AlphaChain.Services.Storage;
 using KnockBox.Core.Plugins;
 using Microsoft.AspNetCore.Components;
 
@@ -20,6 +21,7 @@ namespace KnockBox.AlphaChain
             registration.AddSingleton<IEngineEvaluator, EngineEvaluator>();
             registration.AddSingleton<IModifierCardFactory, ModifierCardFactory>();
             registration.AddGameEngine<AlphaChainGameEngine>();
+            registration.AddScoped<AlphaChainStorage, AlphaChainStorage>();
         }
 
         public RenderFragment? GetCustomHeader() => builder =>

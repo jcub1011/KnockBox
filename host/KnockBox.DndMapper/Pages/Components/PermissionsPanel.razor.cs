@@ -1,7 +1,7 @@
 using KnockBox.Core.Components.Shared;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
-using KnockBox.Core.Services.Storage.ClientStorage;
+using KnockBox.DndMapper.Services.Storage;
 using KnockBox.DndMapper.Models;
 using KnockBox.DndMapper.Services.Logic.Games;
 using KnockBox.DndMapper.Services.State.Games;
@@ -18,7 +18,7 @@ namespace KnockBox.DndMapper.Pages.Components
 
         [Inject] protected DndMapperGameEngine Engine { get; set; } = default!;
         [Inject] protected IUserService UserService { get; set; } = default!;
-        [Inject] protected ILocalStorageService LocalStorage { get; set; } = default!;
+        [Inject] protected DndMapperStorage Storage { get; set; } = default!;
         [Inject] protected ILogger<PermissionsPanel> Logger { get; set; } = default!;
         [CascadingParameter] public DndMapperToastService? Toasts { get; set; }
 
@@ -119,7 +119,7 @@ namespace KnockBox.DndMapper.Pages.Components
         private async Task LoadSettingsAsync()
         {
             // A failed/canceled read falls through to the built-in defaults already on the state.
-            var savedResult = await LocalStorage.GetAsync<DndMapperSettings>("dnd-mapper", "settings", _cts.Token);
+            var savedResult = await Storage.Local.GetAsync<DndMapperSettings>("settings", "value", _cts.Token);
             // If the host already edited a setting while the load was in flight,
             // the user's edit wins — the saved snapshot would clobber it.
             if (savedResult.TryGetSuccess(out var saved) && saved is not null && !_userHasEdited)
@@ -145,7 +145,7 @@ namespace KnockBox.DndMapper.Pages.Components
             {
                 try { await prior; } catch { /* prior failure already logged */ }
             }
-            var saveResult = await LocalStorage.SetAsync("dnd-mapper", "settings", settings, ct);
+            var saveResult = await Storage.Local.SetAsync("settings", "value", settings, ct);
             if (saveResult.TryGetFailure(out var saveError))
                 Logger.LogError("Error saving Dnd Mapper settings: {Error}", saveError.InternalMessage);
         }

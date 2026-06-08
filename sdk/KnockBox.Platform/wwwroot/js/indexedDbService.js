@@ -241,6 +241,164 @@ export async function listDatabases() {
     }
 }
 
+// One-time database rename / namespacing. Copies every record from `oldName`
+// into `newName` (mirroring the source's object stores + indexes), then
+// deletes `oldName`. Guarded so a completed migration never re-copies:
+//   - no-op if `oldName` doesn't exist (so we never create an empty shell), and
+//   - no-op if `newName` already exists (don't clobber migrated / live data).
+// Blobs survive because cursor/getAll values carry the Blob and put() re-stores
+// it via structured clone. Records are read whole-store then written whole-store
+// (two single-store transactions) so the cross-database copy never trips the
+// IDB auto-commit-when-idle rule mid-walk.
+export async function migrateDatabase(oldName, newName) {
+    try {
+        if (typeof indexedDB.databases === "function") {
+            const existing = await indexedDB.databases();
+            const names = new Set(existing.map(d => d.name));
+            if (!names.has(oldName)) return ok();   // nothing to migrate
+            if (names.has(newName)) return ok();    // already migrated
+        }
+
+        const oldDb = await openExistingDatabase(oldName);
+        if (!oldDb) return ok();                    // didn't actually exist
+
+        const storeNames = Array.from(oldDb.objectStoreNames);
+        if (storeNames.length === 0) {
+            oldDb.close();
+            await deleteDatabaseInternal(oldName);
+            return ok();
+        }
+
+        const meta = readStoreMeta(oldDb, storeNames);
+        const newDb = await openCreatingStores(newName, oldDb.version, meta);
+        try {
+            for (const sn of storeNames) {
+                const { values, keys } = await readAllRecords(oldDb, sn);
+                await writeAllRecords(newDb, sn, values, keys);
+            }
+        } finally {
+            newDb.close();
+        }
+        oldDb.close();
+        await deleteDatabaseInternal(oldName);
+        return ok();
+    } catch (e) {
+        return fail(mapDomError(e));
+    }
+}
+
+// Opens an existing DB without a version (never triggers an upgrade). If the
+// DB had to be created (it didn't exist), the freshly-created shell is closed,
+// deleted, and null is returned so the caller treats it as "nothing to migrate"
+// — the path taken on user agents lacking indexedDB.databases().
+function openExistingDatabase(name) {
+    return new Promise((resolve, reject) => {
+        let created = false;
+        const req = indexedDB.open(name);
+        req.onupgradeneeded = () => { created = true; };
+        req.onsuccess = () => {
+            const db = req.result;
+            if (created) {
+                db.close();
+                indexedDB.deleteDatabase(name);
+                resolve(null);
+            } else {
+                resolve(db);
+            }
+        };
+        req.onerror = () => reject(req.error);
+        req.onblocked = () => reject(new Error(`Open blocked for '${name}'.`));
+    });
+}
+
+function readStoreMeta(db, storeNames) {
+    const tx = db.transaction(storeNames, "readonly");
+    const meta = [];
+    for (const sn of storeNames) {
+        const store = tx.objectStore(sn);
+        const indexes = [];
+        for (const idxName of store.indexNames) {
+            const idx = store.index(idxName);
+            indexes.push({
+                name: idx.name,
+                keyPath: idx.keyPath,
+                unique: idx.unique,
+                multiEntry: idx.multiEntry,
+            });
+        }
+        meta.push({
+            name: sn,
+            keyPath: store.keyPath,            // string | string[] | null
+            autoIncrement: store.autoIncrement,
+            indexes,
+        });
+    }
+    return meta;
+}
+
+function openCreatingStores(name, version, meta) {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(name, version || 1);
+        req.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            for (const m of meta) {
+                if (db.objectStoreNames.contains(m.name)) continue;
+                const options = {};
+                if (m.keyPath !== null && m.keyPath !== undefined) options.keyPath = m.keyPath;
+                if (m.autoIncrement) options.autoIncrement = true;
+                const store = db.createObjectStore(m.name, options);
+                for (const idx of m.indexes) {
+                    store.createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multiEntry });
+                }
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+        req.onblocked = () => reject(new Error(`Open blocked for '${name}'.`));
+    });
+}
+
+function readAllRecords(db, storeName) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([storeName], "readonly");
+        const store = tx.objectStore(storeName);
+        const inlineKeys = store.keyPath !== null && store.keyPath !== undefined;
+        const valuesReq = store.getAll();
+        const keysReq = inlineKeys ? null : store.getAllKeys();
+        tx.oncomplete = () => resolve({
+            values: valuesReq.result || [],
+            keys: keysReq ? (keysReq.result || []) : null,
+        });
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error("read aborted"));
+    });
+}
+
+function writeAllRecords(db, storeName, values, keys) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction([storeName], "readwrite");
+        const store = tx.objectStore(storeName);
+        for (let i = 0; i < values.length; i++) {
+            if (keys) store.put(values[i], keys[i]);
+            else store.put(values[i]);
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error("write aborted"));
+    });
+}
+
+function deleteDatabaseInternal(name) {
+    return new Promise((resolve) => {
+        const req = indexedDB.deleteDatabase(name);
+        req.onsuccess = () => resolve();
+        // Best-effort: a blocked/failed delete leaves the legacy DB behind, but
+        // the newName-exists guard keeps the next run from re-copying.
+        req.onerror = () => resolve();
+        req.onblocked = () => resolve();
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Key / range envelope conversion
 // ---------------------------------------------------------------------------

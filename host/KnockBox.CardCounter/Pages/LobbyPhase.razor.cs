@@ -3,7 +3,7 @@ using KnockBox.CardCounter.Services.Logic.Games;
 using KnockBox.CardCounter.Services.State.Games;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
-using KnockBox.Core.Services.Storage.ClientStorage;
+using KnockBox.CardCounter.Services.Storage;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.CardCounter.Pages
@@ -14,7 +14,7 @@ namespace KnockBox.CardCounter.Pages
 
         [Inject] protected IUserService UserService { get; set; } = default!;
 
-        [Inject] protected ILocalStorageService LocalStorage { get; set; } = default!;
+        [Inject] protected CardCounterStorage Storage { get; set; } = default!;
 
         [Inject] protected ILogger<LobbyPhase> Logger { get; set; } = default!;
 
@@ -162,7 +162,7 @@ namespace KnockBox.CardCounter.Pages
 
         private async Task LoadSettingsAsync()
         {
-            var savedResult = await LocalStorage.GetAsync<CardCounterSettings>("card-counter", "settings", _cts.Token);
+            var savedResult = await Storage.Local.GetAsync<CardCounterSettings>("settings", "value", _cts.Token);
             // If the host already edited a setting while the load was in flight,
             // the user's edit wins — the saved snapshot would clobber it. A failed/canceled
             // read is a non-success result that simply falls through to built-in defaults.
@@ -189,7 +189,7 @@ namespace KnockBox.CardCounter.Pages
             {
                 try { await prior; } catch { /* prior failure already logged */ }
             }
-            var saveResult = await LocalStorage.SetAsync("card-counter", "settings", settings, ct);
+            var saveResult = await Storage.Local.SetAsync("settings", "value", settings, ct);
             if (saveResult.TryGetFailure(out var saveError))
                 Logger.LogError("Error saving Card Counter settings: {Error}", saveError.InternalMessage);
         }

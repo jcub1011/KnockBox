@@ -4,7 +4,7 @@ using KnockBox.DrawnToDress.Services.State.Games.Data;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
-using KnockBox.Core.Services.Storage.ClientStorage;
+using KnockBox.DrawnToDress.Services.Storage;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.DrawnToDress.Pages
@@ -15,7 +15,7 @@ namespace KnockBox.DrawnToDress.Pages
 
         [Inject] protected IUserService UserService { get; set; } = default!;
 
-        [Inject] protected ILocalStorageService LocalStorage { get; set; } = default!;
+        [Inject] protected DrawnToDressStorage Storage { get; set; } = default!;
 
         [Inject] protected ILogger<LobbyPhase> Logger { get; set; } = default!;
 
@@ -238,7 +238,7 @@ namespace KnockBox.DrawnToDress.Pages
         private async Task LoadSettingsAsync()
         {
             // A failed/canceled read falls through to the built-in defaults already on the state.
-            var savedResult = await LocalStorage.GetAsync<DrawnToDressSettings>("drawn-to-dress", "settings", _cts.Token);
+            var savedResult = await Storage.Local.GetAsync<DrawnToDressSettings>("settings", "value", _cts.Token);
             // If the host already edited a setting while the load was in flight,
             // the user's edit wins — the saved snapshot would clobber it.
             if (savedResult.TryGetSuccess(out var saved) && saved is not null && !_userHasEdited)
@@ -264,7 +264,7 @@ namespace KnockBox.DrawnToDress.Pages
             {
                 try { await prior; } catch { /* prior failure already logged */ }
             }
-            var saveResult = await LocalStorage.SetAsync("drawn-to-dress", "settings", settings, ct);
+            var saveResult = await Storage.Local.SetAsync("settings", "value", settings, ct);
             if (saveResult.TryGetFailure(out var saveError))
                 Logger.LogError("Error saving Drawn To Dress settings: {Error}", saveError.InternalMessage);
         }

@@ -122,6 +122,41 @@ public sealed class IndexedDbServiceTests
     }
 
     [TestMethod]
+    public async Task MigrateDatabaseAsync_HappyPath_InvokesMigrateWithBothNames()
+    {
+        var interop = IndexedDbTestHelpers.NewInteropMock();
+        interop.SetupVoidSuccess("migrateDatabase");
+
+        using var registry = IndexedDbTestHelpers.NewRegistry();
+        var service = NewService(interop.Object, registry);
+
+        var result = await service.MigrateDatabaseAsync("OldDb", "NewDb");
+
+        Assert.IsTrue(result.IsSuccess);
+        interop.Verify(x => x.InvokeVoidAsync(
+            "migrateDatabase",
+            It.IsAny<CancellationToken>(),
+            It.Is<object?[]>(args => args.Length == 2 && (string)args[0]! == "OldDb" && (string)args[1]! == "NewDb")),
+            Times.Once);
+    }
+
+    [TestMethod]
+    public async Task MigrateDatabaseAsync_Failure_ReturnsError()
+    {
+        var interop = IndexedDbTestHelpers.NewInteropMock();
+        interop.SetupVoidFailure("migrateDatabase",
+            new IndexedDbError(IndexedDbErrorKind.Blocked, "an open connection holds it"));
+
+        using var registry = IndexedDbTestHelpers.NewRegistry();
+        var service = NewService(interop.Object, registry);
+
+        var result = await service.MigrateDatabaseAsync("OldDb", "NewDb");
+
+        Assert.IsTrue(result.TryGetFailure(out var err));
+        Assert.AreEqual(IndexedDbErrorKind.Blocked, err.Kind);
+    }
+
+    [TestMethod]
     public async Task ListDatabasesAsync_HappyPath_ReturnsInfos()
     {
         var interop = IndexedDbTestHelpers.NewInteropMock();
