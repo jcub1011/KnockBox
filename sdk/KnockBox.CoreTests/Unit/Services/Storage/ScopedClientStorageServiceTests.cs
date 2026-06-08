@@ -113,6 +113,24 @@ public sealed class ScopedClientStorageServiceTests
     }
 
     [TestMethod]
+    public async Task ClearAsync_RemovesKeysWhoseScopeContainsADot()
+    {
+        // Regression: ClearAsync must remove every key in the namespace even when
+        // a scope itself contains '.', which a naive first-'.' split would
+        // mis-parse and leave behind.
+        var inner = new InMemoryClientStorage();
+        var scoped = new ScopedClientStorageService(inner, "card-counter");
+        await scoped.SetAsync("a.b", "value", 1);   // stored as "card-counter::a.b.value"
+        await scoped.SetAsync("plain", "value", 2);
+
+        var result = await scoped.ClearAsync();
+
+        Assert.IsTrue(result.IsSuccess);
+        Assert.IsFalse(inner.Store.Keys.Any(k => k.StartsWith("card-counter::", StringComparison.Ordinal)),
+            "Every key in the namespace must be cleared, including dotted scopes.");
+    }
+
+    [TestMethod]
     public async Task GetKeysAsync_StripsRoutePrefix()
     {
         var inner = new InMemoryClientStorage();

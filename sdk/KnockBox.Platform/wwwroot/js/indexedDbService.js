@@ -252,7 +252,9 @@ export async function listDatabases() {
 // IDB auto-commit-when-idle rule mid-walk.
 export async function migrateDatabase(oldName, newName) {
     try {
+        let checkedViaDatabases = false;
         if (typeof indexedDB.databases === "function") {
+            checkedViaDatabases = true;
             const existing = await indexedDB.databases();
             const names = new Set(existing.map(d => d.name));
             if (!names.has(oldName)) return ok();   // nothing to migrate
@@ -261,6 +263,20 @@ export async function migrateDatabase(oldName, newName) {
 
         const oldDb = await openExistingDatabase(oldName);
         if (!oldDb) return ok();                    // didn't actually exist
+
+        // Fallback for user agents without indexedDB.databases(): probe the
+        // destination directly so we never copy `oldName`'s records into a
+        // `newName` that already holds migrated / live data. openExistingDatabase
+        // is self-cleaning — it deletes the empty shell it creates when newName
+        // doesn't exist — so this probe is a no-op on a fresh destination.
+        if (!checkedViaDatabases) {
+            const existingNew = await openExistingDatabase(newName);
+            if (existingNew) {
+                existingNew.close();
+                oldDb.close();
+                return ok();                        // already migrated
+            }
+        }
 
         const storeNames = Array.from(oldDb.objectStoreNames);
         if (storeNames.length === 0) {

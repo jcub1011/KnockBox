@@ -76,21 +76,19 @@ namespace KnockBox.Core.Services.Storage.ClientStorage
             if (keysResult.TryGetFailure(out var failure)) return Result.FromError(failure);
             if (!keysResult.TryGetSuccess(out var keys) || keys.Count == 0) return Result.Success;
 
-            // Each stored key is "{route}::{scope}.{key}". The prefixed scope is
-            // everything up to the first '.', which we hand to the inner
-            // RemoveAsync(scope) (it removes every "{prefixedScope}." key).
-            var prefixedScopes = new HashSet<string>(StringComparer.Ordinal);
+            // Each stored key is the physical "{route}::{scope}.{key}". Remove the
+            // namespace's keys one at a time, splitting at the LAST '.' into the
+            // (scope, key) pair the inner service rejoins as "{scope}.{key}". That
+            // pair round-trips back to exactly this physical key even when the
+            // scope or key itself contains a '.' — a first-'.' split would
+            // mis-derive the scope and silently leave the key behind.
             foreach (var k in keys)
             {
                 if (!k.StartsWith(_scopePrefix, StringComparison.Ordinal)) continue;
-                var dot = k.IndexOf('.');
-                if (dot <= 0) continue;
-                prefixedScopes.Add(k[..dot]);
-            }
+                var dot = k.LastIndexOf('.');
+                if (dot <= 0 || dot == k.Length - 1) continue;
 
-            foreach (var prefixedScope in prefixedScopes)
-            {
-                var removeResult = await _inner.RemoveAsync(prefixedScope).ConfigureAwait(false);
+                var removeResult = await _inner.RemoveAsync(k[..dot], k[(dot + 1)..]).ConfigureAwait(false);
                 if (removeResult.IsCanceled) return Result.FromCancellation();
                 if (removeResult.TryGetFailure(out var removeError)) return Result.FromError(removeError);
             }
