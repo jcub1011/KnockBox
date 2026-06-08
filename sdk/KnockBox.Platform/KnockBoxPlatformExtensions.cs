@@ -371,6 +371,15 @@ public static class KnockBoxPlatformExtensions
             (Core.Services.State.Shared.ISessionIdentityTokenService tokens) =>
                 Results.Json(new { token = tokens.Issue() }));
 
+        // Catalogue of available games for the WASM home shell (and any external
+        // client). Honors the same availability gate the Server home grid uses;
+        // LobbyService.CreateLobbyAsync re-checks availability on create, so a
+        // stale/disabled tile cannot bypass the gate. Public, same trust level as
+        // the public home grid.
+        app.MapGet("/api/games",
+            (IEnumerable<IGameModule> modules, IGameAvailabilityService availability) =>
+                HandleGamesCatalogue(modules, availability));
+
         // Serve runtime-streamed plugin client UI assemblies + their integrity
         // manifests. This is the path that loads a DLL the trimmed WASM client
         // never referenced at build time.
@@ -383,6 +392,15 @@ public static class KnockBoxPlatformExtensions
 
         return app;
     }
+
+    /// <summary>
+    /// Builds the <c>GET /api/games</c> response. Extracted from the endpoint lambda
+    /// so it can be unit-tested without a running host.
+    /// </summary>
+    internal static IResult HandleGamesCatalogue(
+        IEnumerable<IGameModule> modules,
+        IGameAvailabilityService availability)
+        => Results.Json(GameCatalogueProjection.Build(modules, availability));
 
     /// <summary>
     /// Maps <c>GET /_plugins/{routeIdentifier}/client/manifest.json</c> (integrity

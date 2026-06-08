@@ -1,0 +1,20 @@
+<!--
+  Shared contract DTOs for MyGame: the commands the client sends and the per-player
+  view the server projects back. This assembly loads in BOTH runtimes — promoted
+  into the server's default ALC AND shipped to the browser alongside the client UI —
+  so both sides bind the same CLR types.
+
+  CRITICAL: this project has ZERO KnockBox.* references and imports no plugin
+  targets. It is pure DTOs/enums only (mirrors the KnockBox.WordService.Contracts
+  pattern). Source-generated JSON keeps the DTOs trim-safe in the WASM client.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+</Project>

@@ -61,4 +61,29 @@ public sealed class CrossRuleIndependenceTests
         await AnalyzerHarness.AssertNoDiagnosticAsync<KB1004EnvironmentAnalyzer>(Kb1002PositiveSource);
         await AnalyzerHarness.AssertNoDiagnosticAsync<KB1004EnvironmentAnalyzer>(Kb1003PositiveSource);
     }
+
+    [TestMethod]
+    public async Task NewBoundaryRules_DoNotFireOnSandboxApiSources()
+    {
+        // The WASM boundary rules KB1005/KB1006 must not flag plain sandbox-API usage
+        // (no server-only types, no HubLobbyPageBase) even in a client project.
+        foreach (var source in new[] { Kb1001PositiveSource, Kb1002PositiveSource, Kb1003PositiveSource, Kb1004PositiveSource })
+        {
+            await AnalyzerHarness.AssertNoDiagnosticAsync<KB1005ClientServerTypeReferenceAnalyzer>(source, WasmAnalyzerOptions.Client);
+            await AnalyzerHarness.AssertNoDiagnosticAsync<KB1006ClientContractBoundaryAnalyzer>(source, WasmAnalyzerOptions.Client);
+        }
+
+        // KB1008 flags only System.IO; the HTTP / process / environment sources are clean.
+        await AnalyzerHarness.AssertNoDiagnosticAsync<KB1008ClientFilesystemAnalyzer>(Kb1002PositiveSource, WasmAnalyzerOptions.Client);
+        await AnalyzerHarness.AssertNoDiagnosticAsync<KB1008ClientFilesystemAnalyzer>(Kb1003PositiveSource, WasmAnalyzerOptions.Client);
+        await AnalyzerHarness.AssertNoDiagnosticAsync<KB1008ClientFilesystemAnalyzer>(Kb1004PositiveSource, WasmAnalyzerOptions.Client);
+    }
+
+    [TestMethod]
+    public async Task KB1007_DoesNotFireOnSandboxApiSources()
+    {
+        // The server projection rule only inspects AbstractStateProjector subclasses.
+        foreach (var source in new[] { Kb1001PositiveSource, Kb1002PositiveSource, Kb1003PositiveSource, Kb1004PositiveSource })
+            await AnalyzerHarness.AssertNoDiagnosticAsync<KB1007ProjectionReturnTypeAnalyzer>(source, WasmAnalyzerOptions.Server);
+    }
 }

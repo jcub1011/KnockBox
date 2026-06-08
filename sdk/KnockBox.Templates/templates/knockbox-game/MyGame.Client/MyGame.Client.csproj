@@ -1,0 +1,82 @@
+<!--
+  Browser UI for MyGame — a Razor Class Library downloaded into the player's browser
+  at runtime and rendered by the WASM client.
+
+  It references ONLY MyGame.Contracts (the shared DTOs) and KnockBox.Core.Client (the
+  WASM-safe SDK: HubLobbyPageBase, IGameClientModule, the hub connection factory). It
+  must NOT reference KnockBox.Core / KnockBox.Platform or the server plugin — analyzer
+  rule KB1005 enforces that, KB1006 enforces that the hub view type comes from a
+  *.Contracts assembly, and KB1008 flags server System.IO (use browser File/Blob).
+-->
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- The DLL is streamed and loaded via LoadFromStream; we don't need the RCL
+         static-web-assets pipeline. -->
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+
+    <!-- Marks this as a CLIENT plugin so the gated WASM analyzers (KB1005/KB1006/
+         KB1008) apply. CompilerVisibleProperty surfaces it to the analyzer config. -->
+    <KnockBoxPluginKind>client</KnockBoxPluginKind>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <CompilerVisibleProperty Include="KnockBoxPluginKind" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MyGame.Contracts\MyGame.Contracts.csproj" />
+
+    <!-- WASM-safe client SDK. Floating 1.* picks up patch/minor releases. -->
+    <PackageReference Include="KnockBox.Core.Client" Version="1.*" />
+
+    <!-- Build-time client analyzers (KB1005/KB1006/KB1008). PrivateAssets="all" +
+         IncludeAssets="analyzers" keeps it a build-only dependency. -->
+    <PackageReference Include="KnockBox.Plugins.Analyzer" Version="1.*"
+                      PrivateAssets="all"
+                      IncludeAssets="analyzers" />
+  </ItemGroup>
+
+  <!--
+    Stage the client + contracts DLLs (plus a build-time SHA-256 integrity sidecar)
+    into the DevHost's games/MyGame/client/ folder — the layout a directory-discovery
+    host serves runtime client assets from.
+
+    SCOPE NOTE: the scaffolded DevHost runs Blazor Server with EXPLICIT plugin
+    registration and does NOT serve runtime client assets, so this staging is for
+    deploying to a full WASM-capable host (or a future Web App DevHost). The sidecar
+    is an optimization — a host computes the hash at serve time if it's absent.
+  -->
+  <Target Name="StageMyGameClientAssets" AfterTargets="Build">
+    <PropertyGroup>
+      <_ClientDestDir>$(MSBuildProjectDirectory)\..\MyGame.DevHost\bin\$(Configuration)\$(TargetFramework)\games\MyGame\client\</_ClientDestDir>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <_MyGameClientFiles Include="$(TargetDir)$(TargetName).dll" />
+      <_MyGameClientFiles Include="$(TargetDir)MyGame.Contracts.dll" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_MyGameClientFiles)" DestinationFolder="$(_ClientDestDir)" SkipUnchangedFiles="true" />
+
+    <ItemGroup>
+      <_MyGameStaged Include="$(_ClientDestDir)%(_MyGameClientFiles.Filename)%(_MyGameClientFiles.Extension)" />
+    </ItemGroup>
+
+    <GetFileHash Files="@(_MyGameStaged)" Algorithm="SHA256" HashEncoding="hex">
+      <Output TaskParameter="Items" ItemName="_MyGameHashed" />
+    </GetFileHash>
+
+    <PropertyGroup>
+      <_MyGameHashJson>{%0A@(_MyGameHashed->'  "%(Filename)": "%(FileHash)"', ',%0A')%0A}</_MyGameHashJson>
+    </PropertyGroup>
+
+    <WriteLinesToFile File="$(_ClientDestDir)assets.sha256.json"
+                      Lines="$(_MyGameHashJson)"
+                      Overwrite="true" />
+  </Target>
+
+</Project>

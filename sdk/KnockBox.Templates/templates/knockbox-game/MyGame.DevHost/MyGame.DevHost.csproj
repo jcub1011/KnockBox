@@ -28,5 +28,13 @@
          save. The production host never project-references a plugin; it only
          discovers staged DLLs from its games/ folder at startup. -->
     <ProjectReference Include="..\MyGame\MyGame.csproj" />
+
+    <!-- Build the browser UI alongside the DevHost so it (and its build-time
+         integrity sidecar) are staged for a WASM-capable host. NOTE: this DevHost
+         runs Blazor Server with explicit registration and does not itself serve the
+         runtime client UI — deploy the staged games/MyGame/client/ assets to a full
+         KnockBox host to exercise the WASM client. -->
+    <ProjectReference Include="..\MyGame.Client\MyGame.Client.csproj"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

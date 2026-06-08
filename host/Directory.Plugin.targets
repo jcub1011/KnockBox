@@ -90,6 +90,19 @@
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
 
+  <!--
+    Mark this as a SERVER plugin for the gated WASM analyzers (KB1005–KB1008).
+    CompilerVisibleProperty surfaces KnockBoxPluginKind to the analyzer config so
+    the server projection rule KB1007 runs here while the client-only rules
+    (KB1005/KB1006/KB1008) stay off.
+  -->
+  <PropertyGroup>
+    <KnockBoxPluginKind>server</KnockBoxPluginKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <CompilerVisibleProperty Include="KnockBoxPluginKind" />
+  </ItemGroup>
+
   <Target Name="PublishPlugin" AfterTargets="Build">
     <Message Text="Publishing plugin $(TargetName) to KnockBox app..." Importance="high" />
     <PropertyGroup>

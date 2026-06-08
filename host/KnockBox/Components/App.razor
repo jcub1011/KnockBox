@@ -1,4 +1,5 @@
 @inject NavigationManager Nav
+@using KnockBox.Core.Client.Routing
 
 <!DOCTYPE html>
 <html lang="en">
@@ -71,11 +72,13 @@
         {
             return null;
         }
-        // The WASM migration spike page declares its own @rendermode
-        // InteractiveWebAssembly. Keep the Routes host static (return null) for it
-        // so a static→WebAssembly transition is used rather than nesting a WASM
-        // page inside an InteractiveServer parent (which is not allowed).
-        if (rel.StartsWith("spike/wasm", StringComparison.OrdinalIgnoreCase))
+        // WASM pages (the spike, the home shell, and future runtime-loaded games)
+        // declare their own @rendermode InteractiveWebAssembly. Keep the Routes host
+        // static (return null) for them so a static→WebAssembly transition is used
+        // rather than nesting a WASM page inside an InteractiveServer parent (which
+        // is not allowed). The route set lives in WasmRouteTable so adding a game is
+        // a one-line edit there, not here.
+        if (WasmRouteTable.IsWasmRoute(rel))
         {
             return null;
         }

@@ -1,0 +1,53 @@
+@inherits HubLobbyPageBase<GameView>
+@*
+    GameRoot — the runtime-loaded WASM UI entry point.
+
+    The client loader resolves this by the convention {RootNamespace}.GameRoot, or
+    via the IGameClientModule declared in GameClientModule.cs. It is rendered by the
+    WASM client from an assembly the client never referenced at build time.
+
+    Inheriting HubLobbyPageBase<GameView> wires up the realtime plumbing for you:
+      - opens the hub connection with the per-tab identity token,
+      - joins the lobby (LobbyUri below),
+      - deserializes each per-player projection into the strongly-typed `View`,
+      - drops stale/duplicate projections after a reconnect,
+      - and disposes the subscription + connection on teardown.
+
+    KB1006 requires the view type (GameView) to come from a *.Contracts assembly.
+*@
+
+@if (View is null)
+{
+    <p>Loading…</p>
+}
+else if (View.IsJoinable)
+{
+    <h2>Waiting for players…</h2>
+    <ul>
+        <li><strong>@View.HostName</strong> (Host)</li>
+        @foreach (var name in View.PlayerNames)
+        {
+            <li>@name</li>
+        }
+    </ul>
+    <button @onclick="StartGame">Start Game</button>
+}
+else
+{
+    <h2>Game in progress!</h2>
+    <p>Players: @View.PlayerNames.Count</p>
+    @* TODO: render your in-game UI from fields you add to GameView. *@
+}
+
+@code {
+    // The lobby code from the room URL, supplied by the WASM host when it renders
+    // this component (room/my-game/{Code}).
+    [Parameter] public string Code { get; set; } = "";
+
+    // Must match the server plugin's RouteIdentifier and the @page route segment.
+    protected override string RouteIdentifier => "my-game";
+
+    protected override string LobbyUri => $"room/my-game/{Code}";
+
+    private Task StartGame() => SubmitCommandAsync(GameCommands.Start);
+}

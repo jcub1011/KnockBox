@@ -6,5 +6,10 @@
   "version": "1.0.0",
   "entryAssembly": "MyGame",
   "capabilities": [],
-  "tileAsset": "tile.svg"
+  "tileAsset": "tile.svg",
+  "clientAssembly": "MyGame.Client",
+  "clientContracts": ["MyGame.Contracts"],
+  "clientAssets": [
+    { "name": "MyGame.Client", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+  ]
 }

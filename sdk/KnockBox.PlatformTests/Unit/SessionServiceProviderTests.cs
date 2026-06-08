@@ -115,4 +115,57 @@ public sealed class SessionServiceProviderTests
         await provider.WaitForPendingEvictionsAsync();
         Assert.IsFalse(reg1.Service.IsDisposed);
     }
+
+    [TestMethod]
+    public async Task GetService_SameToken_TwoHolders_NotEvictedUntilBothReleased()
+    {
+        // Identity unification means a tab's Server circuit and its hub connection
+        // acquire the SAME SessionToken. Releasing one holder must NOT evict the
+        // shared instance while the other still holds it — eviction is gated on
+        // ReferenceCount<=0. This is the core safety property of the unification.
+        var (provider, time) = NewProvider();
+        var token = new SessionToken(Guid.NewGuid());
+
+        var circuit = provider.GetService<TrackedService>(token);
+        var hub = provider.GetService<TrackedService>(token);
+        Assert.IsTrue(circuit.TryGetSuccess(out var circuitReg));
+        Assert.IsTrue(hub.TryGetSuccess(out var hubReg));
+        Assert.AreSame(circuitReg.Service, hubReg.Service, "Both holders share one cached instance.");
+
+        // First holder leaves. Count drops to 1 — no eviction timer should fire.
+        circuitReg.LifecycleToken.Dispose();
+        time.Advance(TimeSpan.FromMinutes(2));
+        await provider.WaitForPendingEvictionsAsync();
+        Assert.IsFalse(hubReg.Service.IsDisposed,
+            "The session must survive while the second holder still references it.");
+
+        // Second holder leaves. Now count hits 0 → eviction after the grace period.
+        hubReg.LifecycleToken.Dispose();
+        time.Advance(TimeSpan.FromMinutes(2));
+        await provider.WaitForPendingEvictionsAsync();
+        Assert.IsTrue(hubReg.Service.IsDisposed,
+            "Once both holders release, the session evicts as normal.");
+    }
+
+    [TestMethod]
+    public void GetService_SameToken_ReleaseThenReacquireWithinGrace_KeepsInstance()
+    {
+        // Models the Server-page → WASM (or reload) handoff for one tab: the first
+        // holder releases, and a second acquisition within the grace window adopts
+        // the still-warm instance rather than building a fresh one.
+        var (provider, time) = NewProvider();
+        var token = new SessionToken(Guid.NewGuid());
+
+        var first = provider.GetService<TrackedService>(token);
+        Assert.IsTrue(first.TryGetSuccess(out var reg1));
+        reg1.LifecycleToken.Dispose();
+
+        time.Advance(TimeSpan.FromSeconds(20));
+
+        var second = provider.GetService<TrackedService>(token);
+        Assert.IsTrue(second.TryGetSuccess(out var reg2));
+
+        Assert.AreSame(reg1.Service, reg2.Service);
+        Assert.IsFalse(reg1.Service.IsDisposed);
+    }
 }

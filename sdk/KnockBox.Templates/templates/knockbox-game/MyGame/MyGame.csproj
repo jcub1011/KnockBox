@@ -16,7 +16,16 @@
     <!-- Required so @page directives (MVC-style routing) work inside this
          class library. Without it, your lobby pages won't be routable. -->
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+
+    <!-- Marks this as a SERVER plugin for the gated WASM analyzers, so the server
+         projection rule KB1007 (projector view types must be serializable contract
+         DTOs) applies. CompilerVisibleProperty surfaces it to the analyzer config. -->
+    <KnockBoxPluginKind>server</KnockBoxPluginKind>
   </PropertyGroup>
+
+  <ItemGroup>
+    <CompilerVisibleProperty Include="KnockBoxPluginKind" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- ASP.NET Core shared framework — needed by the Razor SDK. -->
@@ -42,6 +51,12 @@
     <PackageReference Include="KnockBox.Plugins.Analyzer" Version="1.*"
                       PrivateAssets="all"
                       IncludeAssets="analyzers" />
+
+    <!-- The game's own shared contract DTOs (commands + projected view). This is a
+         pure-DTO sidecar with NO KnockBox dependency — referencing it does not break
+         the "KnockBox.Core only" rule above. The server projector produces these
+         DTOs; the .Client UI consumes them. -->
+    <ProjectReference Include="..\MyGame.Contracts\MyGame.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -34,7 +35,9 @@ internal static class AnalyzerHarness
     /// <typeparamref name="TAnalyzer"/> against it. Returns only the analyzer's
     /// diagnostics — compiler errors/warnings from the snippet are ignored.
     /// </summary>
-    public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync<TAnalyzer>(string source)
+    public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync<TAnalyzer>(
+        string source,
+        IReadOnlyDictionary<string, string>? globalOptions = null)
         where TAnalyzer : DiagnosticAnalyzer, new()
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Latest));
@@ -44,11 +47,48 @@ internal static class AnalyzerHarness
             references: References,
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
+        // The gated WASM analyzers (KB1005–KB1008) read the KnockBoxPluginKind build
+        // property from global analyzer config options; tests pass it through here.
+        AnalyzerOptions? analyzerOptions = globalOptions is null
+            ? null
+            : new AnalyzerOptions(
+                ImmutableArray<AdditionalText>.Empty,
+                new TestConfigOptionsProvider(globalOptions));
+
         var withAnalyzers = compilation.WithAnalyzers(
-            ImmutableArray.Create<DiagnosticAnalyzer>(new TAnalyzer()));
+            ImmutableArray.Create<DiagnosticAnalyzer>(new TAnalyzer()),
+            analyzerOptions);
 
         var diagnostics = await withAnalyzers.GetAnalyzerDiagnosticsAsync();
         return diagnostics;
+    }
+
+    private sealed class TestConfigOptionsProvider : AnalyzerConfigOptionsProvider
+    {
+        private readonly AnalyzerConfigOptions _options;
+        public TestConfigOptionsProvider(IReadOnlyDictionary<string, string> values)
+            => _options = new TestConfigOptions(values);
+
+        public override AnalyzerConfigOptions GlobalOptions => _options;
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => _options;
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => _options;
+    }
+
+    private sealed class TestConfigOptions : AnalyzerConfigOptions
+    {
+        private readonly IReadOnlyDictionary<string, string> _values;
+        public TestConfigOptions(IReadOnlyDictionary<string, string> values) => _values = values;
+
+        public override bool TryGetValue(string key, out string value)
+        {
+            if (_values.TryGetValue(key, out var v))
+            {
+                value = v;
+                return true;
+            }
+            value = null!;
+            return false;
+        }
     }
 
     /// <summary>
@@ -56,13 +96,21 @@ internal static class AnalyzerHarness
     /// produces exactly one diagnostic with the expected rule id, and that its
     /// message contains every expected substring.
     /// </summary>
-    public static async Task AssertSingleDiagnosticAsync<TAnalyzer>(
+    public static Task AssertSingleDiagnosticAsync<TAnalyzer>(
         string source,
         string expectedRuleId,
         params string[] expectedMessageSubstrings)
         where TAnalyzer : DiagnosticAnalyzer, new()
+        => AssertSingleDiagnosticAsync<TAnalyzer>(source, null, expectedRuleId, expectedMessageSubstrings);
+
+    public static async Task AssertSingleDiagnosticAsync<TAnalyzer>(
+        string source,
+        IReadOnlyDictionary<string, string>? globalOptions,
+        string expectedRuleId,
+        params string[] expectedMessageSubstrings)
+        where TAnalyzer : DiagnosticAnalyzer, new()
     {
-        var diagnostics = await GetDiagnosticsAsync<TAnalyzer>(source);
+        var diagnostics = await GetDiagnosticsAsync<TAnalyzer>(source, globalOptions);
 
         Assert.HasCount(
             1,
@@ -78,10 +126,12 @@ internal static class AnalyzerHarness
             StringAssert.Contains(message, substring);
     }
 
-    public static async Task AssertNoDiagnosticAsync<TAnalyzer>(string source)
+    public static async Task AssertNoDiagnosticAsync<TAnalyzer>(
+        string source,
+        IReadOnlyDictionary<string, string>? globalOptions = null)
         where TAnalyzer : DiagnosticAnalyzer, new()
     {
-        var diagnostics = await GetDiagnosticsAsync<TAnalyzer>(source);
+        var diagnostics = await GetDiagnosticsAsync<TAnalyzer>(source, globalOptions);
         Assert.IsEmpty(
             diagnostics,
             $"Expected no diagnostics, got [{diagnostics.Length}]:{Environment.NewLine}" +

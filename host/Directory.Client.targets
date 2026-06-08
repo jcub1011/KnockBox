@@ -25,6 +25,23 @@
     <ClientPluginGameAssembly>$(MSBuildProjectName.Replace('.Client',''))</ClientPluginGameAssembly>
   </PropertyGroup>
 
+  <!--
+    Mark this as a CLIENT plugin and wire the analyzer so the client-side WASM rules
+    (KB1005/KB1006/KB1008) run on the .Client assembly; the server projection rule
+    KB1007 stays off here. OutputItemType="Analyzer" + ReferenceOutputAssembly="false"
+    routes the analyzer into the compiler pipeline only (no runtime dependency), the
+    same way Directory.Plugin.targets wires it for server plugins.
+  -->
+  <PropertyGroup>
+    <KnockBoxPluginKind>client</KnockBoxPluginKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <CompilerVisibleProperty Include="KnockBoxPluginKind" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\sdk\KnockBox.Plugins.Analyzer\KnockBox.Plugins.Analyzer.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
   <Target Name="StageClientAssets" AfterTargets="Build">
     <PropertyGroup>
       <ClientDestDir>$(MSBuildThisFileDirectory)KnockBox\bin\$(Configuration)\$(TargetFramework)\games\$(ClientPluginGameAssembly)\client\</ClientDestDir>

@@ -26,11 +26,17 @@ namespace KnockBox.Platform.Hubs;
 /// The session lifecycle moves here from the circuit: <see cref="OnConnectedAsync"/>
 /// acquires a session-service reference on the first connection for a token and
 /// <see cref="OnDisconnectedAsync"/> releases it on the last, so reconnect within
-/// the provider's grace window re-attaches the same session. This coexists with
-/// the still-circuit-based <c>GameSessionService</c> used by the unmigrated Blazor
-/// Server pages: those derive identity from <c>UserService</c>/<c>SessionTokenProvider</c>
-/// (a client-generated GUID), a different <see cref="SessionToken"/> than the
-/// signed token used here, so the two acquisition paths never evict each other.
+/// the provider's grace window re-attaches the same session. Identity is now
+/// <b>unified</b> with the still-circuit-based Blazor Server pages: their
+/// <c>SessionTokenProvider</c> resolves the SAME signed per-tab token from
+/// <c>sessionStorage</c> that this hub reads from the handshake, so a tab's circuit
+/// and its hub connection produce the same <see cref="SessionToken"/> and co-own
+/// the one cached <c>GameSessionState</c>. That cache is ref-counted with a 1-minute
+/// eviction grace, so eviction waits for <b>both</b> the circuit and the hub to
+/// release — a transition (Server page → WASM, or a reload) keeps the session warm
+/// rather than evicting it. The hub tracks its per-lobby registration in
+/// <see cref="GameConnectionRegistry"/>, not in <c>GameSessionState</c>, so the only
+/// object the two paths share is the ref-counted cache entry.
 /// </para>
 /// </summary>
 public sealed class GameHub(

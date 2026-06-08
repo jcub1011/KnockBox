@@ -1,0 +1,103 @@
+@page "/shell"
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@implements IAsyncDisposable
+@using KnockBox.Core.Client.Catalogue
+@inject HttpClient Http
+@inject GameHubConnectionFactory HubFactory
+@inject IClientSessionTokenProvider TokenProvider
+@inject NavigationManager Nav
+
+<PageTitle>KnockBox — WASM Shell</PageTitle>
+
+<h1>KnockBox WASM Home Shell</h1>
+<p style="color:#555;">
+    Additive preview of the WASM host shell. The game catalogue is fetched from
+    <code>GET /api/games</code> and rendered in the browser; creating a lobby goes
+    over the SignalR hub. This does not replace the live home page.
+</p>
+
+<p><strong>Status:</strong> @_status</p>
+
+@if (_lastCreatedUri is not null)
+{
+    <p><strong>Created lobby:</strong> <code>@_lastCreatedUri</code></p>
+}
+
+@if (_games is null)
+{
+    <p><em>Loading catalogue…</em></p>
+}
+else if (_games.Length == 0)
+{
+    <p><em>No games available.</em></p>
+}
+else
+{
+    <div style="display:flex; flex-wrap:wrap; gap:1rem;">
+        @foreach (var game in _games)
+        {
+            <button style="width:160px; height:160px; position:relative; cursor:@(game.HasClientUi ? "pointer" : "not-allowed");"
+                    title="@(game.HasClientUi ? game.Name : game.Name + " (Server only)")"
+                    disabled="@(!game.HasClientUi || !_connected)"
+                    @onclick="() => CreateLobbyAsync(game)">
+                @if (game.TileAsset is { } tile)
+                {
+                    <img src="_content/@(game.EntryAssembly)/@tile" alt="" draggable="false"
+                         style="width:100%; height:100%; object-fit:contain;" />
+                }
+                else
+                {
+                    <span>@game.Name</span>
+                }
+                @if (!game.HasClientUi)
+                {
+                    <span style="position:absolute; bottom:4px; left:0; right:0; font-size:0.7rem; background:#0008; color:#fff;">Server only</span>
+                }
+            </button>
+        }
+    </div>
+}
+
+@code {
+    private HubConnection? _hub;
+    private GameCatalogueEntry[]? _games;
+    private bool _connected;
+    private string _status = "Initializing…";
+    private string? _lastCreatedUri;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _games = await Http.GetFromJsonAsync<GameCatalogueEntry[]>("api/games");
+
+        // Per-tab identity: a server-signed token persisted in sessionStorage so a
+        // reload is the same player but a fresh tab is a distinct one.
+        var token = await TokenProvider.GetOrIssueAsync();
+        _hub = HubFactory.Create(token, $"Player-{token[^4..]}");
+        await _hub.StartAsync();
+        _connected = true;
+        _status = "Connected to hub. Pick a game to create a lobby.";
+    }
+
+    private async Task CreateLobbyAsync(GameCatalogueEntry game)
+    {
+        if (!game.HasClientUi || _hub is null)
+            return;
+
+        _status = $"Creating a {game.Name} lobby…";
+        var uri = await _hub.InvokeAsync<string?>("CreateRoom", game.RouteIdentifier);
+        if (uri is null)
+        {
+            _status = $"Failed to create a {game.Name} lobby.";
+            return;
+        }
+
+        _lastCreatedUri = uri;
+        _status = $"Created a {game.Name} lobby over the hub.";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hub is not null)
+            await _hub.DisposeAsync();
+    }
+}
