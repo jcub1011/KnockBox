@@ -170,28 +170,28 @@ namespace KnockBox.CardCounter.Services.Logic.Games
 
         // ── AbstractGameEngine lifecycle ─────────────────────────────────────
 
-        public override async Task<ValueResult<AbstractGameState>> CreateStateAsync(
+        public override Task<ValueResult<AbstractGameState>> CreateStateAsync(
             User host, CancellationToken ct = default)
         {
             if (host is null)
-                return ValueResult<AbstractGameState>.FromError(
-                    "Failed to create game state.", $"Parameter {nameof(host)} was null.");
+                return Task.FromResult(ValueResult<AbstractGameState>.FromError(
+                    "Failed to create game state.", $"Parameter {nameof(host)} was null."));
 
             var gameState = new CardCounterGameState(host, stateLogger);
             gameState.Execute(() => gameState.SetJoinable(true));
             gameState.SubscribePlayerUnregistered(player => HandlePlayerLeft(player, gameState));
             logger.LogInformation("Created CardCounter state with host [{id}].", host.Id);
-            return gameState;
+            return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
         }
 
-        protected override async Task<Result> StartAsyncCore(
+        protected override Task<Result> StartAsyncCore(
             CardCounterGameState gameState, CancellationToken ct = default)
         {
             // The host counts as a participant when configured to play, so a host-as-player game
             // can start with no other players. A shared-display game still needs a joined player.
             int participantCount = gameState.Players.Length + (gameState.Settings.HostPlays ? 1 : 0);
             if (participantCount == 0)
-                return Result.FromError("At least one player must be in the game before starting.");
+                return Task.FromResult(Result.FromError("At least one player must be in the game before starting."));
 
             var context = new CardCounterGameContext(gameState, randomNumberService, logger);
             var fsm = new FiniteStateMachine<CardCounterGameContext, CardCounterCommand>(logger);
@@ -205,7 +205,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
                 InitializeGame(context);
             });
 
-            if (executeResult.IsFailure) return executeResult;
+            if (executeResult.IsFailure) return Task.FromResult(executeResult);
 
             // Transition into the initial FSM state.
             // In Active Operator Mode the buy-in step is skipped: every player starts with a
@@ -223,7 +223,7 @@ namespace KnockBox.CardCounter.Services.Logic.Games
             {
                 context.Fsm.TransitionTo(context, new BuyInState());
             }
-            return Result.Success;
+            return Task.FromResult(Result.Success);
         }
 
         // ── FSM core ─────────────────────────────────────────────────────────

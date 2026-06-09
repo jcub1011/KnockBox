@@ -129,6 +129,55 @@ namespace KnockBox.CardCounter.Tests.Unit.Projection
         }
 
         [TestMethod]
+        public void ProjectFor_RoundTripsThroughSourceGenContext_AsTheWasmClientDoes()
+        {
+            // The browser never runs reflection-based JSON for first-party views: GameRoot
+            // reads each projection through SourceGenProjectionDeserializer<CardCounterView>
+            // backed by CardCounterContractsJsonContext.Default.CardCounterView (the trim-safe
+            // path that actually ships). This test mirrors that exact server-write →
+            // client-read boundary so the GENERATED metadata is pinned — especially the
+            // polymorphic BaseCard discriminator — not just the reflection wire shape.
+            var state = BuildTwoPlayerState(out var aId, out var bId);
+
+            var view = _projector.ProjectFor(state, aId);
+
+            // Write side: identical to GameViewCoordinator.Serialize — reflection, enums as
+            // strings, concrete runtime type (the server is not trimmed).
+            var json = JsonSerializer.Serialize(view, view.GetType(), WireWriteOptions);
+
+            // Read side: the source-gen path the WASM client ships. SourceGenProjectionDeserializer
+            // is a one-line wrapper over exactly this call, so reading via the context directly
+            // exercises the same generated JsonTypeInfo without a Blazor-RCL test reference.
+            var roundTripped = JsonSerializer.Deserialize(
+                json, CardCounterContractsJsonContext.Default.CardCounterView);
+
+            Assert.IsNotNull(roundTripped);
+
+            // Polymorphic BaseCard discriminator resolves through the generated metadata.
+            var aliceReveal = roundTripped!.Players.Single(p => p.PlayerId == aId).PrivateReveal!;
+            Assert.IsInstanceOfType<NumberCard>(aliceReveal[0]);
+            Assert.AreEqual(7, ((NumberCard)aliceReveal[0]).Value);
+            Assert.IsInstanceOfType<OperatorCard>(aliceReveal[1]);
+            Assert.AreEqual(Operator.Multiply, ((OperatorCard)aliceReveal[1]).Op);
+
+            // The non-polymorphic ActionCard member resolves too.
+            Assert.AreEqual(
+                ActionType.Skim,
+                roundTripped.Players.Single(p => p.PlayerId == aId).ActionHand![0].Action);
+
+            // String-keyed shoe counts survive the generated dictionary converter.
+            Assert.AreEqual(5, roundTripped.ShoeCardCounts["Number"]);
+            Assert.AreEqual(3, roundTripped.ShoeCardCounts["Operator"]);
+
+            // The security boundary holds across the real client wire path: the recipient
+            // keeps her own hand; the opponent's is hidden behind a count.
+            Assert.IsNotNull(roundTripped.Players.Single(p => p.PlayerId == aId).ActionHand);
+            var bobSeenByA = roundTripped.Players.Single(p => p.PlayerId == bId);
+            Assert.IsNull(bobSeenByA.ActionHand, "Opponent's hand must not cross even the source-gen wire.");
+            Assert.AreEqual(3, bobSeenByA.ActionHandCount);
+        }
+
+        [TestMethod]
         public void ProjectFor_DoesNotExposeDeckCards_OnlyCounts()
         {
             var state = BuildTwoPlayerState(out var aId, out _);
