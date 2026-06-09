@@ -271,4 +271,12 @@ else
         var filename = $"DnD-Rolls-{Code}-{timestamp}.csv";
         await _fileExport.InvokeVoidAsync("downloadCsvFile", filename, base64);
     }
+
+    // Dispose the lazily-imported fileExport ES module before the base tears down
+    // the hub connection. Runs while the runtime is still live.
+    protected override async ValueTask DisposeAsyncCore()
+    {
+        if (_fileExport is not null)
+            await _fileExport.DisposeAsync();
+    }
 }

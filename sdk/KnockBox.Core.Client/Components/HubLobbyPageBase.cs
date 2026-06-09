@@ -174,10 +174,20 @@ public abstract class HubLobbyPageBase<TView> : DisposableComponent, IAsyncDispo
     /// <summary>Hook fired when <see cref="JoinAsync"/> is rejected by the server.</summary>
     protected virtual Task OnJoinFailedAsync(string error) => Task.CompletedTask;
 
+    /// <summary>
+    /// Async teardown hook for a derived page's own resources (e.g. an imported
+    /// <c>IJSObjectReference</c> module). Runs before the hub connection is disposed,
+    /// while the circuit/runtime is still live. Default does nothing.
+    /// </summary>
+    protected virtual ValueTask DisposeAsyncCore() => ValueTask.CompletedTask;
+
     public async ValueTask DisposeAsync()
     {
         _receiveViewRegistration?.Dispose();
         _receiveEventRegistration?.Dispose();
+
+        await DisposeAsyncCore();
+
         if (_hub is not null)
             await _hub.DisposeAsync();
 

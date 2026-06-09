@@ -85,10 +85,15 @@ else
         // uri == "room/dice-simulator/{guidA}-{guidB}"; navigate to the join URL,
         // carrying the chosen name so the game's hub connection presents it.
         var code = uri[(uri.LastIndexOf('/') + 1)..];
-        var target = $"/room/{Route}/{code}";
+        // Both @page routes map to THIS component, so an SPA nav would reuse the
+        // instance and the _started latch would skip LoadGameAsync, leaving the page
+        // stuck on "Loading game…". forceLoad gives a fresh instance with Code set;
+        // an ABSOLUTE URI keeps MainLayout's LocationChanging handler from calling
+        // ToBaseRelativePath on a relative URI (which throws). Mirrors Home.NavigateToWasm.
+        var target = $"{Nav.BaseUri}room/{Route}/{code}";
         if (!string.IsNullOrWhiteSpace(Name))
             target += $"?name={Uri.EscapeDataString(Name)}";
-        Nav.NavigateTo(target);
+        Nav.NavigateTo(target, forceLoad: true);
     }
 
     private async Task LoadGameAsync()
