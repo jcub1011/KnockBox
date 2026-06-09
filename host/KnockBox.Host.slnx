@@ -10,6 +10,8 @@
   <Project Path="../sdk/KnockBox.Plugins.AnalyzerTests/KnockBox.Plugins.AnalyzerTests.csproj" />
   <Project Path="../sdk/KnockBox.Tooling/KnockBox.Tooling.csproj" />
   <Project Path="KnockBox.AlphaChain/KnockBox.AlphaChain.csproj" />
+  <Project Path="KnockBox.AlphaChain.Contracts/KnockBox.AlphaChain.Contracts.csproj" />
+  <Project Path="KnockBox.AlphaChain.Client/KnockBox.AlphaChain.Client.csproj" />
   <Project Path="KnockBox.AlphaChainTests/KnockBox.AlphaChainTests.csproj" />
   <Project Path="KnockBox.Client/KnockBox.Client.csproj" />
   <Project Path="KnockBox.SpikePlugin.Client/KnockBox.SpikePlugin.Client.csproj" />

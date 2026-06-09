@@ -1,10 +1,8 @@
-using KnockBox.AlphaChain.Components;
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.Storage;
 using KnockBox.Core.Plugins;
-using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.AlphaChain
 {
@@ -24,10 +22,9 @@ namespace KnockBox.AlphaChain
             registration.AddScoped<AlphaChainStorage, AlphaChainStorage>();
         }
 
-        public RenderFragment? GetCustomHeader() => builder =>
-        {
-            builder.OpenComponent<AlphaChainHeader>(0);
-            builder.CloseComponent();
-        };
+        // The game UI now lives in the WASM client (KnockBox.AlphaChain.Client); the server
+        // registers only the engine. The hub resolves its IGameStateProjector /
+        // IGameCommandHandler / IServerTickHandler off the keyed AbstractGameEngine, and the
+        // WASM client renders the custom header — so there is no server-side GetCustomHeader.
     }
 }

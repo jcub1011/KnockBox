@@ -171,8 +171,19 @@ public abstract class HubLobbyPageBase<TView> : DisposableComponent, IAsyncDispo
     /// <summary>Hook fired after a new projection is applied to <see cref="View"/>.</summary>
     protected virtual Task OnViewReceivedAsync(TView? view) => Task.CompletedTask;
 
-    /// <summary>Hook fired when <see cref="JoinAsync"/> is rejected by the server.</summary>
-    protected virtual Task OnJoinFailedAsync(string error) => Task.CompletedTask;
+    /// <summary>
+    /// Hook fired when <see cref="JoinAsync"/> is rejected by the server — an unknown, stale, or
+    /// already-closed lobby code (e.g. an old/typo'd room URL, or a route under a game's WASM prefix
+    /// that isn't a real lobby). The default logs the reason and navigates home, so the page never
+    /// sits stuck on its loading state waiting for a projection that will never arrive; override to
+    /// surface a message first.
+    /// </summary>
+    protected virtual Task OnJoinFailedAsync(string error)
+    {
+        _logger?.LogInformation("Join rejected for [{Uri}]: {Error}. Navigating home.", LobbyUri, error);
+        Navigation.NavigateTo("/", forceLoad: true);
+        return Task.CompletedTask;
+    }
 
     /// <summary>
     /// Async teardown hook for a derived page's own resources (e.g. an imported

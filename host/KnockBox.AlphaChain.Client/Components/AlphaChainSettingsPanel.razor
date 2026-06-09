@@ -1,0 +1,233 @@
+@using System.Globalization
+
+@* Host editor for the match rules, re-expressed against the projected AlphaChainView. The host
+   edits a local settings draft; each change is sent as an `update-settings` command (the server is
+   the source of truth — non-host viewers re-render from the next projection). Non-host players see a
+   read-only view of the same settings. localStorage persistence is deferred (no WASM client storage
+   SDK yet). *@
+
+@{
+    var s = IsHost ? _draft : View.Settings;
+    var validation = s.Validate();
+}
+
+<section class="ac-settings @(IsHost ? "ac-settings-host" : "ac-settings-readonly")">
+    <h3 class="ac-settings-title">Match Rules</h3>
+
+    @if (IsHost)
+    {
+        <div class="ac-settings-grid">
+            <fieldset class="ac-settings-field ac-settings-field-full" title="@BanModeTip">
+                <legend>Ban Mode</legend>
+                <div class="ac-settings-radios">
+                    <label class="ac-settings-radio">
+                        <input type="radio" name="ac-ban-mode"
+                               checked="@(s.BanMode == BanLetterMode.Vowels)"
+                               @onchange="() => Set(_draft with { BanMode = BanLetterMode.Vowels })" />
+                        <span>Vowels Only</span>
+                    </label>
+                    <label class="ac-settings-radio">
+                        <input type="radio" name="ac-ban-mode"
+                               checked="@(s.BanMode == BanLetterMode.Consonants)"
+                               @onchange="() => Set(_draft with { BanMode = BanLetterMode.Consonants })" />
+                        <span>Consonants Only</span>
+                    </label>
+                    <label class="ac-settings-radio">
+                        <input type="radio" name="ac-ban-mode"
+                               checked="@(s.BanMode == BanLetterMode.All)"
+                               @onchange="() => Set(_draft with { BanMode = BanLetterMode.All })" />
+                        <span>All Bannable</span>
+                    </label>
+                </div>
+            </fieldset>
+
+            <label class="ac-settings-field ac-settings-field-full" title="@ShotClockTip">
+                <span>Shot Clock <strong>@s.ShotClockSeconds s</strong></span>
+                <input type="range"
+                       min="@AlphaChainSettings.MinShotClockSeconds"
+                       max="@AlphaChainSettings.MaxShotClockSeconds"
+                       step="1"
+                       value="@s.ShotClockSeconds"
+                       @oninput="e => ApplyInt(e, v => _draft with { ShotClockSeconds = v })" />
+            </label>
+
+            <label class="ac-settings-field" title="@EraIntervalTip">
+                <span>Era Interval (rounds)</span>
+                <input type="number"
+                       min="@AlphaChainSettings.MinEraInterval"
+                       max="@AlphaChainSettings.MaxEraInterval"
+                       value="@s.EraInterval"
+                       @oninput="e => ApplyInt(e, v => _draft with { EraInterval = v })" />
+            </label>
+
+            <label class="ac-settings-field" title="@EraCountTip">
+                <span>Era Count</span>
+                <input type="number"
+                       min="@AlphaChainSettings.MinEraCount"
+                       max="@AlphaChainSettings.MaxEraCount"
+                       value="@s.EraCount"
+                       @oninput="e => ApplyInt(e, v => _draft with { EraCount = v })" />
+            </label>
+
+            <label class="ac-settings-field" title="@IntermissionTip">
+                <span>Intermission Timer (s)</span>
+                <input type="number"
+                       min="@AlphaChainSettings.MinIntermissionSeconds"
+                       max="@AlphaChainSettings.MaxIntermissionSeconds"
+                       value="@s.IntermissionCardSelectSeconds"
+                       @oninput="e => ApplyInt(e, v => _draft with { IntermissionCardSelectSeconds = v })" />
+            </label>
+
+            <label class="ac-settings-field" title="@SniperBanTip">
+                <span>Sniper Ban Timer (s)</span>
+                <input type="number"
+                       min="@AlphaChainSettings.MinSniperBanSeconds"
+                       max="@AlphaChainSettings.MaxSniperBanSeconds"
+                       value="@s.SniperBanSeconds"
+                       @oninput="e => ApplyInt(e, v => _draft with { SniperBanSeconds = v })" />
+            </label>
+
+            <label class="ac-settings-field" title="@CountdownTip">
+                <span>Get Ready Timer (s)</span>
+                <input type="number"
+                       min="@AlphaChainSettings.MinCountdownSeconds"
+                       max="@AlphaChainSettings.MaxCountdownSeconds"
+                       value="@s.PreRoundCountdownSeconds"
+                       @oninput="e => ApplyInt(e, v => _draft with { PreRoundCountdownSeconds = v })" />
+            </label>
+
+            <label class="ac-settings-field" title="@ModifiersTip">
+                <span>Modifiers / Era</span>
+                <input type="number"
+                       min="@AlphaChainSettings.MinCardsDealtPerEra"
+                       max="@AlphaChainSettings.MaxCardsDealtPerEra"
+                       value="@s.ModifiersDealtPerEra"
+                       @oninput="e => ApplyInt(e, v => _draft with { ModifiersDealtPerEra = v })" />
+            </label>
+
+            <label class="ac-settings-field ac-settings-field-full" title="@EngineAnimTip">
+                <span>Engine Animation <strong>@s.EngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture) s</strong></span>
+                <input type="range"
+                       min="@AlphaChainSettings.MinEngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture)"
+                       max="@AlphaChainSettings.MaxEngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture)"
+                       step="0.5"
+                       value="@s.EngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture)"
+                       @oninput="OnEngineAnimationChanged" />
+            </label>
+
+            <label class="ac-settings-field ac-settings-field-row" title="@SurvivalTip">
+                <span>Survival Mode</span>
+                <input type="checkbox"
+                       checked="@s.SurvivalMode"
+                       @onchange="e => Set(_draft with { SurvivalMode = e.Value is true })" />
+            </label>
+
+            <label class="ac-settings-field ac-settings-field-row" title="@TutorialsTip">
+                <span>Enable Tutorials</span>
+                <input type="checkbox"
+                       checked="@s.EnableTutorials"
+                       @onchange="e => Set(_draft with { EnableTutorials = e.Value is true })" />
+            </label>
+        </div>
+
+        @if (!validation.IsValid)
+        {
+            <ul class="ac-settings-errors">
+                @foreach (var violation in validation.Violations)
+                {
+                    <li>@violation</li>
+                }
+            </ul>
+        }
+
+        <div class="ac-settings-actions">
+            <button type="button" class="ac-settings-reset" title="@ResetTip" @onclick="ResetToDefaults">
+                Reset Defaults
+            </button>
+        </div>
+    }
+    else
+    {
+        @* Non-host read-only view so joiners can see what they're signing up for. *@
+        <dl class="ac-settings-readout">
+            <div title="@BanModeTip"><dt>Ban Mode</dt><dd>@BanModeLabel(s.BanMode)</dd></div>
+            <div title="@ShotClockTip"><dt>Shot Clock</dt><dd>@s.ShotClockSeconds s</dd></div>
+            <div title="@EraIntervalTip"><dt>Era Interval</dt><dd>@s.EraInterval rounds</dd></div>
+            <div title="@EraCountTip"><dt>Era Count</dt><dd>@s.EraCount</dd></div>
+            <div title="@IntermissionTip"><dt>Intermission Timer</dt><dd>@s.IntermissionCardSelectSeconds s</dd></div>
+            <div title="@SniperBanTip"><dt>Sniper Ban Timer</dt><dd>@s.SniperBanSeconds s</dd></div>
+            <div title="@CountdownTip"><dt>Get Ready Timer</dt><dd>@s.PreRoundCountdownSeconds s</dd></div>
+            <div title="@ModifiersTip"><dt>Modifiers / Era</dt><dd>@s.ModifiersDealtPerEra</dd></div>
+            <div title="@EngineAnimTip"><dt>Engine Animation</dt><dd>@s.EngineAnimationSeconds.ToString("0.#", CultureInfo.InvariantCulture) s</dd></div>
+            <div title="@SurvivalTip"><dt>Survival Mode</dt><dd>@(s.SurvivalMode ? "On" : "Off")</dd></div>
+            <div title="@TutorialsTip"><dt>Enable Tutorials</dt><dd>@(s.EnableTutorials ? "On" : "Off")</dd></div>
+        </dl>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public AlphaChainView View { get; set; } = default!;
+
+    /// <summary>Sends a hub command (name + optional JSON payload).</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task> Submit { get; set; } = default!;
+
+    /// <summary>True for the host (editable controls); false renders read-only.</summary>
+    private bool IsHost => View.RecipientIsHost;
+
+    // Local editable copy of the host's settings. Seeded from the authoritative projection until
+    // the host makes their first edit, after which local edits drive it (the host is the only editor).
+    private AlphaChainSettings _draft = new();
+    private bool _userHasEdited;
+
+    // Per-setting help text. Shared by the editable host controls and the read-only joiner view.
+    private const string BanModeTip = "Which letters can become the per-round Banned Letter. A word containing the Banned Letter still keeps the chain alive but scores 0 for that turn.";
+    private const string ShotClockTip = "Seconds each player has to submit a valid word on their turn. GDD baseline is 10–15 s; go lower for frantic matches or higher for relaxed ones.";
+    private const string EraIntervalTip = "Rounds per Era. At the end of each Era the game pauses for an Intermission: deal cards, gain a Modifier slot, reorder your engine, and last place picks the next Banned Letter.";
+    private const string EraCountTip = "How many Eras are played before the match ends. Highest cumulative score at the end of the final Era wins.";
+    private const string IntermissionTip = "Seconds players have during an Intermission to draft and rearrange their Engine Bay modifier cards.";
+    private const string SniperBanTip = "Seconds the last-place player has to pick the next Banned Letter. If they don't choose in time, a legal letter is banned at random.";
+    private const string CountdownTip = "Seconds of the \"Get Ready\" countdown shown before a round begins — at the start of the match and again after each Banned Letter is chosen — so players have a beat to prepare before the shot clock starts.";
+    private const string ModifiersTip = "Modifier cards dealt to each player every Intermission. Modifiers are persistent engine cards applied left-to-right in bay order (place additives before multipliers to multiply a bigger base) — the only card tier in the game.";
+    private const string SurvivalTip = "When on, a player who misses the shot clock is eliminated for good instead of being penalized and staying in.";
+    private const string TutorialsTip = "When on, three short non-interactive tutorials play at their cue points (word chain at the start, the scoring engine when the first era ends, and the tax before the first banned letter is chosen). You can skip each one as host.";
+    private const string EngineAnimTip = "Total length of the score-replay animation that runs each accepted word through the Engine Bay so everyone sees how the score is built. Constant regardless of how many cards you hold — bigger engines just animate faster.";
+    private const string ResetTip = "Reset every match rule back to its default value.";
+
+    private static string BanModeLabel(BanLetterMode mode) => mode switch
+    {
+        BanLetterMode.Vowels => "Vowels Only",
+        BanLetterMode.Consonants => "Consonants Only",
+        _ => "All Bannable"
+    };
+
+    protected override void OnParametersSet()
+    {
+        // Seed the draft from the authoritative settings until the host's first edit; after that
+        // local edits own it, so a re-projection (e.g. someone joining) can't clobber an in-flight edit.
+        if (IsHost && !_userHasEdited)
+            _draft = View.Settings;
+    }
+
+    private Task Set(AlphaChainSettings updated)
+    {
+        _userHasEdited = true;
+        _draft = updated;
+        return Submit(AlphaChainCommands.UpdateSettings,
+            JsonSerializer.Serialize(_draft, AlphaChainContractsJsonContext.Default.AlphaChainSettings));
+    }
+
+    // Reset every match rule to its default by swapping in a fresh settings record.
+    private Task ResetToDefaults() => Set(new AlphaChainSettings());
+
+    // Raw value stored as-typed (no clamping) so Validate() can flag out-of-range input and gate the
+    // start buttons; an unparseable value is ignored.
+    private Task ApplyInt(ChangeEventArgs e, Func<int, AlphaChainSettings> build)
+        => int.TryParse(e.Value?.ToString(), out var value) ? Set(build(value)) : Task.CompletedTask;
+
+    // EngineAnimationSeconds is a double (range slider); parsed invariant so the browser's
+    // dot-decimal value is read correctly regardless of host locale.
+    private Task OnEngineAnimationChanged(ChangeEventArgs e)
+        => double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+            ? Set(_draft with { EngineAnimationSeconds = value })
+            : Task.CompletedTask;
+}

@@ -1,0 +1,51 @@
+@* Prominent, transient overlay announcing the automated engine effects that just fired — so a
+   targeted player understands what hit them, which card did it, and why. The parent @keys this on
+   the engine-notice sequence so the pop+fade animation replays exactly once per fire. *@
+
+@if (Notices.Count > 0)
+{
+    <div class="ac-rx-overlay" aria-live="polite">
+        @foreach (var n in Notices)
+        {
+            var youHit = n.TargetUserId == CurrentUserId && n.Class == EngineEffectClass.Offensive && !n.Negated;
+            var tone = n.Negated
+                ? "ac-rx-negate"
+                : n.Class switch
+                {
+                    EngineEffectClass.Offensive => "ac-rx-attack",
+                    EngineEffectClass.Special => "ac-rx-special",
+                    _ => "ac-rx-defend"
+                };
+            <div class="ac-rx-card @tone @(youHit ? "ac-rx-you" : "")">
+                <span class="ac-rx-icon"><CardIcon Card="@n.CardId" /></span>
+                <div class="ac-rx-body">
+                    <span class="ac-rx-name">@n.CardName@(n.Negated ? " — reflected!" : "")</span>
+                    <span class="ac-rx-head">@Headline(n)</span>
+                    <span class="ac-rx-reason">@n.Reason</span>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>The engine effects to announce. Parent passes <c>View.LatestEngineNotices</c>.</summary>
+    [Parameter] public IReadOnlyList<EngineEffectEvent> Notices { get; set; } = [];
+
+    /// <summary>The local player's id, so the overlay can emphasize hits against them.</summary>
+    [Parameter] public Guid? CurrentUserId { get; set; }
+
+    private string Headline(EngineEffectEvent n)
+    {
+        bool holderIsYou = n.HolderUserId == CurrentUserId;
+        bool targetIsYou = n.TargetUserId == CurrentUserId;
+
+        if (n.TargetUserId is null)
+            return holderIsYou ? "Your engine fired" : $"{n.HolderName}'s engine fired";
+        if (targetIsYou)
+            return n.Negated ? $"Your Mirror reflected {n.HolderName}'s attack" : $"Hit by {n.HolderName}";
+        if (holderIsYou)
+            return $"You hit {n.TargetName}";
+        return $"{n.HolderName} → {n.TargetName}";
+    }
+}

@@ -4,10 +4,14 @@ A step-by-step, footgun-aware recipe for migrating a game plugin from the Blazor
 model to the WASM tri-split. **DiceSimulator is the reference implementation** — when in
 doubt, copy what `host/KnockBox.DiceSimulator{,.Contracts,.Client}` does.
 
-> **Status:** DiceSimulator (game #1) and CardCounter (game #2) are migrated and the shared
-> infrastructure is proven. Game #2 added the **server-owned tick loop** (timed games) and a
-> **WASM `CountdownClock`** — both now reusable. Most of the footguns below are solved once in
-> the SDK/platform; this guide tells you which steps are per-game and which are handled for you.
+> **Status:** DiceSimulator (game #1), CardCounter (game #2), and AlphaChain (game #3) are
+> migrated and the shared infrastructure is proven. Game #2 added the **server-owned tick loop**
+> (timed games) and a **WASM `CountdownClock`** — both now reusable. Game #3 proved the pattern
+> at scale: a full FSM, ~40 modifier cards **flattened by the projector into wire DTOs** (the
+> card capability interfaces stay server-side), and **client-owned JS-interop word input** — and
+> surfaced the WASM blur→sync-`invokeMethodAsync` heap-lock footgun (see step 4). Most of the
+> footguns below are solved once in the SDK/platform; this guide tells you which steps are per-game
+> and which are handled for you.
 
 Read [`01-target-architecture.md`](./01-target-architecture.md) and
 [`03-work-breakdown.md`](./03-work-breakdown.md) first. The migration order (easy → hard)
@@ -210,6 +214,18 @@ The old scoped `.razor.css` does **not** ship: `StaticWebAssetsEnabled=false` pr
 > _mod ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/KnockBox.{Game}/js/file.js");
 > await _mod.InvokeVoidAsync("fn", args);
 > ```
+
+> **Footgun — a DOM event that calls back into .NET *during a Blazor render* throws
+> `Assertion failed - heap is currently locked` on WASM.** A JS event handler that synchronously
+> calls `dotNetRef.invokeMethodAsync(...)` is fine on the Blazor Server circuit (the call is a
+> remote async hop) but reenters the WASM runtime while its heap is locked if the event itself was
+> *fired by Blazor's own render edit*. AlphaChain hit this with a client-owned `<input>`: when the
+> turn changes, Blazor sets `disabled` on the focused input → the browser fires `blur` mid-render →
+> the blur handler's `invokeMethodAsync("OnDraftCommitted", …)` asserts. **Fix:** defer the .NET
+> call out of the synchronous event callback — capture the value, then
+> `setTimeout(() => notify(...), 0)`. It's build/test-clean and only manifests at runtime, so it's
+> a `dotnet run` catch. (User-gesture events like Enter, and already-`setTimeout`-deferred timers,
+> are safe — only events Blazor itself triggers mid-render bite.)
 
 ---
 

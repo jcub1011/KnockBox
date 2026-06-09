@@ -1,0 +1,3756 @@
+/*
+  De-scoped Alpha Chain UI stylesheet for the WASM tri-split. The 15 former scoped
+  .razor.css bundles (which do NOT ship with StaticWebAssetsEnabled=false) are merged
+  here. Selectors are scoped under .ac-root (the wrapper GameRoot renders) so nothing
+  leaks into the host shell; Blazor ::deep tokens become plain descendant combinators.
+  Header rules (.ac-header-*) render as a sibling BEFORE .ac-root, so they are left
+  unscoped. @keyframes / @media / @font-face wrappers are not prefixed (their inner
+  rules are). alpha-chain-theme.css and cards.css stay plain and are linked separately.
+*/
+
+/* The runtime UI wrapper (GameRoot's <div class="ac-root">) is a child of MainLayout's
+   scrolling <article>, below the fixed header. Grow to fill the remaining space. */
+.ac-root {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* ═══════════════════ Pages/AlphaChainLobby.razor.css ═══════════════════ */
+.ac-root .content {
+    padding: 1rem;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-root .ac-lobby {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: 1rem 0 2rem;
+}
+
+.ac-root .ac-lobby-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    text-align: center;
+}
+
+.ac-root .ac-lobby-brand {
+    font-family: var(--font-display, system-ui);
+    font-size: clamp(2rem, 9vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    background: linear-gradient(90deg, var(--ac-cyan, #00e5ff), var(--ac-magenta, #ff2e8b));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 18px rgba(0, 229, 255, 0.3));
+}
+
+.ac-root .ac-lobby-tagline {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-lobby-card {
+    padding: 1.25rem;
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+    border-radius: 1rem;
+    background: var(--ac-panel, rgba(18, 24, 44, 0.72));
+    backdrop-filter: blur(6px);
+}
+
+.ac-root .ac-lobby-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.85rem;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-lobby-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.6rem;
+    height: 1.6rem;
+    padding: 0 0.4rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ac-cyan) 18%, transparent);
+    color: var(--ac-cyan, #00e5ff);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.85rem;
+    font-weight: 800;
+}
+
+.ac-root .ac-lobby-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.ac-root .ac-player-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.45rem 0.8rem;
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ac-ink, #eaf2ff);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.ac-root .ac-player-chip:hover {
+    border-color: var(--ac-danger, #ff3b5c);
+    background: color-mix(in srgb, var(--ac-danger) 12%, transparent);
+}
+
+.ac-root .ac-player-host {
+    border-color: color-mix(in srgb, var(--ac-cyan) 55%, transparent);
+}
+
+.ac-root .ac-player-badge {
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    background: var(--ac-cyan, #00e5ff);
+    color: #04121a;
+    font-size: 0.6rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.ac-root .ac-lobby-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.ac-root .ac-start-btn {
+    flex: 1 1 12rem;
+    padding: 0.75rem 1.25rem;
+    border: 3px solid #000;
+    border-radius: 0.7rem;
+    font-family: var(--font-display, system-ui);
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+    transition: transform 0.08s, box-shadow 0.08s, filter 0.15s;
+}
+
+.ac-root .ac-start-btn:hover:not(:disabled) {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 #000;
+}
+
+.ac-root .ac-start-btn:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #000;
+}
+
+.ac-root .ac-start-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    filter: grayscale(40%);
+}
+
+.ac-root .ac-start-primary {
+    background: var(--ac-cyan, #00e5ff);
+    color: #04121a;
+}
+
+.ac-root .ac-start-secondary {
+    background: var(--ac-magenta, #ff2e8b);
+    color: #2a0716;
+}
+
+.ac-root .ac-lobby-note {
+    margin: 0.5rem 0 0;
+    font-size: 0.85rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-lobby-note-warn {
+    color: var(--ac-danger, #ff3b5c);
+    font-weight: 600;
+}
+
+@media (max-width: 30rem) {
+    .ac-root .ac-start-btn {
+        flex-basis: 100%;
+    }
+}
+
+/* ═══════════════════ Pages/AlphaChainGame.razor.css ═══════════════════ */
+/* Alpha Chain — in-game HUD (Neon-Noir Esports). Tokens come from alpha-chain-theme.css. */
+
+.ac-root .ac-game {
+    color: var(--ac-ink);
+    font-family: var(--font-primary);
+    padding: 1rem clamp(0.5rem, 2vw, 1.5rem) 2rem;
+    max-width: 1180px;
+    margin: 0 auto;
+}
+
+/* ── Layout: main stage + sticky leaderboard rail ─────────────────────── */
+.ac-root .ac-round {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 20rem;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.ac-root .ac-stage {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.ac-root .ac-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    position: sticky;
+    top: 0.5rem;
+}
+
+/* ── Command rail ─────────────────────────────────────────────────────── */
+.ac-root .ac-command {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: var(--ac-panel);
+    border: 1px solid var(--ac-border);
+    border-radius: 1rem;
+    backdrop-filter: blur(6px);
+}
+
+.ac-root .ac-cmd-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ac-root .ac-cmd-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ac-ink-soft);
+}
+
+.ac-root .ac-cmd-letter {
+    font-family: var(--font-mono);
+    font-size: clamp(2.2rem, 7vw, 3.2rem);
+    font-weight: 800;
+    line-height: 1;
+}
+
+.ac-root .ac-cmd-start {
+    color: var(--ac-cyan);
+    text-shadow: var(--ac-glow-cyan);
+}
+
+.ac-root .ac-cmd-banned .ac-cmd-letter {
+    color: var(--ac-danger);
+    text-shadow: var(--ac-glow-danger);
+    position: relative;
+}
+
+/* Last-place exemption: the era banned letter still shows so the player knows what it is, but it is
+   dimmed and overlaid with an X — they sit in last place, so it can't tax them (until someone else
+   drops to last). */
+.ac-root .ac-cmd-banned .ac-cmd-exempt {
+    opacity: 0.5;
+    color: var(--ac-muted, #8a94a6);
+    text-shadow: none;
+}
+
+.ac-root .ac-cmd-banned .ac-cmd-exempt::after {
+    content: "✕";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25em;
+    font-weight: 900;
+    color: var(--ac-go, #36d399);
+    text-shadow: 0 0 10px color-mix(in srgb, var(--ac-go, #36d399) 60%, transparent);
+    pointer-events: none;
+}
+
+/* Banned + Censor letters sit side by side. */
+.ac-root .ac-cmd-letters {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+}
+
+/* The extra Censor letter: smaller, violet (the Censor card's accent) so it reads as a
+   separate, temporary ban next to the era's banned letter. */
+.ac-root .ac-cmd-banned .ac-cmd-censor {
+    font-size: clamp(1.4rem, 4.5vw, 2.1rem);
+    color: var(--ac-violet, #b97bff);
+    text-shadow: 0 0 12px color-mix(in srgb, var(--ac-violet, #b97bff) 55%, transparent);
+    align-self: center;
+}
+
+/* A Riposte-immune player still sees the letter, struck through to show it doesn't apply. */
+.ac-root .ac-cmd-banned .ac-cmd-censor-exempt {
+    opacity: 0.4;
+    text-decoration: line-through;
+    text-shadow: none;
+}
+
+/* The personal Jinx letter: smaller, rose (the offensive-reaction accent), only the cursed
+   player sees their own. */
+.ac-root .ac-cmd-banned .ac-cmd-jinx {
+    font-size: clamp(1.4rem, 4.5vw, 2.1rem);
+    color: var(--ac-rose, #ff5d73);
+    text-shadow: 0 0 12px color-mix(in srgb, var(--ac-rose, #ff5d73) 55%, transparent);
+    align-self: center;
+}
+
+/* A personal banned letter rolled by the player's own card (The Roulette Wheel / The Toll Booth):
+   smaller, amber, only the owner sees their own — distinct from the era ban (red) and a forced
+   hijack ban (rose). */
+.ac-root .ac-cmd-banned .ac-cmd-cardban {
+    font-size: clamp(1.4rem, 4.5vw, 2.1rem);
+    color: var(--ac-amber, #f5a623);
+    text-shadow: 0 0 12px color-mix(in srgb, var(--ac-amber, #f5a623) 55%, transparent);
+    align-self: center;
+}
+
+/* ── Shot-clock ring ──────────────────────────────────────────────────── */
+.ac-root .ac-cmd-clock {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ac-root .ac-ring {
+    position: relative;
+    width: clamp(72px, 18vw, 96px);
+    height: clamp(72px, 18vw, 96px);
+}
+
+.ac-root .ac-ring-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.ac-root .ac-ring-track {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.08);
+    stroke-width: 8;
+}
+
+.ac-root .ac-ring-fill {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 276.46;
+    transition: stroke-dashoffset 0.2s linear, stroke 0.4s ease;
+}
+
+.ac-root .ac-ring-num {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 1.6rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.ac-root .ac-ring-go .ac-ring-fill { stroke: var(--ac-cyan); }
+.ac-root .ac-ring-go .ac-ring-num { color: var(--ac-cyan); }
+.ac-root .ac-ring-warn .ac-ring-fill { stroke: var(--ac-amber); }
+.ac-root .ac-ring-warn .ac-ring-num { color: var(--ac-amber); }
+.ac-root .ac-ring-danger .ac-ring-fill { stroke: var(--ac-danger); }
+.ac-root .ac-ring-danger .ac-ring-num { color: var(--ac-danger); }
+.ac-root .ac-ring-danger { animation: ac-pulse 0.9s ease-in-out infinite; }
+
+/* ── Turn spotlight ───────────────────────────────────────────────────── */
+.ac-root .ac-turnflag {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 1rem;
+    border-radius: 0.7rem;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
+    border-left: 3px solid var(--accent);
+}
+
+.ac-root .ac-turnflag-text {
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.ac-root .ac-turnflag-now {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ac-ink-soft);
+}
+
+.ac-root .ac-turnflag-name {
+    font-weight: 800;
+    color: var(--accent);
+}
+
+.ac-root .ac-turnflag-meta {
+    margin-left: auto;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--ac-ink-soft);
+    font-variant-numeric: tabular-nums;
+}
+
+.ac-root .ac-turnflag-me {
+    animation: ac-pulse 1.6s ease-in-out infinite;
+}
+
+/* ── Word entry ───────────────────────────────────────────────────────── */
+.ac-root .ac-entry {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+    background: var(--ac-panel-solid);
+    border: 2px solid var(--ac-border-strong);
+    border-radius: 0.8rem;
+    padding: 0.4rem;
+    transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+
+.ac-root .ac-entry-live {
+    border-color: var(--ac-cyan);
+    box-shadow: var(--ac-glow-cyan);
+}
+
+.ac-root .ac-entry-wait {
+    opacity: 0.55;
+}
+
+.ac-root .ac-entry-prefix {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3rem;
+    padding: 0 0.6rem;
+    border-radius: 0.55rem;
+    background: color-mix(in srgb, var(--ac-cyan) 18%, transparent);
+    color: var(--ac-cyan);
+    font-family: var(--font-mono);
+    font-size: 1.8rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.ac-root .ac-entry-prefix-free {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--ac-ink-soft);
+}
+
+.ac-root .ac-word-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    color: var(--ac-ink);
+    font-family: var(--font-mono);
+    font-size: clamp(1.2rem, 4vw, 1.6rem);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.4rem 0.5rem;
+    outline: none;
+}
+
+.ac-root .ac-word-input::placeholder {
+    color: var(--ac-ink-faint);
+    font-family: var(--font-primary);
+    font-weight: 500;
+    letter-spacing: normal;
+}
+
+.ac-root .ac-word-input:disabled {
+    cursor: not-allowed;
+}
+
+/* Feedback Loop: the field is locked (readOnly) for a few seconds at turn start. */
+.ac-root .ac-word-input-silenced {
+    cursor: not-allowed;
+    color: var(--ac-danger);
+}
+
+.ac-root .ac-word-input-silenced::placeholder {
+    color: var(--ac-danger);
+    opacity: 0.85;
+}
+
+/* The Blindfold: the owner's own typed text is hidden while they type — a self-inflicted UI
+   penalty traded for a multiplier. The input still works; only the rendered glyphs are hidden
+   (the caret stays visible so the player knows the field is focused). */
+.ac-root .ac-word-input-blind {
+    color: transparent;
+    text-shadow: none;
+    caret-color: var(--ac-ink);
+}
+
+.ac-root .ac-word-input-blind::selection {
+    background: transparent;
+}
+
+.ac-root .ac-submit-btn {
+    flex: 0 0 auto;
+    padding: 0 1.4rem;
+    border: 3px solid #000;
+    border-radius: 0.6rem;
+    background: var(--ac-cyan);
+    color: #04121a;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    box-shadow: var(--ac-shadow-sm);
+    transition: transform 0.08s, box-shadow 0.08s, filter 0.15s;
+}
+
+.ac-root .ac-submit-btn:hover:not(:disabled) {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 #000;
+}
+
+.ac-root .ac-submit-btn:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #000;
+}
+
+.ac-root .ac-submit-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    filter: grayscale(40%);
+}
+
+/* ── Game-over actions: the host's Return to Lobby button ──────────────── */
+.ac-root .ac-results-actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.25rem;
+}
+
+/* Matches the in-game submit button (cyan, hard border + shadow, press nudge), with the
+   standalone vertical padding it needs outside the submit input row. */
+.ac-root .ac-results-btn {
+    padding: 0.7rem 1.8rem;
+    border: 3px solid #000;
+    border-radius: 0.6rem;
+    background: var(--ac-cyan);
+    color: #04121a;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    box-shadow: var(--ac-shadow-sm);
+    transition: transform 0.08s, box-shadow 0.08s, filter 0.15s;
+}
+
+.ac-root .ac-results-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 #000;
+}
+
+.ac-root .ac-results-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #000;
+}
+
+/* ── Entry status: pending action + feedback ──────────────────────────── */
+.ac-root .ac-entry-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 1.5rem;
+}
+
+.ac-root .ac-feedback {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.ac-root .ac-feedback-bad { color: var(--ac-danger); }
+
+/* ── Recent words ─────────────────────────────────────────────────────── */
+/* Newest → oldest, scrolls horizontally. The newest entry is accented so the eye lands on it;
+   the player rarely needs more than the last word or two, so older entries just scroll away. */
+.ac-root .ac-recent {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--ac-cyan) 45%, transparent) transparent;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--ac-border);
+    border-radius: 0.7rem;
+}
+
+.ac-root .ac-recent::-webkit-scrollbar {
+    height: 0.4rem;
+}
+
+.ac-root .ac-recent::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ac-cyan) 45%, transparent);
+}
+
+.ac-root .ac-recent-item {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 6rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--ac-border);
+}
+
+/* The newest word: cyan accent so it reads as the live link to chain from. */
+.ac-root .ac-recent-newest {
+    border-color: var(--ac-cyan);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-cyan) 45%, transparent);
+}
+
+.ac-root .ac-recent-word {
+    font-family: var(--font-mono);
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ac-ink);
+    white-space: nowrap;
+}
+
+.ac-root .ac-recent-newest .ac-recent-word {
+    color: var(--ac-cyan);
+}
+
+.ac-root .ac-recent-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+}
+
+.ac-root .ac-recent-by {
+    flex: 1;
+    min-width: 0;
+    max-width: 7rem;
+    font-size: 0.7rem;
+    color: var(--ac-ink-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ac-root .ac-recent-score {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--ac-mint);
+}
+
+.ac-root .ac-recent-taxed .ac-recent-word {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+/* ── Cards ────────────────────────────────────────────────────────────── */
+/* The own bay is a single full-width horizontal row (it scrolls internally). */
+.ac-root .ac-cards {
+    display: block;
+}
+
+/* Opponents stack vertically; each opponent bay is itself a full-width horizontal scrolling
+   row (same EngineBay component as the player's). */
+.ac-root .ac-opponent-bays {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    opacity: 0.85;
+}
+
+/* ── Panels (leaderboard + feed) ──────────────────────────────────────── */
+.ac-root .ac-panel {
+    background: var(--ac-panel);
+    border: 1px solid var(--ac-border);
+    border-radius: 1rem;
+    padding: 0.85rem;
+    backdrop-filter: blur(6px);
+}
+
+.ac-root .ac-panel-title {
+    margin: 0 0 0.6rem;
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ac-ink-soft);
+}
+
+.ac-root .ac-leaderboard {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.ac-root .ac-lb-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: 0.55rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 3px solid var(--accent);
+    transition: background 0.2s;
+}
+
+.ac-root .ac-lb-active {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* Your own row stands out so you can find yourself at a glance during the word-entry phase:
+   a brighter accent wash, an inset ring, and a thicker accent edge — on top of the name colour. */
+.ac-root .ac-lb-me {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent);
+    border-left-width: 5px;
+}
+
+.ac-root .ac-lb-me .ac-lb-name { color: var(--accent); font-weight: 800; }
+
+/* "you" pill on your own leaderboard row. */
+.ac-root .ac-tag-you {
+    background: var(--accent);
+    color: #04121a;
+    border-color: var(--accent);
+}
+
+.ac-root .ac-lb-rank {
+    flex: 0 0 1.2rem;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: var(--ac-ink-faint);
+    text-align: center;
+}
+
+.ac-root .ac-lb-name {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ac-root .ac-lb-arrow {
+    font-size: 0.7rem;
+    font-weight: 800;
+}
+
+.ac-root .ac-lb-up { color: var(--ac-mint); }
+.ac-root .ac-lb-down { color: var(--ac-danger); }
+
+.ac-root .ac-lb-score {
+    font-family: var(--font-mono);
+    font-size: 1.05rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--ac-ink);
+}
+
+.ac-root .ac-score-pop {
+    position: absolute;
+    right: 0.6rem;
+    top: 0.1rem;
+    font-family: var(--font-mono);
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: var(--ac-mint);
+    text-shadow: 0 0 10px rgba(20, 241, 149, 0.6);
+    pointer-events: none;
+    animation: ac-float-up 1.1s ease-out forwards;
+}
+
+.ac-root .ac-eliminated {
+    opacity: 0.5;
+}
+
+.ac-root .ac-eliminated .ac-lb-name {
+    text-decoration: line-through;
+}
+
+.ac-root .ac-tag {
+    padding: 0.05rem 0.4rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-radius: 0.35rem;
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--ac-ink-soft);
+}
+
+.ac-root .ac-tag-tax {
+    background: color-mix(in srgb, var(--ac-tax) 25%, transparent);
+    color: var(--ac-tax);
+}
+
+/* ── Mobile leaderboard strip ─────────────────────────────────────────────
+   Hidden on desktop (the rail shows the vertical board). On mobile it sits inline above the
+   word box as a single horizontal scroller that auto-centres on the local player (see centerMe
+   in alpha-chain-input.js). Full names, no truncation — long names just widen their item. */
+.ac-root .ac-lbm {
+    display: none;
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+    overflow-x: auto;
+    padding: 0.1rem 0.1rem 0.35rem;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--ac-cyan) 45%, transparent) transparent;
+}
+
+.ac-root .ac-lbm::-webkit-scrollbar {
+    height: 0.35rem;
+}
+
+.ac-root .ac-lbm::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ac-cyan) 45%, transparent);
+}
+
+.ac-root .ac-lbm-item {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 0.55rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 3px solid var(--accent);
+}
+
+.ac-root .ac-lbm-rank {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: var(--ac-ink-faint);
+}
+
+.ac-root .ac-lbm-name {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.ac-root .ac-lbm-score {
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--ac-ink);
+}
+
+/* The local player's item: brighter accent wash + ring so it's obvious where you are. */
+.ac-root .ac-lbm-me {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.ac-root .ac-lbm-me .ac-lbm-name {
+    color: var(--accent);
+}
+
+/* ── Intermission shell ───────────────────────────────────────────────── */
+.ac-root .ac-intermission {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 2rem;
+}
+
+.ac-root .ac-im-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.ac-root .ac-im-era {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ac-ink);
+}
+
+.ac-root .ac-im-arrow {
+    color: var(--ac-magenta);
+    margin: 0 0.2rem;
+}
+
+.ac-root .ac-im-timer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    width: min(20rem, 80%);
+}
+
+.ac-root .ac-im-clock {
+    font-family: var(--font-mono);
+    font-size: 2rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--ac-cyan);
+}
+
+.ac-root .ac-im-clock-unit {
+    font-size: 1rem;
+    color: var(--ac-ink-soft);
+    margin-left: 0.1rem;
+}
+
+.ac-root .ac-im-bar {
+    width: 100%;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.ac-root .ac-im-bar-fill {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--ac-magenta), var(--ac-cyan));
+    border-radius: 999px;
+    transition: width 0.3s linear;
+}
+
+.ac-root .ac-clock-urgent {
+    color: var(--ac-danger);
+    animation: ac-pulse 0.9s ease-in-out infinite;
+}
+
+.ac-root .ac-im-spectate {
+    margin: 0;
+    color: var(--ac-ink-soft);
+    text-align: center;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+@media (max-width: 48rem) {
+    .ac-root .ac-round {
+        grid-template-columns: 1fr;
+    }
+
+    /* The vertical rail leaderboard is replaced on mobile by the inline horizontal strip
+       (.ac-lbm) that sits above the word box. */
+    .ac-root .ac-rail {
+        display: none;
+    }
+
+    .ac-root .ac-command {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+    }
+
+    .ac-root .ac-turnflag-meta {
+        font-size: 0.66rem;
+    }
+
+    /* Reveal the inline leaderboard strip as a single horizontal scroller. */
+    .ac-root .ac-lbm {
+        display: flex;
+    }
+}
+
+@media (max-width: 30rem) {
+    .ac-root .ac-command {
+        gap: 0.5rem;
+        padding: 0.75rem;
+    }
+
+    .ac-root .ac-cmd-letter {
+        font-size: 2rem;
+    }
+
+    .ac-root .ac-entry-prefix {
+        min-width: 2.4rem;
+        font-size: 1.4rem;
+    }
+
+    .ac-root .ac-submit-btn {
+        padding: 0 1rem;
+    }
+}
+
+/* ═══════════════════ Components/AlphaChainHeader.razor.css ═══════════════════ */
+.ac-header-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    /* The game UI renders inside MainLayout's scrolling <article>; a flex header collapses
+       without this when the body content is tall. */
+    flex-shrink: 0;
+    padding: 0.6rem 1rem;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    background: var(--ac-bg-1, #0c1020);
+}
+
+.ac-header-brand {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: inherit;
+    flex-shrink: 0;
+}
+
+.ac-header-text {
+    font-family: var(--font-display, system-ui);
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    background: linear-gradient(90deg, var(--ac-cyan, #00e5ff), var(--ac-magenta, #ff2e8b));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.35));
+}
+
+.ac-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+.ac-header-leave {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    padding: 0;
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+    border-radius: 0.6rem;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.ac-header-leave:hover {
+    background: color-mix(in srgb, var(--ac-danger, #ff3b5c) 18%, transparent);
+    border-color: var(--ac-danger, #ff3b5c);
+    color: var(--ac-danger, #ff3b5c);
+}
+
+/* ── Session-code reveal button ─────────────────────────────────────────
+   RoomCodeButton renders the cover + value spans, so they carry that child
+   component's scope — they must be targeted with ::deep. Cover and value are
+   stacked in one grid cell and slide horizontally; the code stays hidden until
+   the anchor gets the `revealed` class (toggled on click). */
+.ac-header-actions .ac-header-code {
+    display: inline-grid;
+    overflow: hidden;
+    cursor: pointer;
+    text-decoration: none;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ac-ink, #eaf2ff);
+    background: var(--ac-panel-solid, #121830);
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    border-radius: 0.5rem;
+    transition: border-color 0.15s;
+}
+
+.ac-header-actions .ac-header-code:hover {
+    border-color: var(--ac-cyan, #00e5ff);
+}
+
+.ac-header-actions .ac-header-code-cover, .ac-header-actions .ac-header-code-value {
+    grid-area: 1 / 1;
+    padding: 0.35rem 0.7rem;
+    text-align: center;
+    white-space: nowrap;
+    /* Opacity is the real guard against a leak: because the cover ("SESSION ID")
+       is wider than a short code, translateX(110%) of the narrower value box
+       doesn't fully clear the cell, so the hidden side is faded out as well. */
+    transition: transform 0.32s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.2s ease;
+}
+
+.ac-header-actions .ac-header-code-cover {
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    z-index: 1;
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.ac-header-actions .ac-header-code-value {
+    color: var(--ac-cyan, #00e5ff);
+    text-shadow: var(--ac-glow-cyan, 0 0 18px rgba(0, 229, 255, 0.45));
+    transform: translateX(110%);
+    opacity: 0;
+}
+
+.ac-header-actions .ac-header-code.revealed .ac-header-code-cover {
+    transform: translateX(-110%);
+    opacity: 0;
+}
+
+.ac-header-actions .ac-header-code.revealed .ac-header-code-value {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+@media (max-width: 32rem) {
+    .ac-header-container {
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+    }
+
+    .ac-header-text {
+        font-size: 1rem;
+        letter-spacing: 0.08em;
+    }
+
+    .ac-header-leave {
+        width: 2.1rem;
+        height: 2.1rem;
+    }
+
+    .ac-header-actions .ac-header-code {
+        font-size: 0.82rem;
+        letter-spacing: 0.1em;
+    }
+
+    .ac-header-actions .ac-header-code-cover, .ac-header-actions .ac-header-code-value {
+        padding: 0.3rem 0.55rem;
+    }
+}
+
+/* On very narrow screens keep the brand + session code from overflowing. */
+@media (max-width: 26rem) {
+    .ac-header-text {
+        font-size: 0.9rem;
+        letter-spacing: 0.04em;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ac-header-actions .ac-header-code-cover, .ac-header-actions .ac-header-code-value {
+        transition: none;
+    }
+}
+
+/* ═══════════════════ Components/AlphaChainSettingsPanel.razor.css ═══════════════════ */
+.ac-root .ac-settings {
+    margin-top: 1rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+    border-radius: 0.85rem;
+    background: rgba(255, 255, 255, 0.02);
+    text-align: left;
+}
+
+.ac-root .ac-settings-title {
+    margin: 0 0 0.85rem;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.85rem 1rem;
+}
+
+.ac-root .ac-settings-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    border: none;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+
+.ac-root .ac-settings-field > span, .ac-root .ac-settings-field > legend {
+    font-weight: 700;
+    color: var(--ac-ink, #eaf2ff);
+    padding: 0;
+}
+
+.ac-root .ac-settings-field > span strong {
+    color: var(--ac-cyan, #00e5ff);
+    font-variant-numeric: tabular-nums;
+}
+
+.ac-root .ac-settings-field-full {
+    grid-column: 1 / -1;
+}
+
+.ac-root .ac-settings-field-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ac-root .ac-settings-field input[type="number"] {
+    width: 100%;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    border-radius: 0.45rem;
+    background: var(--ac-bg-1, #0c1020);
+    color: var(--ac-ink, #eaf2ff);
+    font: inherit;
+    font-family: var(--font-mono, monospace);
+}
+
+.ac-root .ac-settings-field input[type="number"]:focus {
+    outline: none;
+    border-color: var(--ac-cyan, #00e5ff);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ac-cyan) 30%, transparent);
+}
+
+.ac-root .ac-settings-field input[type="range"] {
+    width: 100%;
+    padding: 0;
+    accent-color: var(--ac-cyan, #00e5ff);
+}
+
+.ac-root .ac-settings-field-row input[type="checkbox"] {
+    width: 1.2rem;
+    height: 1.2rem;
+    accent-color: var(--ac-cyan, #00e5ff);
+}
+
+.ac-root .ac-settings-radios {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 0.35rem;
+}
+
+.ac-root .ac-settings-radio {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.45rem;
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+    background: rgba(255, 255, 255, 0.03);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.ac-root .ac-settings-radio input { accent-color: var(--ac-cyan, #00e5ff); }
+
+.ac-root .ac-settings-radio:has(input:checked) {
+    border-color: var(--ac-cyan, #00e5ff);
+    background: color-mix(in srgb, var(--ac-cyan) 14%, transparent);
+    color: var(--ac-cyan, #00e5ff);
+}
+
+.ac-root .ac-settings-errors {
+    margin: 0.85rem 0 0;
+    padding: 0.5rem 0.75rem 0.5rem 1.6rem;
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--ac-danger) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ac-danger) 40%, transparent);
+    color: var(--ac-danger, #ff3b5c);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.ac-root .ac-settings-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.85rem;
+}
+
+.ac-root .ac-settings-reset {
+    padding: 0.4rem 0.9rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    font: inherit;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.ac-root .ac-settings-reset:hover {
+    border-color: var(--ac-cyan, #00e5ff);
+    color: var(--ac-cyan, #00e5ff);
+    background: color-mix(in srgb, var(--ac-cyan) 12%, transparent);
+}
+
+/* ── Non-host read-only view ─────────────────────────────────────────── */
+.ac-root .ac-settings-readout {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.6rem 1rem;
+    margin: 0;
+}
+
+.ac-root .ac-settings-readout > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+}
+
+.ac-root .ac-settings-readout dt {
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+}
+
+.ac-root .ac-settings-readout dd {
+    margin: 0;
+    font-family: var(--font-mono, monospace);
+    font-weight: 800;
+    color: var(--ac-cyan, #00e5ff);
+}
+
+/* ═══════════════════ Components/CountdownOverlay.razor.css ═══════════════════ */
+/* "Get Ready" transition overlay — a centered neon card with the pre-round countdown. Mirrors the
+   TutorialOverlay backdrop/card aesthetic so the two transition screens feel like one family. The
+   resting state is fully readable, so the global prefers-reduced-motion guard (which strips ac-*
+   animations) leaves everything legible. */
+
+.ac-root .ac-ready {
+    position: fixed;
+    inset: 0;
+    z-index: 70; /* same layer as the tutorial overlay */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    background: rgba(6, 8, 15, 0.82);
+    backdrop-filter: blur(3px);
+    animation: ac-ready-backdrop-in 0.28s ease-out both;
+}
+
+@keyframes ac-ready-backdrop-in {
+    from  { opacity: 0; }
+    to  { opacity: 1; }
+}
+
+.ac-root .ac-ready-card {
+    width: min(520px, 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.1rem;
+    padding: 2rem 1.6rem;
+    text-align: center;
+    border-radius: 1rem;
+    background: var(--ac-panel, rgba(18, 24, 44, 0.72));
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    box-shadow: var(--ac-shadow-lift, 7px 7px 0 #000), var(--ac-glow-cyan, 0 0 18px rgba(0, 229, 255, 0.45));
+    backdrop-filter: blur(6px);
+    animation: ac-ready-pop 0.4s ease-out both;
+}
+
+@keyframes ac-ready-pop {
+    from  { opacity: 0; transform: scale(0.94) translateY(8px); }
+    to  { opacity: 1; transform: none; }
+}
+
+.ac-root .ac-ready-eyebrow {
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    opacity: 0.75;
+}
+
+.ac-root .ac-ready-title {
+    margin: 0;
+    font-size: 2.2rem;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    text-shadow: var(--ac-glow-cyan, 0 0 18px rgba(0, 229, 255, 0.45));
+}
+
+/* ── Banned-letter callout (era 2+) ── */
+.ac-root .ac-ready-banned {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.ac-root .ac-ready-banned-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    opacity: 0.7;
+}
+
+.ac-root .ac-ready-banned-letter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3rem;
+    min-height: 3rem;
+    padding: 0.25rem 0.6rem;
+    font-size: 2.4rem;
+    font-weight: 800;
+    line-height: 1;
+    border-radius: 0.6rem;
+    color: var(--ac-danger, #ff5470);
+    border: 2px solid var(--ac-danger, #ff5470);
+    box-shadow: 0 0 14px rgba(255, 84, 112, 0.5);
+}
+
+.ac-root .ac-ready-hint {
+    margin: 0;
+    max-width: 38ch;
+    font-size: 0.92rem;
+    opacity: 0.85;
+}
+
+/* ── Countdown clock ── */
+.ac-root .ac-ready-clock {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.ac-root .ac-ready-num {
+    font-size: 3.4rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.ac-root .ac-ready-bar {
+    display: block;
+    width: min(280px, 80%);
+    height: 0.5rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+    overflow: hidden;
+}
+
+.ac-root .ac-ready-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--ac-accent-cyan, #00e5ff);
+    transition: width 0.2s linear;
+}
+
+/* Final seconds — pulse the number and flip the bar to the danger colour. */
+.ac-root .ac-ready-urgent .ac-ready-num {
+    color: var(--ac-danger, #ff5470);
+    animation: ac-ready-pulse 0.6s ease-in-out infinite;
+}
+
+.ac-root .ac-ready-urgent .ac-ready-bar-fill {
+    background: var(--ac-danger, #ff5470);
+}
+
+@keyframes ac-ready-pulse {
+    0%, 100%  { transform: scale(1); }
+    50%  { transform: scale(1.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ac-root .ac-ready, .ac-root .ac-ready-card, .ac-root .ac-ready-urgent .ac-ready-num {
+        animation: none;
+    }
+}
+
+/* ═══════════════════ Components/EngineBay.razor.css ═══════════════════ */
+.ac-root .ac-bay {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+    border-radius: 0.75rem;
+    background: var(--ac-panel, rgba(18, 24, 44, 0.72));
+    width: 100%;
+    box-sizing: border-box;
+    /* Card footprint for the cards in this bay — desktop 100px tall, ~1.3 w:h ratio. These
+       custom properties cascade into the child GameCards' .gc-small (CSS variables inherit
+       through the DOM regardless of Blazor scoping). */
+    --gc-small-h: 100px;
+    --gc-small-w: 130px;
+}
+
+.ac-root .ac-bay-readonly {
+    opacity: 0.9;
+}
+
+.ac-root .ac-bay-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.ac-root .ac-bay-title {
+    font-family: var(--font-display, system-ui);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-bay-flow {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.68rem;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+    font-variant-numeric: tabular-nums;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.3rem;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* A single horizontal row that scrolls — the whole bay stays on one line (mobile-friendly),
+   newest design order left → right. A little bottom padding keeps the scrollbar clear of the
+   cards' hover-lift. */
+.ac-root .ac-bay-slots {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0 0 0.35rem;
+    list-style: none;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--ac-cyan, #00e5ff) 45%, transparent) transparent;
+}
+
+.ac-root .ac-bay-slots::-webkit-scrollbar {
+    height: 0.4rem;
+}
+
+.ac-root .ac-bay-slots::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ac-cyan, #00e5ff) 45%, transparent);
+}
+
+.ac-root .ac-bay-slot {
+    flex: 0 0 auto;
+}
+
+/* Empty slot placeholder — matches the Small card's footprint so the row stays even. */
+.ac-root .ac-bay-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: var(--gc-small-w, 7rem);
+    height: var(--gc-small-h, 5.4rem);
+    border: 1px dashed var(--ac-border, rgba(255, 255, 255, 0.08));
+    border-radius: 0.6rem;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+    font-size: 0.7rem;
+    font-style: italic;
+}
+
+/* Mobile: shrink the card footprint to ~70px tall (the internals scale with it). */
+@media (max-width: 48rem) {
+    .ac-root .ac-bay {
+        --gc-small-h: 70px;
+        --gc-small-w: 91px;
+    }
+}
+
+/* ═══════════════════ Components/EngineEffectOverlay.razor.css ═══════════════════ */
+.ac-root .ac-rx-overlay {
+    position: fixed;
+    top: 18%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    align-items: center;
+    pointer-events: none;
+}
+
+.ac-root .ac-rx-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 16rem;
+    max-width: min(28rem, 92vw);
+    padding: 0.8rem 1.1rem;
+    border-radius: 0.85rem;
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    background: var(--ac-picker-bg, rgba(10, 14, 28, 0.96));
+    color: var(--ac-ink, #eaf2ff);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+    /* Pop in, hold, then fade out and stay hidden until the next sequence remounts us. */
+    animation: ac-rx-pop 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.3) both,
+               ac-rx-fade 0.5s ease-in 3.4s both;
+}
+
+.ac-root .ac-rx-icon {
+    flex: 0 0 auto;
+    width: 2rem;
+    height: 2rem;
+    display: grid;
+    place-items: center;
+}
+
+.ac-root .ac-rx-icon :global(svg) {
+    width: 100%;
+    height: 100%;
+}
+
+.ac-root .ac-rx-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.ac-root .ac-rx-name {
+    font-family: var(--font-display, system-ui);
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.ac-root .ac-rx-head {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.7));
+}
+
+.ac-root .ac-rx-reason {
+    font-size: 0.74rem;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.5));
+}
+
+/* ── Tones by reaction role ──────────────────────────────────────────── */
+.ac-root .ac-rx-defend {
+    border-color: color-mix(in srgb, var(--ac-teal, #41e0c8) 55%, transparent);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 26px color-mix(in srgb, var(--ac-teal, #41e0c8) 28%, transparent);
+}
+
+.ac-root .ac-rx-attack {
+    border-color: color-mix(in srgb, var(--ac-rose, #ff5d73) 60%, transparent);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 26px color-mix(in srgb, var(--ac-rose, #ff5d73) 30%, transparent);
+}
+
+.ac-root .ac-rx-special {
+    border-color: color-mix(in srgb, var(--ac-violet, #b97bff) 60%, transparent);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 26px color-mix(in srgb, var(--ac-violet, #b97bff) 30%, transparent);
+}
+
+.ac-root .ac-rx-negate {
+    border-color: color-mix(in srgb, var(--ac-amber, #ffce5c) 65%, transparent);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 26px color-mix(in srgb, var(--ac-amber, #ffce5c) 32%, transparent);
+}
+
+/* The local player is the victim of an attack — make it unmissable. */
+.ac-root .ac-rx-you {
+    transform: scale(1.06);
+    animation: ac-rx-pop 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.3) both,
+               ac-rx-shake 0.4s ease-in-out 0.32s 2,
+               ac-rx-fade 0.5s ease-in 3.8s both;
+}
+
+@keyframes ac-rx-pop {
+    from  { opacity: 0; transform: translateY(-12px) scale(0.85); }
+    to    { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ac-rx-fade {
+    from  { opacity: 1; }
+    to    { opacity: 0; visibility: hidden; }
+}
+
+@keyframes ac-rx-shake {
+    0%, 100%  { transform: translateX(0) scale(1.06); }
+    25%       { transform: translateX(-5px) scale(1.06); }
+    75%       { transform: translateX(5px) scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ac-root .ac-rx-card, .ac-root .ac-rx-you {
+        animation: ac-rx-fade 0.5s ease-in 3.6s both;
+    }
+}
+
+/* ═══════════════════ Components/GameCard.razor.css ═══════════════════ */
+/* Two purpose-built card footprints, both fixed-dimension so cards always line up.
+   The family accent (--gc-accent) is set inline by GameCard from the card's CardAccent;
+   a neutral fallback keeps the border visible if it is ever unset. */
+
+.ac-root .gc-card {
+    position: relative;
+    box-sizing: border-box;
+    color: var(--ac-ink, #eaf2ff);
+    text-align: left;
+    --gc-accent: var(--ac-accent-neutral, #8aa0b3);
+}
+
+/* ── Category accents ────────────────────────────────────────────────── */
+
+/* Reactions default to the special/violet accent; the role sub-tint overrides it. */
+.ac-root .gc-reaction {
+    --gc-accent: var(--ac-violet, #b97bff);
+}
+
+.ac-root .gc-reaction-defensive {
+    --gc-accent: var(--ac-teal, #41e0c8);
+}
+
+.ac-root .gc-reaction-offensive {
+    --gc-accent: var(--ac-rose, #ff5d73);
+}
+
+.ac-root .gc-reaction-special {
+    --gc-accent: var(--ac-violet, #b97bff);
+}
+
+/* ── Small variant — icon + chips, for at-a-glance recognition ───────── */
+
+/* Size is driven by --gc-small-w/-h (default 7rem × 5.4rem), so a consumer (e.g. the Engine Bay)
+   can resize the card by setting those vars on an ancestor. The internals are derived from those
+   vars via calc() (the private --_w/--_h aliases inherit to descendants), so the card scales as a
+   unit; the multipliers are tuned to the default footprint, so every other Small-card site looks
+   unchanged. */
+.ac-root .gc-small {
+    --_w: var(--gc-small-w, 7rem);
+    --_h: var(--gc-small-h, 5.4rem);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--_h) * 0.056);
+    width: var(--_w);
+    height: var(--_h);
+    padding: calc(var(--_h) * 0.083) calc(var(--_w) * 0.079);
+    overflow: hidden;
+    isolation: isolate;
+    /* Thick border in the card's family accent (letter/clock/economy/utility) for at-a-glance purpose;
+       fill = the card's identity color, in the same top-down lightness gradient the large faces use. */
+    border: 3px solid var(--gc-accent);
+    border-radius: 0.6rem;
+    background:
+        linear-gradient(160deg,
+            color-mix(in srgb, var(--gc-card-color, var(--gc-accent)) 16%, transparent),
+            color-mix(in srgb, var(--gc-card-color, var(--gc-accent)) 5%, transparent)),
+        var(--ac-panel-solid, #121830);
+    transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+
+/* Top row: icon + chips, with the name sitting on its own line below. */
+.ac-root .gc-small-top {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: calc(var(--_h, 5.4rem) * 0.074);
+}
+
+.ac-root .gc-small .gc-icon {
+    width: calc(var(--_h, 5.4rem) * 0.389);
+    height: calc(var(--_h, 5.4rem) * 0.389);
+}
+
+.ac-root .gc-small .gc-chips {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: calc(var(--_h, 5.4rem) * 0.033);
+    margin-left: auto;
+    max-width: calc(var(--_w, 7rem) * 0.629);
+}
+
+.ac-root .gc-small .gc-chip {
+    font-size: calc(var(--_h, 5.4rem) * 0.111);
+    padding: calc(var(--_h, 5.4rem) * 0.015) calc(var(--_w, 7rem) * 0.057);
+}
+
+/* Card name below the icon/chips — an SVG scaled uniformly (preserveAspectRatio) to the card width,
+   so the title fits on one line without stretching. height:auto follows the viewBox aspect; max-height
+   keeps short names from ballooning. */
+.ac-root .gc-small .gc-name-fit {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: calc(var(--_h, 5.4rem) * 0.278);
+    margin-top: auto;
+    overflow: visible;
+}
+
+.ac-root .gc-small .gc-name-fit text {
+    font-family: var(--font-display, system-ui);
+    font-weight: 800;
+    fill: var(--ac-ink, #eaf2ff);
+}
+
+/* ── Large variant — flip card that teaches the card ─────────────────── */
+
+.ac-root .gc-large {
+    width: 11rem;
+    height: 15rem;
+    perspective: 1100px;
+}
+
+.ac-root .gc-flip-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ac-root .gc-flipped .gc-flip-inner {
+    transform: rotateY(180deg);
+}
+
+.ac-root .gc-face {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    padding: 0.8rem 0.75rem;
+    /* Thick border in the card's family accent (letter/clock/economy/utility); fill = identity color. */
+    border: 3px solid var(--gc-accent);
+    border-radius: 0.8rem;
+    background:
+        linear-gradient(160deg,
+            color-mix(in srgb, var(--gc-card-color, var(--gc-accent)) 18%, transparent),
+            color-mix(in srgb, var(--gc-card-color, var(--gc-accent)) 6%, transparent)),
+        var(--ac-panel-solid, #121830);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    overflow: hidden;
+    isolation: isolate;
+    transition: box-shadow 0.18s ease;
+}
+
+.ac-root .gc-front {
+    gap: 0.55rem;
+}
+
+.ac-root .gc-large .gc-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+}
+
+.ac-root .gc-large .gc-icon {
+    width: 2.85rem;
+    height: 2.85rem;
+}
+
+.ac-root .gc-large .gc-chips {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+    margin-left: auto;
+    max-width: 5.5rem;
+}
+
+.ac-root .gc-large .gc-name {
+    font-family: var(--font-display, system-ui);
+    font-size: 1.05rem;
+    font-weight: 800;
+    line-height: 1.15;
+}
+
+/* A teaser of the rules below the title, clamped with an ellipsis — flip for the full text. */
+.ac-root .gc-front-desc {
+    margin: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    overflow: hidden;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.72));
+}
+
+.ac-root .gc-flip-hint {
+    margin-top: auto;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+}
+
+.ac-root .gc-back {
+    transform: rotateY(180deg);
+    gap: 0.4rem;
+}
+
+.ac-root .gc-back-name {
+    flex: 0 0 auto;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: var(--gc-card-color, var(--gc-accent));
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.ac-root .gc-back .gc-desc {
+    flex: 1 1 auto;
+    margin: 0;
+    overflow-y: auto;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--ac-ink, #eaf2ff);
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--gc-accent) 60%, transparent) transparent;
+}
+
+.ac-root .gc-back .gc-desc::-webkit-scrollbar {
+    width: 0.35rem;
+}
+
+.ac-root .gc-back .gc-desc::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--gc-accent) 55%, transparent);
+}
+
+/* ── Shared bits — icon, chips, live badge ───────────────────────────── */
+
+/* The icon is a swatch of the card's identity color: a 50%-transparent fill inside a solid full-color
+   border, with the glyph drawn in the full color — a clear, framed block of the card's hue. */
+.ac-root .gc-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    padding: 0.22rem;
+    border-radius: 0.4rem;
+    border: 2px solid var(--gc-card-color, var(--gc-accent));
+    color: var(--gc-card-color, var(--gc-accent));
+    background: color-mix(in srgb, var(--gc-card-color, var(--gc-accent)) 16%, transparent);
+}
+
+.ac-root .gc-icon-svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* A scaled-up, faint copy of the card's own glyph, bled off the bottom-right corner. Gives every card
+   a distinct *shape* behind its content — the differentiator that survives color-vision deficiency when
+   two cards' palette colors look alike. Sits behind content via z-index (cards isolate a context). */
+.ac-root .gc-watermark {
+    position: absolute;
+    z-index: -1;
+    color: var(--gc-card-color, var(--gc-accent));
+    pointer-events: none;
+}
+
+.ac-root .gc-watermark .gc-icon-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.ac-root .gc-small .gc-watermark {
+    right: -16%;
+    bottom: -28%;
+    width: 78%;
+    height: 160%;
+    opacity: 0.11;
+}
+
+.ac-root .gc-large .gc-watermark {
+    right: -14%;
+    bottom: -16%;
+    width: 92%;
+    height: 92%;
+    opacity: 0.1;
+}
+
+.ac-root .gc-chip {
+    display: inline-block;
+    padding: 0.08rem 0.4rem;
+    border-radius: 0.35rem;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.25;
+    /* Labels carry spaces around their "/" and "–" separators so they can wrap cleanly. */
+    white-space: normal;
+    text-align: center;
+    overflow-wrap: break-word;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Every chip renders uniformly in its own color (--chip): tinted fill + outline, the color
+   carrying the meaning (accent = type, identity = magnitude, violet = effect, cyan = live). */
+.ac-root .gc-chip {
+    color: var(--chip, var(--gc-accent));
+    background: color-mix(in srgb, var(--chip, var(--gc-accent)) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--chip, var(--gc-accent)) 55%, transparent);
+}
+
+/* ── States ──────────────────────────────────────────────────────────── */
+
+/* Small: lift (no scale — scaling rasterizes blurry) with an animated drop shadow + a colored glow. */
+.ac-root .gc-small:hover:not(.gc-dim) {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.42),
+                0 0 18px color-mix(in srgb, var(--gc-card-color, var(--gc-accent)) 50%, transparent);
+}
+
+/* Large: lift the whole card (outer container, so the flip transform is untouched). */
+.ac-root .gc-large {
+    transition: transform 0.16s ease;
+}
+
+.ac-root .gc-large:hover:not(.gc-dim) {
+    transform: translateY(-7px);
+}
+
+.ac-root .gc-large:hover:not(.gc-dim) .gc-face {
+    box-shadow: 0 18px 34px rgba(0, 0, 0, 0.5),
+                0 0 24px color-mix(in srgb, var(--gc-card-color, var(--gc-accent)) 45%, transparent);
+}
+
+.ac-root .gc-selected.gc-small, .ac-root .gc-selected.gc-large .gc-face {
+    outline: 2px solid var(--gc-accent);
+    outline-offset: 1px;
+    box-shadow: 0 0 14px color-mix(in srgb, var(--gc-accent) 45%, transparent);
+}
+
+.ac-root .gc-dragging {
+    opacity: 0.5;
+}
+
+.ac-root .gc-dragging.gc-small {
+    outline: 2px dashed var(--ac-cyan, #00e5ff);
+    outline-offset: 1px;
+}
+
+.ac-root .gc-dragging.gc-large .gc-face {
+    outline: 2px dashed var(--ac-cyan, #00e5ff);
+    outline-offset: 1px;
+}
+
+.ac-root .gc-dim {
+    opacity: 0.5;
+}
+
+.ac-root .gc-new {
+    animation: ac-pop 0.4s ease-out both;
+}
+
+.ac-root .gc-new.gc-small {
+    box-shadow: 0 0 16px color-mix(in srgb, var(--gc-accent) 50%, transparent);
+}
+
+.ac-root .gc-new.gc-large .gc-face {
+    box-shadow: 0 0 16px color-mix(in srgb, var(--gc-accent) 50%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ac-root .gc-small, .ac-root .gc-large, .ac-root .gc-flip-inner, .ac-root .gc-new {
+        animation: none;
+        transition: none;
+    }
+}
+
+/* ═══════════════════ Components/GameOverPanel.razor.css ═══════════════════ */
+.ac-root .ac-results {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 2rem 1rem;
+    max-width: 36rem;
+    margin: 0 auto;
+    animation: ac-rise 0.4s ease-out;
+}
+
+.ac-root .ac-results-title {
+    margin: 0;
+    font-family: var(--font-display, system-ui);
+    font-size: clamp(2rem, 8vw, 3rem);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, var(--ac-cyan, #00e5ff), var(--ac-magenta, #ff2e8b));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 16px rgba(0, 229, 255, 0.3));
+}
+
+.ac-root .ac-results-winner {
+    margin: 0;
+    font-size: 1.15rem;
+    color: var(--ac-ink, #eaf2ff);
+    text-align: center;
+}
+
+.ac-root .ac-results-winner strong {
+    color: var(--ac-amber, #ffb020);
+    text-shadow: 0 0 14px rgba(255, 176, 32, 0.45);
+}
+
+.ac-root .ac-standings {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    width: min(28rem, 92vw);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.ac-root .ac-standings-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.85rem;
+    border-radius: 0.6rem;
+    background: var(--ac-panel, rgba(18, 24, 44, 0.72));
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+}
+
+/* Winner (rank 1, non-eliminated). */
+.ac-root .ac-standings-row:first-child:not(.ac-eliminated) {
+    border-color: color-mix(in srgb, var(--ac-amber) 60%, transparent);
+    background: color-mix(in srgb, var(--ac-amber) 12%, transparent);
+    box-shadow: 0 0 24px color-mix(in srgb, var(--ac-amber) 25%, transparent);
+}
+
+.ac-root .ac-standings-row:first-child .ac-standings-rank {
+    color: var(--ac-amber, #ffb020);
+}
+
+.ac-root .ac-standings-row.ac-eliminated {
+    opacity: 0.55;
+}
+
+.ac-root .ac-standings-row.ac-eliminated .ac-standings-name {
+    text-decoration: line-through;
+}
+
+.ac-root .ac-standings-rank {
+    font-family: var(--font-mono, monospace);
+    font-weight: 800;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+    min-width: 2rem;
+}
+
+.ac-root .ac-standings-name {
+    flex: 1;
+    text-align: left;
+    font-weight: 700;
+}
+
+.ac-root .ac-standings-words {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.72rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    font-variant-numeric: tabular-nums;
+}
+
+.ac-root .ac-standings-score {
+    font-family: var(--font-mono, monospace);
+    font-variant-numeric: tabular-nums;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--ac-cyan, #00e5ff);
+    min-width: 2.5rem;
+    text-align: right;
+}
+
+.ac-root .ac-standings-row:first-child .ac-standings-score {
+    color: var(--ac-amber, #ffb020);
+}
+
+.ac-root .ac-tag {
+    margin-left: 0.4rem;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-radius: 0.4rem;
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-results-totals {
+    display: flex;
+    gap: 1.5rem;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.82rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    font-variant-numeric: tabular-nums;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+}
+
+/* ═══════════════════ Components/IntermissionOptimizationPanel.razor.css ═══════════════════ */
+.ac-root .ac-im-opt {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    align-items: stretch;
+    width: min(40rem, 94vw);
+    padding: 1rem;
+    background: var(--ac-panel, rgba(18, 24, 44, 0.72));
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+    border-radius: 1rem;
+}
+
+.ac-root .ac-im-opt-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.ac-root .ac-im-opt-title {
+    margin: 0;
+    font-family: var(--font-display, system-ui);
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-root .ac-im-opt-count {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--ac-cyan, #00e5ff);
+    font-variant-numeric: tabular-nums;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ac-cyan) 14%, transparent);
+}
+
+.ac-root .ac-im-opt-locked {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--ac-mint, #14f195);
+    font-weight: 700;
+}
+
+.ac-root .ac-im-opt-warn {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--ac-danger, #ff3b5c);
+    font-weight: 700;
+}
+
+.ac-root .ac-im-opt-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ac-root .ac-im-opt-slot {
+    position: relative;
+    width: 11rem;
+}
+
+/* The overflow warning tints the front face (the .gc-card root is transparent for the 3D flip). */
+.ac-root .ac-im-opt-slot.ac-im-opt-overflow .gc-face {
+    border-color: var(--ac-danger, #ff3b5c);
+    border-style: dashed;
+    background: color-mix(in srgb, var(--ac-danger) 12%, transparent);
+}
+
+/* Slot order number, top-left over the card. */
+.ac-root .ac-im-opt-pos {
+    position: absolute;
+    top: 0.4rem;
+    left: 0.55rem;
+    z-index: 1;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.66rem;
+    font-weight: 800;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.6));
+    pointer-events: none;
+}
+
+/* NEW marker for freshly-dealt cards — top-center, clear of the pos number and the chips. */
+.ac-root .ac-im-opt-newmark {
+    position: absolute;
+    top: 0.4rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    padding: 0.05rem 0.4rem;
+    border-radius: 0.3rem;
+    background: var(--ac-mint, #14f195);
+    color: #042418;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    pointer-events: none;
+}
+
+/* Expansion banner — replaces the old dedicated Expansion sub-phase. */
+.ac-root .ac-im-opt-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.82rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.72));
+}
+
+.ac-root .ac-im-opt-slotbadge {
+    padding: 0.15rem 0.5rem;
+    border-radius: 0.4rem;
+    background: var(--ac-cyan, #00e5ff);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+}
+
+.ac-root .ac-im-opt-newtag {
+    padding: 0 0.3rem;
+    border-radius: 0.3rem;
+    background: var(--ac-mint, #14f195);
+    color: #042418;
+    font-size: 0.62rem;
+    font-weight: 800;
+}
+
+.ac-root .ac-im-opt-hint {
+    margin: 0;
+    font-size: 0.74rem;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.5));
+}
+
+.ac-root .ac-im-opt-discard {
+    position: absolute;
+    top: -0.45rem;
+    right: -0.45rem;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--ac-danger) 70%, transparent);
+    background: color-mix(in srgb, var(--ac-danger) 22%, transparent);
+    color: var(--ac-danger, #ff3b5c);
+    cursor: pointer;
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.ac-root .ac-im-opt-discard:disabled { cursor: default; opacity: 0.4; }
+
+.ac-root .ac-im-opt-bin {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem;
+    border: 1px dashed var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    border-radius: 0.6rem;
+}
+
+.ac-root .ac-im-opt-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.ac-root .ac-im-opt-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.ac-root .ac-im-opt-bin-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+}
+
+.ac-root .ac-im-opt-confirm {
+    align-self: flex-start;
+    padding: 0.55rem 1.3rem;
+    border: 3px solid #000;
+    border-radius: 0.6rem;
+    background: var(--ac-mint, #14f195);
+    color: #042418;
+    font-family: var(--font-display, system-ui);
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+    transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.ac-root .ac-im-opt-confirm:hover:not(:disabled) {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 #000;
+}
+
+.ac-root .ac-im-opt-confirm:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #000;
+}
+
+.ac-root .ac-im-opt-confirm:disabled { cursor: default; opacity: 0.5; filter: grayscale(40%); }
+
+/* ═══════════════════ Components/ScoreReplayStrip.razor.css ═══════════════════ */
+/* Score replay shown in a fixed, reserved slot below the word-submit box. Keeps a constant
+   footprint (min-height) so the layout never shifts, and lingers as a readout until the next
+   word is submitted. */
+.ac-root .ac-replay {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-height: 3.4rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: 0.5rem;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.ac-root .ac-replay-who {
+    font-family: var(--font-display, system-ui);
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-replay-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.ac-root .ac-replay-word {
+    font-family: var(--font-display, system-ui);
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--ac-ink, #eaf2ff);
+    margin-right: 0.15rem;
+}
+
+.ac-root .ac-replay-seq {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.05rem;
+    min-width: 2.1rem;
+    padding: 0.15rem 0.3rem;
+    border-radius: 0.35rem;
+    background: rgba(255, 255, 255, 0.05);
+    /* Reuse the shared pop keyframe; duration is the per-step time so the total stays constant. */
+    animation: ac-pop var(--ac-step) ease-out both;
+}
+
+.ac-root .ac-replay-icon {
+    display: inline-flex;
+    width: 1rem;
+    height: 1rem;
+}
+
+.ac-root .ac-replay-icon .gc-icon-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.ac-root .ac-replay-op {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.5));
+}
+
+.ac-root .ac-replay-run {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.85rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-root .ac-replay-seed .ac-replay-run { color: var(--ac-cyan, #00e5ff); }
+/* Icon carries the card's family accent; the op (delta) is colored semantically inline
+   (green gain / red loss / violet FX) by ScoreStepColors. */
+.ac-root .ac-replay-step .ac-replay-icon { color: var(--ac-step-accent, var(--ac-accent-neutral, #8aa0b3)); }
+.ac-root .ac-replay-skip { opacity: 0.5; }
+
+.ac-root .ac-replay-final {
+    background: color-mix(in srgb, var(--ac-additive, #14f195) 18%, transparent);
+}
+
+.ac-root .ac-replay-final .ac-replay-run { color: var(--ac-additive, #14f195); }
+
+.ac-root .ac-replay-taxed {
+    background: color-mix(in srgb, var(--ac-tax, #ff3b5c) 20%, transparent);
+}
+
+.ac-root .ac-replay-taxed .ac-replay-run, .ac-root .ac-replay-taxed .ac-replay-op {
+    color: var(--ac-tax, #ff3b5c);
+}
+
+/* ── Tax Collector steal: who took the points off this taxed word ──────── */
+.ac-root .ac-replay-steal {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    /* Reveals after the final chip; reuse the shared pop keyframe at the per-step duration. */
+    animation: ac-pop var(--ac-step) ease-out both;
+}
+
+.ac-root .ac-replay-steal-label {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ac-tax, #ff3b5c);
+}
+
+.ac-root .ac-replay-steal-who {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.35rem;
+    background: color-mix(in srgb, var(--ac-tax, #ff3b5c) 16%, transparent);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-root .ac-replay-steal-amt {
+    font-family: var(--font-mono, monospace);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--ac-additive, #14f195);
+}
+
+/* ── Reactions that auto-fired on this word ────────────────────────────── */
+.ac-root .ac-replay-rx {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.35rem;
+    background: rgba(255, 255, 255, 0.05);
+    /* Reveals after the score/steal rows; reuse the shared pop keyframe at the per-step duration. */
+    animation: ac-pop var(--ac-step) ease-out both;
+}
+
+.ac-root .ac-replay-rx-icon {
+    display: inline-flex;
+    width: 1rem;
+    height: 1rem;
+}
+
+.ac-root .ac-replay-rx-icon .gc-icon-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.ac-root .ac-replay-rx-name {
+    font-family: var(--font-display, system-ui);
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.ac-root .ac-replay-rx-reason {
+    font-size: 0.7rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-replay-rx-defend { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-teal, #41e0c8) 45%, transparent); }
+.ac-root .ac-replay-rx-defend .ac-replay-rx-name { color: var(--ac-teal, #41e0c8); }
+.ac-root .ac-replay-rx-attack { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-rose, #ff5d73) 45%, transparent); }
+.ac-root .ac-replay-rx-attack .ac-replay-rx-name { color: var(--ac-rose, #ff5d73); }
+.ac-root .ac-replay-rx-special { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-violet, #b97bff) 45%, transparent); }
+.ac-root .ac-replay-rx-special .ac-replay-rx-name { color: var(--ac-violet, #b97bff); }
+.ac-root .ac-replay-rx-negate { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-amber, #ffce5c) 55%, transparent); }
+.ac-root .ac-replay-rx-negate .ac-replay-rx-name { color: var(--ac-amber, #ffce5c); }
+
+/* ═══════════════════ Components/SniperBanPicker.razor.css ═══════════════════ */
+.ac-root .ac-im-sniper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    text-align: center;
+}
+
+.ac-root .ac-im-sniper-title {
+    margin: 0;
+    font-family: var(--font-display, system-ui);
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-root .ac-im-sniper-sub {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-im-sniper-letters {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+    max-width: min(30rem, 92vw);
+}
+
+.ac-root .ac-im-sniper-letter {
+    width: 3rem;
+    height: 3rem;
+    min-width: 44px;
+    min-height: 44px;
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ac-ink, #eaf2ff);
+    font-family: var(--font-mono, monospace);
+    font-size: 1.2rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.1s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.ac-root .ac-im-sniper-letter:hover {
+    transform: translateY(-2px);
+    border-color: var(--ac-danger, #ff3b5c);
+    background: color-mix(in srgb, var(--ac-danger) 14%, transparent);
+}
+
+.ac-root .ac-im-sniper-chosen {
+    border-color: var(--ac-danger, #ff3b5c);
+    background: color-mix(in srgb, var(--ac-danger) 28%, transparent);
+    color: var(--ac-danger, #ff3b5c);
+    box-shadow: var(--ac-glow-danger);
+}
+
+/* ═══════════════════ Components/SubmissionHistoryPanel.razor.css ═══════════════════ */
+/* Post-game word-history list. Sits below the standings on the Game Over screen. A static
+   (non-animated) cousin of ScoreReplayStrip: the engine strip on each row scrolls horizontally
+   so rows stay a uniform height for <Virtualize>. */
+.ac-root .ac-hist {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    width: min(34rem, 94vw);
+    margin: 1.5rem auto 0;
+}
+
+.ac-root .ac-hist-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.ac-root .ac-hist-title {
+    margin: 0;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.95rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+/* ── Sort control ──────────────────────────────────────────────────────── */
+.ac-root .ac-hist-sort {
+    display: inline-flex;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+    background: var(--ac-panel, rgba(18, 24, 44, 0.72));
+}
+
+.ac-root .ac-hist-sortbtn {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    padding: 0.3rem 0.65rem;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ac-root .ac-hist-sortbtn + .ac-hist-sortbtn {
+    border-left: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+}
+
+.ac-root .ac-hist-sortbtn:hover {
+    color: var(--ac-ink, #eaf2ff);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.ac-root .ac-hist-sortbtn-on, .ac-root .ac-hist-sortbtn-on:hover {
+    color: var(--ac-bg, #0a0e1a);
+    background: var(--ac-cyan, #00e5ff);
+}
+
+.ac-root .ac-hist-empty {
+    text-align: center;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+/* ── Virtualized list ──────────────────────────────────────────────────── */
+.ac-root .ac-hist-list {
+    height: min(28rem, 60vh);
+    overflow-y: auto;
+    border-radius: 0.6rem;
+    border: 1px solid var(--ac-border, rgba(255, 255, 255, 0.08));
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.ac-root .ac-hist-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    height: 150px;
+    box-sizing: border-box;
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid var(--ac-border, rgba(255, 255, 255, 0.06));
+}
+
+.ac-root .ac-hist-row-main {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+}
+
+.ac-root .ac-hist-word {
+    font-family: var(--font-display, system-ui);
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-root .ac-hist-by {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-hist-score {
+    font-family: var(--font-mono, monospace);
+    font-size: 1rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--ac-additive, #14f195);
+}
+
+.ac-root .ac-hist-score-taxed {
+    color: var(--ac-tax, #ff3b5c);
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+}
+
+/* ── Engine strip — the submitter's Engine Bay as small cards, in pipeline order ── */
+.ac-root .ac-hist-engine {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 6.4rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.2rem;
+    scrollbar-width: thin;
+}
+
+.ac-root .ac-hist-card {
+    flex: 0 0 auto;
+}
+
+/* Seed / final-score markers flanking the cards. */
+.ac-root .ac-hist-marker {
+    display: inline-flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1rem;
+    min-width: 2.4rem;
+    padding: 0.3rem 0.4rem;
+    border-radius: 0.4rem;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.ac-root .ac-hist-marker-op {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.58rem;
+    font-weight: 700;
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.5));
+}
+
+.ac-root .ac-hist-marker-run {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-root .ac-hist-seed .ac-hist-marker-run { color: var(--ac-cyan, #00e5ff); }
+
+.ac-root .ac-hist-final {
+    background: color-mix(in srgb, var(--ac-additive, #14f195) 18%, transparent);
+}
+
+.ac-root .ac-hist-final .ac-hist-marker-run { color: var(--ac-additive, #14f195); }
+
+.ac-root .ac-hist-taxed {
+    background: color-mix(in srgb, var(--ac-tax, #ff3b5c) 20%, transparent);
+}
+
+.ac-root .ac-hist-taxed .ac-hist-marker-run, .ac-root .ac-hist-taxed .ac-hist-marker-op {
+    color: var(--ac-tax, #ff3b5c);
+}
+
+/* ═══════════════════ Components/TutorialOverlay.razor.css ═══════════════════ */
+/* Tutorial overlay — a centered neon card with a staged, CSS-only scripted demo. Used both
+   full-screen (Tutorial phase) and inside the Intermission (Tax sub-phase). All reveal animations
+   keep their RESTING state visible so the global prefers-reduced-motion guard (which strips
+   ac-* animations) leaves the content fully readable. */
+
+/* Fixed, centered modal layer. Fixed positioning (identical in the normal and exiting states)
+   keeps the slide-out seamless — the exiting instance mounts in exactly the same spot the card
+   occupied, so it slides away rather than jumping. The dim/blur backdrop focuses attention and
+   lets the next phase be revealed cleanly as the overlay fades out. */
+.ac-root .ac-tut {
+    position: fixed;
+    inset: 0;
+    z-index: 70; /* above ReactionOverlay (60) */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    background: rgba(6, 8, 15, 0.82);
+    backdrop-filter: blur(3px);
+    animation: ac-tut-backdrop-in 0.28s ease-out both;
+}
+
+/* ── Exit: slide the card away while the backdrop fades, revealing the next phase underneath ── */
+.ac-root .ac-tut-exiting {
+    pointer-events: none; /* the revealed phase is immediately interactive + the word box focusable */
+    animation: ac-tut-backdrop-out 0.45s ease-in forwards;
+}
+
+.ac-root .ac-tut-exiting .ac-tut-card {
+    /* Override the ac-pop entrance so the freshly-mounted exiting instance slides out, not in. */
+    animation: ac-tut-slide-out 0.45s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Freeze the staged demo content so it doesn't replay its entrance while the card slides away. */
+.ac-root .ac-tut-exiting .ac-tut-reveal, .ac-root .ac-tut-exiting .ac-tut-taxed {
+    animation: none;
+}
+
+@keyframes ac-tut-backdrop-in {
+    from  { opacity: 0; }
+    to  { opacity: 1; }
+}
+
+@keyframes ac-tut-backdrop-out {
+    from  { opacity: 1; }
+    to  { opacity: 0; }
+}
+
+@keyframes ac-tut-slide-out {
+    from  { transform: translateY(0); }
+    to  { transform: translateY(-115%); }
+}
+
+.ac-root .ac-tut-card {
+    width: min(680px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.6rem 1.6rem 1.2rem;
+    border-radius: 1rem;
+    background: var(--ac-panel, rgba(18, 24, 44, 0.72));
+    border: 1px solid var(--ac-border-strong, rgba(255, 255, 255, 0.18));
+    box-shadow: var(--ac-shadow-lift, 7px 7px 0 #000), var(--ac-glow-cyan, 0 0 18px rgba(0, 229, 255, 0.45));
+    backdrop-filter: blur(6px);
+    animation: ac-pop 0.4s ease-out both;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.ac-root .ac-tut-head { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.ac-root .ac-tut-eyebrow {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--ac-cyan, #00e5ff);
+}
+
+.ac-root .ac-tut-title {
+    margin: 0;
+    font-family: var(--font-display, system-ui);
+    font-size: 1.7rem;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-root .ac-tut-sub {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+/* ── Stage ──────────────────────────────────────────────────────────────── */
+.ac-root .ac-tut-stage {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+    padding: 1.2rem 0.5rem;
+    border-radius: 0.75rem;
+    background: rgba(0, 0, 0, 0.28);
+    min-height: 9rem;
+    justify-content: center;
+}
+
+/* Staged reveal: resting state is VISIBLE; the keyframe plays in from hidden during the delay,
+   so reduced-motion users (animation stripped) still see everything. */
+.ac-root .ac-tut-reveal {
+    animation: ac-tut-in 0.5s ease-out both;
+    animation-delay: calc(var(--ac-step, 0.55s) * var(--i, 0));
+}
+
+@keyframes ac-tut-in {
+    from  { opacity: 0; transform: translateY(10px) scale(0.96); }
+    to  { opacity: 1; transform: none; }
+}
+
+/* ── Shiritori chain ────────────────────────────────────────────────────── */
+.ac-root .ac-tut-chain {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.ac-root .ac-tut-chip {
+    display: inline-flex;
+    padding: 0.35rem 0.5rem;
+    border-radius: 0.4rem;
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 0 0 1px var(--ac-border, rgba(255, 255, 255, 0.08));
+}
+
+.ac-root .ac-tut-ltr {
+    font-family: var(--font-display, system-ui);
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-root .ac-tut-link {
+    color: var(--ac-cyan, #00e5ff);
+    text-shadow: var(--ac-glow-cyan, 0 0 18px rgba(0, 229, 255, 0.45));
+}
+
+.ac-root .ac-tut-arrow {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+}
+
+/* ── Engine / Tax pipeline ──────────────────────────────────────────────── */
+.ac-root .ac-tut-pipe {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+}
+
+.ac-root .ac-tut-step {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    min-width: 4.2rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: 0.45rem;
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 0 0 1px var(--ac-border, rgba(255, 255, 255, 0.08));
+}
+
+.ac-root .ac-tut-step-word {
+    font-family: var(--font-display, system-ui);
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-root .ac-tut-step-name {
+    font-family: var(--font-display, system-ui);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-tut-step-run {
+    font-family: var(--font-mono, monospace);
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-root .ac-tut-step-op {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+}
+
+.ac-root .ac-tut-op-sign {
+    font-family: var(--font-mono, monospace);
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+}
+
+.ac-root .ac-tut-seed .ac-tut-step-run { color: var(--ac-cyan, #00e5ff); }
+.ac-root .ac-tut-add { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-additive, #14f195) 45%, transparent); }
+.ac-root .ac-tut-add .ac-tut-step-run, .ac-root .ac-tut-add .ac-tut-step-name { color: var(--ac-additive, #14f195); }
+.ac-root .ac-tut-mul { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-multiplicative, #ffb020) 45%, transparent); }
+.ac-root .ac-tut-mul .ac-tut-step-run, .ac-root .ac-tut-mul .ac-tut-step-name { color: var(--ac-multiplicative, #ffb020); }
+
+.ac-root .ac-tut-taxed {
+    background: color-mix(in srgb, var(--ac-tax, #ff3b5c) 22%, transparent);
+    animation: ac-flash 0.4s ease-out both;
+    animation-delay: calc(var(--ac-step, 0.55s) * var(--i, 0));
+}
+
+.ac-root .ac-tut-taxed .ac-tut-step-run, .ac-root .ac-tut-taxed .ac-tut-step-name { color: var(--ac-tax, #ff3b5c); }
+
+.ac-root .ac-tut-formula {
+    margin: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.78rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    text-align: center;
+}
+
+/* ── Reaction chips (Engine) ────────────────────────────────────────────── */
+.ac-root .ac-tut-rx-row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+
+.ac-root .ac-tut-rx {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.55rem;
+    border-radius: 0.4rem;
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-violet, #b97bff) 40%, transparent);
+}
+
+.ac-root .ac-tut-rx-name {
+    font-family: var(--font-display, system-ui);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ac-violet, #b97bff);
+}
+
+.ac-root .ac-tut-rx-reason { font-size: 0.72rem; color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62)); }
+
+/* ── Banned badge + steal (Tax) ─────────────────────────────────────────── */
+.ac-root .ac-tut-banned {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ac-root .ac-tut-banned-label {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--ac-danger, #ff3b5c);
+}
+
+.ac-root .ac-tut-banned-letter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 0.4rem;
+    font-family: var(--font-display, system-ui);
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: var(--ac-danger, #ff3b5c);
+    background: color-mix(in srgb, var(--ac-danger, #ff3b5c) 18%, transparent);
+    box-shadow: inset 0 0 0 1px var(--ac-danger, #ff3b5c), var(--ac-glow-danger, 0 0 18px rgba(255, 59, 92, 0.5));
+}
+
+.ac-root .ac-tut-steal {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.4rem;
+    background: color-mix(in srgb, var(--ac-tax, #ff3b5c) 14%, transparent);
+}
+
+.ac-root .ac-tut-steal-label {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ac-tax, #ff3b5c);
+}
+
+.ac-root .ac-tut-steal-amt {
+    font-family: var(--font-mono, monospace);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--ac-additive, #14f195);
+}
+
+.ac-root .ac-tut-steal-arrow { color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38)); }
+.ac-root .ac-tut-steal-who { font-size: 0.78rem; font-weight: 700; color: var(--ac-ink, #eaf2ff); }
+
+.ac-root .ac-tut-note {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    text-align: center;
+}
+
+.ac-root .ac-tut-note strong, .ac-root .ac-tut-formula strong { color: var(--ac-ink, #eaf2ff); }
+
+/* ── Footer: progress bar + Skip ────────────────────────────────────────── */
+.ac-root .ac-tut-foot {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+}
+
+.ac-root .ac-tut-progress {
+    flex: 1;
+    height: 0.35rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.ac-root .ac-tut-progress-fill {
+    display: block;
+    height: 100%;
+    width: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--ac-cyan, #00e5ff), var(--ac-violet, #b97bff));
+    animation: ac-tut-fill var(--ac-tut-dwell, 12s) linear both;
+}
+
+@keyframes ac-tut-fill {
+    from  { width: 0; }
+    to  { width: 100%; }
+}
+
+.ac-root .ac-tut-skip {
+    flex-shrink: 0;
+    padding: 0.5rem 1.1rem;
+    border: none;
+    border-radius: 0.5rem;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ac-bg-0, #06080f);
+    background: var(--ac-cyan, #00e5ff);
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+    cursor: pointer;
+}
+
+.ac-root .ac-tut-skip:hover { filter: brightness(1.1); }
+.ac-root .ac-tut-skip:active { transform: translate(2px, 2px); box-shadow: none; }
+
+.ac-root .ac-tut-wait {
+    flex-shrink: 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.72rem;
+    color: var(--ac-ink-faint, rgba(234, 242, 255, 0.38));
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Testing Bay (card-library dev bench) — ported from the deleted
+   AlphaChainCardLibrary.razor.css, scoped under .ac-root for the WASM split.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Lobby entry button (mode button alongside the start buttons). */
+.ac-root .ac-start-bench {
+    background: var(--ac-violet, #b97bff);
+    color: #1a0b2e;
+}
+.ac-root .ac-start-bench:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.ac-root .ac-library {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 1rem 0 2rem;
+}
+
+.ac-root .ac-library-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    text-align: center;
+}
+
+.ac-root .ac-library-brand {
+    font-family: var(--font-display, system-ui);
+    font-size: clamp(2rem, 9vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    background: linear-gradient(90deg, var(--ac-cyan, #00e5ff), var(--ac-magenta, #ff2e8b));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 18px rgba(0, 229, 255, 0.3));
+}
+
+.ac-root .ac-library-tagline {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-bench-leave {
+    margin-top: 0.35rem;
+    padding: 0.4rem 1rem;
+    border: 3px solid #000;
+    border-radius: 0.55rem;
+    background: var(--ac-ink, #eaf2ff);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+}
+
+.ac-root .ac-library-size {
+    margin-top: 0.35rem;
+    padding: 0.45rem 1.1rem;
+    border: 3px solid #000;
+    border-radius: 0.55rem;
+    background: var(--ac-cyan, #00e5ff);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+    transition: transform 0.08s, box-shadow 0.08s;
+}
+.ac-root .ac-library-size:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 #000; }
+.ac-root .ac-library-size:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+
+.ac-root .ac-bench {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    border: 3px solid #000;
+    border-radius: 0.75rem;
+    background: var(--ac-panel, rgba(8, 18, 32, 0.55));
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+}
+
+.ac-root .ac-bench-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.85rem;
+}
+
+.ac-root .ac-field { display: flex; flex-direction: column; gap: 0.25rem; }
+.ac-root .ac-field-word { flex: 1 1 14rem; }
+
+.ac-root .ac-field-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-input {
+    padding: 0.5rem 0.65rem;
+    border: 3px solid #000;
+    border-radius: 0.5rem;
+    background: var(--ac-ink, #eaf2ff);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+.ac-root .ac-input-num { width: 6rem; }
+
+.ac-root .ac-run {
+    margin-left: auto;
+    padding: 0.55rem 1.6rem;
+    border: 3px solid #000;
+    border-radius: 0.55rem;
+    background: var(--ac-magenta, #ff2e8b);
+    color: #fff;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+    transition: transform 0.08s, box-shadow 0.08s;
+}
+.ac-root .ac-run:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 #000; }
+.ac-root .ac-run:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+
+.ac-root .ac-bench-empty {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-bench-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.ac-root .ac-bench-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ac-root .ac-bench-slot-ops { display: flex; gap: 0.2rem; }
+
+.ac-root .ac-bench-slot-ops button {
+    width: 1.6rem;
+    height: 1.6rem;
+    border: 2px solid #000;
+    border-radius: 0.35rem;
+    background: var(--ac-ink, #eaf2ff);
+    color: #042029;
+    font-size: 0.7rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+.ac-root .ac-bench-slot-ops button:disabled { opacity: 0.35; cursor: default; }
+
+.ac-root .ac-bench-result {
+    border-top: 2px dashed rgba(234, 242, 255, 0.2);
+    padding-top: 0.85rem;
+}
+
+.ac-root .ac-breakdown {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ac-root .ac-breakdown-word {
+    font-family: var(--font-display, system-ui);
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--ac-cyan, #00e5ff);
+    margin-right: 0.35rem;
+}
+
+.ac-root .ac-bd-step {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 2.6rem;
+    padding: 0.3rem 0.4rem;
+    border: 2px solid #000;
+    border-radius: 0.45rem;
+    background: rgba(8, 18, 32, 0.6);
+    font-weight: 700;
+}
+
+.ac-root .ac-bd-icon { width: 1.4rem; height: 1.4rem; color: var(--ac-ink, #eaf2ff); }
+.ac-root .ac-bd-op { font-size: 0.72rem; color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62)); }
+.ac-root .ac-bd-run { font-size: 0.95rem; color: var(--ac-ink, #eaf2ff); }
+.ac-root .ac-bd-triggered { border-color: var(--ac-step-accent, var(--ac-accent-neutral, #8aa0b3)); }
+.ac-root .ac-bd-skip { opacity: 0.5; }
+.ac-root .ac-bd-final { background: var(--ac-cyan, #00e5ff); }
+.ac-root .ac-bd-final .ac-bd-op,
+.ac-root .ac-bd-final .ac-bd-run { color: #042029; }
+.ac-root .ac-bd-taxed { background: var(--ac-magenta, #ff2e8b); }
+.ac-root .ac-bd-taxed .ac-bd-op,
+.ac-root .ac-bd-taxed .ac-bd-run { color: #fff; }
+
+.ac-root .ac-bench-note {
+    margin: 0.6rem 0 0;
+    font-size: 0.8rem;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+}
+
+.ac-root .ac-bench-scenario {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.85rem;
+}
+
+.ac-root .ac-bench-turn {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin-left: auto;
+    font-family: var(--font-display, system-ui);
+    font-size: 1.05rem;
+    color: var(--ac-cyan, #00e5ff);
+}
+
+.ac-root .ac-bench-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.ac-root .ac-bench-player {
+    flex: 1 1 16rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.7rem;
+    border: 3px solid #000;
+    border-radius: 0.6rem;
+    background: rgba(8, 18, 32, 0.45);
+}
+
+.ac-root .ac-bench-player-current {
+    border-color: var(--ac-cyan, #00e5ff);
+    box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.25);
+}
+.ac-root .ac-bench-player-active { background: rgba(255, 46, 139, 0.12); }
+
+.ac-root .ac-bench-player-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.ac-root .ac-bench-player-name {
+    padding: 0.35rem 0.6rem;
+    border: 2px solid #000;
+    border-radius: 0.45rem;
+    background: var(--ac-ink, #eaf2ff);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-weight: 800;
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+}
+.ac-root .ac-bench-player-active .ac-bench-player-name {
+    background: var(--ac-magenta, #ff2e8b);
+    color: #fff;
+}
+
+.ac-root .ac-bench-score { display: flex; flex-direction: column; gap: 0.2rem; }
+.ac-root .ac-bench-score .ac-input-num { width: 4.5rem; }
+
+.ac-root .ac-bench-skip {
+    padding: 0.55rem 1.2rem;
+    border: 3px solid #000;
+    border-radius: 0.55rem;
+    background: var(--ac-ink, #eaf2ff);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    box-shadow: var(--ac-shadow-sm, 3px 3px 0 #000);
+    transition: transform 0.08s, box-shadow 0.08s;
+}
+.ac-root .ac-bench-skip:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 #000; }
+.ac-root .ac-bench-skip:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+
+.ac-root .ac-bench-msg {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-root .ac-bench-steal {
+    margin: 0.6rem 0 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ac-magenta, #ff2e8b);
+}
+
+.ac-root .ac-bench-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.6rem;
+}
+
+.ac-root .ac-bench-feed-line {
+    padding: 0.35rem 0.55rem;
+    border-left: 3px solid var(--ac-cyan, #00e5ff);
+    background: rgba(8, 18, 32, 0.5);
+    border-radius: 0.3rem;
+    font-size: 0.82rem;
+    color: var(--ac-ink, #eaf2ff);
+}
+
+.ac-root .ac-bench-history {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.6rem;
+    border-top: 2px dashed rgba(234, 242, 255, 0.2);
+    padding-top: 0.6rem;
+}
+
+.ac-root .ac-bench-history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.ac-root .ac-bench-history-item {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.35rem 0.55rem;
+    border-radius: 0.35rem;
+    background: rgba(8, 18, 32, 0.5);
+    font-size: 0.85rem;
+}
+
+.ac-root .ac-bench-history-num {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--ac-ink-soft, rgba(234, 242, 255, 0.62));
+    min-width: 2rem;
+}
+.ac-root .ac-bench-history-who { font-weight: 800; color: var(--ac-cyan, #00e5ff); min-width: 3rem; }
+.ac-root .ac-bench-history-word {
+    font-family: var(--font-display, system-ui);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: var(--ac-ink, #eaf2ff);
+    flex: 1 1 auto;
+}
+.ac-root .ac-bench-history-score { font-weight: 800; color: var(--ac-additive, #38e08b); }
+.ac-root .ac-bench-history-tax { font-weight: 800; color: var(--ac-magenta, #ff2e8b); }
+.ac-root .ac-bench-history-bounty { font-size: 0.75rem; font-weight: 700; color: var(--ac-magenta, #ff2e8b); }
+
+.ac-root .ac-library-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.85rem;
+}
+
+.ac-root .ac-palette-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.ac-root .ac-palette-add {
+    padding: 0.3rem 0.9rem;
+    border: 2px solid #000;
+    border-radius: 0.4rem;
+    background: var(--ac-additive, #38e08b);
+    color: #042029;
+    font-family: var(--font-display, system-ui);
+    font-weight: 800;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 #000;
+    transition: transform 0.08s, box-shadow 0.08s;
+}
+.ac-root .ac-palette-add:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 #000; }
+.ac-root .ac-palette-add:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 #000; }
+
+.ac-root .ac-library-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-start;
+    justify-content: center;
+}
+.ac-root .ac-library-grid-small { gap: 0.6rem; }

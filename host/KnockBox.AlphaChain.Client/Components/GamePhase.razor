@@ -1,0 +1,192 @@
+@inherits DisposableComponent
+@using System.Globalization
+
+@* In-game phase dispatcher — GameOver / Intermission / Tutorial / Countdown / Round. Ported from
+   the server AlphaChainGame markup, rendering from the projected AlphaChainView and dispatching to
+   the phase components. The bulk of the Round branch lives in RoundPhase. *@
+
+<div class="ac-game">
+    @if (View.Phase == AlphaChainGamePhase.GameOver)
+    {
+        <GameOverPanel Results="View.Results" />
+        <SubmissionHistoryPanel Submissions="View.PlayFeed" />
+        @if (IsHost)
+        {
+            <div class="ac-results-actions">
+                <button class="ac-results-btn" @onclick="ReturnToLobbyAsync">
+                    Return to Lobby
+                </button>
+            </div>
+        }
+        else
+        {
+            <p class="ac-results-wait">Waiting for host…</p>
+        }
+    }
+    else if (View.Phase == AlphaChainGamePhase.Intermission)
+    {
+        <div class="ac-intermission">
+            <div class="ac-im-header">
+                <span class="ac-im-era">Era @View.CurrentEra <span class="ac-im-arrow">→</span> @(View.CurrentEra + 1)</span>
+                @if (View.SubPhaseEndsAtUtc is { } subEnd && View.SubPhaseDurationSeconds > 0)
+                {
+                    <CountdownClock EndTimeUtc="subEnd" Duration="TimeSpan.FromSeconds(View.SubPhaseDurationSeconds)" Context="im">
+                        @{
+                            int imSecs = (int)Math.Ceiling(Math.Max(0, im.RemainingSeconds));
+                            float imFrac = Math.Clamp(im.Fraction, 0f, 1f);
+                        }
+                        <div class="ac-im-timer">
+                            <span class="ac-im-clock @(im.RemainingSeconds <= 3 ? "ac-clock-urgent" : "")">@imSecs<span class="ac-im-clock-unit">s</span></span>
+                            <span class="ac-im-bar"><span class="ac-im-bar-fill" style="width:@((imFrac * 100).ToString("0.#", CultureInfo.InvariantCulture))%"></span></span>
+                        </div>
+                    </CountdownClock>
+                }
+            </div>
+
+            @switch (View.IntermissionPhase)
+            {
+                case IntermissionSubPhase.Optimization:
+                    @if (MyPlayer is { } me)
+                    {
+                        <IntermissionOptimizationPanel Cards="me.EngineBay"
+                                                       Slots="me.ModifierSlots"
+                                                       NewCardIds="me.NewlyDealtModifierIds"
+                                                       SubmittedCount="View.OptimizationSubmittedCount"
+                                                       TotalCount="View.OptimizationTotalCount"
+                                                       HasSubmitted="View.RecipientHasSubmittedOptimization"
+                                                       OnSubmit="SubmitOptimizationAsync" />
+                    }
+                    else
+                    {
+                        <p class="ac-im-spectate">Players are optimizing their Engine Bays… (@View.OptimizationSubmittedCount / @View.OptimizationTotalCount ready)</p>
+                    }
+                    break;
+
+                case IntermissionSubPhase.TaxTutorial:
+                    <TutorialOverlay @key="100" Kind="TutorialKind.Tax" IsHost="IsHost" OnSkip="SkipTutorialAsync" />
+                    break;
+
+                case IntermissionSubPhase.SniperBan:
+                    <SniperBanPicker IsPicker="View.RecipientIsSniperBanPicker"
+                                     LegalLetters="View.LegalBanLetters"
+                                     PickerName="@SniperBanPickerName"
+                                     BannedLetter="@View.BannedLetter"
+                                     OnSelect="SelectSniperBanAsync" />
+                    break;
+            }
+        </div>
+    }
+    else if (View.Phase == AlphaChainGamePhase.Tutorial)
+    {
+        <TutorialOverlay @key="View.CurrentTutorial" Kind="View.CurrentTutorial"
+                         IsHost="IsHost" OnSkip="SkipTutorialAsync" />
+    }
+    else if (View.Phase == AlphaChainGamePhase.Countdown)
+    {
+        <CountdownOverlay EndTimeUtc="@(View.SubPhaseEndsAtUtc ?? DateTimeOffset.UtcNow)"
+                          Duration="TimeSpan.FromSeconds(View.CountdownDurationSeconds)"
+                          Era="View.CurrentEra" BannedLetter="@View.BannedLetter" />
+    }
+    else
+    {
+        <RoundPhase View="View" Submit="Submit" SubmitWithResult="SubmitWithResult" />
+    }
+
+    @* The just-ended tutorial slides away on top of the now-rendered next phase. It is a fixed,
+       pointer-events:none layer, so the revealed phase is immediately interactive. *@
+    @if (_exitingTutorial is { } exitingKind)
+    {
+        <TutorialOverlay Kind="exitingKind" IsHost="IsHost" Exiting="true" />
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AlphaChainView View { get; set; } = default!;
+
+    /// <summary>Fire-and-forget hub command (name + optional JSON payload).</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task> Submit { get; set; } = default!;
+
+    /// <summary>Hub command returning the server's reply (null = success). Used for word submission.</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> SubmitWithResult { get; set; } = default!;
+
+    private bool IsHost => View.RecipientIsHost;
+
+    private PlayerView? MyPlayer => View.Players.FirstOrDefault(p => p.UserId == View.RecipientId);
+
+    private string SniperBanPickerName =>
+        View.SniperBanUserId is { } id && View.Players.FirstOrDefault(p => p.UserId == id) is { } ps
+            ? ps.DisplayName
+            : "the last-place player";
+
+    // ── Tutorial slide-away transition ──────────────────────────────────
+    // When a tutorial leaves the screen, keep rendering it briefly as a fixed overlay sliding away
+    // on top of the now-rendered next phase, then drop it. Tracked across projections in
+    // OnParametersSet (kept in sync with the CSS animation duration in alpha-chain.css).
+    private const int TutorialExitMs = 450;
+    private TutorialKind? _activeTutorial;
+    private TutorialKind? _exitingTutorial;
+    private CancellationTokenSource? _exitCts;
+
+    protected override void OnParametersSet()
+    {
+        var current = CurrentActiveTutorial();
+        if (current is { } showing)
+        {
+            _activeTutorial = showing;
+            _exitingTutorial = null;
+        }
+        else if (_activeTutorial is { } ended)
+        {
+            _activeTutorial = null;
+            _exitingTutorial = ended;
+            StartExitTimer();
+        }
+    }
+
+    /// <summary>The tutorial currently on screen (full-screen phase or the Intermission Tax
+    /// sub-phase), or null when no tutorial is showing.</summary>
+    private TutorialKind? CurrentActiveTutorial()
+    {
+        if (View.Phase == AlphaChainGamePhase.Tutorial)
+            return View.CurrentTutorial;
+        if (View.Phase == AlphaChainGamePhase.Intermission
+            && View.IntermissionPhase == IntermissionSubPhase.TaxTutorial)
+            return TutorialKind.Tax;
+        return null;
+    }
+
+    private void StartExitTimer()
+    {
+        _exitCts?.Cancel();
+        _exitCts?.Dispose();
+        _exitCts = new CancellationTokenSource();
+        _ = RunExitTimerAsync(_exitCts.Token);
+    }
+
+    private async Task RunExitTimerAsync(CancellationToken token)
+    {
+        try { await Task.Delay(TutorialExitMs, token); }
+        catch (TaskCanceledException) { return; }
+        _exitingTutorial = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task SubmitOptimizationAsync(IReadOnlyList<string> cardIds)
+        => Submit(AlphaChainCommands.SubmitOptimization,
+            JsonSerializer.Serialize(new OptimizationPayload(cardIds), AlphaChainContractsJsonContext.Default.OptimizationPayload));
+
+    private Task SelectSniperBanAsync(string letter)
+        => Submit(AlphaChainCommands.SelectSniperBan,
+            JsonSerializer.Serialize(new SniperBanPayload(letter), AlphaChainContractsJsonContext.Default.SniperBanPayload));
+
+    private Task SkipTutorialAsync() => Submit(AlphaChainCommands.SkipTutorial, null);
+
+    private Task ReturnToLobbyAsync() => Submit(AlphaChainCommands.ReturnToLobby, null);
+
+    public override void Dispose()
+    {
+        _exitCts?.Cancel();
+        _exitCts?.Dispose();
+        base.Dispose();
+    }
+}

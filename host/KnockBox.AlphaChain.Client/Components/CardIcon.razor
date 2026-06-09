@@ -1,0 +1,28 @@
+@using System.Collections.Immutable
+
+@* Renders a card glyph by referencing a <symbol> in the external sprite (wwwroot/icons/cards.svg)
+   via <use>, instead of inlining per-card geometry. The geometry lives once in the static file and
+   never enters the render tree, so each instance is just <svg><use/></svg>. Stroke uses currentColor
+   so the parent (GameCard) can still tint it to the card's category accent. *@
+
+<svg class="gc-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+    <use href="@($"_content/KnockBox.AlphaChain/icons/cards.svg#{IconId(Card)}")" />
+</svg>
+
+@code {
+    /// <summary>The card whose glyph to render, keyed by its <see cref="ModifierId"/>.</summary>
+    [Parameter] public ModifierId Card { get; set; }
+
+    // Symbol ids in cards.svg mirror the enum member names verbatim. ModifierId is contiguous from
+    // Unknown = 0, so index the names by (int)id; Unknown -> "fallback" (the original default circle).
+    private static readonly ImmutableArray<string> IconNames =
+        Enum.GetValues<ModifierId>()
+            .OrderBy(id => (int)id)
+            .Select(id => id == ModifierId.Unknown ? "fallback" : id.ToString())
+            .ToImmutableArray();
+
+    // (uint) cast makes the bounds check also reject negative casts -> "fallback".
+    private static string IconId(ModifierId id) =>
+        (uint)id < (uint)IconNames.Length ? IconNames[(int)id] : "fallback";
+}

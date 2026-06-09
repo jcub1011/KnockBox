@@ -24,11 +24,14 @@ namespace KnockBox.AlphaChain.Tests.Unit
         }
 
         [TestMethod]
-        public void GetCustomHeader_ReturnsNonNullFragment()
+        public void GetCustomHeader_ReturnsNull_HeaderNowLivesInTheWasmClient()
         {
-            var module = new AlphaChainModule();
+            // The custom header moved to KnockBox.AlphaChain.Client (AlphaChainHeader); the server
+            // module no longer overrides GetCustomHeader, so it falls back to the IGameModule
+            // default (null), which is only reachable through the interface.
+            IGameModule module = new AlphaChainModule();
 
-            Assert.IsNotNull(module.GetCustomHeader());
+            Assert.IsNull(module.GetCustomHeader());
         }
 
         [TestMethod]

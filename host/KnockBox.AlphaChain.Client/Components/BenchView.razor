@@ -1,0 +1,358 @@
+@* Testing Bay — the host-only developer card-balancing bench, reintroduced for the WASM split.
+   Ported from the old in-circuit AlphaChainCardLibrary page: it now renders from the projected
+   AlphaChainView (the server runs a throwaway god-mode AlphaChainBenchScenario over a permissive
+   word list and projects its inner state) and drives it with bench-* hub commands. Build each
+   player's Engine Bay from the palette, set scores + the banned letter, then submit words turn by
+   turn and watch the per-card scoring trace, steals, and engine effects evolve through the real
+   RoundState pipeline. *@
+
+<div class="ac-library">
+    <header class="ac-library-head">
+        <span class="ac-library-brand">ALPHA CHAIN</span>
+        <span class="ac-library-tagline">Card Bench · @View.CardCatalogue.Count cards · live engine</span>
+        <button type="button" class="ac-bench-leave" @onclick="ExitBench">✕ Leave Testing Bay</button>
+    </header>
+
+    <section class="ac-bench">
+        @* ── Scenario: player count, ban, whose turn it is ── *@
+        <div class="ac-bench-scenario">
+            <label class="ac-field">
+                <span class="ac-field-label">Players</span>
+                <select class="ac-input" value="@_playerCount" @onchange="OnPlayerCountChanged">
+                    @for (int n = MinPlayers; n <= MaxPlayers; n++)
+                    {
+                        <option value="@n">@n</option>
+                    }
+                </select>
+            </label>
+            <button type="button" class="ac-run" @onclick="ResetAsync">Reset</button>
+            <label class="ac-field">
+                <span class="ac-field-label">Banned letter</span>
+                <input type="text" class="ac-input ac-input-num" maxlength="1" value="@_banLetter"
+                       @oninput="OnBanInput" placeholder="—" />
+            </label>
+            <div class="ac-bench-turn">
+                <span class="ac-field-label">Current turn</span>
+                <strong>@CurrentLabel</strong>
+            </div>
+        </div>
+
+        @* ── Per-player columns: each player's bay + score; click a name to target the palette. ── *@
+        <div class="ac-bench-players">
+            @for (int pi = 0; pi < View.Players.Count; pi++)
+            {
+                var index = pi;
+                var player = View.Players[index];
+                var isCurrent = player.UserId == View.CurrentPlayerId;
+                var isTarget = index == _selectedPlayer;
+                <div class="ac-bench-player @(isCurrent ? "ac-bench-player-current" : "") @(isTarget ? "ac-bench-player-active" : "")">
+                    <div class="ac-bench-player-head">
+                        <button type="button" class="ac-bench-player-name" @onclick="() => _selectedPlayer = index">
+                            @player.DisplayName@(isCurrent ? " • turn" : "")
+                        </button>
+                        <label class="ac-bench-score">
+                            <span class="ac-field-label">Score</span>
+                            <input type="number" class="ac-input ac-input-num" min="0"
+                                   value="@player.Score" @onchange="@(e => OnScoreChanged(player.UserId, e))" />
+                        </label>
+                    </div>
+
+                    @if (player.EngineBay.Count == 0)
+                    {
+                        <p class="ac-bench-empty">No cards. Click this name, then ＋ Add from the palette.</p>
+                    }
+                    else
+                    {
+                        <div class="ac-bench-slots">
+                            @for (int i = 0; i < player.EngineBay.Count; i++)
+                            {
+                                var slot = i;
+                                var card = player.EngineBay[slot];
+                                <div class="ac-bench-slot">
+                                    <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id"
+                                              Accent="card.Accent" Size="CardSize.Small" Chips="@card.Chips" />
+                                    <div class="ac-bench-slot-ops">
+                                        <button type="button" title="Move left" disabled="@(slot == 0)"
+                                                @onclick="() => MoveCard(player, slot, -1)">◀</button>
+                                        <button type="button" title="Remove"
+                                                @onclick="() => RemoveCard(player, slot)">✕</button>
+                                        <button type="button" title="Move right" disabled="@(slot == player.EngineBay.Count - 1)"
+                                                @onclick="() => MoveCard(player, slot, 1)">▶</button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        @* ── Submit a word for the current player, or skip their turn. ── *@
+        <div class="ac-bench-controls">
+            <label class="ac-field ac-field-word">
+                <span class="ac-field-label">Word for @CurrentLabel</span>
+                <input type="text" class="ac-input" @bind="_word" @bind:event="oninput" placeholder="type a word…" />
+            </label>
+            <label class="ac-field">
+                <span class="ac-field-label">Remaining (s)</span>
+                <input type="number" class="ac-input ac-input-num" min="0" step="1" @bind="_remaining" />
+            </label>
+            <button type="button" class="ac-run" @onclick="SubmitWord">Submit</button>
+            <button type="button" class="ac-bench-skip" @onclick="Skip">Skip turn ▶</button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_message))
+        {
+            <p class="ac-bench-msg">@_message</p>
+        }
+
+        @* ── The last accepted word's scoring trace, steal line, and effect feed. ── *@
+        @if (View.LatestReplay is { } replay)
+        {
+            <div class="ac-bench-result">
+                <div class="ac-breakdown">
+                    <span class="ac-breakdown-word">
+                        @(replay.DisplayName): @(string.IsNullOrEmpty(replay.Breakdown.Word) ? "∅" : replay.Breakdown.Word.ToUpperInvariant())
+                    </span>
+                    <span class="ac-bd-step ac-bd-seed">
+                        <span class="ac-bd-op">len</span>
+                        <span class="ac-bd-run">@replay.Breakdown.Seed</span>
+                    </span>
+                    @foreach (var step in replay.Breakdown.Steps)
+                    {
+                        var kindClass = step.Triggered ? "ac-bd-triggered" : "ac-bd-skip";
+                        <span class="ac-bd-step @kindClass" style="--ac-step-accent: @CardStyles.AccentColor(step.Accent)">
+                            <span class="ac-bd-icon"><CardIcon Card="@step.CardId" /></span>
+                            <span class="ac-bd-op" style="color: @CardStyles.StepDelta(step)">@(step.Triggered ? step.ValueText : "—")</span>
+                            <span class="ac-bd-run">@step.RunningScore</span>
+                        </span>
+                    }
+                    <span class="ac-bd-step ac-bd-final @(replay.Breakdown.Taxed ? "ac-bd-taxed" : "")">
+                        <span class="ac-bd-op">@(replay.Breakdown.Taxed ? "tax" : "score")</span>
+                        <span class="ac-bd-run">@($"+{replay.Breakdown.FinalScore}")</span>
+                    </span>
+                </div>
+
+                @if (replay.Breakdown.Taxed && replay.Breakdown.FinalBeforeTax != replay.Breakdown.FinalScore)
+                {
+                    <p class="ac-bench-note">Would have scored @replay.Breakdown.FinalBeforeTax before the Zero-Point Tax.</p>
+                }
+
+                @if (replay.HasSteal)
+                {
+                    <p class="ac-bench-steal">
+                        Stolen by @string.Join(", ", replay.TaxCollectors): +@replay.TaxBounty each (Tax Collector).
+                    </p>
+                }
+
+                @if (replay.HasEffects)
+                {
+                    <div class="ac-bench-feed">
+                        <span class="ac-field-label">This submission</span>
+                        @foreach (var fx in replay.Effects)
+                        {
+                            <div class="ac-bench-feed-line">@FormatEffect(fx)</div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        @if (View.LatestEngineNotices.Count > 0)
+        {
+            <div class="ac-bench-feed">
+                <span class="ac-field-label">Off-turn effects</span>
+                @foreach (var fx in View.LatestEngineNotices)
+                {
+                    <div class="ac-bench-feed-line">@FormatEffect(fx)</div>
+                }
+            </div>
+        }
+
+        @* ── Every accepted word this scenario, newest first (View.PlayFeed is newest-first). ── *@
+        @if (View.PlayFeed.Count > 0)
+        {
+            <div class="ac-bench-history">
+                <span class="ac-field-label">Submission history · @View.PlayFeed.Count</span>
+                <ol class="ac-bench-history-list">
+                    @{ var total = View.PlayFeed.Count; }
+                    @for (int i = 0; i < total; i++)
+                    {
+                        var sub = View.PlayFeed[i];
+                        <li class="ac-bench-history-item">
+                            <span class="ac-bench-history-num">#@(total - i)</span>
+                            <span class="ac-bench-history-who">@sub.DisplayName</span>
+                            <span class="ac-bench-history-word">@sub.Word.ToUpperInvariant()</span>
+                            @if (sub.ZeroPointTax)
+                            {
+                                <span class="ac-bench-history-tax">taxed · 0</span>
+                            }
+                            else
+                            {
+                                <span class="ac-bench-history-score">+@sub.Score</span>
+                            }
+                            @if (sub.TaxBounty > 0)
+                            {
+                                <span class="ac-bench-history-bounty">bounty +@sub.TaxBounty</span>
+                            }
+                        </li>
+                    }
+                </ol>
+            </div>
+        }
+    </section>
+
+    @* ── Palette: every dealable card; ＋ Add drops it into the targeted player's bay. ── *@
+    <div class="ac-library-toolbar">
+        <span class="ac-library-tagline">Palette → adding to @TargetLabel</span>
+        <button type="button" class="ac-library-size" @onclick="ToggleSize">
+            @(_size == CardSize.Large ? "Show small cards" : "Show large cards")
+        </button>
+    </div>
+
+    <div class="ac-library-grid @(_size == CardSize.Small ? "ac-library-grid-small" : "")">
+        @foreach (var card in View.CardCatalogue)
+        {
+            <div class="ac-palette-item">
+                @if (_size == CardSize.Large)
+                {
+                    <button type="button" class="ac-cardbtn" title="Click to flip" @onclick="() => ToggleFlip(card.Id)">
+                        <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Accent="card.Accent"
+                                  Size="CardSize.Large" Chips="@card.Chips" Flipped="@_flipped.Contains(card.Id)" />
+                    </button>
+                }
+                else
+                {
+                    <GameCard Name="@card.Name" Description="@card.Description" Card="@card.Id" Accent="card.Accent"
+                              Size="CardSize.Small" Chips="@card.Chips" />
+                }
+                <button type="button" class="ac-palette-add" @onclick="() => AddCard(card.Id)">＋ Add</button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AlphaChainView View { get; set; } = default!;
+
+    /// <summary>Fire-and-forget hub command (name + optional JSON payload).</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task> Submit { get; set; } = default!;
+
+    /// <summary>Hub command returning the server's reply (null = success). Used for word submission.</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> SubmitWithResult { get; set; } = default!;
+
+    private const int MinPlayers = 2;
+    private const int MaxPlayers = 8;
+
+    // ── Client-local UI state (palette presentation, edit target, draft word) ──
+    private CardSize _size = CardSize.Large;
+    private readonly HashSet<ModifierId> _flipped = new();
+    private int _selectedPlayer;
+    private int _playerCount = 2;
+    private string _banLetter = "";
+    private string _word = "";
+    private int _remaining = 15;
+    private string _message = "";
+
+    private PlayerView? CurrentPlayer => View.Players.FirstOrDefault(p => p.UserId == View.CurrentPlayerId);
+    private string CurrentLabel => CurrentPlayer?.DisplayName ?? "—";
+
+    private PlayerView? TargetPlayer =>
+        _selectedPlayer >= 0 && _selectedPlayer < View.Players.Count ? View.Players[_selectedPlayer] : null;
+    private string TargetLabel => TargetPlayer?.DisplayName ?? "—";
+
+    // ── Bay editing — server is authoritative; recompute the id list from the projected bay + the
+    //    op and send bench-set-bay. The next projection refreshes the rendered bay. ──
+    private Task SetBay(Guid playerId, IEnumerable<ModifierId> ids)
+        => Submit(AlphaChainCommands.BenchSetBay,
+            JsonSerializer.Serialize(
+                new BenchBayPayload(playerId, ids.Select(i => i.ToString()).ToList()),
+                AlphaChainContractsJsonContext.Default.BenchBayPayload));
+
+    private Task AddCard(ModifierId id)
+        => TargetPlayer is { } p ? SetBay(p.UserId, p.EngineBay.Select(c => c.Id).Append(id)) : Task.CompletedTask;
+
+    private Task RemoveCard(PlayerView p, int slot)
+    {
+        var ids = p.EngineBay.Select(c => c.Id).ToList();
+        if (slot < 0 || slot >= ids.Count) return Task.CompletedTask;
+        ids.RemoveAt(slot);
+        return SetBay(p.UserId, ids);
+    }
+
+    private Task MoveCard(PlayerView p, int slot, int delta)
+    {
+        var ids = p.EngineBay.Select(c => c.Id).ToList();
+        int target = slot + delta;
+        if (slot < 0 || slot >= ids.Count || target < 0 || target >= ids.Count) return Task.CompletedTask;
+        (ids[slot], ids[target]) = (ids[target], ids[slot]);
+        return SetBay(p.UserId, ids);
+    }
+
+    private Task OnScoreChanged(Guid playerId, ChangeEventArgs e)
+        => int.TryParse(e.Value?.ToString(), out var score)
+            ? Submit(AlphaChainCommands.BenchSetScore,
+                JsonSerializer.Serialize(new BenchScorePayload(playerId, score),
+                    AlphaChainContractsJsonContext.Default.BenchScorePayload))
+            : Task.CompletedTask;
+
+    private Task OnBanInput(ChangeEventArgs e)
+    {
+        var text = e.Value?.ToString() ?? "";
+        _banLetter = text.Length > 0 ? text[..1] : "";
+        return Submit(AlphaChainCommands.BenchSetBan,
+            JsonSerializer.Serialize(new BenchBanPayload(_banLetter.Length > 0 ? _banLetter : null),
+                AlphaChainContractsJsonContext.Default.BenchBanPayload));
+    }
+
+    private Task OnPlayerCountChanged(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var n)) return Task.CompletedTask;
+        _playerCount = n;
+        return ResetAsync();
+    }
+
+    private Task ResetAsync()
+    {
+        _selectedPlayer = 0;
+        _word = "";
+        _message = "";
+        _banLetter = "";
+        return Submit(AlphaChainCommands.BenchReset,
+            JsonSerializer.Serialize(new BenchResetPayload(_playerCount),
+                AlphaChainContractsJsonContext.Default.BenchResetPayload));
+    }
+
+    private async Task SubmitWord()
+    {
+        var error = await SubmitWithResult(AlphaChainCommands.BenchSubmit,
+            JsonSerializer.Serialize(new BenchSubmitPayload(_word, _remaining),
+                AlphaChainContractsJsonContext.Default.BenchSubmitPayload));
+        // A rejection comes back as the hub reply; an accepted word returns null and the breakdown
+        // strip above shows the result.
+        _message = string.IsNullOrEmpty(error) ? "" : error;
+    }
+
+    private Task Skip()
+    {
+        _message = "";
+        return Submit(AlphaChainCommands.BenchSkip, null);
+    }
+
+    private Task ExitBench() => Submit(AlphaChainCommands.BenchExit, null);
+
+    private void ToggleSize() => _size = _size == CardSize.Large ? CardSize.Small : CardSize.Large;
+
+    private void ToggleFlip(ModifierId id)
+    {
+        if (!_flipped.Remove(id)) _flipped.Add(id);
+    }
+
+    /// <summary>One feed line for an automated engine effect (who, which card, target, what happened).</summary>
+    private static string FormatEffect(EngineEffectEvent fx)
+    {
+        var prefix = fx.Negated ? "⛊ blocked — " : "";
+        var target = fx.TargetName is { } t ? $" → {t}" : "";
+        return $"{prefix}{fx.HolderName} · {fx.CardName}{target} · {fx.Reason}";
+    }
+}

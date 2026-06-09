@@ -1,58 +1,11 @@
 using System.Buffers;
 using System.Collections.Immutable;
+using KnockBox.AlphaChain.Contracts;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 
 namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 {
-    /// <summary>Strongly-typed identity for every modifier card, replacing the legacy string ids.
-    /// The factory creates a card from one of these; the network/UI id surface is <c>ToString()</c>.</summary>
-    public enum ModifierId
-    {
-        Unknown = 0,
-        TheAnchor,
-        Vanilla,
-        ConsonantCrunch,
-        VocalVowels,
-        VowelSurge,
-        TheArchitect,
-        BrickLayer,
-        Speedracer,
-        LetterHoarder,
-        Sesquipedalian,
-        GutturalRoar,
-        HighRoller,
-        PerfectLink,
-        TheVault,
-        Redline,
-        PanicButton,
-        HyperDrive,
-        TaxCollector,
-        IrsAgent,
-        RouletteWheel,
-        TollBooth,
-        BaitAndSwitch,
-        Blindfold,
-        DoubleDown,
-        AnchorChain,
-        FlakCannon,
-        BountyHunter,
-        TitaniumMirror,
-        HeatSink,
-        Prism,
-        Wildcard,
-        Catalyst,
-        TheBlueprint,
-        SlowBurn,
-        TryHard,
-        ChronoSyphon,
-        Forgery,
-        TaxWriteOff,
-        BoosterPack,
-        Scavenger,
-        MagnifyingGlass,
-    }
-
     /// <summary>
     /// A self-contained modifier card: it owns its identity, presentation, scoring, and every
     /// side-effecting behavior. Scoring folds through <see cref="ExecuteModifier"/>; the lifecycle

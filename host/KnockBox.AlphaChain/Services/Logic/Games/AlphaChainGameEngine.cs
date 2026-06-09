@@ -1,14 +1,18 @@
+using System.Text.Json;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM.States;
+using KnockBox.AlphaChain.Pages.Bench;
+using KnockBox.AlphaChain.Services.Projection;
 using KnockBox.AlphaChain.Services.State.Games;
 using KnockBox.AlphaChain.Services.State.Games.Data;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Games.Shared.Projection;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.WordService.Contracts;
 
@@ -32,8 +36,268 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
         IEngineEvaluator evaluator,
         IModifierCardFactory modifierFactory,
         ILogger<AlphaChainGameEngine> logger,
-        ILogger<AlphaChainGameState> stateLogger) : AbstractGameEngine<AlphaChainGameState>(2, 8)
+        ILogger<AlphaChainGameState> stateLogger)
+        : AbstractGameEngine<AlphaChainGameState>(2, 8),
+          IGameStateProjector, IGameCommandHandler, IServerTickHandler
     {
+        // The projector resolves the per-card rules text (for the game-over history tooltip) from the
+        // same modifier-card factory the engine uses; cards are flattened to wire DTOs server-side.
+        private readonly AlphaChainStateProjector _projector = new(modifierFactory);
+
+        // Match the hub's wire format: enums as strings, case-insensitive property names,
+        // so a client-serialized command payload deserializes here.
+        private static readonly JsonSerializerOptions CommandJsonOptions = new()
+        {
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
+            PropertyNameCaseInsensitive = true,
+        };
+
+        // ── Hub projection / command / tick surface ──────────────────────────
+
+        /// <summary>Per-recipient projection entry point used by the host's <c>GameViewCoordinator</c>.</summary>
+        public object? ProjectFor(AbstractGameState state, Guid recipientId)
+            => ((IGameStateProjector)_projector).ProjectFor(state, recipientId);
+
+        /// <summary>
+        /// Maps a hub command name to the same engine method a Razor page used to call directly.
+        /// Per-command authorization (host-only, active-player) lives in the invoked methods / FSM
+        /// states. Compares the caller by <c>User.Id</c>, never by reference: the hub resolves a
+        /// fresh <c>User</c> per command, so a reference check would always reject the real host.
+        /// </summary>
+        public async ValueTask<Result> HandleCommandAsync(
+            User caller, AbstractGameState state, string command, string? payloadJson, CancellationToken ct = default)
+        {
+            if (state is not AlphaChainGameState s)
+                return Result.FromError("Invalid game state for Alpha Chain.");
+
+            return command switch
+            {
+                AlphaChainCommands.Start              => await StartFromPayload(caller, s, payloadJson, ct),
+                AlphaChainCommands.SubmitWord         => await SubmitWordFromPayload(caller, s, payloadJson),
+                AlphaChainCommands.AdvanceTurn        => await AdvanceTurnAsync(caller.Id, s),
+                AlphaChainCommands.SubmitOptimization => await SubmitOptimizationFromPayload(caller, s, payloadJson),
+                AlphaChainCommands.SelectSniperBan    => await SelectSniperBanFromPayload(caller, s, payloadJson),
+                AlphaChainCommands.SkipTutorial       => await SkipTutorialAsync(caller.Id, s),
+                AlphaChainCommands.ReturnToLobby      => ReturnToLobby(caller, s),
+                AlphaChainCommands.UpdateSettings     => UpdateSettingsFromPayload(caller, s, payloadJson),
+                AlphaChainCommands.KickPlayer         => KickFromPayload(caller, s, payloadJson),
+                // ── Testing Bay (host-only dev card bench) ──
+                AlphaChainCommands.BenchEnter         => await BenchEnter(caller, s),
+                AlphaChainCommands.BenchExit          => BenchExit(caller, s),
+                AlphaChainCommands.BenchReset         => await BenchResetFromPayload(caller, s, payloadJson),
+                AlphaChainCommands.BenchSetBan        => BenchSetBanFromPayload(caller, s, payloadJson),
+                AlphaChainCommands.BenchSetBay        => BenchSetBayFromPayload(caller, s, payloadJson),
+                AlphaChainCommands.BenchSetScore      => BenchSetScoreFromPayload(caller, s, payloadJson),
+                AlphaChainCommands.BenchSubmit        => await BenchSubmitFromPayload(caller, s, payloadJson),
+                AlphaChainCommands.BenchSkip          => await BenchSkip(caller, s),
+                _ => Result.FromError($"Unknown command [{command}].")
+            };
+        }
+
+        /// <summary>Server-owned clock entry point; drives the FSM's time-based transitions
+        /// (replacing the old host-circuit tick).</summary>
+        void IServerTickHandler.Tick(AbstractGameState state, DateTimeOffset now)
+        {
+            if (state is AlphaChainGameState s && s.Context is not null)
+                Tick(s.Context, now);
+        }
+
+        // ── Command payload adapters ─────────────────────────────────────────
+
+        private async Task<Result> StartFromPayload(User caller, AlphaChainGameState state, string? payloadJson, CancellationToken ct)
+        {
+            // The two start buttons choose whether the host plays; carry it into settings before
+            // the host-checked StartAsync runs StartAsyncCore (mirrors the old lobby's StartGame).
+            var payload = Deserialize<StartPayload>(payloadJson);
+            if (caller.Id == state.Host.Id
+                && state.UpdateSettings(cfg => cfg with { HostPlays = payload?.HostPlays ?? false }).TryGetFailure(out var settingsError))
+                return settingsError;
+            return await StartAsync(caller, state, ct);
+        }
+
+        private async Task<Result> SubmitWordFromPayload(User caller, AlphaChainGameState state, string? payloadJson)
+        {
+            if (Deserialize<SubmitWordPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed submit-word payload.");
+
+            var outcome = await SubmitWordAsync(caller.Id, p.Word, state);
+            if (outcome.TryGetFailure(out var error)) return error;
+            if (!outcome.TryGetSuccess(out var result)) return Result.Success;
+
+            // The typed-return pattern doesn't fit a projection-only hub: surface a rejection as a
+            // Result error (the client reads SubmitCommandAsync's return value for inline feedback).
+            // Accepted plays (scored or taxed) are a success — the score-replay strip shows the rest.
+            return result switch
+            {
+                SubmitWordResult.Accepted or SubmitWordResult.AcceptedZeroPointTax => Result.Success,
+                SubmitWordResult.RejectedNotYourTurn => Result.FromError("It's not your turn."),
+                SubmitWordResult.RejectedChainBroken c => Result.FromError($"Word must start with '{char.ToUpperInvariant(c.Required)}'."),
+                SubmitWordResult.RejectedNotInDictionary => Result.FromError("Not a word in the dictionary."),
+                SubmitWordResult.RejectedDuplicate => Result.FromError("That word has already been played."),
+                SubmitWordResult.RejectedEmpty => Result.FromError("Enter a word."),
+                _ => Result.Success
+            };
+        }
+
+        private async Task<Result> SubmitOptimizationFromPayload(User caller, AlphaChainGameState state, string? payloadJson)
+        {
+            if (Deserialize<OptimizationPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed optimization payload.");
+            return await SubmitOptimizationAsync(caller.Id, p.CardIds, state);
+        }
+
+        private async Task<Result> SelectSniperBanFromPayload(User caller, AlphaChainGameState state, string? payloadJson)
+        {
+            if (Deserialize<SniperBanPayload>(payloadJson) is not { Letter.Length: > 0 } p)
+                return Result.FromError("Malformed sniper-ban payload.");
+            return await SelectSniperBanAsync(caller.Id, p.Letter[0], state);
+        }
+
+        private Result UpdateSettingsFromPayload(User caller, AlphaChainGameState state, string? payloadJson)
+        {
+            // Host-only, and only meaningful before the game starts (the panel is a lobby control).
+            // HostPlays is owned by the start buttons, so it is preserved across a settings edit.
+            if (caller.Id != state.Host.Id)
+                return Result.FromError("Only the host can change the settings.");
+            if (!state.IsJoinable)
+                return Result.FromError("Settings can only change before the game starts.");
+            if (Deserialize<AlphaChainSettings>(payloadJson) is not { } incoming)
+                return Result.FromError("Malformed settings payload.");
+            return state.UpdateSettings(cur => incoming with { HostPlays = cur.HostPlays });
+        }
+
+        private Result KickFromPayload(User caller, AlphaChainGameState state, string? payloadJson)
+        {
+            if (Deserialize<TargetPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed kick payload.");
+
+            var target = state.Players.FirstOrDefault(e => e.User.Id == p.PlayerId).User;
+            if (target is null)
+                return Result.FromError("Player is not in this lobby.");
+            return state.KickPlayer(caller, target);
+        }
+
+        private static T? Deserialize<T>(string? payloadJson)
+        {
+            if (string.IsNullOrEmpty(payloadJson)) return default;
+            try { return JsonSerializer.Deserialize<T>(payloadJson, CommandJsonOptions); }
+            catch (JsonException) { return default; }
+        }
+
+        // ── Testing Bay (host-only developer card bench) ─────────────────────
+        //
+        // The bench is a throwaway, god-mode AlphaChainBenchScenario (its own inner engine over a
+        // permissive word list + synthetic players) hung off the lobby state. Bench commands mutate
+        // the scenario's INNER state, then ping the LOBBY state (RaiseBenchChanged / SetJoinable) so
+        // the coordinator re-projects — the two are sequential top-level calls, never nested, to keep
+        // the per-state execute-lock identity clean.
+
+        private async Task<Result> BenchEnter(User caller, AlphaChainGameState state)
+        {
+            if (caller.Id != state.Host.Id) return Result.FromError("Only the host can open the Testing Bay.");
+            if (state.Bench is not null) return Result.Success;
+            // Single-occupant only: the lobby roster holds non-host joiners, so this must be empty.
+            if (state.Players.Length != 0)
+                return Result.FromError("Close the lobby to others before opening the Testing Bay.");
+
+            var bench = new AlphaChainBenchScenario(rng, evaluator, modifierFactory, logger, stateLogger);
+            await bench.ResetAsync(AlphaChainBenchScenario.MinPlayers);
+            state.Bench = bench;
+            // Close the lobby so no one can join while the god-mode bench is active; the Execute also
+            // fans out the IsBench=true projection.
+            return state.Execute(() => state.SetJoinable(false));
+        }
+
+        private Result BenchExit(User caller, AlphaChainGameState state)
+        {
+            if (caller.Id != state.Host.Id) return Result.FromError("Only the host can close the Testing Bay.");
+            state.Bench?.Dispose();
+            state.Bench = null;
+            return state.Execute(() => state.SetJoinable(true));
+        }
+
+        private async Task<Result> BenchResetFromPayload(User caller, AlphaChainGameState state, string? payloadJson)
+        {
+            if (!TryBench(caller, state, out var bench, out var err)) return err;
+            if (Deserialize<BenchResetPayload>(payloadJson) is not { } p) return Result.FromError("Malformed bench-reset payload.");
+            await bench.ResetAsync(p.PlayerCount);
+            state.RaiseBenchChanged();
+            return Result.Success;
+        }
+
+        private Result BenchSetBanFromPayload(User caller, AlphaChainGameState state, string? payloadJson)
+        {
+            if (!TryBench(caller, state, out var bench, out var err)) return err;
+            var letter = Deserialize<BenchBanPayload>(payloadJson)?.Letter;
+            bench.SetBannedLetter(string.IsNullOrEmpty(letter) ? null : letter[0]);
+            state.RaiseBenchChanged();
+            return Result.Success;
+        }
+
+        private Result BenchSetBayFromPayload(User caller, AlphaChainGameState state, string? payloadJson)
+        {
+            if (!TryBench(caller, state, out var bench, out var err)) return err;
+            if (Deserialize<BenchBayPayload>(payloadJson) is not { } p) return Result.FromError("Malformed bench-set-bay payload.");
+            var cards = p.CardIds
+                .Select(id => Enum.TryParse<ModifierId>(id, out var m) ? m : ModifierId.Unknown)
+                .Where(m => m != ModifierId.Unknown)
+                .ToList();
+            bench.SetBay(p.PlayerId, cards);
+            state.RaiseBenchChanged();
+            return Result.Success;
+        }
+
+        private Result BenchSetScoreFromPayload(User caller, AlphaChainGameState state, string? payloadJson)
+        {
+            if (!TryBench(caller, state, out var bench, out var err)) return err;
+            if (Deserialize<BenchScorePayload>(payloadJson) is not { } p) return Result.FromError("Malformed bench-set-score payload.");
+            bench.SetScore(p.PlayerId, p.Score);
+            state.RaiseBenchChanged();
+            return Result.Success;
+        }
+
+        private async Task<Result> BenchSubmitFromPayload(User caller, AlphaChainGameState state, string? payloadJson)
+        {
+            if (!TryBench(caller, state, out var bench, out var err)) return err;
+            if (Deserialize<BenchSubmitPayload>(payloadJson) is not { } p) return Result.FromError("Malformed bench-submit payload.");
+
+            var outcome = await bench.SubmitAsync(p.Word, p.RemainingSeconds);
+            state.RaiseBenchChanged();
+            if (outcome.TryGetFailure(out var error)) return error;
+            if (!outcome.TryGetSuccess(out var result)) return Result.Success;
+            // Surface a rejection as a Result error (shown inline); accepted plays are a success and
+            // the projected score-replay strip reports the points.
+            return result switch
+            {
+                SubmitWordResult.Accepted or SubmitWordResult.AcceptedZeroPointTax => Result.Success,
+                SubmitWordResult.RejectedNotYourTurn => Result.FromError("It's not that player's turn."),
+                SubmitWordResult.RejectedChainBroken c => Result.FromError($"Word must start with '{char.ToUpperInvariant(c.Required)}'."),
+                SubmitWordResult.RejectedNotInDictionary => Result.FromError("Not a valid word (letters only)."),
+                SubmitWordResult.RejectedDuplicate => Result.FromError("That word has already been played."),
+                SubmitWordResult.RejectedEmpty => Result.FromError("Enter a word."),
+                _ => Result.Success
+            };
+        }
+
+        private async Task<Result> BenchSkip(User caller, AlphaChainGameState state)
+        {
+            if (!TryBench(caller, state, out var bench, out var err)) return err;
+            var result = await bench.SkipTurnAsync();
+            state.RaiseBenchChanged();
+            return result;
+        }
+
+        /// <summary>Host-only + bench-active gate shared by the in-bench commands.</summary>
+        private static bool TryBench(User caller, AlphaChainGameState state, out AlphaChainBenchScenario bench, out Result error)
+        {
+            bench = null!;
+            if (caller.Id != state.Host.Id) { error = Result.FromError("Only the host can drive the Testing Bay."); return false; }
+            if (state.Bench is not { } b) { error = Result.FromError("The Testing Bay is not open."); return false; }
+            bench = b;
+            error = Result.Success;
+            return true;
+        }
+
         // ── Lifecycle ────────────────────────────────────────────────────────
 
         /// <summary>
@@ -57,6 +321,10 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
             var gameState = new AlphaChainGameState(host, stateLogger);
             gameState.Execute(() => gameState.SetJoinable(true));
             gameState.SubscribePlayerUnregistered(user => HandlePlayerLeft(user, gameState));
+            // The Testing Bay's throwaway inner state holds its own lock/synthetic players; dispose it
+            // when the lobby state tears down (host leaves / grace expires). Dispose() is non-virtual,
+            // so this disposed-subscription is the correct teardown hook.
+            gameState.SubscribeStateDisposed(() => gameState.Bench?.Dispose());
             logger.LogInformation("Created Alpha Chain gameState with user [{userId}] as host.", host.Id);
             return Task.FromResult<ValueResult<AbstractGameState>>(gameState);
         }

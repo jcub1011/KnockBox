@@ -1,29 +1,7 @@
+using KnockBox.AlphaChain.Contracts;
+
 namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
 {
-    /// <summary>
-    /// A card's standardized accent — the family it belongs to, encoded as a fixed border color so a
-    /// player can recognize a card's purpose at a glance. The palette is small and standardized (one
-    /// color per family) and lives in exactly one place (<see cref="CardAccents"/>); cards expose their
-    /// accent via <see cref="IModifierCard.GetAccent"/> rather than hard-coding a hex.
-    /// </summary>
-    public enum CardAccent
-    {
-        /// <summary>Word/letter scoring cards.</summary>
-        Letter,
-
-        /// <summary>Shot-clock cards.</summary>
-        Clock,
-
-        /// <summary>Points/economy and aggression cards.</summary>
-        Economy,
-
-        /// <summary>Utility, defensive, and policy cards.</summary>
-        Utility,
-
-        /// <summary>Fallback for an unknown/inert card.</summary>
-        Neutral,
-    }
-
     /// <summary>The standardized accent palette: one CSS color token per <see cref="CardAccent"/>, plus
     /// the family map from a card's <see cref="ModifierId"/>. The color tokens are theme variables so the
     /// concrete hues live in CSS; the map is the single source of truth for which family a card is in.</summary>

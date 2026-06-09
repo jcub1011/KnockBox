@@ -18,10 +18,29 @@
       loads before any game plugin, so no host wiring is needed here.
     -->
     <ProjectReference Include="..\KnockBox.WordService.Contracts\KnockBox.WordService.Contracts.csproj" />
+    <!--
+      Shared contract DTOs for the WASM tri-split: the moved enums/records (ModifierId,
+      CardAccent, the phase enums, AlphaChainSettings) plus the projected view + commands.
+      The server engine/state/projector reference these at runtime.
+    -->
+    <ProjectReference Include="..\KnockBox.AlphaChain.Contracts\KnockBox.AlphaChain.Contracts.csproj" />
+  </ItemGroup>
+
+  <!--
+    The Contracts DLL is a private dependency loaded into this plugin's own ALC (it is
+    not promoted to the default ALC), so it must be staged into games/KnockBox.AlphaChain/
+    alongside the plugin DLL. Omitting this makes the plugin's PluginLoadContext throw
+    FileNotFoundException at load and the loader silently SKIPS the whole plugin — the
+    game vanishes from the home page and /api/games. See Directory.Plugin.targets.
+  -->
+  <ItemGroup>
+    <PluginPrivateAssembly Include="$(TargetDir)KnockBox.AlphaChain.Contracts.dll" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Microsoft.Extensions.Logging" />
+    <!-- The moved Contracts types resolve unqualified across the whole server project. -->
+    <Using Include="KnockBox.AlphaChain.Contracts" />
   </ItemGroup>
 
   <ItemGroup>

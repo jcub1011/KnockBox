@@ -35,7 +35,14 @@ export function register(id, el, dotNetRef) {
         }
     };
     state.blurHandler = () => {
-        notify(state, 'OnDraftCommitted', el.value);
+        // Defer the .NET call out of the synchronous blur callback. Under WASM, a blur fired by
+        // Blazor's own render edit (e.g. the input being `disabled` on a turn change) would
+        // otherwise call back into .NET while the runtime heap is locked mid-render — the
+        // "Assertion failed - heap is currently locked" error. OnDraftCommitted is a
+        // fire-and-forget resilience mirror, so running it a tick later is harmless. (On the old
+        // Blazor Server circuit the call was always a remote async hop, so this never bit.)
+        const value = el.value;
+        setTimeout(() => notify(state, 'OnDraftCommitted', value), 0);
     };
 
     el.addEventListener('keydown', state.keyHandler);

@@ -8,5 +8,10 @@
   "capabilities": [],
   "tileAsset": "tile.svg",
   "backgroundColor": "#06080f",
-  "fontColor": "#eaf2ff"
+  "fontColor": "#eaf2ff",
+  "clientAssembly": "KnockBox.AlphaChain.Client",
+  "clientContracts": ["KnockBox.AlphaChain.Contracts"],
+  "clientAssets": [
+    { "name": "KnockBox.AlphaChain.Client", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+  ]
 }

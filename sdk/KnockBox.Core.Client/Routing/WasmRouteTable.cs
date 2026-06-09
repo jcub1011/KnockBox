@@ -26,7 +26,7 @@ public static class WasmRouteTable
     /// </para>
     /// </summary>
     private static readonly string[] Prefixes =
-        ["spike/wasm", "shell", "room/dice-simulator", "room/card-counter"];
+        ["spike/wasm", "shell", "room/dice-simulator", "room/card-counter", "room/alpha-chain"];
 
     /// <summary>
     /// Returns whether <paramref name="baseRelativePath"/> (e.g. the result of

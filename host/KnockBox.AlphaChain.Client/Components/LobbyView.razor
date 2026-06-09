@@ -1,0 +1,118 @@
+@* Lobby view — roster, host settings panel, and the two start buttons. Ported from the server
+   AlphaChainLobby markup, rendering from the projected AlphaChainView and sending commands over
+   the hub. *@
+
+<div class="content">
+    <div class="ac-lobby">
+        <header class="ac-lobby-head">
+            <span class="ac-lobby-brand">ALPHA CHAIN</span>
+            <span class="ac-lobby-tagline">Build the value chain · beat the shot clock</span>
+        </header>
+
+        <div class="ac-lobby-card">
+            <h4 class="ac-lobby-heading">
+                Players
+                <span class="ac-lobby-count">@View.Roster.Count</span>
+            </h4>
+            <div class="ac-lobby-players">
+                @foreach (var entry in View.Roster)
+                {
+                    var isHostPlayer = entry.IsHost;
+                    @if (IsHost)
+                    {
+                        <button class="ac-player-chip @(isHostPlayer ? "ac-player-host" : "")" title="Click to kick player."
+                                @onclick="() => KickPlayer(entry.UserId)">
+                            <span class="ac-player-name">@entry.DisplayName</span>
+                            @if (isHostPlayer)
+                            {
+                                <span class="ac-player-badge">Host</span>
+                            }
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="ac-player-chip @(isHostPlayer ? "ac-player-host" : "")">
+                            <span class="ac-player-name">@entry.DisplayName</span>
+                            @if (isHostPlayer)
+                            {
+                                <span class="ac-player-badge">Host</span>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+
+            @{
+                // The roster includes the host entry; the in-game participant count excludes a
+                // shared-display host, so derive non-host joiners for the start gating.
+                int joinedPlayers = View.Roster.Count(r => !r.IsHost);
+                bool settingsValid = View.Settings.Validate().IsValid;
+            }
+
+            @if (IsHost)
+            {
+                @* Two start buttons (mirrors the server lobby): shared display vs. host as player.
+                   Both are gated on a valid config — Settings.Validate() is the single source of
+                   truth shared with the server's StartAsyncCore. *@
+                <div class="ac-lobby-actions">
+                    <button class="ac-start-btn ac-start-primary"
+                            disabled="@(joinedPlayers < View.MinPlayerCount || !settingsValid)"
+                            @onclick="() => StartGame(false)">
+                        Start Game
+                    </button>
+                    <button class="ac-start-btn ac-start-secondary"
+                            disabled="@(joinedPlayers + 1 < View.MinPlayerCount || !settingsValid)"
+                            @onclick="() => StartGame(true)">
+                        Start As Player
+                    </button>
+                </div>
+                @if (joinedPlayers + 1 < View.MinPlayerCount)
+                {
+                    <p class="ac-lobby-note">Need at least @View.MinPlayerCount players (or @(View.MinPlayerCount - 1) plus the host).</p>
+                }
+                else if (joinedPlayers < View.MinPlayerCount)
+                {
+                    <p class="ac-lobby-note">Need @View.MinPlayerCount players to start, or start as a player to join in.</p>
+                }
+                else if (!settingsValid)
+                {
+                    <p class="ac-lobby-note ac-lobby-note-warn">Fix the highlighted settings below before starting.</p>
+                }
+
+                @* Testing Bay — a host-only developer card bench (closes the lobby while open, so it's
+                   only available when you're alone). Drives a throwaway god-mode match to balance cards. *@
+                <button class="ac-start-btn ac-start-bench"
+                        disabled="@(joinedPlayers > 0)"
+                        title="@(joinedPlayers > 0 ? "Only available when no one else has joined." : "Open the card-balancing Testing Bay.")"
+                        @onclick="() => Submit(AlphaChainCommands.BenchEnter, null)">
+                    🧪 Testing Bay
+                </button>
+            }
+            else
+            {
+                <p class="ac-lobby-note">Waiting for host to start…</p>
+            }
+
+            @* Host edits the config here; non-host players see it read-only. Every projection
+               re-renders the panel, so a host edit immediately reflects in joiners' read-only views. *@
+            <AlphaChainSettingsPanel View="View" Submit="Submit" />
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AlphaChainView View { get; set; } = default!;
+
+    /// <summary>Sends a hub command (name + optional JSON payload).</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task> Submit { get; set; } = default!;
+
+    private bool IsHost => View.RecipientIsHost;
+
+    private Task KickPlayer(Guid userId)
+        => Submit(AlphaChainCommands.KickPlayer,
+            JsonSerializer.Serialize(new TargetPayload(userId), AlphaChainContractsJsonContext.Default.TargetPayload));
+
+    private Task StartGame(bool hostPlays)
+        => Submit(AlphaChainCommands.Start,
+            JsonSerializer.Serialize(new StartPayload(hostPlays), AlphaChainContractsJsonContext.Default.StartPayload));
+}

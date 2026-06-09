@@ -1,3 +1,4 @@
+using KnockBox.AlphaChain.Pages.Bench;
 using KnockBox.AlphaChain.Services.Logic.Games.Data;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 using KnockBox.AlphaChain.Services.Logic.Games.FSM;
@@ -270,5 +271,24 @@ namespace KnockBox.AlphaChain.Services.State.Games
                 Settings = mutate(Settings);
                 SetHostIsParticipant(Settings.HostPlays);
             });
+
+        // ── Testing Bay (host-only developer card bench) ──────────────────────
+
+        /// <summary>
+        /// The active Testing Bay scenario (a throwaway, god-mode match the host drives over a
+        /// permissive word list), or null when the bench is closed. Held off the lobby state so the
+        /// WASM projector can render the bench by projecting its inner state; disposed when this lobby
+        /// state is disposed (wired in <c>AlphaChainGameEngine.CreateStateAsync</c>). Single-host only
+        /// — the engine closes the lobby (<c>SetJoinable(false)</c>) while it is active.
+        /// </summary>
+        internal AlphaChainBenchScenario? Bench { get; set; }
+
+        /// <summary>
+        /// Fires this (lobby) state's change notification so the <c>GameViewCoordinator</c> re-projects.
+        /// Bench mutations land on the bench's <i>inner</i> state (notifying only its own manager), so
+        /// after a bench command the engine pings the lobby state through here to publish the new
+        /// projection. A no-op <c>Execute</c> notifies unconditionally (writer path).
+        /// </summary>
+        internal void RaiseBenchChanged() => Execute(() => { });
     }
 }

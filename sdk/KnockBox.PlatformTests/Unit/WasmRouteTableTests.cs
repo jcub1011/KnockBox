@@ -16,6 +16,7 @@ public sealed class WasmRouteTableTests
     [DataRow("shell/anything")]
     [DataRow("room/dice-simulator/abc")]   // migrated game #1
     [DataRow("room/card-counter/abc")]     // migrated game #2
+    [DataRow("room/alpha-chain/abc")]      // migrated game #3
     public void IsWasmRoute_True_ForWasmPrefixes(string rel)
         => Assert.IsTrue(WasmRouteTable.IsWasmRoute(rel));
 
@@ -24,7 +25,7 @@ public sealed class WasmRouteTableTests
     [DataRow("home")]
     [DataRow("admin")]
     [DataRow("admin/login")]
-    [DataRow("room/alpha-chain/abc")]      // un-migrated game keeps its server route
+    [DataRow("room/tracery/abc")]          // un-migrated game keeps its server route
     public void IsWasmRoute_False_ForNonWasmRoutes(string rel)
         => Assert.IsFalse(WasmRouteTable.IsWasmRoute(rel));
 

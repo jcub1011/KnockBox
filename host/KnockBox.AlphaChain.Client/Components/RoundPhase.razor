@@ -1,0 +1,505 @@
+@inherits DisposableComponent
+@using System.Globalization
+@implements IAsyncDisposable
+
+@* The live round: command rail (start letter, shot-clock ring, banned letters), turn spotlight,
+   leaderboards, the client-owned word input, score replay, recent words, and the Engine Bays.
+   Rendered from the projected AlphaChainView. The word <input> is NOT value-bound to Blazor — the
+   constant projection re-renders would race fast typing — so its live value is read via JS only at
+   submit time (Enter / timeout auto-submit). See wwwroot/js/alpha-chain-input.js. *@
+
+<div class="ac-round">
+    <section class="ac-stage">
+        @* ── Command rail: chain rule + banned letter + shot clock ── *@
+        <div class="ac-command">
+            <div class="ac-cmd-cell">
+                <span class="ac-cmd-label">Start with</span>
+                <span class="ac-cmd-letter ac-cmd-start">@RequiredStartDisplay</span>
+            </div>
+            <div class="ac-cmd-clock">
+                @if (View.PhaseEndsAtUtc is { } shotEnd)
+                {
+                    <CountdownClock EndTimeUtc="shotEnd" Duration="ShotClockDuration" Context="clock">
+                        @{
+                            var frac = Math.Clamp(clock.Fraction, 0f, 1f);
+                            var offset = (276.46 * (1 - frac)).ToString("0.0", CultureInfo.InvariantCulture);
+                            var ringClass = clock.RemainingSeconds <= 3 ? "ac-ring-danger"
+                                : clock.RemainingSeconds <= 6 ? "ac-ring-warn" : "ac-ring-go";
+                        }
+                        <div class="ac-ring @ringClass">
+                            <svg class="ac-ring-svg" viewBox="0 0 100 100" aria-hidden="true">
+                                <circle class="ac-ring-track" cx="50" cy="50" r="44" />
+                                <circle class="ac-ring-fill" cx="50" cy="50" r="44" style="stroke-dashoffset:@offset" />
+                            </svg>
+                            <span class="ac-ring-num">@((int)Math.Ceiling(Math.Max(0, clock.RemainingSeconds)))</span>
+                        </div>
+                    </CountdownClock>
+                }
+            </div>
+            <div class="ac-cmd-cell ac-cmd-banned">
+                <span class="ac-cmd-label">Banned</span>
+                <span class="ac-cmd-letters">
+                    @if (View.RecipientExemptFromEraBan)
+                    {
+                        <span class="ac-cmd-letter ac-cmd-exempt"
+                              title="You're in last place — the banned letter doesn't tax you (until someone else drops to last).">@BannedLetterDisplay</span>
+                    }
+                    else
+                    {
+                        <span class="ac-cmd-letter">@BannedLetterDisplay</span>
+                    }
+                    @if (!string.IsNullOrEmpty(View.RecipientPersonalBanLetter))
+                    {
+                        <span class="ac-cmd-letter ac-cmd-jinx"
+                              title="A personal banned letter forced onto your next word (Tracer Round / Bait & Switch)">@View.RecipientPersonalBanLetter</span>
+                    }
+                    @foreach (var cardBan in View.RecipientCardBanLetters)
+                    {
+                        <span class="ac-cmd-letter ac-cmd-cardban"
+                              title="A personal banned letter from one of your own cards (The Roulette Wheel / The Toll Booth)">@cardBan</span>
+                    }
+                </span>
+            </div>
+        </div>
+
+        @* ── Turn spotlight ── *@
+        <div class="ac-turnflag @(IsMyTurn ? "ac-turnflag-me" : "")"
+             style="--accent: var(--ac-p@(CurrentPlayerAccentSlot))">
+            @if (IsMyTurn)
+            {
+                <span class="ac-turnflag-text">YOUR TURN</span>
+            }
+            else
+            {
+                <span class="ac-turnflag-now">NOW</span>
+                <span class="ac-turnflag-name">@CurrentPlayerName</span>
+            }
+            <span class="ac-turnflag-meta">Era @View.CurrentEra · Round @View.CurrentRound</span>
+        </div>
+
+        @* ── Mobile leaderboard: inline horizontal strip (hidden on desktop, which uses the rail).
+              Auto-scrolls to centre the local player whenever their rank changes (centerMe). *@
+        <div class="ac-lbm" @ref="_mobileLbRef" aria-label="Leaderboard">
+            @{ var lbmRank = 0; }
+            @foreach (var p in Leaderboard)
+            {
+                lbmRank++;
+                var lbmIsMe = p.UserId == View.RecipientId;
+                <div class="ac-lbm-item @(p.IsEliminated ? "ac-eliminated" : "") @(lbmIsMe ? "ac-lbm-me" : "")"
+                     style="--accent: var(--ac-p@(p.AccentSlot))">
+                    <span class="ac-lbm-rank">@lbmRank</span>
+                    <span class="ac-lbm-name">@p.DisplayName</span>
+                    @if (lbmIsMe)
+                    {
+                        <span class="ac-tag ac-tag-you">you</span>
+                    }
+                    <span class="ac-lbm-score">@p.Score</span>
+                </div>
+            }
+        </div>
+
+        @* ── Word entry: client-owned input (no @bind — see alpha-chain-input.js) ── *@
+        <div class="ac-entry @(CanSubmit ? "ac-entry-live" : "ac-entry-wait")">
+            <span class="ac-entry-prefix @(View.RequiredStartLetter is null ? "ac-entry-prefix-free" : "")"
+                  title="@(View.RequiredStartLetter is null ? "Free choice — any letter" : "Your word must start with this letter")">
+                @(View.RequiredStartLetter ?? "∗")
+            </span>
+            <input @ref="_wordInputRef" class="ac-word-input @(View.RecipientHidesInput ? "ac-word-input-blind" : "")" type="text"
+                   placeholder="@(View.AwaitingTransition ? TransitionHoldMessage : CanSubmit ? (View.RecipientHidesInput ? "blind — type a word…" : "type a word…") : $"{CurrentPlayerName} is playing…")"
+                   disabled="@(!CanSubmit)"
+                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+            <button type="button" class="ac-submit-btn" disabled="@(!CanSubmit || IsSubmitting)"
+                    @onclick="SubmitFromButtonAsync">GO</button>
+        </div>
+
+        <div class="ac-entry-status">
+            @if (FeedbackMessage is { } feedback)
+            {
+                <span class="ac-feedback ac-feedback-bad">@feedback</span>
+            }
+        </div>
+
+        @* ── Score replay: one fixed spot, same for every player; names the submitter and lingers
+              as a readout until the next word lands. *@
+        @if (View.LatestReplay is { } replay)
+        {
+            <ScoreReplayStrip @key="replay.Sequence" Replay="replay"
+                              ReplayTotalSeconds="View.EngineAnimationSeconds" />
+        }
+
+        @* ── Engine-effect strike overlay: announces auto-fired modifier effects, emphasising hits
+              against the local player. Keyed on the notice sequence so it replays once. *@
+        <EngineEffectOverlay @key="View.EngineNoticeSequence"
+                             Notices="View.LatestEngineNotices" CurrentUserId="View.RecipientId" />
+
+        @* ── Recent words: newest → oldest, scrolls horizontally. Tunnel Vision masks the newest
+              word's first & last letter for its holder only. *@
+        @if (View.PlayFeed.Count > 0)
+        {
+            <div class="ac-recent" aria-label="Recent words">
+                @for (int t = 0; t < View.PlayFeed.Count; t++)
+                {
+                    var play = View.PlayFeed[t];
+                    bool isNewest = t == 0;
+                    <div class="ac-recent-item @(isNewest ? "ac-recent-newest" : "") @(play.ZeroPointTax ? "ac-recent-taxed" : "")">
+                        <span class="ac-recent-word">@DisplayWord(play, isNewest)</span>
+                        <span class="ac-recent-meta">
+                            <span class="ac-recent-by">@play.DisplayName</span>
+                            @if (play.ZeroPointTax)
+                            {
+                                <span class="ac-tag ac-tag-tax">tax</span>
+                            }
+                            else
+                            {
+                                <span class="ac-recent-score">+@play.Score</span>
+                            }
+                        </span>
+                    </div>
+                }
+            </div>
+        }
+
+        @* ── Cards: own Engine Bay (the only card tier). Always Locked during a live round —
+              the scoring pipeline order is frozen and only resequenced at Intermission. ── *@
+        @if (MyPlayer is { } myCards)
+        {
+            <div class="ac-cards">
+                <EngineBay Cards="myCards.EngineBay" Slots="myCards.ModifierSlots"
+                           Locked="true" Title="Your Engine Bay" />
+            </div>
+        }
+
+        @* ── Opponent Engine Bays (read-only summary) ── *@
+        @if (Opponents.Count > 0)
+        {
+            <div class="ac-opponent-bays">
+                @foreach (var opp in Opponents)
+                {
+                    <EngineBay Cards="opp.EngineBay" Slots="opp.ModifierSlots" ReadOnly="true"
+                               Title="@opp.DisplayName" />
+                }
+            </div>
+        }
+    </section>
+
+    <aside class="ac-rail">
+        @* ── Live leaderboard ── *@
+        <div class="ac-panel ac-panel-leaderboard">
+            <h3 class="ac-panel-title">Leaderboard</h3>
+            <ol class="ac-leaderboard">
+                @{ var rank = 0; }
+                @foreach (var p in Leaderboard)
+                {
+                    rank++;
+                    var arrow = RankArrow(p.UserId);
+                    var isMe = p.UserId == View.RecipientId;
+                    var isActive = p.UserId == View.CurrentPlayerId;
+                    <li class="ac-lb-row @(p.IsEliminated ? "ac-eliminated" : "") @(isMe ? "ac-lb-me" : "") @(isActive ? "ac-lb-active" : "")"
+                        style="--accent: var(--ac-p@(p.AccentSlot))">
+                        <span class="ac-lb-rank">@rank</span>
+                        <span class="ac-lb-name">
+                            @p.DisplayName
+                        </span>
+                        @if (isMe)
+                        {
+                            <span class="ac-tag ac-tag-you">you</span>
+                        }
+                        @if (p.IsEliminated)
+                        {
+                            <span class="ac-tag">out</span>
+                        }
+                        else if (p.HasLeft)
+                        {
+                            <span class="ac-tag">left</span>
+                        }
+                        @if (!string.IsNullOrEmpty(arrow))
+                        {
+                            <span class="ac-lb-arrow @(arrow == "▲" ? "ac-lb-up" : "ac-lb-down")">@arrow</span>
+                        }
+                        <span class="ac-lb-score">@p.Score</span>
+                        @if (LatestPlay is { } lp && lp.UserId == p.UserId && lp.Score > 0)
+                        {
+                            <span class="ac-score-pop" @key="LatestPlayKey">+@lp.Score</span>
+                        }
+                    </li>
+                }
+            </ol>
+        </div>
+    </aside>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AlphaChainView View { get; set; } = default!;
+
+    /// <summary>Fire-and-forget hub command (name + optional JSON payload).</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task> Submit { get; set; } = default!;
+
+    /// <summary>Hub command that returns the server's reply string (null on success, an error
+    /// message on rejection). Used for word submission so a rejected word surfaces inline.</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> SubmitWithResult { get; set; } = default!;
+
+    [Inject] protected IJSRuntime JS { get; set; } = default!;
+
+    // ── Client-owned word input (see wwwroot/js/alpha-chain-input.js) ────
+    private readonly string _inputId = $"ac-input-{Guid.NewGuid():N}";
+    private ElementReference _wordInputRef;
+    private IJSObjectReference? _inputModule;
+    private DotNetObjectReference<RoundPhase>? _dotNetRef;
+    private bool _inputRegistered;
+    private string? _lastArmSig;
+
+    /// <summary>Lead time (ms) the client auto-submits before the server shot-clock deadline, so
+    /// typed-but-not-Entered text is sent rather than discarded.</summary>
+    private const int AutoSubmitLeadMs = 400;
+
+    /// <summary>Server-side mirror of the draft (committed on blur). The authoritative submit value
+    /// comes live from JS; this is a resilience fallback.</summary>
+    protected string WordInput { get; set; } = string.Empty;
+
+    /// <summary>True while a submission is in flight, to debounce double-sends.</summary>
+    protected bool IsSubmitting { get; private set; }
+
+    /// <summary>Human-readable inline feedback for a rejected submission (the hub's error reply).</summary>
+    protected string? FeedbackMessage { get; private set; }
+
+    // ── Leaderboard rank-change tracking (view-only, for the ▲/▼ indicator) ──
+    private List<Guid> _prevRankOrder = new();
+    private readonly Dictionary<Guid, int> _rankMovement = new();
+
+    // ── Mobile leaderboard auto-centre ──
+    private ElementReference _mobileLbRef;
+    private int _lastMyRankIndex = -1;
+
+    /// <summary>Whether it is the local player's turn (input is enabled only then).</summary>
+    protected bool IsMyTurn => View.CurrentPlayerId == View.RecipientId;
+
+    /// <summary>Status text shown in the entry while the end-of-round hold plays out.</summary>
+    protected string TransitionHoldMessage =>
+        View.PendingTransitionIsGameOver ? "final word — tallying…" : "era complete — tallying…";
+
+    /// <summary>Whether the local player may submit right now (their turn and not mid-hold).</summary>
+    protected bool CanSubmit => IsMyTurn && !View.AwaitingTransition;
+
+    /// <summary>Display name of the active player, or a placeholder when unset.</summary>
+    protected string CurrentPlayerName =>
+        View.CurrentPlayerId is { } pid && View.Players.FirstOrDefault(p => p.UserId == pid) is { } ps
+            ? ps.DisplayName
+            : "—";
+
+    /// <summary>The accent slot of the active player (for the turn spotlight tint).</summary>
+    protected int CurrentPlayerAccentSlot =>
+        View.CurrentPlayerId is { } pid && View.Players.FirstOrDefault(p => p.UserId == pid) is { } ps
+            ? ps.AccentSlot
+            : 1;
+
+    /// <summary>The required start letter as an upper-case string, or "Any" when free.</summary>
+    protected string RequiredStartDisplay => View.RequiredStartLetter ?? "Any";
+
+    /// <summary>The banned letter as an upper-case string, or "—" when unset.</summary>
+    protected string BannedLetterDisplay => View.BannedLetter ?? "—";
+
+    /// <summary>Total duration of the per-turn shot clock (for the countdown ring).</summary>
+    protected TimeSpan ShotClockDuration => TimeSpan.FromSeconds(View.ShotClockDurationSeconds);
+
+    /// <summary>Players ordered for the live leaderboard (score desc, then name).</summary>
+    protected IReadOnlyList<PlayerView> Leaderboard =>
+        View.Players
+            .OrderByDescending(p => p.Score)
+            .ThenBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    /// <summary>The local player's projected state, or null if spectating.</summary>
+    protected PlayerView? MyPlayer =>
+        View.Players.FirstOrDefault(p => p.UserId == View.RecipientId);
+
+    /// <summary>Opponents still in play, for the opponent bay summaries.</summary>
+    protected IReadOnlyList<PlayerView> Opponents =>
+        View.Players
+            .Where(p => p.UserId != View.RecipientId && !p.HasLeft)
+            .OrderBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    /// <summary>The newest accepted play, used to flash a score-pop on the leaderboard.</summary>
+    protected SubmissionView? LatestPlay => View.PlayFeed.Count > 0 ? View.PlayFeed[0] : null;
+
+    /// <summary>Changes whenever a new word lands, so the score-pop @key remounts and re-animates.</summary>
+    protected int LatestPlayKey => View.PlayFeed.Count;
+
+    /// <summary>The word as shown in the recent-words list. Tunnel Vision masks the newest word's
+    /// first &amp; last letter for its holder only (the chain rule stays server-enforced regardless).</summary>
+    protected string DisplayWord(SubmissionView play, bool isNewest)
+    {
+        var word = play.Word.ToUpperInvariant();
+        if (!isNewest || !View.RecipientMasksPreviousWord || word.Length == 0)
+            return word;
+
+        var chars = word.ToCharArray();
+        chars[0] = '·';
+        chars[^1] = '·';
+        return new string(chars);
+    }
+
+    /// <summary>"▲" if the player moved up since the last reorder, "▼" if down, else "".</summary>
+    protected string RankArrow(Guid userId) =>
+        _rankMovement.TryGetValue(userId, out var m) ? m < 0 ? "▲" : m > 0 ? "▼" : "" : "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+        UpdateRankMovement();
+
+        // RoundPhase only renders during the Round phase, so the input is always wanted here.
+        if (_inputModule is null)
+            _inputModule = await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/KnockBox.AlphaChain/js/alpha-chain-input.js");
+
+        if (!_inputRegistered)
+        {
+            await _inputModule.InvokeVoidAsync("register", _inputId, _wordInputRef, _dotNetRef);
+            _inputRegistered = true;
+            _lastArmSig = null; // force a fresh arm + focus
+        }
+
+        // Re-arm the auto-submit deadline + focus only when the turn (or my deadline) changes —
+        // not on every projection re-render. The intermission hold disarms entry.
+        var sig = View.AwaitingTransition
+            ? "hold"
+            : IsMyTurn
+                ? $"me|{View.PhaseEndsAtUtc?.UtcTicks}"
+                : $"other|{View.CurrentPlayerId}";
+        if (sig != _lastArmSig)
+        {
+            _lastArmSig = sig;
+            if (CanSubmit && View.PhaseEndsAtUtc is { } endsAt)
+            {
+                var remainingMs = Math.Max(0, (endsAt - DateTimeOffset.UtcNow).TotalMilliseconds);
+                await _inputModule.InvokeVoidAsync("armDeadline", _inputId, remainingMs, AutoSubmitLeadMs);
+                await _inputModule.InvokeVoidAsync("focus", _inputId);
+            }
+            else
+            {
+                await _inputModule.InvokeVoidAsync("armDeadline", _inputId, -1, AutoSubmitLeadMs);
+                await _inputModule.InvokeVoidAsync("clear", _inputId);
+            }
+        }
+
+        // Re-centre the mobile leaderboard strip on the local player whenever their rank changes
+        // (the strip is hidden on desktop, where centerMe is a no-op).
+        var board = Leaderboard;
+        int myIndex = -1;
+        for (int i = 0; i < board.Count; i++)
+        {
+            if (board[i].UserId == View.RecipientId) { myIndex = i; break; }
+        }
+        if (myIndex >= 0 && myIndex != _lastMyRankIndex)
+        {
+            _lastMyRankIndex = myIndex;
+            await _inputModule.InvokeVoidAsync("centerMe", _mobileLbRef);
+        }
+    }
+
+    /// <summary>Recomputes per-player rank movement when the leaderboard order changes.</summary>
+    private void UpdateRankMovement()
+    {
+        var order = Leaderboard.Select(p => p.UserId).ToList();
+        if (order.SequenceEqual(_prevRankOrder)) return;
+
+        if (_prevRankOrder.Count > 0)
+        {
+            _rankMovement.Clear();
+            for (int i = 0; i < order.Count; i++)
+            {
+                int prev = _prevRankOrder.IndexOf(order[i]);
+                _rankMovement[order[i]] = prev < 0 ? 0 : Math.Sign(i - prev);
+            }
+        }
+        _prevRankOrder = order;
+    }
+
+    // ── JS-invoked submit paths (live DOM value, never the stale mirror) ──
+
+    /// <summary>Invoked from JS on Enter or when the client-side timeout fires.</summary>
+    [JSInvokable]
+    public async Task OnWordSubmitted(string value)
+    {
+        WordInput = value ?? string.Empty;
+        await SubmitWordAsync(WordInput);
+    }
+
+    /// <summary>Invoked from JS on blur — commits the draft to the local mirror only (does NOT
+    /// play the word; clicking a card mid-turn must not submit prematurely).</summary>
+    [JSInvokable]
+    public void OnDraftCommitted(string value) => WordInput = value ?? string.Empty;
+
+    /// <summary>Submit-button path: read the live DOM value, then submit.</summary>
+    protected async Task SubmitFromButtonAsync()
+    {
+        if (_inputModule is null) return;
+        var value = await _inputModule.InvokeAsync<string>("getValue", _inputId);
+        await SubmitWordAsync(value);
+    }
+
+    /// <summary>Submits <paramref name="word"/> for the local player. Debounced via
+    /// <see cref="IsSubmitting"/>; the input is cleared (client-side) only when accepted.</summary>
+    protected async Task SubmitWordAsync(string word)
+    {
+        if (IsSubmitting || !IsMyTurn) return;
+        if (string.IsNullOrWhiteSpace(word)) return;
+
+        IsSubmitting = true;
+        try
+        {
+            var error = await SubmitWithResult(AlphaChainCommands.SubmitWord,
+                JsonSerializer.Serialize(new SubmitWordPayload(word), AlphaChainContractsJsonContext.Default.SubmitWordPayload));
+            if (string.IsNullOrEmpty(error))
+            {
+                // Accepted (scored or taxed) — the score-replay strip shows the result; clear the input.
+                FeedbackMessage = null;
+                WordInput = string.Empty;
+                if (_inputModule is not null)
+                    await _inputModule.InvokeVoidAsync("clear", _inputId);
+            }
+            else
+            {
+                FeedbackMessage = error;
+            }
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    public override void Dispose()
+    {
+        _ = DisposeInputModuleAsync();
+        _dotNetRef?.Dispose();
+        base.Dispose();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await DisposeInputModuleAsync();
+        _dotNetRef?.Dispose();
+    }
+
+    /// <summary>Best-effort JS teardown. The runtime may already be gone, in which case the swallow
+    /// is harmless.</summary>
+    private async Task DisposeInputModuleAsync()
+    {
+        if (_inputModule is null) return;
+        var module = _inputModule;
+        _inputModule = null;
+        try
+        {
+            await module.InvokeVoidAsync("unregister", _inputId);
+            await module.DisposeAsync();
+        }
+        catch
+        {
+            // Disconnected; nothing to clean up client-side.
+        }
+    }
+}

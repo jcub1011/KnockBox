@@ -54,6 +54,10 @@ namespace KnockBox.AlphaChain.Pages.Bench
         /// <summary>True once a scenario has been started and is sitting in a round.</summary>
         public bool IsReady => _state is not null;
 
+        /// <summary>The live inner game state the bench drives, or null before the first reset. Exposed
+        /// so the WASM projector can render the bench by projecting this state through the normal path.</summary>
+        internal AlphaChainGameState? State => _state;
+
         /// <summary>The live phase; the page shows a "reset to continue" hint if it ever leaves <c>Round</c>.</summary>
         public AlphaChainGamePhase Phase => _state?.Phase ?? AlphaChainGamePhase.Setup;
 

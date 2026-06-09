@@ -14,12 +14,15 @@
 
   <ItemGroup>
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+    <!-- The moved Contracts types resolve unqualified across the test project. -->
+    <Using Include="KnockBox.AlphaChain.Contracts" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
     <ProjectReference Include="..\..\sdk\KnockBox.Platform\KnockBox.Platform.csproj" />
     <ProjectReference Include="..\KnockBox.AlphaChain\KnockBox.AlphaChain.csproj" />
+    <ProjectReference Include="..\KnockBox.AlphaChain.Contracts\KnockBox.AlphaChain.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

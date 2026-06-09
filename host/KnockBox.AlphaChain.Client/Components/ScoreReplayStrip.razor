@@ -1,0 +1,90 @@
+@* The score replay shown in one fixed spot below the word-submit box (so every player reads
+   the result in the same place regardless of how many bays are on screen). Animates the word
+   running through the submitter's engine — seed → each card's contribution → final score — and
+   lingers as a readout until the next word is submitted. The parent @keys this on the replay
+   sequence so the reveal plays exactly once per accepted word.
+
+   Total runtime is held roughly constant: per-step time shrinks as the engine grows, capped so
+   tiny engines don't drag. The subtitle names the player the score belongs to. Rendered from the
+   precomputed ScoreReplayView (AnimationRows / HasSteal already resolved server-side). *@
+
+<div class="ac-replay" style="--ac-step:@StepDurationCss; --ac-rows:@Replay.AnimationRows">
+    <span class="ac-replay-who">@Replay.DisplayName</span>
+    <div class="ac-replay-row">
+        <span class="ac-replay-word">@Replay.Breakdown.Word.ToUpperInvariant()</span>
+        <span class="ac-replay-seq ac-replay-seed" style="animation-delay: calc(var(--ac-step) * 0)">
+            <span class="ac-replay-op">len</span>
+            <span class="ac-replay-run">@Replay.Breakdown.Seed</span>
+        </span>
+        @for (int i = 0; i < Replay.Breakdown.Steps.Count; i++)
+        {
+            var step = Replay.Breakdown.Steps[i];
+            var kindClass = step.Triggered ? "ac-replay-step" : "ac-replay-skip";
+            <span class="ac-replay-seq @kindClass" style="animation-delay: calc(var(--ac-step) * @(i + 1)); --ac-step-accent: @CardStyles.AccentColor(step.Accent)">
+                <span class="ac-replay-icon"><CardIcon Card="@step.CardId" /></span>
+                <span class="ac-replay-op" style="color: @CardStyles.StepDelta(step)">@(step.Triggered ? step.ValueText : "—")</span>
+                <span class="ac-replay-run">@step.RunningScore</span>
+            </span>
+        }
+        <span class="ac-replay-seq ac-replay-final @(Replay.Breakdown.Taxed ? "ac-replay-taxed" : "")"
+              style="animation-delay: calc(var(--ac-step) * @(Replay.Breakdown.Steps.Count + 1))">
+            <span class="ac-replay-op">@(Replay.Breakdown.Taxed ? "tax" : "score")</span>
+            <span class="ac-replay-run">@(Replay.Breakdown.Taxed ? "0" : $"+{Replay.Breakdown.FinalScore}")</span>
+        </span>
+    </div>
+
+    @* Tax Collector steal: a taxed word pays the submitter nothing but hands every opponent
+       holding a Tax Collector half the would-be score — list who took the points. *@
+    @if (Replay.TaxCollectors is { Count: > 0 } stealers)
+    {
+        <div class="ac-replay-steal" style="animation-delay: calc(var(--ac-step) * @(Replay.Breakdown.Steps.Count + 2))">
+            <span class="ac-replay-steal-label">stolen by</span>
+            @foreach (var name in stealers)
+            {
+                <span class="ac-replay-steal-who">@name<span class="ac-replay-steal-amt">+@Replay.TaxBounty</span></span>
+            }
+        </div>
+    }
+
+    @* Automated engine effects that fired on this word, revealed after the score (and steal) rows. *@
+    @if (Replay.Effects is { Count: > 0 } fired)
+    {
+        @for (int i = 0; i < fired.Count; i++)
+        {
+            var fx = fired[i];
+            <div class="ac-replay-rx @(fx.Negated ? "ac-replay-rx-negate" : fx.Class == EngineEffectClass.Offensive ? "ac-replay-rx-attack" : fx.Class == EngineEffectClass.Special ? "ac-replay-rx-special" : "ac-replay-rx-defend")"
+                 style="animation-delay: calc(var(--ac-step) * @(EffectRowBase + i))">
+                <span class="ac-replay-rx-icon"><CardIcon Card="@fx.CardId" /></span>
+                <span class="ac-replay-rx-name">@fx.CardName</span>
+                <span class="ac-replay-rx-reason">@fx.Reason</span>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    /// <summary>The accepted word's scoring trace to animate (must have steps; parent guards).</summary>
+    [Parameter] public ScoreReplayView Replay { get; set; } = default!;
+
+    /// <summary>Total runtime (seconds) of the replay; per-step time scales to keep it roughly
+    /// constant, capped so tiny engines don't drag.</summary>
+    [Parameter] public double ReplayTotalSeconds { get; set; } = 2.5;
+
+    /// <summary>Hard cap on a single step's reveal time.</summary>
+    private const double MaxStepSeconds = 0.5;
+
+    /// <summary>Animation-delay row index of the first engine-effect row: after the seed, every
+    /// modifier step, the final score, and the steal line (when present).</summary>
+    private int EffectRowBase => Replay.Breakdown.Steps.Count + 2 + (Replay.HasSteal ? 1 : 0);
+
+    /// <summary>Per-step reveal/stagger time as a CSS literal: total / rows, clamped to the cap.</summary>
+    private string StepDurationCss
+    {
+        get
+        {
+            int rows = Replay.AnimationRows;
+            double step = Math.Min(ReplayTotalSeconds / Math.Max(1, rows), MaxStepSeconds);
+            return step.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "s";
+        }
+    }
+}
