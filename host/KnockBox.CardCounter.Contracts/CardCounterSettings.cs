@@ -1,5 +1,11 @@
-namespace KnockBox.CardCounter.Services.State.Games;
+namespace KnockBox.CardCounter.Contracts;
 
+/// <summary>
+/// Host-configurable match rules. Shared between the server (authoritative
+/// <c>state.Settings</c>) and the browser (the House Rules drawer renders + edits a
+/// copy, then sends it as the <c>update-settings</c> command payload, which the server
+/// deserializes straight back into this type). Pure record, no logic.
+/// </summary>
 public sealed record CardCounterSettings
 {
     public int DeckSize { get; init; } = 52;

@@ -34,6 +34,10 @@ namespace KnockBox.Services.Registrations.States
             services.AddSingleton<ILobbyService>(sp => sp.GetRequiredService<LobbyService>());
             services.AddHostedService(sp => sp.GetRequiredService<LobbyService>());
 
+            // Server-owned game clock: drives time-based FSM transitions for engines
+            // that implement IServerTickHandler (replaces the old per-host circuit tick).
+            services.AddHostedService<LobbyTickService>();
+
             // Session service registrations
             services.AddSingleton<ISessionServiceProvider, SessionServiceProvider>();
             services.AddScoped<ISessionTokenProvider, SessionTokenProvider>();

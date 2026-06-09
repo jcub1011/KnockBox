@@ -1,8 +1,5 @@
-using KnockBox.CardCounter.Components;
 using KnockBox.CardCounter.Services.Logic.Games;
-using KnockBox.CardCounter.Services.Storage;
 using KnockBox.Core.Plugins;
-using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.CardCounter
 {
@@ -13,14 +10,10 @@ namespace KnockBox.CardCounter
 
         public void RegisterServices(IPluginRegistration registration)
         {
+            // The game UI now lives in the WASM client (KnockBox.CardCounter.Client). The
+            // server registers only the engine; the hub resolves its IGameStateProjector /
+            // IGameCommandHandler / IServerTickHandler off the keyed AbstractGameEngine.
             registration.AddGameEngine<CardCounterGameEngine>();
-            registration.AddScoped<CardCounterStorage, CardCounterStorage>();
         }
-
-        public RenderFragment? GetCustomHeader() => builder =>
-        {
-            builder.OpenComponent<CardCounterHeader>(0);
-            builder.CloseComponent();
-        };
     }
 }

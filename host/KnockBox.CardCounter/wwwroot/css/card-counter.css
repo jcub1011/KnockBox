@@ -1,3 +1,952 @@
+/*
+  Card Counter stylesheet — combined + de-scoped for the WASM client.
+  Generated from the former scoped .razor.css files (CardCounterLobby, header,
+  timer, and the four phase components). Every selector is already .cc-* prefixed,
+  so it is self-namespacing; the only transform is removing Blazor's ::deep token
+  (which becomes a plain descendant selector). GameRoot links this from the server
+  plugin's mounted wwwroot and wraps the UI in .cc-root.
+*/
+
+
+/* ═══════════════════ Pages/CardCounterLobby.razor.css ═══════════════════ */
+
+/* ── Page layout ──────────────────────────────────────────────────────────── */
+
+/* The runtime UI wrapper (GameRoot's <div class="cc-root">) is a child of MainLayout's
+   column <article>, sitting below the fixed-height header. Grow to fill the remaining
+   space and pass a definite height down so .cc-page / .cc-loading expand instead of
+   collapsing to their content. */
+.cc-root {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.cc-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 100%;
+    background: radial-gradient(ellipse at center, #0d3d1e 0%, #061a0c 100%);
+    color: #fff;
+    font-family: var(--font-primary);
+    position: relative;
+    overflow: hidden;
+}
+
+.cc-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 12px;
+    font-size: 1.2rem;
+    color: #f7d547;
+    background: #061a0c;
+}
+
+.cc-loading-icon {
+    font-size: 3rem;
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ── Shared utility styles (apply to all child components via ) ─────── */
+
+.cc-waiting-text {
+    color: rgba(255,255,255,0.6);
+    font-style: italic;
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+.cc-balance {
+    font-family: var(--font-mono);
+    font-weight: 700;
+}
+
+.cc-positive {
+    color: #2ecc71;
+}
+
+.cc-negative {
+    color: #e74c3c;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+
+.cc-btn {
+    font-family: var(--font-primary);
+    font-size: 0.9rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 3px solid #000;
+    border-radius: 8px;
+    box-shadow: 4px 4px 0 #000;
+    transition: transform 0.1s, box-shadow 0.1s;
+    cursor: pointer;
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    background: none;
+    color: #fff;
+}
+
+.cc-btn:hover:not(:disabled) {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 #000;
+}
+
+.cc-btn:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 #000;
+}
+
+.cc-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+    filter: grayscale(30%);
+}
+
+.cc-btn-sm {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-width: 2px;
+    box-shadow: 3px 3px 0 #000;
+}
+
+.cc-btn-lg {
+    font-size: 1.1rem;
+    padding: 12px 28px;
+    box-shadow: 5px 5px 0 #000;
+}
+
+.cc-btn-primary {
+    background: #00b8d4;
+    color: #000;
+}
+
+.cc-btn-ghost {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.3);
+    color: #fff;
+    box-shadow: none;
+}
+
+.cc-btn-ghost:hover:not(:disabled) {
+    background: rgba(255,255,255,0.2);
+    box-shadow: none;
+    transform: none;
+}
+
+.cc-btn-pass {
+    background: #f7d547;
+    color: #000;
+}
+
+.cc-btn-fold {
+    background: #7f8c8d;
+    color: #fff;
+}
+
+.cc-btn-positive {
+    background: #27ae60;
+    color: #fff;
+}
+
+.cc-btn-negative {
+    background: #e74c3c;
+    color: #fff;
+}
+
+.cc-btn-warning {
+    background: #e67e22;
+    color: #fff;
+}
+
+.cc-btn-secondary {
+    background: #7f8c8d;
+    color: #fff;
+}
+
+.cc-btn-danger {
+    background: #e74c3c;
+    color: #fff;
+}
+
+/* ═══════════════════ Components/CardCounterHeader.razor.css ═══════════════════ */
+
+.cc-header-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    height: 60px;
+    background: linear-gradient(to bottom, #111 0%, #000 100%);
+    border-bottom: 3px solid #5c3411; /* Wood trim */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    z-index: 1000;
+    /* Constant-height header. In the WASM layout the header is a child of MainLayout's
+       column <article>, so flex-grow:1 (the old `flex: 1`, which only filled width in the
+       server header row) would expand it vertically and eat the leftover space. Pin it to
+       its 60px basis and never grow/shrink. */
+    flex: 0 0 auto;
+    gap: 8px;
+}
+
+.cc-header-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    color: #f7d547;
+    font-weight: 900;
+    font-size: 1.4rem;
+    letter-spacing: 2px;
+    text-shadow: 2px 2px 0 #000;
+    transition: transform 0.2s, filter 0.2s;
+    flex-shrink: 1;
+}
+
+.cc-header-brand-text {
+    text-overflow: ellipsis;
+    flex-shrink: 1;
+}
+
+.cc-header-brand:hover {
+    transform: scale(1.02);
+    filter: brightness(1.2);
+}
+
+.cc-header-brand-icon {
+    font-size: 1.6rem;
+    color: #fff;
+    text-shadow: 0 0 10px rgba(255,255,255,0.4);
+}
+
+.cc-header-brand-icon-flipped {
+    font-size: 1.6rem;
+    color: #fff;
+    transform: rotate(180deg);
+    text-shadow: 0 0 10px rgba(255,255,255,0.4);
+}
+
+.cc-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.cc-header-actions .cc-header-code {
+    background: #1a1a1a;
+    border: 2px solid #8B6914;
+    border-radius: 8px;
+    padding: 4px 12px;
+    color: #f7d547;
+    font-family: var(--font-mono);
+    font-weight: 800;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    min-width: 120px;
+    transition: all 0.2s;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+}
+
+.cc-header-actions .cc-header-code:hover {
+    border-color: #f7d547;
+    background: #222;
+}
+
+.cc-header-actions .cc-header-code-cover,
+.cc-header-actions .cc-header-code-value {
+    grid-area: 1 / 1;
+    transition: opacity 0.2s ease;
+}
+
+.cc-header-actions .cc-header-code-cover {
+    display: block;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    /* Set the color on the span itself: the shared RoomCodeButton's scoped reset
+       (a:hover/:focus/:active/:visited { color: inherit }) out-specifies a color set on
+       the .cc-header-code <a>, so inheriting from it would render the link's fallback
+       (black). No scoped rule targets these spans, so this wins cleanly. */
+    color: #f7d547;
+}
+
+.cc-header-actions .cc-header-code-value {
+    opacity: 0;
+    pointer-events: none;
+    font-size: 1.1rem;
+    letter-spacing: 3px;
+    color: #f7d547;
+}
+
+.cc-header-actions .cc-header-code.revealed .cc-header-code-cover {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.cc-header-actions .cc-header-code.revealed .cc-header-code-value {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.cc-header-leave {
+    background: #7d0000;
+    border: 2px solid #e74c3c;
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.cc-header-leave:hover {
+    background: #e74c3c;
+    transform: rotate(90deg);
+}
+
+/* ═══════════════════ Pages/CardCounterTimer.razor.css ═══════════════════ */
+
+/* ── Timer Display ── */
+
+.cc-timer-container {
+    position: absolute;
+    padding: 10px;
+    z-index: 10000;
+    pointer-events: none;
+}
+
+.cc-timer-card {
+    background-color: rgba(0, 0, 0, 0.25);
+    border: 2px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    transition: all 0.3s ease;
+}
+
+.cc-timer-urgent {
+    border-color: #ff4757;
+    color: #ff4757;
+    animation: cc-pulse-urgent 1s infinite alternate;
+    box-shadow: 0 0 15px rgba(255, 71, 87, 0.4);
+}
+
+@keyframes cc-pulse-urgent {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.1); text-shadow: 0 0 8px rgba(255, 71, 87, 0.6); }
+}
+
+/* ═══════════════════ Pages/LobbyPhase.razor.css ═══════════════════ */
+
+/* ── Lobby Phase ──────────────────────────────────────────────────────────── */
+
+.cc-lobby {
+    flex: 1;
+    display: flex;
+    justify-content: safe center;
+    padding: 24px;
+    overflow-x: hidden; /* prevent horizontal scroll when settings drawer slides off-screen */
+    overflow-y: auto;
+    position: relative;
+}
+
+.cc-lobby-table {
+    flex: 1;
+    max-width: 700px;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.cc-lobby-table-container {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 32px;
+    justify-content: safe center;
+}
+
+.cc-lobby-felt {
+    background: #1a6b3a;
+    border-radius: 50% / 30%;
+    border: 12px solid #5c3411;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6), inset 0 0 40px rgba(0,0,0,0.3);
+    padding: 48px 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+}
+
+.cc-lobby-title {
+    font-size: 1.8rem;
+    font-weight: 900;
+    color: #f7d547;
+    text-shadow: 3px 3px 0 #000;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin: 0;
+    text-align: center;
+}
+
+.cc-lobby-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+}
+
+.cc-lobby-player {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,0,0,0.4);
+    padding: 10px 18px;
+    border-radius: 8px;
+    border: 2px solid rgba(247,213,71,0.3);
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.cc-lobby-player-me {
+    border-color: #f7d547;
+    background: rgba(247,213,71,0.15);
+}
+
+.cc-player-avatar {
+    font-size: 1.4rem;
+}
+
+.cc-player-lobbyname {
+    color: #fff;
+}
+
+.cc-host-badge {
+    background: #f7d547;
+    color: #000;
+    font-size: 0.7rem;
+    font-weight: 900;
+    padding: 2px 7px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ── Settings Button ──────────────────────────────────────────────────────── */
+
+.cc-settings-gear-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 200;
+    background: rgba(0,0,0,0.5);
+    border: 2px solid #8B6914;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    font-size: 1.4rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, border-color 0.2s, transform 0.2s;
+    line-height: 1;
+}
+
+.cc-settings-gear-btn:hover {
+    background: rgba(139,105,20,0.4);
+    border-color: #f7d547;
+    transform: scale(1.12);
+}
+
+/* ── Settings Backdrop ────────────────────────────────────────────────────── */
+
+.cc-settings-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 300;
+}
+
+/* ── Settings Drawer ──────────────────────────────────────────────────────── */
+
+.cc-settings-drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 420px;
+    max-width: 95%;
+    background: #0d2e17;
+    border-left: 3px solid #8B6914;
+    box-shadow: -4px 0 32px rgba(0,0,0,0.7);
+    z-index: 400;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+}
+
+.cc-settings-drawer-open {
+    transform: translateX(0);
+}
+
+.cc-settings-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 2px solid rgba(139,105,20,0.5);
+    flex-shrink: 0;
+}
+
+.cc-settings-drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.cc-settings-drawer-footer {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(139,105,20,0.4);
+}
+
+.cc-settings-close-btn {
+    background: transparent;
+    border: 2px solid rgba(139,105,20,0.6);
+    border-radius: 6px;
+    color: rgba(255,255,255,0.8);
+    font-size: 1.1rem;
+    font-weight: 700;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    flex-shrink: 0;
+}
+
+.cc-settings-close-btn:hover {
+    background: rgba(139,105,20,0.3);
+    border-color: #f7d547;
+    color: #f7d547;
+}
+
+/* ── Config Styles ────────────────────────────────────────────────────────── */
+
+.cc-config-title {
+    font-size: 1.2rem;
+    font-weight: 900;
+    color: #f7d547;
+    margin: 0;
+    text-transform: uppercase;
+    text-shadow: 2px 2px 0 #000;
+}
+
+.cc-config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    width: 100%;
+    text-align: left;
+    margin-bottom: 8px;
+}
+
+.cc-config-label {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.85);
+    gap: 5px;
+}
+
+.cc-config-label-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.cc-config-input {
+    background: rgba(0,0,0,0.4);
+    border: 2px solid #8B6914;
+    border-radius: 6px;
+    color: #fff;
+    padding: 6px 10px;
+    font-size: 0.95rem;
+    font-family: var(--font-primary);
+    width: 100%;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.cc-config-input:focus {
+    outline: none;
+    border-color: #f7d547;
+    background: rgba(0,0,0,0.6);
+}
+
+.cc-config-checkbox {
+    width: 20px;
+    height: 20px;
+    accent-color: #f7d547;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.cc-config-section-title {
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: rgba(247, 213, 71, 0.9);
+    margin: 16px 0 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    width: 100%;
+    text-align: left;
+    border-bottom: 1px solid rgba(139, 105, 20, 0.5);
+    padding-bottom: 5px;
+}
+
+.cc-config-section-title:first-child {
+    margin-top: 0;
+}
+
+@media (max-width: 500px) {
+    .cc-config-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cc-settings-drawer {
+        width: 100%;
+    }
+}
+
+/* ── Lobby min-players warning ────────────────────────────────────────────── */
+
+.cc-lobby-min-players {
+    color: #e67e22;
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin: 0;
+    text-align: center;
+    animation: pulse 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+    from { opacity: 0.7; }
+    to { opacity: 1; }
+}
+
+.cc-btn-primary {
+    max-width: 250px;
+    margin: 0 auto;
+}
+
+/* Deal buttons stack a bold main label over a smaller, grayed subtitle line.
+   Override the base .cc-btn nowrap/row layout and the .cc-btn-primary width cap
+   so the button sizes to its content instead of clipping the longer label.
+   The doubled class raises specificity above the parent's `.cc-btn`. */
+.cc-btn.cc-deal-btn {
+    flex-direction: column;
+    gap: 1px;
+    white-space: normal;
+    max-width: none;
+    margin: 0 auto;
+    line-height: 1.15;
+}
+
+.cc-deal-btn-main {
+    display: block;
+}
+
+.cc-deal-btn-sub {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0.3px;
+    opacity: 0.7;
+}
+
+button.cc-lobby-player:hover {
+    cursor: pointer;
+}
+/* ═══════════════════ Pages/BuyInPhase.razor.css ═══════════════════ */
+
+/* ── Buy-In Phase ─────────────────────────────────────────────────────────── */
+
+.cc-buyin-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.cc-buyin-panel {
+    background: rgba(0,0,0,0.5);
+    border: 3px solid #8B6914;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    padding: 32px 40px;
+    max-width: 500px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+}
+
+.cc-panel-title {
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: #f7d547;
+    text-shadow: 2px 2px 0 #000;
+    text-transform: uppercase;
+    margin: 0;
+}
+
+.cc-buyin-subtitle {
+    color: rgba(255,255,255,0.7);
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.cc-buyin-players {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cc-buyin-player-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255,255,255,0.05);
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.cc-buyin-player-name {
+    font-weight: 700;
+    color: #fff;
+}
+
+.cc-buyin-status {
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.cc-buyin-done {
+    color: #27ae60;
+}
+
+.cc-buyin-pending {
+    color: #f7d547;
+}
+
+.cc-buyin-roll {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(247,213,71,0.1);
+    border: 2px solid #f7d547;
+    border-radius: 10px;
+    padding: 16px 32px;
+    gap: 4px;
+}
+
+.cc-buyin-roll-label {
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.7);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.cc-buyin-roll-value {
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: #f7d547;
+    font-family: var(--font-mono);
+    text-shadow: 2px 2px 0 #000;
+}
+
+.cc-buyin-choice-label {
+    color: rgba(255,255,255,0.8);
+    font-weight: 600;
+    margin: 0;
+}
+
+.cc-buyin-buttons {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.cc-buyin-waiting {
+    text-align: center;
+    color: rgba(255,255,255,0.8);
+    line-height: 1.8;
+}
+
+/* ── Host TV Buy-In View ──────────────────────────────────────────────────── */
+
+.cc-buyin-host-panel {
+    max-width: 900px;
+}
+
+.cc-buyin-host-title {
+    font-size: 2.2rem;
+    letter-spacing: 3px;
+}
+
+.cc-buyin-host-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: center;
+    width: 100%;
+}
+
+.cc-buyin-host-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 3px solid rgba(255, 255, 255, 0.15);
+    border-radius: 14px;
+    padding: 20px 28px;
+    min-width: 180px;
+    transition: all 0.3s ease;
+}
+
+.cc-buyin-host-ready {
+    border-color: #27ae60;
+    background: rgba(39, 174, 96, 0.08);
+}
+
+.cc-buyin-host-choosing {
+    border-color: #f7d547;
+    background: rgba(247, 213, 71, 0.06);
+    animation: hintPulse 2s ease-in-out infinite;
+}
+
+@keyframes hintPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.cc-buyin-host-name {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.cc-buyin-host-roll {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cc-buyin-host-dice {
+    font-size: 2rem;
+}
+
+.cc-buyin-host-roll-val {
+    font-size: 2.5rem;
+    font-weight: 900;
+    font-family: var(--font-mono);
+    color: #f7d547;
+    text-shadow: 2px 2px 0 #000;
+}
+
+.cc-buyin-host-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cc-buyin-host-balance {
+    font-size: 1.4rem;
+    font-weight: 900;
+    font-family: var(--font-mono);
+}
+
+.cc-buyin-host-check {
+    font-size: 1.4rem;
+}
+
+.cc-buyin-host-pending {
+    font-size: 1rem;
+    color: #f7d547;
+    font-style: italic;
+}
+
+/* ── Mobile Buy-In ────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .cc-buyin-area {
+        padding: 16px;
+    }
+    .cc-buyin-panel {
+        padding: 24px 20px;
+    }
+    .cc-buyin-buttons {
+        flex-direction: column;
+        width: 100%;
+    }
+    .cc-buyin-buttons .cc-btn {
+        width: 100%;
+        min-height: 56px;
+        justify-content: center;
+        font-size: 1.2rem;
+    }
+    .cc-buyin-roll-value {
+        font-size: 2rem;
+    }
+}
+
+/* ═══════════════════ Pages/PlayingPhase.razor.css ═══════════════════ */
+
 /* ── Header ───────────────────────────────────────────────────────────────── */
 
 .cc-header {
@@ -3240,5 +4189,200 @@
     .cc-action-card {
         width: 88px;
         height: 124px;
+    }
+}
+
+/* ═══════════════════ Pages/GameOverPhase.razor.css ═══════════════════ */
+
+/* ── Game Over ────────────────────────────────────────────────────────────── */
+
+.cc-gameover-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.cc-gameover-panel {
+    background: rgba(0,0,0,0.5);
+    border: 3px solid #f7d547;
+    border-radius: 16px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    padding: 32px 48px;
+    max-width: 600px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+}
+
+.cc-gameover-title {
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: #f7d547;
+    text-shadow: 3px 3px 0 #000;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin: 0;
+}
+
+.cc-gameover-subtitle {
+    color: rgba(255,255,255,0.6);
+    font-style: italic;
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.cc-leaderboard {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cc-leaderboard-row {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+    background: rgba(255,255,255,0.05);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 12px 18px;
+    transition: background 0.2s;
+}
+
+.cc-leaderboard-winner {
+    background: rgba(247,213,71,0.12);
+    border-color: #f7d547;
+    box-shadow: 0 0 16px rgba(247,213,71,0.25);
+}
+
+.cc-leaderboard-me {
+    border-color: #27ae60;
+    background: rgba(39,174,96,0.08);
+}
+
+.cc-rank {
+    font-size: 1.4rem;
+    min-width: 32px;
+    text-align: center;
+}
+
+.cc-player-result-name {
+    flex: 1;
+    font-weight: 800;
+    font-size: 1rem;
+    color: #fff;
+}
+
+.cc-player-result-balance {
+    font-family: var(--font-mono);
+    font-weight: 900;
+    font-size: 1.2rem;
+}
+
+.cc-player-result-abs {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.4);
+    font-family: var(--font-mono);
+}
+
+.cc-gameover-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* ── Host TV Game Over View ───────────────────────────────────────────────── */
+
+.cc-gameover-host-panel {
+    max-width: 800px;
+}
+
+.cc-gameover-host-title {
+    font-size: 3rem;
+    letter-spacing: 5px;
+    animation: winnerGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes winnerGlow {
+    from { text-shadow: 3px 3px 0 #000, 0 0 20px rgba(247, 213, 71, 0.3); }
+    to   { text-shadow: 3px 3px 0 #000, 0 0 40px rgba(247, 213, 71, 0.6); }
+}
+
+.cc-gameover-host-leaderboard {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.cc-gameover-host-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px 24px;
+    transition: all 0.3s ease;
+}
+
+.cc-gameover-host-winner {
+    background: rgba(247, 213, 71, 0.12);
+    border-color: #f7d547;
+    box-shadow: 0 0 30px rgba(247, 213, 71, 0.3);
+    animation: winnerGlow 2s ease-in-out infinite alternate;
+}
+
+.cc-gameover-host-rank {
+    font-size: 2rem;
+    min-width: 48px;
+    text-align: center;
+}
+
+.cc-gameover-host-name {
+    flex: 1;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.cc-gameover-host-balance {
+    font-size: 2rem;
+    font-weight: 900;
+    font-family: var(--font-mono);
+}
+
+/* ── Mobile Game Over ─────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .cc-gameover-area {
+        padding: 16px;
+    }
+    .cc-gameover-panel {
+        padding: 24px 20px;
+    }
+    .cc-gameover-title {
+        font-size: 1.6rem;
+    }
+    .cc-leaderboard-row {
+        padding: 10px 14px;
+    }
+    .cc-gameover-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+    .cc-gameover-actions .cc-btn {
+        width: 100%;
+        min-height: 48px;
+        justify-content: center;
     }
 }

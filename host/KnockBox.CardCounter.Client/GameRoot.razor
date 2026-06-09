@@ -1,0 +1,115 @@
+@inherits HubLobbyPageBase<CardCounterView>
+@*
+    GameRoot — the runtime-loaded WASM UI entry point for Card Counter. Inheriting
+    HubLobbyPageBase<CardCounterView> opens the hub, joins the lobby, deserializes each
+    per-player projection into `View`, and disposes on teardown. It dispatches to the
+    phase components (lobby / buy-in / playing / game-over) exactly as the old server
+    CardCounterLobby page did, passing the projected View and a command-submit callback.
+*@
+
+@* The game ships its own stylesheet from the server plugin's mounted wwwroot; a runtime-
+   loaded WASM component can't use HeadContent and the streamed .Client DLL has no scoped
+   bundle, so we link the plain (de-scoped) stylesheet here. *@
+<link rel="stylesheet" href="_content/KnockBox.CardCounter/css/card-counter.css" />
+
+<CardCounterHeader Code="@LobbyCode" OnLeave="LeaveAsync" />
+
+<div class="cc-root">
+@if (View is null)
+{
+    <div class="cc-loading">
+        <span class="cc-loading-icon">🃏</span>
+        <span>Loading table...</span>
+    </div>
+}
+else
+{
+    <div class="cc-page">
+
+        @if (View.PhaseEndsAtUtc is { } endsAt && View.PhaseDurationSeconds > 0)
+        {
+            <CountdownClock EndTimeUtc="endsAt" Duration="TimeSpan.FromSeconds(View.PhaseDurationSeconds)" Context="countdown">
+                @{
+                    var seconds = (int)Math.Ceiling(countdown.RemainingSeconds);
+                }
+                <div class="cc-timer-container">
+                    <div class="cc-timer-card @(seconds < 5 ? "cc-timer-urgent" : "")">
+                        ⏳ @seconds
+                    </div>
+                </div>
+            </CountdownClock>
+        }
+
+        @if (View.IsJoinable)
+        {
+            <LobbyPhase View="View" Submit="Submit" />
+        }
+        else if (View.Phase == GamePhase.BuyIn)
+        {
+            <BuyInPhase View="View" Submit="Submit" />
+        }
+        else if (View.Phase == GamePhase.Playing)
+        {
+            <PlayingPhase View="View" Submit="Submit" IsAnimatingShoe="_isAnimatingShoe" />
+        }
+        else if (View.Phase == GamePhase.GameOver)
+        {
+            <GameOverPhase View="View" Submit="Submit" />
+        }
+
+    </div>
+}
+</div>
+
+@code {
+    /// <summary>The lobby code from the room URL, supplied by the WASM host page.</summary>
+    [Parameter] public string Code { get; set; } = "";
+
+    /// <summary>The player's chosen display name, propagated from the home page.</summary>
+    [Parameter] public string? PlayerName { get; set; }
+
+    protected override string RouteIdentifier => "card-counter";
+    protected override string LobbyUri => $"room/card-counter/{Code}";
+    protected override string DisplayName => string.IsNullOrWhiteSpace(PlayerName) ? "Player" : PlayerName!;
+
+    // Shoe-deal animation: triggered when the projected ShoeIndex increments (mirrors the
+    // server page's OnStateChangedAsync shoe-animation logic).
+    private const int ShoeAnimationDurationMs = 2500;
+    private int _prevShoeIndex = -1;
+    private bool _isAnimatingShoe;
+
+    public GameRoot()
+        : base(new SourceGenProjectionDeserializer<CardCounterView>(
+            CardCounterContractsJsonContext.Default.CardCounterView))
+    {
+    }
+
+    private Task Submit(string command, string? payload) => SubmitCommandAsync(command, payload);
+
+    protected override async Task OnViewReceivedAsync(CardCounterView? view)
+    {
+        if (view is null) return;
+
+        if (view.ShoeIndex < _prevShoeIndex)
+            _prevShoeIndex = view.ShoeIndex;           // game restarted; resync baseline
+
+        if (view.ShoeIndex > _prevShoeIndex)
+        {
+            bool first = _prevShoeIndex < 0;
+            _prevShoeIndex = view.ShoeIndex;
+            if (!first)                                // don't animate the very first shoe
+            {
+                _isAnimatingShoe = true;
+                _ = ResetShoeAnimationAsync();
+            }
+        }
+    }
+
+    private async Task ResetShoeAnimationAsync()
+    {
+        try { await Task.Delay(ShoeAnimationDurationMs, ComponentDetached); }
+        catch (OperationCanceledException) { return; }
+        _isAnimatingShoe = false;
+        await InvokeAsync(StateHasChanged);
+    }
+}

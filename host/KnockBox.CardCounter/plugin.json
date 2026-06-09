@@ -8,5 +8,10 @@
   "backgroundColor": "#061a0c",
   "fontColor": "#ffffff",
   "capabilities": [],
-  "tileAsset": "tile.svg"
+  "tileAsset": "tile.svg",
+  "clientAssembly": "KnockBox.CardCounter.Client",
+  "clientContracts": ["KnockBox.CardCounter.Contracts"],
+  "clientAssets": [
+    { "name": "KnockBox.CardCounter.Client", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+  ]
 }

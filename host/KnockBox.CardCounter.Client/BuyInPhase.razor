@@ -1,22 +1,22 @@
-@using KnockBox.CardCounter.Services.Logic.Formatting
-@using KnockBox.Core.Services.State.Users
-@using KnockBox.CardCounter.Services.State.Games
+@*
+    Buy-in phase — host (shared-display) TV grid vs. the player's choice view, re-expressed
+    against the projected CardCounterView.
+*@
 
 @{
-    var myPlayer = GetMyPlayer();
-    var isHost = IsSharedDisplay();
+    var myPlayer = View.Players.FirstOrDefault(p => p.PlayerId == View.RecipientId);
+    var isHost = View.RecipientId == View.HostId && !View.HostIsParticipant;
 }
 
 @if (isHost)
 {
-    @* ── HOST VIEW: TV-friendly Buy-In ── *@
     <div class="cc-buyin-area">
         <div class="cc-buyin-panel cc-buyin-host-panel">
             <h3 class="cc-panel-title cc-buyin-host-title">♦ BUY-IN PHASE ♦</h3>
             <p class="cc-buyin-subtitle">Players are choosing their starting balance</p>
 
             <div class="cc-buyin-host-grid">
-                @foreach (var p in GameState.GamePlayers.Values)
+                @foreach (var p in View.Players)
                 {
                     <div class="cc-buyin-host-card @(p.HasSetBuyIn ? "cc-buyin-host-ready" : "cc-buyin-host-choosing")">
                         <div class="cc-buyin-host-name">@p.DisplayName</div>
@@ -45,14 +45,13 @@
 }
 else
 {
-    @* ── PLAYER VIEW ── *@
     <div class="cc-buyin-area">
         <div class="cc-buyin-panel">
             <h3 class="cc-panel-title">♦ CHOOSE YOUR SIDE ♦</h3>
             <p class="cc-buyin-subtitle">Will you play it safe or go all in?</p>
 
             <div class="cc-buyin-players">
-                @foreach (var p in GameState.GamePlayers.Values)
+                @foreach (var p in View.Players)
                 {
                     <div class="cc-buyin-player-row">
                         <span class="cc-buyin-player-name">@p.DisplayName</span>
@@ -97,3 +96,11 @@ else
     </div>
 }
 
+@code {
+    [Parameter] public CardCounterView View { get; set; } = default!;
+    [Parameter] public Func<string, string?, Task> Submit { get; set; } = default!;
+
+    private Task SetBuyIn(bool isNegative)
+        => Submit(CardCounterCommands.SetBuyIn,
+            JsonSerializer.Serialize(new SetBuyInPayload(isNegative), CardCounterContractsJsonContext.Default.SetBuyInPayload));
+}

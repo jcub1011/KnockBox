@@ -212,6 +212,13 @@ namespace KnockBox.Services.Logic.Games.Shared
             return _lobbiesByUri.TryGetValue(uri, out registration);
         }
 
+        /// <summary>
+        /// Snapshot of every currently-open lobby. <see cref="ConcurrentDictionary{TKey,TValue}.Values"/>
+        /// is itself a snapshot; materialized to an array so callers (e.g. the server
+        /// tick loop) can enumerate without racing concurrent create/close mutations.
+        /// </summary>
+        public IReadOnlyCollection<LobbyRegistration> GetOpenLobbies() => _lobbies.Values.ToArray();
+
         public IReadOnlyDictionary<string, int> GetLobbyCountsByRoute()
         {
             // ConcurrentDictionary.Values is a snapshot; safe to enumerate

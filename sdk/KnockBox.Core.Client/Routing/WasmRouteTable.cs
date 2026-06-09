@@ -17,8 +17,16 @@ public static class WasmRouteTable
     /// <summary>
     /// Base-relative path prefixes served as WASM pages (no leading slash, matching
     /// <c>NavigationManager.ToBaseRelativePath</c> output). Compared case-insensitively.
+    /// <para>
+    /// Each migrated game adds one <c>"room/{route}"</c> entry. This must stay a
+    /// per-game list rather than a blanket <c>"room/"</c> prefix: un-migrated games
+    /// also live under <c>room/</c> and must keep rendering under
+    /// <c>InteractiveServer</c> (with the default header), so only routes listed here
+    /// flip to the static→WASM transition.
+    /// </para>
     /// </summary>
-    private static readonly string[] Prefixes = ["spike/wasm", "shell", "room/dice-simulator"];
+    private static readonly string[] Prefixes =
+        ["spike/wasm", "shell", "room/dice-simulator", "room/card-counter"];
 
     /// <summary>
     /// Returns whether <paramref name="baseRelativePath"/> (e.g. the result of

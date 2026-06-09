@@ -4,9 +4,10 @@ A step-by-step, footgun-aware recipe for migrating a game plugin from the Blazor
 model to the WASM tri-split. **DiceSimulator is the reference implementation** — when in
 doubt, copy what `host/KnockBox.DiceSimulator{,.Contracts,.Client}` does.
 
-> **Status:** DiceSimulator (game #1) is migrated and the shared infrastructure is proven.
-> Most of the footguns below are now solved once in the SDK/platform; this guide tells you
-> which steps are per-game and which are already handled for you.
+> **Status:** DiceSimulator (game #1) and CardCounter (game #2) are migrated and the shared
+> infrastructure is proven. Game #2 added the **server-owned tick loop** (timed games) and a
+> **WASM `CountdownClock`** — both now reusable. Most of the footguns below are solved once in
+> the SDK/platform; this guide tells you which steps are per-game and which are handled for you.
 
 Read [`01-target-architecture.md`](./01-target-architecture.md) and
 [`03-work-breakdown.md`](./03-work-breakdown.md) first. The migration order (easy → hard)
@@ -33,17 +34,27 @@ These were built during game #1 and work for every game automatically:
   parity, parameterized by `Code` + `JoinUrl`.
 - **Host shell** — `MainLayout` suppresses its header on WASM routes; `Home` branches
   `IsClientGame` games to the hub-create flow; `IsHomePage` tolerates query strings.
+- **Generic runtime-game page** — `host/KnockBox.Client/Pages/RuntimeGameLobby.razor` is
+  `@page "/room/{Route}"` + `"/room/{Route}/{Code}"`, serving every migrated game; no per-game
+  host-page work remains (done at game #2).
+- **Server-owned tick loop** — `LobbyTickService` (in `KnockBox.Platform`) drives time-based
+  FSM transitions for any engine implementing `IServerTickHandler` (`KnockBox.Core`), replacing
+  the old per-host browser-circuit tick. Engines opt in; the host has no compile-time knowledge.
+- **`CountdownClock`** (in `KnockBox.Core.Client`) — renders a phase countdown from a
+  server-projected deadline timestamp, reusing the existing `_content/KnockBox.Core/js/countdownClock.js`.
 - **Analyzers** KB1005–KB1008 enforce the boundaries at build time.
 
 What you still do **per game**: extract Contracts, write `ProjectFor` + command handlers,
 port the UI, declare the staging/manifest bits, recreate the game's custom header, ship its
 stylesheet, and add tests.
 
-**One-time step for game #2:** generalize `host/KnockBox.Client/Pages/RuntimeGameLobby.razor`
-from the dice-simulator-specific `@page` routes to a generic `@page "/room/{Route}/{Code}"`
-(+ a create-mode `@page "/room/{Route}"`), driving `Route` from the route parameter instead
-of the `dice-simulator` constant. After that, no per-game host-page work is needed — only a
-`WasmRouteTable` prefix entry per game.
+**The generic host page is done (game #2).** Each new game now needs only **one
+`WasmRouteTable` prefix entry** (`"room/{route}"`) — do NOT collapse the list to a blanket
+`"room/"`: un-migrated games also live under `room/` and must keep rendering under
+`InteractiveServer` (with the default header). The generic `@page "/room/{Route}/{Code}"` is
+safe alongside un-migrated server games because Blazor's literal-segment routes
+(`/room/alpha-chain/{code}`) outrank the parameterized one; only routes listed in
+`WasmRouteTable` flip to the static→WASM transition.
 
 ---
 
@@ -122,6 +133,13 @@ public class {Game}GameEngine(...)
   `LobbyService.CreateLobbyAsync` → the engine's existing `CreateStateAsync`. No change there.
 - No DI changes: `AddGameEngine<TEngine>()` already registers the engine keyed by route, and
   the hub/coordinator resolve the projector + command handler off that keyed instance.
+- **Timed games (auto-advance on a deadline):** also implement `IServerTickHandler` on the
+  engine (`void Tick(AbstractGameState, DateTimeOffset now)`, delegating to the existing
+  per-frame tick). The platform's `LobbyTickService` calls it ~4 Hz for every open lobby — the
+  old host-circuit tick (`LobbyPageBase.TryGetHostTick`) is gone in WASM. Project the current
+  deadline as an absolute UTC timestamp (e.g. `PhaseEndsAtUtc` + a duration) so the client can
+  render a `CountdownClock`; the server stays authoritative on expiry. (CardCounter is the
+  reference for all three interfaces + the countdown.)
 
 > **Footgun — never compare `User` by reference in a command handler.** `User` is a plain
 > class (reference equality). The hub resolves a **fresh `User` per command** from the
@@ -264,8 +282,7 @@ declare it as a private ALC dependency to stage:
 - Add `"room/{route}"` to `WasmRouteTable.Prefixes`
   (`sdk/KnockBox.Core.Client/Routing/WasmRouteTable.cs`). This makes `App.razor` keep the
   route static (static→WASM transition) **and** makes `MainLayout` suppress its header.
-- Ensure `RuntimeGameLobby.razor` serves the route (after the game-#2 generalization it
-  serves all games; until then it's dice-only).
+- `RuntimeGameLobby.razor` already serves every route generically — no per-game edit.
 - **Home page launch needs no per-game change** — `Home.IsClientGame` already detects any
   game with a `clientAssembly` and routes create/join through the hub.
 

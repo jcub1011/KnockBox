@@ -1,0 +1,289 @@
+@implements IDisposable
+@*
+    Lobby phase — roster, host deal buttons, and the House Rules drawer, re-expressed
+    against the projected CardCounterView. The host edits a local settings draft; each
+    change is sent as an `update-settings` command (the server is the source of truth).
+    Client-side localStorage persistence is deferred (no WASM client storage SDK yet).
+*@
+
+<div class="cc-lobby">
+    @{
+        bool amHost = View.RecipientId == View.HostId;
+    }
+    @if (amHost)
+    {
+        <button class="cc-settings-gear-btn" @onclick="ToggleSettings" title="House Rules">
+            🎰
+        </button>
+    }
+
+    <div class="cc-lobby-table-container">
+        <div class="cc-lobby-table">
+            <h2 class="cc-lobby-title">♠ WAITING FOR PLAYERS ♥</h2>
+            <div class="cc-lobby-players">
+                @foreach (var entry in View.Roster)
+                {
+                    bool isHost = entry.IsHost;
+                    bool isMe = entry.PlayerId == View.RecipientId;
+                    @if (isHost)
+                    {
+                        <div class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")">
+                            <span class="cc-player-avatar">👑</span>
+                            <span class="cc-player-lobbyname">@entry.DisplayName</span>
+                            <span class="cc-host-badge">HOST</span>
+                        </div>
+                    }
+                    else if (amHost)
+                    {
+                        <button class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")"
+                                @onclick="() => KickPlayer(entry.PlayerId)" title="Click to kick player">
+                            <span class="cc-player-avatar">🃏</span>
+                            <span class="cc-player-lobbyname">@entry.DisplayName</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="cc-lobby-player @(isMe ? "cc-lobby-player-me" : "")">
+                            <span class="cc-player-avatar">🃏</span>
+                            <span class="cc-player-lobbyname">@entry.DisplayName</span>
+                        </div>
+                    }
+                }
+            </div>
+            @if (amHost)
+            {
+                @* The host counts toward the player total only when joining as a player; the
+                   shared-display button needs at least one joined (non-host) player. *@
+                bool hasJoinedPlayers = View.Roster.Count(r => !r.IsHost) > 0;
+                <button class="cc-btn cc-btn-primary cc-btn-lg cc-deal-btn" @onclick="() => StartGame(false)" disabled="@(!hasJoinedPlayers)"
+                        title="@(!hasJoinedPlayers ? "Need at least 1 player to start as a shared display" : "Deal cards and run this screen as a shared display")">
+                    <span class="cc-deal-btn-main">🃏 Deal Cards</span>
+                    <span class="cc-deal-btn-sub">and be a shared display</span>
+                </button>
+                <button class="cc-btn cc-btn-secondary cc-btn-lg cc-deal-btn" @onclick="() => StartGame(true)"
+                        title="Deal cards and join the game as a player">
+                    <span class="cc-deal-btn-main">🃏 Deal Cards</span>
+                    <span class="cc-deal-btn-sub">and join as a player</span>
+                </button>
+                @if (!hasJoinedPlayers)
+                {
+                    <p class="cc-lobby-min-players">⚠️ Need at least 1 player to deal as a shared display</p>
+                }
+            }
+            else
+            {
+                <p class="cc-waiting-text">Waiting for host to start...</p>
+            }
+        </div>
+    </div>
+
+    @if (amHost)
+    {
+        @if (SettingsOpen)
+        {
+            <div class="cc-settings-backdrop" @onclick="ToggleSettings"></div>
+        }
+        <div class="cc-settings-drawer @(SettingsOpen ? "cc-settings-drawer-open" : "")">
+            <div class="cc-settings-drawer-header">
+                <h3 class="cc-config-title">🎰 House Rules</h3>
+                <button class="cc-settings-close-btn" @onclick="ToggleSettings" title="Close settings">✕</button>
+            </div>
+            <div class="cc-settings-drawer-body">
+
+                <h4 class="cc-config-section-title">🃏 Deck &amp; Cards</h4>
+                <div class="cc-config-grid">
+                    <label class="cc-config-label">Deck Size:
+                        <input type="number" class="cc-config-input" @bind:get="_draft.DeckSize" @bind:set="@(v => Set(_draft with { DeckSize = v }))" />
+                    </label>
+                    <label class="cc-config-label">Number to Operator Ratio:
+                        <input type="number" step="0.1" class="cc-config-input" @bind:get="_draft.NumberToOperatorRatio" @bind:set="@(v => Set(_draft with { NumberToOperatorRatio = v }))" />
+                    </label>
+                    <label class="cc-config-label">Add/Sub to Mul/Div Ratio:
+                        <input type="number" step="0.1" class="cc-config-input" @bind:get="_draft.AddSubToMulDivRatio" @bind:set="@(v => Set(_draft with { AddSubToMulDivRatio = v }))" />
+                    </label>
+                    <label class="cc-config-label">Min Shoe Size:
+                        <input type="number" class="cc-config-input" @bind:get="_draft.MinShoeSize" @bind:set="@(v => Set(_draft with { MinShoeSize = v }))" />
+                    </label>
+                    <label class="cc-config-label">Max Shoe Size:
+                        <input type="number" class="cc-config-input" @bind:get="_draft.MaxShoeSize" @bind:set="@(v => Set(_draft with { MaxShoeSize = v }))" />
+                    </label>
+                </div>
+
+                <h4 class="cc-config-section-title">🎮 Gameplay</h4>
+                <div class="cc-config-grid">
+                    <label class="cc-config-label">Actions Dealt Per Round:
+                        <input type="number" class="cc-config-input" @bind:get="_draft.ActionsDealtPerRound" @bind:set="@(v => Set(_draft with { ActionsDealtPerRound = v }))" />
+                    </label>
+                    <label class="cc-config-label">Action Hand Limit:
+                        <input type="number" class="cc-config-input" @bind:get="_draft.ActionHandLimit" @bind:set="@(v => Set(_draft with { ActionHandLimit = v }))" />
+                    </label>
+                    <label class="cc-config-label">Passes Per Player:
+                        <input type="number" class="cc-config-input" @bind:get="_draft.TotalPassesPerPlayer" @bind:set="@(v => Set(_draft with { TotalPassesPerPlayer = v }))" />
+                    </label>
+                    <label class="cc-config-label cc-config-label-row" title="Highest absolute score wins rather than closest to 0">
+                        <span>Flip Win Condition:</span>
+                        <input type="checkbox" class="cc-config-checkbox" @bind:get="_draft.FlipWinCondition" @bind:set="@(v => Set(_draft with { FlipWinCondition = v }))" />
+                    </label>
+                    <label class="cc-config-label cc-config-label-row" title="Show the operator used by the Not My Money card">
+                        <span>Show NMM Operator:</span>
+                        <input type="checkbox" class="cc-config-checkbox" @bind:get="_draft.ShowMakeMyMoneyOperator" @bind:set="@(v => Set(_draft with { ShowMakeMyMoneyOperator = v }))" />
+                    </label>
+                    <label class="cc-config-label cc-config-label-row" title="Number cards apply directly to balance using a player's active operator instead of building a pot">
+                        <span>Active Operator Mode:</span>
+                        <input type="checkbox" class="cc-config-checkbox" @bind:get="_draft.ActiveOperatorMode" @bind:set="@(v => Set(_draft with { ActiveOperatorMode = v }))" />
+                    </label>
+                </div>
+
+                <h4 class="cc-config-section-title">⏱️ Timers</h4>
+                <div class="cc-config-grid">
+                    <label class="cc-config-label cc-config-label-row">
+                        <span>Enable Action Timer:</span>
+                        <input type="checkbox" class="cc-config-checkbox" @bind:get="_draft.EnableActionTimer" @bind:set="@(v => Set(_draft with { EnableActionTimer = v }))" />
+                    </label>
+                    <label class="cc-config-label">Player Turn Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind:get="_draft.PlayerTurnTimeoutMs" @bind:set="@(v => Set(_draft with { PlayerTurnTimeoutMs = v }))" />
+                    </label>
+                    <label class="cc-config-label">Buy-in Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind:get="_draft.BuyInTimeoutMs" @bind:set="@(v => Set(_draft with { BuyInTimeoutMs = v }))" />
+                    </label>
+                    <label class="cc-config-label">Round End Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind:get="_draft.RoundEndTimeoutMs" @bind:set="@(v => Set(_draft with { RoundEndTimeoutMs = v }))" />
+                    </label>
+                    <label class="cc-config-label">Reaction Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind:get="_draft.WaitingForReactionTimeoutMs" @bind:set="@(v => Set(_draft with { WaitingForReactionTimeoutMs = v }))" />
+                    </label>
+                    <label class="cc-config-label">Feeling Lucky Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind:get="_draft.FeelingLuckyChainTimeoutMs" @bind:set="@(v => Set(_draft with { FeelingLuckyChainTimeoutMs = v }))" />
+                    </label>
+                    <label class="cc-config-label">Make My Luck Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind:get="_draft.MakeMyLuckTimeoutMs" @bind:set="@(v => Set(_draft with { MakeMyLuckTimeoutMs = v }))" />
+                    </label>
+                    <label class="cc-config-label">Not My Money Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind:get="_draft.NotMyMoneyTimeoutMs" @bind:set="@(v => Set(_draft with { NotMyMoneyTimeoutMs = v }))" />
+                    </label>
+                    <label class="cc-config-label">Skim Timeout (ms):
+                        <input type="number" class="cc-config-input" @bind:get="_draft.SkimTimeoutMs" @bind:set="@(v => Set(_draft with { SkimTimeoutMs = v }))" />
+                    </label>
+                </div>
+
+                <h4 class="cc-config-section-title">🎴 Action Card Rarities</h4>
+                <div class="cc-config-grid">
+                    <label class="cc-config-label">Feeling Lucky Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind:get="_draft.FeelingLuckyWeight" @bind:set="@(v => Set(_draft with { FeelingLuckyWeight = v }))" />
+                    </label>
+                    <label class="cc-config-label">Make My Luck Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind:get="_draft.MakeMyLuckWeight" @bind:set="@(v => Set(_draft with { MakeMyLuckWeight = v }))" />
+                    </label>
+                    <label class="cc-config-label">Skim Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind:get="_draft.SkimWeight" @bind:set="@(v => Set(_draft with { SkimWeight = v }))" />
+                    </label>
+                    <label class="cc-config-label">Burn Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind:get="_draft.BurnWeight" @bind:set="@(v => Set(_draft with { BurnWeight = v }))" />
+                    </label>
+                    <label class="cc-config-label">Turn The Table Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind:get="_draft.TurnTheTableWeight" @bind:set="@(v => Set(_draft with { TurnTheTableWeight = v }))" />
+                    </label>
+                    <label class="cc-config-label">Comp'd Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind:get="_draft.CompdWeight" @bind:set="@(v => Set(_draft with { CompdWeight = v }))" />
+                    </label>
+                    <label class="cc-config-label">Not My Money Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind:get="_draft.NotMyMoneyWeight" @bind:set="@(v => Set(_draft with { NotMyMoneyWeight = v }))" />
+                    </label>
+                    <label class="cc-config-label">Launder Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind:get="_draft.LaunderWeight" @bind:set="@(v => Set(_draft with { LaunderWeight = v }))" />
+                    </label>
+                    <label class="cc-config-label">Tilt Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind:get="_draft.TiltWeight" @bind:set="@(v => Set(_draft with { TiltWeight = v }))" />
+                    </label>
+                    <label class="cc-config-label">Hedge Your Bet Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind:get="_draft.HedgeYourBetWeight" @bind:set="@(v => Set(_draft with { HedgeYourBetWeight = v }))" />
+                    </label>
+                    <label class="cc-config-label">Let It Ride Weight:
+                        <input type="number" min="0" class="cc-config-input" @bind:get="_draft.LetItRideWeight" @bind:set="@(v => Set(_draft with { LetItRideWeight = v }))" />
+                    </label>
+                </div>
+
+                <div class="cc-settings-drawer-footer">
+                    <button type="button" class="cc-btn @(_resetArmed ? "cc-btn-danger" : "cc-btn-secondary")"
+                            @onclick="ResetToDefaults">
+                        @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public CardCounterView View { get; set; } = default!;
+    [Parameter] public Func<string, string?, Task> Submit { get; set; } = default!;
+
+    protected bool SettingsOpen { get; private set; }
+
+    // Local editable copy of the host's settings. Initialized from the projected view;
+    // each edit optimistically updates this and sends an update-settings command.
+    private CardCounterSettings _draft = new();
+    private bool _initialized;
+
+    private bool _resetArmed;
+    private int _resetGeneration;
+    private CancellationTokenSource? _cts;
+
+    protected override void OnParametersSet()
+    {
+        // Seed the draft from the authoritative settings once, then let local edits drive it
+        // (the host is the only editor). Re-seed only before the first edit.
+        if (!_initialized)
+        {
+            _draft = View.Settings;
+            _initialized = true;
+        }
+    }
+
+    protected void ToggleSettings() => SettingsOpen = !SettingsOpen;
+
+    private Task Set(CardCounterSettings updated)
+    {
+        _draft = updated;
+        return Submit(CardCounterCommands.UpdateSettings,
+            JsonSerializer.Serialize(_draft, CardCounterContractsJsonContext.Default.CardCounterSettings));
+    }
+
+    protected void ResetToDefaults()
+    {
+        if (!_resetArmed)
+        {
+            _resetArmed = true;
+            _ = DisarmResetAfterDelay(++_resetGeneration);
+            return;
+        }
+        _resetArmed = false;
+        _resetGeneration++;
+        _ = Set(new CardCounterSettings());
+    }
+
+    private async Task DisarmResetAfterDelay(int generation)
+    {
+        _cts ??= new CancellationTokenSource();
+        try { await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token); }
+        catch (OperationCanceledException) { return; }
+        if (generation != _resetGeneration) return;
+        _resetArmed = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task KickPlayer(Guid playerId)
+        => Submit(CardCounterCommands.KickPlayer,
+            JsonSerializer.Serialize(new TargetPayload(playerId), CardCounterContractsJsonContext.Default.TargetPayload));
+
+    private Task StartGame(bool hostAsPlayer)
+        => Submit(CardCounterCommands.Start,
+            JsonSerializer.Serialize(new StartPayload(hostAsPlayer), CardCounterContractsJsonContext.Default.StartPayload));
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

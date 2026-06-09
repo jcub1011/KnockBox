@@ -1,27 +1,29 @@
-@using KnockBox.CardCounter.Services.Logic.Formatting
-@using KnockBox.Core.Services.State.Users
-@using KnockBox.CardCounter.Services.State.Games
+@*
+    Game-over phase — host TV leaderboard vs. player leaderboard, re-expressed against the
+    projected CardCounterView. Ranking (closest-to-zero or highest-magnitude) is computed
+    client-side from the projected balances.
+*@
 
 @{
-    var isHost = IsSharedDisplay();
-    var ranked = GameState.Settings.FlipWinCondition
-        ? GameState.GamePlayers.Values.OrderByDescending(p => Math.Abs(p.Balance)).ToList()
-        : GameState.GamePlayers.Values.OrderBy(p => Math.Abs(p.Balance)).ToList();
+    var isHost = View.RecipientId == View.HostId && !View.HostIsParticipant;
+    var ranked = View.Settings.FlipWinCondition
+        ? View.Players.OrderByDescending(p => Math.Abs(p.Balance)).ToList()
+        : View.Players.OrderBy(p => Math.Abs(p.Balance)).ToList();
     var ranks = new int[ranked.Count];
     for (int r = 0; r < ranked.Count; r++)
     {
         bool tiedWithPrevious = r > 0 && Math.Abs(ranked[r].Balance) == Math.Abs(ranked[r - 1].Balance);
         ranks[r] = tiedWithPrevious ? ranks[r - 1] : r + 1;
     }
+    bool amHost = View.RecipientId == View.HostId;
 }
 
 @if (isHost)
 {
-    @* ── HOST VIEW: Dramatic TV Leaderboard ── *@
     <div class="cc-gameover-area">
         <div class="cc-gameover-panel cc-gameover-host-panel">
             <h2 class="cc-gameover-title cc-gameover-host-title">♠ GAME OVER ♠</h2>
-            <p class="cc-gameover-subtitle">@(GameState.Settings.FlipWinCondition ? "Highest magnitude wins!" : "Closest to zero wins!")</p>
+            <p class="cc-gameover-subtitle">@(View.Settings.FlipWinCondition ? "Highest magnitude wins!" : "Closest to zero wins!")</p>
 
             <div class="cc-gameover-host-leaderboard">
                 @for (int i = 0; i < ranked.Count; i++)
@@ -52,18 +54,17 @@
 }
 else
 {
-    @* ── PLAYER VIEW ── *@
     <div class="cc-gameover-area">
         <div class="cc-gameover-panel">
             <h2 class="cc-gameover-title">♠ GAME OVER ♠</h2>
-            <p class="cc-gameover-subtitle">@(GameState.Settings.FlipWinCondition ? "Highest magnitude wins!" : "Closest to zero wins!")</p>
+            <p class="cc-gameover-subtitle">@(View.Settings.FlipWinCondition ? "Highest magnitude wins!" : "Closest to zero wins!")</p>
             <div class="cc-leaderboard">
                 @for (int i = 0; i < ranked.Count; i++)
                 {
                     var p = ranked[i];
                     int rank = ranks[i];
                     string medal = rank switch { 1 => "🥇", 2 => "🥈", 3 => "🥉", _ => $"#{rank}" };
-                    bool isMe = p.PlayerId == UserService.CurrentUser?.Id;
+                    bool isMe = p.PlayerId == View.RecipientId;
                     bool isWinner = rank == 1;
                     <div class="cc-leaderboard-row @(isMe ? "cc-leaderboard-me" : "") @(isWinner ? "cc-leaderboard-winner" : "")">
                         <span class="cc-rank">@medal</span>
@@ -74,7 +75,7 @@ else
                     </div>
                 }
             </div>
-            @if (IsHost())
+            @if (amHost)
             {
                 <div class="cc-gameover-actions">
                     <button class="cc-btn cc-btn-primary cc-btn-lg" @onclick="ReturnToLobby"
@@ -87,3 +88,9 @@ else
     </div>
 }
 
+@code {
+    [Parameter] public CardCounterView View { get; set; } = default!;
+    [Parameter] public Func<string, string?, Task> Submit { get; set; } = default!;
+
+    private Task ReturnToLobby() => Submit(CardCounterCommands.ReturnToLobby, null);
+}

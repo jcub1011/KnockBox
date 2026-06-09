@@ -1,8 +1,11 @@
+using System.Text.Json;
 using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Games.Shared.Projection;
 using KnockBox.Tooling.Collections;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.CardCounter.Services.Logic.Games.FSM;
 using KnockBox.CardCounter.Services.Logic.Games.FSM.States;
+using KnockBox.CardCounter.Services.Projection;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.CardCounter.Services.State.Games;
@@ -20,8 +23,151 @@ namespace KnockBox.CardCounter.Services.Logic.Games
     public class CardCounterGameEngine(
         IRandomNumberService randomNumberService,
         ILogger<CardCounterGameEngine> logger,
-        ILogger<CardCounterGameState> stateLogger) : AbstractGameEngine<CardCounterGameState>
+        ILogger<CardCounterGameState> stateLogger)
+        : AbstractGameEngine<CardCounterGameState>, IGameStateProjector, IGameCommandHandler, IServerTickHandler
     {
+        private readonly CardCounterStateProjector _projector = new();
+
+        // Match the hub's wire format: enums as strings, case-insensitive property
+        // names, so a client-serialized command payload deserializes here.
+        private static readonly JsonSerializerOptions CommandJsonOptions = new()
+        {
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
+            PropertyNameCaseInsensitive = true,
+        };
+
+        // ── Hub projection / command / tick surface ──────────────────────────
+
+        /// <summary>Per-recipient projection entry point used by the host's <c>GameViewCoordinator</c>.</summary>
+        public object? ProjectFor(AbstractGameState state, Guid recipientId)
+            => ((IGameStateProjector)_projector).ProjectFor(state, recipientId);
+
+        /// <summary>
+        /// Maps a hub command name to the same engine method a Razor page used to call
+        /// directly. Per-command authorization (host-only, active-player, target-only)
+        /// lives in the invoked methods / FSM states.
+        /// </summary>
+        public async ValueTask<Result> HandleCommandAsync(
+            User caller, AbstractGameState state, string command, string? payloadJson, CancellationToken ct = default)
+        {
+            if (state is not CardCounterGameState s)
+                return Result.FromError("Invalid game state for Card Counter.");
+
+            return command switch
+            {
+                CardCounterCommands.Start             => await StartFromPayload(caller, s, payloadJson, ct),
+                CardCounterCommands.SetBuyIn          => SetBuyInFromPayload(caller, s, payloadJson),
+                CardCounterCommands.DrawCard          => DrawCard(caller, s),
+                CardCounterCommands.PassTurn          => PassTurn(caller, s),
+                CardCounterCommands.FoldPot           => FoldPot(caller, s),
+                CardCounterCommands.PlayAction        => PlayActionFromPayload(caller, s, payloadJson),
+                CardCounterCommands.AcceptPending     => AcceptPending(caller, s),
+                CardCounterCommands.SubmitReorder     => SubmitReorderFromPayload(caller, s, payloadJson),
+                CardCounterCommands.Discard           => DiscardFromPayload(caller, s, payloadJson),
+                CardCounterCommands.SkimSelect        => SkimSelectFromPayload(caller, s, payloadJson),
+                CardCounterCommands.NotMyMoneyTarget  => NotMyMoneyTargetFromPayload(caller, s, payloadJson),
+                CardCounterCommands.NotMyMoneyCancel  => NotMyMoneyCancel(caller, s),
+                CardCounterCommands.ReturnToLobby     => ReturnToLobby(caller, s),
+                CardCounterCommands.UpdateSettings    => UpdateSettingsFromPayload(caller, s, payloadJson),
+                CardCounterCommands.KickPlayer        => KickFromPayload(caller, s, payloadJson),
+                _ => Result.FromError($"Unknown command [{command}].")
+            };
+        }
+
+        /// <summary>Server-owned clock entry point; drives the FSM's time-based transitions.</summary>
+        void IServerTickHandler.Tick(AbstractGameState state, DateTimeOffset now)
+        {
+            if (state is CardCounterGameState s && s.Context is not null)
+                Tick(s.Context, now);
+        }
+
+        // ── Command payload adapters ─────────────────────────────────────────
+
+        private async Task<Result> StartFromPayload(User caller, CardCounterGameState state, string? payloadJson, CancellationToken ct)
+        {
+            // The deal buttons choose whether the host plays; carry it into settings
+            // before the host-checked StartAsync runs StartAsyncCore.
+            var payload = Deserialize<StartPayload>(payloadJson);
+            if (caller.Id == state.Host.Id)
+                state.UpdateSettings(cfg => cfg with { HostPlays = payload?.HostPlays ?? false });
+            return await StartAsync(caller, state, ct);
+        }
+
+        private Result SetBuyInFromPayload(User caller, CardCounterGameState state, string? payloadJson)
+        {
+            if (Deserialize<SetBuyInPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed buy-in payload.");
+            return SetBuyIn(caller, state, p.IsNegative);
+        }
+
+        private Result PlayActionFromPayload(User caller, CardCounterGameState state, string? payloadJson)
+        {
+            if (Deserialize<PlayActionPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed play-action payload.");
+            return PlayActionCard(caller, state, p.CardIndex, p.TargetPlayerId);
+        }
+
+        private Result SubmitReorderFromPayload(User caller, CardCounterGameState state, string? payloadJson)
+        {
+            if (Deserialize<ReorderPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed reorder payload.");
+            return SubmitReorder(caller, state, p.ReorderedIndices);
+        }
+
+        private Result DiscardFromPayload(User caller, CardCounterGameState state, string? payloadJson)
+        {
+            if (Deserialize<DiscardPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed discard payload.");
+            return DiscardActionCards(caller, state, p.CardIndices);
+        }
+
+        private Result SkimSelectFromPayload(User caller, CardCounterGameState state, string? payloadJson)
+        {
+            if (Deserialize<SkimPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed skim payload.");
+            return SkimSelect(caller, state, p.SourceDigitIndex, p.TargetDigitIndex);
+        }
+
+        private Result NotMyMoneyTargetFromPayload(User caller, CardCounterGameState state, string? payloadJson)
+        {
+            if (Deserialize<TargetPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed target payload.");
+            return NotMyMoneySelectTarget(caller, state, p.TargetPlayerId);
+        }
+
+        private Result UpdateSettingsFromPayload(User caller, CardCounterGameState state, string? payloadJson)
+        {
+            // Host-only, and only meaningful before the game starts (the House Rules
+            // drawer is a lobby control). HostPlays is owned by the deal buttons, so it
+            // is preserved across a settings edit.
+            if (caller.Id != state.Host.Id)
+                return Result.FromError("Only the host can change the settings.");
+            if (!state.IsJoinable)
+                return Result.FromError("Settings can only change before the game starts.");
+            if (Deserialize<CardCounterSettings>(payloadJson) is not { } incoming)
+                return Result.FromError("Malformed settings payload.");
+            return state.UpdateSettings(cur => incoming with { HostPlays = cur.HostPlays });
+        }
+
+        private Result KickFromPayload(User caller, CardCounterGameState state, string? payloadJson)
+        {
+            if (Deserialize<TargetPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed kick payload.");
+
+            var target = state.Players.FirstOrDefault(e => e.User.Id == p.TargetPlayerId).User;
+            if (target is null)
+                return Result.FromError("Player is not in this lobby.");
+
+            return state.KickPlayer(caller, target);
+        }
+
+        private static T? Deserialize<T>(string? payloadJson)
+        {
+            if (string.IsNullOrEmpty(payloadJson)) return default;
+            try { return JsonSerializer.Deserialize<T>(payloadJson, CommandJsonOptions); }
+            catch (JsonException) { return default; }
+        }
+
         // ── AbstractGameEngine lifecycle ─────────────────────────────────────
 
         public override async Task<ValueResult<AbstractGameState>> CreateStateAsync(

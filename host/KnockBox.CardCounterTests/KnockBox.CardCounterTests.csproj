@@ -14,10 +14,14 @@
 
   <ItemGroup>
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+    <!-- Card/enum/settings/notification types moved to the Contracts assembly; a global
+         using keeps existing tests referencing them unchanged. -->
+    <Using Include="KnockBox.CardCounter.Contracts" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\KnockBox.CardCounter\KnockBox.CardCounter.csproj" />
+    <ProjectReference Include="..\KnockBox.CardCounter.Contracts\KnockBox.CardCounter.Contracts.csproj" />
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
   </ItemGroup>
 
