@@ -1,13 +1,17 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using KnockBox.Tracery.Models;
 using KnockBox.Tracery.Services.Logic;
 using KnockBox.Tracery.Services.Logic.Dictionary;
+using KnockBox.Tracery.Services.Projection;
 using KnockBox.Tracery.Services.State.Games;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Games.Shared.Projection;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.WordService.Contracts;
 
@@ -17,8 +21,97 @@ namespace KnockBox.Tracery.Services.Logic.Games
         IWordListService wordListService,
         IRandomNumberService rng,
         ILogger<TraceryGameEngine> logger,
-        ILogger<TraceryGameState> stateLogger) : AbstractGameEngine<TraceryGameState>(2, 8)
+        ILogger<TraceryGameState> stateLogger)
+        : AbstractGameEngine<TraceryGameState>(2, 8), IGameStateProjector, IGameCommandHandler
     {
+        // Per-recipient projector + the wire-command JSON options (string enums + case-insensitive
+        // so the browser's source-gen JSON parses on the server). The hub resolves both interfaces
+        // off this keyed engine instance; per-room data lives on TraceryGameState, so the projector
+        // is stateless and shared. Min/max mirror the base ctor's (2, 8).
+        private readonly TraceryStateProjector _projector = new(2, 8);
+
+        private static readonly JsonSerializerOptions CommandJsonOptions = new()
+        {
+            Converters = { new JsonStringEnumConverter() },
+            PropertyNameCaseInsensitive = true,
+        };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // Hub surface (WASM tri-split): per-recipient projection + command dispatch.
+        // The Razor UI moved to KnockBox.Tracery.Client; these adapt the existing
+        // engine methods to the (command, payloadJson) the hub delivers. Lobby
+        // creation is NOT a command — it flows through GameHub.CreateRoom →
+        // CreateStateAsync. The FSM still auto-advances on the engine's own
+        // ScheduleCallback timers (no IServerTickHandler needed), and every
+        // ExecuteAsync re-projects via the GameViewCoordinator subscription.
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <inheritdoc />
+        public object? ProjectFor(AbstractGameState state, Guid recipientId)
+            => ((IGameStateProjector)_projector).ProjectFor(state, recipientId);
+
+        /// <inheritdoc />
+        public async ValueTask<Result> HandleCommandAsync(
+            User caller, AbstractGameState state, string command, string? payloadJson, CancellationToken ct = default)
+        {
+            if (state is not TraceryGameState s)
+                return Result.FromError("Invalid game state for Tracery.");
+
+            return command switch
+            {
+                TraceryCommands.Start          => await StartFromPayload(caller, s, payloadJson, ct),
+                TraceryCommands.SubmitTrace    => SubmitTraceFromPayload(caller, s, payloadJson),
+                TraceryCommands.SkipReveal     => SkipReveal(s, caller),
+                TraceryCommands.UpdateSettings => UpdateSettingsFromPayload(caller, s, payloadJson),
+                TraceryCommands.KickPlayer     => KickFromPayload(caller, s, payloadJson),
+                TraceryCommands.ReturnToLobby  => ReturnToLobby(caller, s),
+                _ => Result.FromError($"Unknown command [{command}].")
+            };
+        }
+
+        // Host participation is a start-time choice (mirrors the old "Start as Player" button); a
+        // non-host caller can't change it because StartAsync rejects a non-host start anyway.
+        private async Task<Result> StartFromPayload(User caller, TraceryGameState state, string? payloadJson, CancellationToken ct)
+        {
+            bool hostPlays = Deserialize<StartPayload>(payloadJson)?.HostPlays ?? false;
+            if (caller.Id == state.Host.Id
+                && state.UpdateSettings(cfg => cfg with { HostPlaysAlong = hostPlays }).TryGetFailure(out var settingsError))
+                return settingsError;
+            return await StartAsync(caller, state, ct);
+        }
+
+        private Result SubmitTraceFromPayload(User caller, TraceryGameState state, string? payloadJson)
+        {
+            if (Deserialize<SubmitTracePayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed submit-trace payload.");
+            return SubmitTrace(state, caller, p.Path ?? []);
+        }
+
+        private Result UpdateSettingsFromPayload(User caller, TraceryGameState state, string? payloadJson)
+        {
+            // Compare by id, never by reference: the hub resolves a fresh User per command.
+            if (caller.Id != state.Host.Id)
+                return Result.FromError("Only the host can change the settings.");
+            if (Deserialize<TracerySettingsView>(payloadJson) is not { } view)
+                return Result.FromError("Malformed settings payload.");
+            return state.UpdateSettings(cfg => cfg.Apply(view));
+        }
+
+        private Result KickFromPayload(User caller, TraceryGameState state, string? payloadJson)
+        {
+            if (Deserialize<KickPlayerPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed kick payload.");
+            User? target = null;
+            foreach (var entry in state.RosterIncludingHost)
+                if (entry.User.Id == p.PlayerId) { target = entry.User; break; }
+            if (target is null)
+                return Result.FromError("That player is not in the lobby.");
+            return state.KickPlayer(caller, target);
+        }
+
+        private static T? Deserialize<T>(string? json)
+            => string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, CommandJsonOptions);
+
         // The trie is shared across every lobby this singleton serves, so it is built
         // with the smallest word length the game ever allows (the settings panel clamps
         // MinWordLength to [3, 8]). Per-round filtering by the lobby's actual minimum

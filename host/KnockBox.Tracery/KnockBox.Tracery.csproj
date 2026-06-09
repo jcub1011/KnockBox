@@ -17,10 +17,21 @@
       the sibling KnockBox.WordService library plugin, loaded before any game plugin.
     -->
     <ProjectReference Include="..\KnockBox.WordService.Contracts\KnockBox.WordService.Contracts.csproj" />
+    <!-- Shared contract DTOs for the tri-split (the projected view, command payloads, and the
+         moved gameplay types: Grid, TracedWord, the mode/phase enums, reveal/round records). -->
+    <ProjectReference Include="..\KnockBox.Tracery.Contracts\KnockBox.Tracery.Contracts.csproj" />
+  </ItemGroup>
+
+  <!-- The Contracts DLL is a PRIVATE ALC dependency (not promoted to the default ALC). It must be
+       staged into games/KnockBox.Tracery/ or the plugin's load context throws FileNotFoundException
+       and the loader silently skips the whole plugin (the tile vanishes). -->
+  <ItemGroup>
+    <PluginPrivateAssembly Include="$(TargetDir)KnockBox.Tracery.Contracts.dll" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Microsoft.Extensions.Logging" />
+    <Using Include="KnockBox.Tracery.Contracts" />
   </ItemGroup>
 
   <ItemGroup>

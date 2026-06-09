@@ -1,0 +1,133 @@
+@inherits DisposableComponent
+@* The Playing phase. Owns the transient trace feedback (toast + shake) — both client-only now —
+   and routes a submitted path through the hub, surfacing the server's accept/reject reply. The
+   host-observer sees the shared board + a live standings rail instead of an input grid. *@
+
+<div class="tr-stage tr-playing">
+    <div class="tr-playing-head">
+        <span class="tr-playing-round">Round @View.CurrentRound / @View.TotalRounds</span>
+        <TraceryRoundTimer View="View" />
+    </div>
+    @if (View.IsHostObserver)
+    {
+        <TraceryHostGridView View="View" />
+    }
+    else
+    {
+        <div class="tr-play-body">
+            @if (View.Settings.Mode == GameMode.Search)
+            {
+                <p class="tr-muted tr-play-hint">Find every listed word — drag or tap touching tiles.</p>
+            }
+            else
+            {
+                <p class="tr-muted tr-play-hint">Drag or tap touching tiles — min @View.Settings.MinWordLength letters.</p>
+            }
+            <div class="tr-play-layout">
+                @if (View.Settings.Mode == GameMode.Search)
+                {
+                    <TracerySearchList View="View" />
+                }
+                else
+                {
+                    <div class="tr-bank">
+                        <div class="tr-bank-head">
+                            <span class="tr-bank-label">FOUND</span>
+                            <span class="tr-bank-total" title="Round score so far (provisional)">@View.MyProvisionalRoundScore</span>
+                        </div>
+                        <div class="tr-bank-list">
+                            @foreach (var entry in BankedNewestFirst())
+                            {
+                                <div class="tr-bank-word" @key="entry.Word">
+                                    <span class="tr-bank-word-text">@entry.Word.ToUpperInvariant()</span>
+                                    <span class="tr-bank-word-pts">+@entry.ProvisionalPoints</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <TraceryGrid Grid="View.Grid"
+                             IsActive="View.IsRoundActive"
+                             Invalid="_invalidTrace"
+                             OnPathSubmitted="HandlePathSubmitted"
+                             OnTraceCancelled="HandleTraceCancelled" />
+            </div>
+        </div>
+    }
+    <TraceryToast Message="@_toastMessage" Tone="_toastTone" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TraceryView View { get; set; } = default!;
+
+    /// <summary>Sends a command and returns the hub reply (null on success, an error message otherwise).</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> SubmitTrace { get; set; } = default!;
+
+    private string? _toastMessage;
+    private TraceryToast.ToastTone _toastTone = TraceryToast.ToastTone.Danger;
+    private bool _invalidTrace;
+    private bool _submitting;
+    private int _toastGen;
+    private int _shakeGen;
+
+    // The projection lists banked words oldest-first; the in-game list shows them most-recent-first.
+    private IEnumerable<TraceryBankedWord> BankedNewestFirst()
+    {
+        for (int i = View.MyBankedWords.Count - 1; i >= 0; i--)
+            yield return View.MyBankedWords[i];
+    }
+
+    // The engine returns success for both a fresh bank and a duplicate re-trace (a no-op), so a
+    // re-trace shows the same brief "Nice!" — harmless, and avoids racing the async projection to
+    // diff bank counts. Only a real rejection (bad word, not on the search list, …) shakes.
+    private async Task HandlePathSubmitted(IReadOnlyList<int> path)
+    {
+        if (_submitting || View.IsHostObserver) return;
+        _submitting = true;
+        try
+        {
+            var payload = JsonSerializer.Serialize(
+                new SubmitTracePayload(path), TraceryContractsJsonContext.Default.SubmitTracePayload);
+            var error = await SubmitTrace(TraceryCommands.SubmitTrace, payload);
+            if (string.IsNullOrEmpty(error))
+            {
+                await ShowToast("Nice!", TraceryToast.ToastTone.Success);
+            }
+            else
+            {
+                await Task.WhenAll(
+                    ShowToast(error, TraceryToast.ToastTone.Danger),
+                    TriggerInvalidShake());
+            }
+        }
+        finally { _submitting = false; }
+    }
+
+    private Task HandleTraceCancelled() => ShowToast("Trace cancelled", TraceryToast.ToastTone.Warn);
+
+    private async Task ShowToast(string message, TraceryToast.ToastTone tone)
+    {
+        int gen = ++_toastGen;
+        _toastMessage = message;
+        _toastTone = tone;
+        StateHasChanged();
+        try { await Task.Delay(1500, ComponentDetached); }
+        catch (OperationCanceledException) { return; }
+        if (gen != _toastGen) return;
+        _toastMessage = null;
+        StateHasChanged();
+    }
+
+    private async Task TriggerInvalidShake()
+    {
+        int gen = ++_shakeGen;
+        _invalidTrace = true;
+        StateHasChanged();
+        try { await Task.Delay(450, ComponentDetached); }
+        catch (OperationCanceledException) { return; }
+        if (gen != _shakeGen) return;
+        _invalidTrace = false;
+        StateHasChanged();
+    }
+}

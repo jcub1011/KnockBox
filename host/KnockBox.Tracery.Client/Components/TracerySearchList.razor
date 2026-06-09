@@ -1,0 +1,48 @@
+@* Search mode (Playing): the shared target list, each word checked off as the viewing player finds
+   it, a found/total progress count, and a banner once the whole list is complete. Pure renderer of
+   the projected view — re-rendered on every projection. *@
+
+<div class="tr-search">
+    <div class="tr-search-head">
+        <span class="tr-search-label">FIND THESE</span>
+        <span class="tr-search-progress">@FoundCount / @View.SearchList.Count</span>
+    </div>
+
+    @if (View.MyCompletionRank is int rank)
+    {
+        <div class="tr-search-done">FOUND ALL · @Ordinal(rank) PLACE</div>
+    }
+
+    <div class="tr-search-list">
+        @foreach (var word in View.SearchList)
+        {
+            var found = _found.Contains(word);
+            <div class="tr-search-word @(found ? "is-found" : null)" @key="word">
+                <span class="tr-search-tick">@(found ? "✓" : "")</span>
+                <span class="tr-search-word-text">@word.ToUpperInvariant()</span>
+                <span class="tr-search-word-len">@word.Length</span>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TraceryView View { get; set; } = default!;
+
+    // The viewing player's own banked words (lower-cased, matching the lower-cased search list).
+    private HashSet<string> _found = new(StringComparer.Ordinal);
+
+    protected override void OnParametersSet()
+        => _found = View.MyBankedWords.Select(b => b.Word).ToHashSet(StringComparer.Ordinal);
+
+    private int FoundCount => View.SearchList.Count(_found.Contains);
+
+    // 1st / 2nd / 3rd / 4th… with correct -teen handling.
+    private static string Ordinal(int n)
+    {
+        string suffix = (n % 100) is >= 11 and <= 13
+            ? "th"
+            : (n % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" };
+        return $"{n}{suffix}";
+    }
+}

@@ -1,0 +1,184 @@
+@inherits DisposableComponent
+@inject IJSRuntime JS
+@* The pre-game lobby: the player roster (host can kick), the host's settings editor, and the start
+   controls. Settings are edited against a client-owned draft for instant feedback, then sent to the
+   authoritative server and persisted to the host's browser localStorage so preferred rules survive
+   across sessions. *@
+
+<div class="tr-lobby">
+    <div class="tr-lobby-players">
+        <div class="tr-lobby-players-label">PLAYERS (@View.Roster.Count)</div>
+        <div class="tr-lobby-players-list">
+            @foreach (var entry in View.Roster)
+            {
+                bool isHostEntry = entry.IsHost;
+                bool isMe = entry.UserId == View.RecipientId;
+                @if (IsHost && !isHostEntry)
+                {
+                    <button class="tr-chip tr-chip-kick @(isMe ? "tr-chip-me" : "")"
+                            title="Click to kick player"
+                            @onclick="() => KickPlayer(entry.UserId)">
+                        @entry.DisplayName ✕
+                    </button>
+                }
+                else
+                {
+                    <span class="tr-chip @(isMe ? "tr-chip-me" : "")">
+                        @entry.DisplayName @(isHostEntry ? "(Host)" : "")
+                    </span>
+                }
+            }
+        </div>
+    </div>
+
+    @if (IsHost)
+    {
+        <TracerySettingsPanel Settings="_draft" OnUpdate="UpdateSettings" />
+
+        <button class="tr-btn tr-btn-primary tr-lobby-start" @onclick="() => StartGame(false)">
+            Start Session
+        </button>
+        <button class="tr-btn tr-lobby-start" @onclick="() => StartGame(true)">
+            Start Session As Player
+        </button>
+        <button type="button"
+                class="tr-btn @(_resetArmed ? "tr-btn-danger" : "") tr-lobby-reset"
+                @onclick="ResetToDefaults">
+            @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+        </button>
+        @if (!string.IsNullOrEmpty(_startError))
+        {
+            <p class="tr-lobby-error">@_startError</p>
+        }
+    }
+    else
+    {
+        <p class="tr-lobby-waiting">Waiting for <strong>@HostName</strong> to start the game…</p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TraceryView View { get; set; } = default!;
+
+    /// <summary>Sends a command to the hub; returns the reply (null on success, else an error).</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+
+    private const string StorageKey = "tracery.settings";
+
+    private bool IsHost => View.RecipientIsHost;
+    private string HostName => View.Roster.FirstOrDefault(r => r.IsHost)?.DisplayName ?? "the host";
+
+    // Client-owned settings draft: edited instantly, then sent to the authoritative server. Bound to
+    // the server projection until the host first edits, after which the host's draft wins (so a number
+    // input mid-edit isn't clobbered by the echoed projection).
+    private TracerySettingsView _draft = new();
+    private bool _userHasEdited;
+    private bool _loaded;
+
+    private string? _startError;
+    private bool _resetArmed;
+    private int _resetGeneration;
+    private Task? _saveTask;
+
+    protected override void OnParametersSet()
+    {
+        if (!_userHasEdited)
+            _draft = View.Settings;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // localStorage needs JS interop, so the host's saved rules load here. Host-only: only the host
+        // edits/persists, so only the host's browser has anything to restore.
+        if (firstRender && IsHost && !_loaded)
+        {
+            _loaded = true;
+            await LoadSettingsAsync();
+        }
+    }
+
+    private async Task LoadSettingsAsync()
+    {
+        string? json;
+        try { json = await JS.InvokeAsync<string?>("localStorage.getItem", ComponentDetached, StorageKey); }
+        catch { return; } // storage unavailable / cancelled → fall through to server defaults
+
+        if (string.IsNullOrEmpty(json) || _userHasEdited) return;
+
+        TracerySettingsView? saved;
+        try { saved = JsonSerializer.Deserialize(json, TraceryContractsJsonContext.Default.TracerySettingsView); }
+        catch { return; }
+        if (saved is null) return;
+
+        // Apply the restored rules: update the local draft and push them to the authoritative server.
+        _draft = saved;
+        await Submit(TraceryCommands.UpdateSettings,
+            JsonSerializer.Serialize(saved, TraceryContractsJsonContext.Default.TracerySettingsView));
+        StateHasChanged();
+    }
+
+    // Routed in from TracerySettingsPanel. Updates the local draft instantly, then sends to the server
+    // and persists. The displayed inputs read the draft, so editing stays responsive over the hub.
+    private void UpdateSettings(Func<TracerySettingsView, TracerySettingsView> mutate)
+    {
+        _userHasEdited = true;
+        _draft = mutate(_draft);
+        StateHasChanged();
+        var json = JsonSerializer.Serialize(_draft, TraceryContractsJsonContext.Default.TracerySettingsView);
+        _ = Submit(TraceryCommands.UpdateSettings, json);
+        PersistSettings(json);
+    }
+
+    private void PersistSettings(string json)
+        => _saveTask = SaveSettingsAsync(json, _saveTask);
+
+    // Chain each save off the previous one so rapid edits can't complete out of order.
+    private async Task SaveSettingsAsync(string json, Task? prior)
+    {
+        if (prior is not null)
+        {
+            try { await prior; } catch { /* prior failure already swallowed */ }
+        }
+        try { await JS.InvokeVoidAsync("localStorage.setItem", ComponentDetached, StorageKey, json); }
+        catch { /* storage unavailable / cancelled */ }
+    }
+
+    private Task KickPlayer(Guid id)
+        => Submit(TraceryCommands.KickPlayer,
+            JsonSerializer.Serialize(new KickPlayerPayload(id), TraceryContractsJsonContext.Default.KickPlayerPayload));
+
+    private async Task StartGame(bool hostAsPlayer)
+    {
+        _startError = null;
+        var payload = JsonSerializer.Serialize(new StartPayload(hostAsPlayer), TraceryContractsJsonContext.Default.StartPayload);
+        var error = await Submit(TraceryCommands.Start, payload);
+        if (!string.IsNullOrEmpty(error))
+        {
+            _startError = error;
+            StateHasChanged();
+        }
+    }
+
+    // Two-step confirm so an accidental click can't wipe the host's whole config.
+    private void ResetToDefaults()
+    {
+        if (!_resetArmed)
+        {
+            _resetArmed = true;
+            _ = DisarmResetAfterDelay(++_resetGeneration);
+            return;
+        }
+        _resetArmed = false;
+        _resetGeneration++; // invalidate any pending disarm
+        UpdateSettings(_ => new TracerySettingsView());
+    }
+
+    private async Task DisarmResetAfterDelay(int generation)
+    {
+        try { await Task.Delay(TimeSpan.FromSeconds(3), ComponentDetached); }
+        catch (OperationCanceledException) { return; }
+        if (generation != _resetGeneration) return;
+        _resetArmed = false;
+        StateHasChanged();
+    }
+}

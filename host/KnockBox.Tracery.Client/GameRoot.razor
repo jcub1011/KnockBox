@@ -1,0 +1,83 @@
+@inherits HubLobbyPageBase<TraceryView>
+@*
+    GameRoot — the runtime-loaded WASM UI entry point for Tracery. Inheriting
+    HubLobbyPageBase<TraceryView> opens the hub, joins the lobby, deserializes each per-player
+    projection into `View`, and disposes on teardown. It dispatches to the phase components exactly
+    as the old server TraceryRoom page's phase switch did.
+*@
+
+@* The game ships its stylesheets from the server plugin's mounted wwwroot; a runtime-loaded WASM
+   component can't use HeadContent and the streamed .Client DLL has no scoped bundle, so we link the
+   font + theme tokens + the plain (de-scoped) component stylesheet here from the component markup. *@
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" />
+<link rel="stylesheet" href="_content/KnockBox.Tracery/css/tracery-theme.css" />
+<link rel="stylesheet" href="_content/KnockBox.Tracery/css/tracery.css" />
+
+<TraceryHeader Code="@LobbyCode" OnLeave="LeaveAsync" />
+
+<div class="tr-root">
+@if (View is null)
+{
+    <div class="tr-loading">Loading…</div>
+}
+else
+{
+    @switch (View.Phase)
+    {
+        case GamePhase.Lobby:
+            <TraceryLobbyView View="View" Submit="SubmitAsync" />
+            break;
+
+        case GamePhase.RoundIntro:
+            <div class="tr-stage tr-intro">
+                <span class="tr-intro-label">ROUND</span>
+                <span class="tr-intro-number">@((View.CurrentRound + 1).ToString("00")) <span class="tr-intro-of">/ @View.TotalRounds.ToString("00")</span></span>
+                <span class="tr-intro-getready">GET READY</span>
+                <TraceryRoundTimer View="View" />
+            </div>
+            break;
+
+        case GamePhase.Playing:
+            <TraceryPlayingView View="View" SubmitTrace="SubmitAsync" />
+            break;
+
+        case GamePhase.Reveal:
+            @if (View.Settings.Mode == GameMode.Search)
+            {
+                <TracerySearchRevealView View="View" Submit="SubmitAsync" />
+            }
+            else
+            {
+                <TraceryRevealView View="View" Submit="SubmitAsync" />
+            }
+            break;
+
+        case GamePhase.FinalStandings:
+            <TraceryFinalStandingsView View="View" Submit="SubmitAsync" />
+            break;
+    }
+}
+</div>
+
+@code {
+    /// <summary>The lobby code from the room URL, supplied by the WASM host page.</summary>
+    [Parameter] public string Code { get; set; } = "";
+
+    /// <summary>The player's chosen display name, propagated from the home page.</summary>
+    [Parameter] public string? PlayerName { get; set; }
+
+    protected override string RouteIdentifier => "tracery";
+    protected override string LobbyUri => $"room/tracery/{Code}";
+    protected override string DisplayName => string.IsNullOrWhiteSpace(PlayerName) ? "Player" : PlayerName!;
+
+    public GameRoot()
+        : base(new SourceGenProjectionDeserializer<TraceryView>(
+            TraceryContractsJsonContext.Default.TraceryView))
+    {
+    }
+
+    // One submit path for every phase. Returns the hub reply (null on success, an error message on
+    // rejection) so a view can surface a rejected word / failed start inline; fire-and-forget callers
+    // simply ignore the result.
+    private Task<string?> SubmitAsync(string command, string? payload) => SubmitCommandAsync(command, payload);
+}

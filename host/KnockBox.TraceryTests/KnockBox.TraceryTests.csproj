@@ -20,6 +20,9 @@
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
     <ProjectReference Include="..\..\sdk\KnockBox.Platform\KnockBox.Platform.csproj" />
     <ProjectReference Include="..\KnockBox.Tracery\KnockBox.Tracery.csproj" />
+    <!-- The tri-split wire DTOs (TraceryView, command payloads, the source-gen JSON context)
+         the projector + hub command tests assert against. -->
+    <ProjectReference Include="..\KnockBox.Tracery.Contracts\KnockBox.Tracery.Contracts.csproj" />
     <!--
       Tests build the real trie from real data, so they need both the WordListService
       impl and the contracts (IWordListService, WordPoolMode). The host wires these via

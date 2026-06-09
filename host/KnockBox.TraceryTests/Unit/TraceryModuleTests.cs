@@ -1,3 +1,4 @@
+using System.Linq;
 using KnockBox.Tracery;
 
 namespace KnockBox.Tracery.Tests.Unit
@@ -18,11 +19,14 @@ namespace KnockBox.Tracery.Tests.Unit
         }
 
         [TestMethod]
-        public void GetCustomHeader_ReturnsNonNullFragment()
+        public void Manifest_DeclaresClientTriSplit()
         {
+            // The game UI moved to the WASM client, so the module no longer overrides
+            // GetCustomHeader; the manifest instead points the loader at the client assembly.
             var module = new TraceryModule();
 
-            Assert.IsNotNull(module.GetCustomHeader());
+            Assert.AreEqual("KnockBox.Tracery.Client", module.Manifest.ClientAssembly);
+            Assert.IsTrue(module.Manifest.ClientContracts.Contains("KnockBox.Tracery.Contracts"));
         }
     }
 }

@@ -1,0 +1,74 @@
+@* End-of-match final standings. Renders from the projected roster (the server fills it from the
+   frozen start-of-match snapshot once the match is underway, so disconnected players still appear). *@
+
+@{
+    var roster = View.Roster.OrderByDescending(x => x.CumulativeScore).ToList();
+    // A clear winner only when the top score is strictly ahead of the runner-up; a tie crowns nobody.
+    bool hasWinner = roster.Count > 0 && (roster.Count == 1 || roster[0].CumulativeScore > roster[1].CumulativeScore);
+}
+
+<div class="tr-over">
+    <div class="tr-over-banner">
+        <span class="tr-over-banner-main">MATCH OVER</span>
+        <span class="tr-over-banner-sub">FINAL STANDINGS</span>
+    </div>
+
+    <div class="tr-over-board">
+        @{ int rank = 1; }
+        @foreach (var row in roster)
+        {
+            bool isMe = row.UserId == View.RecipientId;
+            bool isWinner = hasWinner && rank == 1;
+            <div class="tr-over-row @(isWinner ? "tr-over-row-winner" : "") @(isMe ? "tr-over-row-me" : "")">
+                <span class="tr-over-rank">@(isWinner ? "👑" : rank.ToString())</span>
+                <span class="tr-over-name">@row.DisplayName</span>
+                <span class="tr-over-score">@row.CumulativeScore</span>
+            </div>
+            rank++;
+        }
+    </div>
+
+    <div class="tr-over-actions">
+        @if (View.RecipientIsHost)
+        {
+            <button class="tr-btn tr-btn-primary tr-over-exit" @onclick="ReturnToLobby" disabled="@_returning">
+                Return to Lobby
+            </button>
+            @if (_error is not null)
+            {
+                <span class="tr-over-error" role="alert">@_error</span>
+            }
+        }
+        else
+        {
+            <span class="tr-over-wait">Waiting for host…</span>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TraceryView View { get; set; } = default!;
+
+    /// <summary>Sends a command to the hub; returns the reply (null on success, else an error).</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+
+    private bool _returning;
+    private string? _error;
+
+    private async Task ReturnToLobby()
+    {
+        if (_returning) return;
+        _returning = true;
+        _error = null;
+        try
+        {
+            var error = await Submit(TraceryCommands.ReturnToLobby, null);
+            if (!string.IsNullOrEmpty(error))
+                _error = error;
+        }
+        finally
+        {
+            _returning = false;
+        }
+    }
+}

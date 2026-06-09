@@ -1,8 +1,6 @@
-using KnockBox.Tracery.Components;
 using KnockBox.Tracery.Services.Logic.Games;
 using KnockBox.Tracery.Services.Storage;
 using KnockBox.Core.Plugins;
-using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Tracery
 {
@@ -17,10 +15,9 @@ namespace KnockBox.Tracery
             registration.AddScoped<TraceryStorage, TraceryStorage>();
         }
 
-        public RenderFragment? GetCustomHeader() => builder =>
-        {
-            builder.OpenComponent<TraceryHeader>(0);
-            builder.CloseComponent();
-        };
+        // The game UI now lives in the WASM client (KnockBox.Tracery.Client); the server registers
+        // only the engine. The hub resolves its IGameStateProjector / IGameCommandHandler off the
+        // keyed AbstractGameEngine, and the WASM client renders the custom header — so there is no
+        // server-side GetCustomHeader.
     }
 }

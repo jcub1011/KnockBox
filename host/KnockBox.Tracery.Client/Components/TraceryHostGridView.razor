@@ -1,0 +1,52 @@
+@* The host-observer view during Playing: the shared grid the whole room is racing on, plus a live
+   standings rail that updates as players bank (re-rendered on every projection). The per-player
+   banked counts come from the projection's HostBoardStandings, which the server populates ONLY for
+   the observing host — competing players never receive opponents' progress. *@
+
+<div class="tr-host">
+    <div class="tr-host-board">
+        <TraceryGrid Grid="View.Grid" IsActive="false" />
+    </div>
+
+    <aside class="tr-host-rail">
+        @if (IsSearch)
+        {
+            <div class="tr-host-rail-head">
+                <span class="tr-host-rail-label">FIND THESE</span>
+                <span class="tr-host-rail-sub">@View.SearchList.Count words</span>
+            </div>
+            <div class="tr-host-searchwords">
+                @foreach (var word in View.SearchList)
+                {
+                    <span class="tr-host-searchword">@word.ToUpperInvariant()</span>
+                }
+            </div>
+        }
+        <div class="tr-host-rail-head">
+            <span class="tr-host-rail-label">STANDINGS</span>
+            <span class="tr-host-rail-sub">@(IsSearch ? "found this round" : "banked this round")</span>
+        </div>
+        <div class="tr-host-standings">
+            @foreach (var row in Standings())
+            {
+                <div class="tr-host-row">
+                    <span class="tr-host-name">@row.DisplayName</span>
+                    <span class="tr-host-banked">@(IsSearch ? $"{row.BankedCount}/{View.SearchList.Count}" : row.BankedCount.ToString())</span>
+                    <span class="tr-host-score">@row.CumulativeScore</span>
+                </div>
+            }
+        </div>
+    </aside>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TraceryView View { get; set; } = default!;
+
+    private bool IsSearch => View.Settings.Mode == GameMode.Search;
+
+    private IEnumerable<TraceryLiveStanding> Standings()
+        => View.HostBoardStandings
+            .OrderByDescending(x => x.CumulativeScore)
+            .ThenByDescending(x => x.BankedCount)
+            .ThenBy(x => x.DisplayName, StringComparer.OrdinalIgnoreCase);
+}

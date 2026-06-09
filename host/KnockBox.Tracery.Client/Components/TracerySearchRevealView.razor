@@ -1,0 +1,86 @@
+@* Search-mode reveal: the round's finishing order. Completers first by placement (with their
+   bonus), then anyone who didn't finish. A pure renderer of the latest projected RoundResult. *@
+
+<div class="tr-stage tr-reveal">
+    <span class="tr-reveal-title">THE RESULTS</span>
+
+    @if (Outcomes.Count == 0)
+    {
+        <p class="tr-muted">Tallying the round…</p>
+    }
+    else
+    {
+        <div class="tr-results">
+            @foreach (var row in Outcomes)
+            {
+                var isYou = row.UserId == View.RecipientId;
+                <div class="tr-result-row @(isYou ? "is-you" : null) @(row.CompletionRank is null ? "is-dnf" : null)">
+                    <span class="tr-result-place">
+                        @(row.CompletionRank is int rank ? Ordinal(rank) : "—")
+                    </span>
+                    <span class="tr-result-name">@row.DisplayName@(isYou ? " (you)" : "")</span>
+                    <span class="tr-result-detail">
+                        @row.WordsFound / @row.SearchListSize found
+                        @if (row.CompletionBonus > 0)
+                        {
+                            <span class="tr-result-bonus">+@row.CompletionBonus bonus</span>
+                        }
+                    </span>
+                    <span class="tr-result-delta">+@row.PointsAwarded</span>
+                    <span class="tr-result-total">@row.CumulativeScore</span>
+                </div>
+            }
+        </div>
+    }
+
+    @if (View.Grid is not null)
+    {
+        <div class="tr-reveal-explorer">
+            <span class="tr-reveal-subtitle">THE BOARD</span>
+            <TraceryBoardExplorer View="View" />
+        </div>
+    }
+
+    @if (View.CurrentRound < View.TotalRounds)
+    {
+        <span class="tr-reveal-next">NEXT · ROUND @((View.CurrentRound + 1).ToString("00")) / @View.TotalRounds.ToString("00")</span>
+    }
+    else
+    {
+        <span class="tr-reveal-next">FINAL STANDINGS NEXT</span>
+    }
+
+    <TraceryRoundTimer View="View" />
+
+    @if (View.RecipientIsHost)
+    {
+        <button type="button" class="tr-btn tr-reveal-skip" @onclick="Skip">
+            @(View.CurrentRound < View.TotalRounds ? "Skip to next round" : "Skip to standings") →
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TraceryView View { get; set; } = default!;
+
+    /// <summary>Sends a command to the hub; the reply is ignored here (skip is fire-and-forget).</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+
+    private Task Skip() => Submit(TraceryCommands.SkipReveal, null);
+
+    // Completers first, ordered by finishing place; non-completers after, richest round first.
+    private IReadOnlyList<TraceryPlayerRoundOutcome> Outcomes =>
+        View.RoundResults.Count == 0
+            ? []
+            : [.. View.RoundResults[^1].Outcomes
+                .OrderBy(o => o.CompletionRank ?? int.MaxValue)
+                .ThenByDescending(o => o.PointsAwarded)];
+
+    private static string Ordinal(int n)
+    {
+        string suffix = (n % 100) is >= 11 and <= 13
+            ? "th"
+            : (n % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" };
+        return $"{n}{suffix}";
+    }
+}

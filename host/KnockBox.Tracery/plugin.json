@@ -9,5 +9,10 @@
   "fontColor": "#ece3d0",
   "capabilities": [],
   "workInProgress": false,
-  "tileAsset": "tile.svg"
+  "tileAsset": "tile.svg",
+  "clientAssembly": "KnockBox.Tracery.Client",
+  "clientContracts": ["KnockBox.Tracery.Contracts"],
+  "clientAssets": [
+    { "name": "KnockBox.Tracery.Client", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+  ]
 }

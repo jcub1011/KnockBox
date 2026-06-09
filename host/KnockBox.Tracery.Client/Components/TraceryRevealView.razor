@@ -1,0 +1,137 @@
+@* The Standard-mode reveal screen — a pure renderer of the projected RevealData. Beats that don't
+   exist (empty round) are skipped. The board explorer beneath reads the projected reveal word set. *@
+
+@if (Reveal is null)
+{
+    <div class="tr-stage tr-reveal">
+        <p class="tr-muted">Tallying the round…</p>
+        <TraceryRoundTimer View="View" />
+    </div>
+}
+else
+{
+    <div class="tr-stage tr-reveal">
+        <div class="tr-reveal-beats">
+            @if (Reveal.LongestWord is { } longest)
+            {
+                <div class="tr-beat tr-beat-longest">
+                    <span class="tr-beat-label">LONGEST WORD</span>
+                    <span class="tr-beat-word">@longest.Word.ToUpperInvariant()</span>
+                    <span class="tr-beat-meta">@longest.Length letters · @FindersText(longest.Finders)</span>
+                </div>
+            }
+
+            @if (Reveal.HighestScoringWord is { } top)
+            {
+                <div class="tr-beat tr-beat-top">
+                    <span class="tr-beat-label">HIGHEST-SCORING WORD</span>
+                    <span class="tr-beat-word">@top.Word.ToUpperInvariant()</span>
+                    <span class="tr-beat-meta">
+                        @top.Points pts@(top.IsUnique ? " · UNIQUE" : "") · @FindersText(top.Finders)
+                    </span>
+                </div>
+            }
+
+            @if (Reveal.RarestLetters.Length > 0)
+            {
+                <div class="tr-beat tr-beat-rare">
+                    <span class="tr-beat-label">RAREST LETTERS USED</span>
+                    <div class="tr-beat-rare-list">
+                        @foreach (var rare in Reveal.RarestLetters)
+                        {
+                            <span class="tr-rare-chip" title="@rare.ExampleWord.ToUpperInvariant()">
+                                <span class="tr-rare-letter">@rare.Letter</span>
+                                <span class="tr-rare-bonus">+@rare.BonusValue</span>
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (Reveal.WordsNobodyFound.Length > 0)
+            {
+                <div class="tr-beat tr-beat-missed">
+                    <span class="tr-beat-label">NOBODY FOUND</span>
+                    <div class="tr-beat-missed-list">
+                        @foreach (var missed in Reveal.WordsNobodyFound)
+                        {
+                            <span class="tr-missed-chip">
+                                <span class="tr-missed-word">@missed.Word.ToUpperInvariant()</span>
+                                <span class="tr-missed-score">@missed.WouldBeScore</span>
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (Reveal.TheoreticalMax is { } max)
+            {
+                <div class="tr-beat tr-beat-max">
+                    <span class="tr-beat-label">THEORETICAL MAX</span>
+                    <span class="tr-beat-word">@max</span>
+                    <span class="tr-beat-meta">if one player banked the whole board</span>
+                </div>
+            }
+        </div>
+
+        @if (Reveal.Standings.Length > 0)
+        {
+            <div class="tr-over-board">
+                @foreach (var row in Reveal.Standings)
+                {
+                    <div class="tr-over-row">
+                        <span class="tr-over-name">@row.DisplayName</span>
+                        <span class="tr-over-delta">+@row.RoundPoints</span>
+                        <span class="tr-over-score">@row.CumulativeScore</span>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (View.Grid is not null)
+        {
+            <div class="tr-reveal-explorer">
+                <span class="tr-reveal-subtitle">THE BOARD</span>
+                <TraceryBoardExplorer View="View" />
+            </div>
+        }
+
+        @if (View.CurrentRound < View.TotalRounds)
+        {
+            <span class="tr-reveal-next">NEXT · ROUND @((View.CurrentRound + 1).ToString("00")) / @View.TotalRounds.ToString("00")</span>
+        }
+        else
+        {
+            <span class="tr-reveal-next">FINAL STANDINGS NEXT</span>
+        }
+
+        <TraceryRoundTimer View="View" />
+
+        @if (View.RecipientIsHost)
+        {
+            <button type="button" class="tr-btn tr-reveal-skip" @onclick="Skip">
+                @(View.CurrentRound < View.TotalRounds ? "Skip to next round" : "Skip to standings") →
+            </button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public TraceryView View { get; set; } = default!;
+
+    /// <summary>Sends a command to the hub; the reply is ignored here (skip is fire-and-forget).</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+
+    private RevealData? Reveal => View.CurrentReveal;
+
+    private Task Skip() => Submit(TraceryCommands.SkipReveal, null);
+
+    private static string FindersText(System.Collections.Immutable.ImmutableArray<string> finders)
+        => finders.Length switch
+        {
+            0 => "—",
+            1 => finders[0],
+            2 => $"{finders[0]} & {finders[1]}",
+            _ => $"{finders[0]} +{finders.Length - 1} more",
+        };
+}

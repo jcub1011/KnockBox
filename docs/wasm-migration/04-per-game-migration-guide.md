@@ -4,14 +4,22 @@ A step-by-step, footgun-aware recipe for migrating a game plugin from the Blazor
 model to the WASM tri-split. **DiceSimulator is the reference implementation** — when in
 doubt, copy what `host/KnockBox.DiceSimulator{,.Contracts,.Client}` does.
 
-> **Status:** DiceSimulator (game #1), CardCounter (game #2), and AlphaChain (game #3) are
-> migrated and the shared infrastructure is proven. Game #2 added the **server-owned tick loop**
-> (timed games) and a **WASM `CountdownClock`** — both now reusable. Game #3 proved the pattern
-> at scale: a full FSM, ~40 modifier cards **flattened by the projector into wire DTOs** (the
+> **Status:** DiceSimulator (game #1), CardCounter (game #2), AlphaChain (game #3), and Tracery
+> (game #4) are migrated and the shared infrastructure is proven. Game #2 added the **server-owned
+> tick loop** (timed games) and a **WASM `CountdownClock`** — both now reusable. Game #3 proved the
+> pattern at scale: a full FSM, ~40 modifier cards **flattened by the projector into wire DTOs** (the
 > card capability interfaces stay server-side), and **client-owned JS-interop word input** — and
-> surfaced the WASM blur→sync-`invokeMethodAsync` heap-lock footgun (see step 4). Most of the
-> footguns below are solved once in the SDK/platform; this guide tells you which steps are per-game
-> and which are handled for you.
+> surfaced the WASM blur→sync-`invokeMethodAsync` heap-lock footgun (see step 4). Game #4 added two
+> wrinkles: (a) a **`ScheduleCallback`-driven timed FSM does NOT need `IServerTickHandler`** — those
+> server-side `Task.Delay` timers fire with no client circuit and each `ExecuteAsync` re-projects, so
+> a game that never used the old host-circuit tick keeps its FSM as-is and only projects
+> `PhaseEndsAtUtc` for the `CountdownClock` (the step-2 "timed games → `IServerTickHandler`" note
+> applies only to games replacing the *host-circuit* tick); and (b) a **drag/tap grid whose
+> `OnParametersSet` reset keyed off the `Grid` reference** must key off a VALUE instead (e.g.
+> `Grid.Letters`) — in WASM every projection deserializes a fresh `Grid` instance for the same board,
+> so a reference check wipes a half-built trace on any mid-drag projection. Most of the footguns below
+> are solved once in the SDK/platform; this guide tells you which steps are per-game and which are
+> handled for you.
 
 Read [`01-target-architecture.md`](./01-target-architecture.md) and
 [`03-work-breakdown.md`](./03-work-breakdown.md) first. The migration order (easy → hard)

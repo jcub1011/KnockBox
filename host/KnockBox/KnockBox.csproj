@@ -116,6 +116,13 @@
     <ProjectReference Include="..\KnockBox.AlphaChain.Client\KnockBox.AlphaChain.Client.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
     <!--
+      Tracery browser UI (game #4 tri-split). Built transitively (also builds
+      KnockBox.Tracery.Contracts) and staged into games/KnockBox.Tracery/client/
+      via Directory.Client.targets; never linked into the host or the WASM client.
+    -->
+    <ProjectReference Include="..\KnockBox.Tracery.Client\KnockBox.Tracery.Client.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+    <!--
       Plugin projects are loaded at runtime, not linked at compile time.
       ReferenceOutputAssembly="false" keeps the host from taking a compile-time
       dependency on plugin types (preserving the runtime-discovery architecture);

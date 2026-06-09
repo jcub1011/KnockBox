@@ -1,0 +1,29 @@
+@* Transient feedback banner for trace accept/reject. Client-owned (no server round-trip). *@
+<div class="tr-toast-holder">
+    @if (!string.IsNullOrEmpty(Message))
+    {
+        <div class="tr-toast @(Tone switch
+        {
+            ToastTone.Warn => "tr-toast-warn",
+            ToastTone.Success => "tr-toast-success",
+            _ => "tr-toast-danger"
+        })">
+            <span class="tr-toast-icon">
+                @(Tone switch
+                {
+                    ToastTone.Warn => "⚠",
+                    ToastTone.Success => "✓",
+                    _ => "✕"
+                })
+            </span>
+            <span class="tr-toast-msg">@Message</span>
+        </div>
+    }
+</div>
+
+@code {
+    public enum ToastTone { Danger, Warn, Success }
+
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public ToastTone Tone { get; set; } = ToastTone.Danger;
+}

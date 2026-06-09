@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Shared contract DTOs for the KnockBox.Tracery tri-split game: the pure data
+    types both runtimes need (the Grid + traced-word records, the mode/phase enums,
+    the reveal/round-result records), the host-editable settings view + the commands
+    the browser UI sends, and the per-player view the server projects back. This
+    assembly loads in BOTH runtimes — compiled against by the server plugin AND
+    streamed to the browser alongside the client UI — so both sides bind the same
+    CLR types.
+
+    CRITICAL: this project has ZERO KnockBox.* references and imports no plugin
+    targets (mirrors KnockBox.AlphaChain.Contracts). It is pure DTOs/enums only.
+    Source-generated JSON keeps the DTOs trim-safe in the WASM client.
+
+    The moved gameplay types (Grid, TracedWord, GameMode, GamePhase, RevealData,
+    RoundResult) intentionally keep their original KnockBox.Tracery.Models namespace
+    so the server plugin (which already `using`s it pervasively) binds them across
+    the assembly boundary with no churn. The new wire DTOs live in the
+    KnockBox.Tracery.Contracts namespace.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Description>Shared contract DTOs for the KnockBox.Tracery tri-split game.</Description>
+  </PropertyGroup>
+
+</Project>

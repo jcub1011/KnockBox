@@ -1,0 +1,229 @@
+@* Host-only match-rules editor. Presentational: every edit is routed back through the OnUpdate
+   delegate supplied by the parent (TraceryLobbyView), which sends the resulting settings to the
+   server (authoritative) and persists them to the host's browser localStorage. *@
+
+<div class="tr-settings">
+    <section class="tr-settings-section">
+        <h4 class="tr-settings-title">Mode</h4>
+        <div class="tr-settings-grid">
+            <label class="tr-field">
+                <span>Game Mode</span>
+                <select value="@S.Mode" @onchange="SetMode">
+                    @foreach (var mode in Enum.GetValues<GameMode>())
+                    {
+                        <option value="@mode">@FriendlyMode(mode)</option>
+                    }
+                </select>
+            </label>
+            @if (S.Mode == GameMode.Search)
+            {
+                <label class="tr-field">
+                    <span>Search List Size</span>
+                    <input type="number" inputmode="numeric" min="3" max="25"
+                           value="@S.SearchListSize"
+                           @oninput="e => SetInt(e, v => s => s with { SearchListSize = v }, 3, 25)" />
+                </label>
+                <label class="tr-field">
+                    <span>Placement Bonus Unit</span>
+                    <input type="number" inputmode="numeric" min="0" max="100" step="1"
+                           value="@S.SearchPlacementBonusUnit"
+                           @oninput="e => SetInt(e, v => s => s with { SearchPlacementBonusUnit = v }, 0, 100)" />
+                </label>
+            }
+        </div>
+    </section>
+
+    <section class="tr-settings-section">
+        <h4 class="tr-settings-title">Grid</h4>
+        <div class="tr-settings-grid">
+            <label class="tr-field">
+                <span>Width</span>
+                <input type="number" inputmode="numeric" min="@TracerySettingsView.MinGridDimension" max="@TracerySettingsView.MaxGridDimension"
+                       value="@S.GridWidth"
+                       @oninput="e => SetInt(e, v => s => s with { GridWidth = v }, TracerySettingsView.MinGridDimension, TracerySettingsView.MaxGridDimension)" />
+            </label>
+            <label class="tr-field">
+                <span>Height</span>
+                <input type="number" inputmode="numeric" min="@TracerySettingsView.MinGridDimension" max="@TracerySettingsView.MaxGridDimension"
+                       value="@S.GridHeight"
+                       @oninput="e => SetInt(e, v => s => s with { GridHeight = v }, TracerySettingsView.MinGridDimension, TracerySettingsView.MaxGridDimension)" />
+            </label>
+            <label class="tr-field">
+                <span>Min Word Length</span>
+                <input type="number" inputmode="numeric" min="3" max="8"
+                       value="@S.MinWordLength"
+                       @oninput="e => SetInt(e, v => s => s with { MinWordLength = v }, 3, 8)" />
+            </label>
+        </div>
+    </section>
+
+    <section class="tr-settings-section">
+        <h4 class="tr-settings-title">Dictionary</h4>
+        <div class="tr-settings-grid">
+            <label class="tr-field">
+                <span>Board Words</span>
+                <select value="@S.GenerationDictionary"
+                        @onchange="e => SetDictionary(e, v => s => s with { GenerationDictionary = v })">
+                    @foreach (var mode in OfferedDictionaries)
+                    {
+                        <option value="@mode">@FriendlyName(mode)</option>
+                    }
+                </select>
+            </label>
+            <label class="tr-field">
+                <span>Allowed Answers</span>
+                <select value="@S.ValidationDictionary"
+                        @onchange="e => SetDictionary(e, v => s => s with { ValidationDictionary = v })">
+                    @foreach (var mode in OfferedDictionaries)
+                    {
+                        <option value="@mode">@FriendlyName(mode)</option>
+                    }
+                </select>
+            </label>
+        </div>
+    </section>
+
+    <section class="tr-settings-section">
+        <h4 class="tr-settings-title">Rounds &amp; Timing</h4>
+        <div class="tr-settings-grid">
+            <label class="tr-field">
+                <span>Total Rounds</span>
+                <input type="number" inputmode="numeric" min="1" max="20"
+                       value="@S.TotalRounds"
+                       @oninput="e => SetInt(e, v => s => s with { TotalRounds = v }, 1, 20)" />
+            </label>
+            <label class="tr-field">
+                <span>Round Timer (seconds)</span>
+                <input type="number" inputmode="numeric" min="15" max="600" step="5"
+                       value="@S.RoundTimerSeconds"
+                       @oninput="OnRoundTimerChanged"
+                       disabled="@_unlimitedTimer" />
+            </label>
+            <label class="tr-field tr-field-row">
+                <span>Unlimited Timer</span>
+                <input type="checkbox" @bind="_unlimitedTimer" @bind:after="OnUnlimitedToggled" />
+            </label>
+            <label class="tr-field">
+                <span>Get Ready (seconds)</span>
+                <input type="number" inputmode="numeric" min="2" max="15" step="1"
+                       value="@S.TransitionSeconds"
+                       @oninput="OnTransitionChanged"
+                       title="The one-time 'get ready' countdown before the first round begins." />
+            </label>
+            <label class="tr-field">
+                <span>Round Transition (seconds)</span>
+                <input type="number" inputmode="numeric" min="5" max="180" step="5"
+                       value="@S.IntermissionSeconds"
+                       @oninput="OnIntermissionChanged"
+                       title="The results/board screen shown between rounds. The host can skip the remaining time." />
+            </label>
+        </div>
+    </section>
+
+    <section class="tr-settings-section">
+        <h4 class="tr-settings-title">Scoring &amp; Host</h4>
+        <div class="tr-settings-grid">
+            <label class="tr-field tr-field-row">
+                <span>Unique-Find Bonus</span>
+                <input type="checkbox"
+                       @bind:get="S.UniqueFindBonusEnabled"
+                       @bind:set="v => OnUpdate(s => s with { UniqueFindBonusEnabled = v })" />
+            </label>
+            <label class="tr-field">
+                <span>Unique-Find Multiplier</span>
+                <input type="number" inputmode="decimal" min="1" max="5" step="0.1"
+                       value="@S.UniqueFindMultiplier"
+                       @oninput="OnMultiplierChanged"
+                       disabled="@(!S.UniqueFindBonusEnabled)" />
+            </label>
+            <label class="tr-field tr-field-row">
+                <span>Rare-Letter Bonus</span>
+                <input type="checkbox"
+                       @bind:get="S.RareLetterBonusEnabled"
+                       @bind:set="v => OnUpdate(s => s with { RareLetterBonusEnabled = v })" />
+            </label>
+        </div>
+    </section>
+</div>
+
+@code {
+    /// <summary>The current (client-owned draft) settings the parent edits.</summary>
+    [Parameter, EditorRequired] public TracerySettingsView Settings { get; set; } = default!;
+
+    /// <summary>
+    /// Applies a settings mutation. Supplied by the parent, which updates its local draft instantly,
+    /// sends the result to the server (authoritative), and persists it to the host's localStorage.
+    /// </summary>
+    [Parameter, EditorRequired] public Action<Func<TracerySettingsView, TracerySettingsView>> OnUpdate { get; set; } = default!;
+
+    private TracerySettingsView S => Settings;
+    private bool _unlimitedTimer;
+
+    // The board-sensible pools, in display order. NytStandard (5-letter only) is intentionally
+    // excluded from the host's choices.
+    private static readonly TraceryWordPool[] OfferedDictionaries =
+        [TraceryWordPool.ReducedDictionary, TraceryWordPool.FullDictionary];
+
+    protected override void OnParametersSet()
+        => _unlimitedTimer = S.RoundTimerSeconds <= 0;
+
+    private void SetDictionary(ChangeEventArgs e, Func<TraceryWordPool, Func<TracerySettingsView, TracerySettingsView>> mutate)
+    {
+        if (Enum.TryParse<TraceryWordPool>(e.Value?.ToString(), out var mode))
+            OnUpdate(mutate(mode));
+    }
+
+    private void SetMode(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<GameMode>(e.Value?.ToString(), out var mode))
+            OnUpdate(s => s with { Mode = mode });
+    }
+
+    private static string FriendlyMode(GameMode mode) => mode switch
+    {
+        GameMode.Standard => "Standard",
+        GameMode.Search => "Search (shared word list)",
+        _ => mode.ToString(),
+    };
+
+    private static string FriendlyName(TraceryWordPool mode) => mode switch
+    {
+        TraceryWordPool.ReducedDictionary => "Common words",
+        TraceryWordPool.FullDictionary => "Full dictionary",
+        TraceryWordPool.NytStandard => "NYT answers",
+        _ => mode.ToString(),
+    };
+
+    private void SetInt(ChangeEventArgs e, Func<int, Func<TracerySettingsView, TracerySettingsView>> mutate, int min, int max)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int value))
+            OnUpdate(mutate(Math.Clamp(value, min, max)));
+    }
+
+    private void OnRoundTimerChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int seconds))
+            OnUpdate(s => s with { RoundTimerSeconds = Math.Clamp(seconds, 15, 600) });
+    }
+
+    private void OnUnlimitedToggled()
+        => OnUpdate(s => s with { RoundTimerSeconds = _unlimitedTimer ? 0 : 90 });
+
+    private void OnTransitionChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int seconds))
+            OnUpdate(s => s with { TransitionSeconds = Math.Clamp(seconds, 2, 15) });
+    }
+
+    private void OnIntermissionChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int seconds))
+            OnUpdate(s => s with { IntermissionSeconds = Math.Clamp(seconds, 5, 180) });
+    }
+
+    private void OnMultiplierChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double value))
+            OnUpdate(s => s with { UniqueFindMultiplier = Math.Clamp(value, 1.0, 5.0) });
+    }
+}
