@@ -21,6 +21,9 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    /* <article> doesn't scroll on WASM routes; this wrapper is the internal scroller so the
+       game's header stays pinned above the scrolling content. */
+    overflow-y: auto;
 }
 
 .cc-page {

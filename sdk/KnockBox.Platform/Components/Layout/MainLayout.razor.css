@@ -241,6 +241,16 @@ article {
     scroll-timeline: --page-scroll block;
 }
 
+/* WASM game routes render their own header + content (no MainLayout header) directly
+   inside <article>. Don't let <article> scroll as a whole — that would carry the game's
+   header out of view. Instead it's a non-scrolling flex column: the game's header stays
+   pinned (flex-shrink: 0) and the game's root wrapper (.{game}-root, flex: 1; min-height: 0)
+   is the internal scroller. This keeps the header fixed without position: fixed (which would
+   let content render underneath it). */
+article.wasm-game {
+    overflow: hidden;
+}
+
 .header-actions ::deep .room-code-btn {
     display: inline-grid;
     overflow: hidden;

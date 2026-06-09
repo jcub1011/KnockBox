@@ -202,10 +202,16 @@ The old scoped `.razor.css` does **not** ship: `StaticWebAssetsEnabled=false` pr
    <link rel="stylesheet" href="_content/KnockBox.{Game}/css/{game}.css" />
    ```
 
-> **Footgun — a top header inside the scrolling article shrinks to nothing.** WASM game UI
-> renders inside `MainLayout`'s `<article>`, a `flex-direction:column` scroll container. A
-> fixed-height header is a flex item with default `flex-shrink:1`, so it collapses as content
-> grows. Give the header `flex-shrink: 0`.
+> **Footgun — header scroll/shrink behaviour.** WASM game UI renders its own header + content
+> directly inside `MainLayout`'s `<article>`, a `flex-direction:column` flex parent. Two rules
+> keep the header pinned in view (handled by shared infra + a per-game convention):
+> - `MainLayout` sets `article.wasm-game { overflow: hidden }` on WASM routes, so the `<article>`
+>   does **not** scroll as a whole (which would carry the header off-screen). This is shared — you
+>   don't touch it.
+> - Per game: give the header `flex-shrink: 0` (so it never collapses) **and** make the game's
+>   root wrapper (`.{game}-root`) the internal scroller: `flex: 1 1 auto; min-height: 0;
+>   overflow-y: auto;`. The header stays put and only the content scrolls — **without**
+>   `position: fixed` (which would let content render underneath it).
 
 > **Footgun — JS interop: a `<script>` rendered into the body does NOT execute.** Convert the
 > game's JS to an **ES module** (`export function ...`) in the server `wwwroot/js/`, and import

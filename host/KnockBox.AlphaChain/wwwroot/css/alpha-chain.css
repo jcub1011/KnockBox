@@ -8,11 +8,14 @@
   rules are). alpha-chain-theme.css and cards.css stay plain and are linked separately.
 */
 
-/* The runtime UI wrapper (GameRoot's <div class="ac-root">) is a child of MainLayout's
-   scrolling <article>, below the fixed header. Grow to fill the remaining space. */
+/* The runtime UI wrapper (GameRoot's <div class="ac-root">) is a flex child of MainLayout's
+   <article>, below the game's pinned header. <article> does not scroll on WASM routes
+   (article.wasm-game), so this wrapper grows to fill the remaining space and is the internal
+   scroller — keeping the header in view as the content scrolls. */
 .ac-root {
     flex: 1 1 auto;
     min-height: 0;
+    overflow-y: auto;
 }
 
 /* ═══════════════════ Pages/AlphaChainLobby.razor.css ═══════════════════ */

@@ -36,9 +36,13 @@
 }
 
 /* ── Layout ── */
+/* <article> doesn't scroll on WASM routes (article.wasm-game); this wrapper grows to fill
+   the space below the pinned header and is the internal scroller, keeping the header in view. */
 .ds-root {
     display: flex;
     flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     flex-direction: column;
     background-color: var(--ds-bg);
     background-image: var(--ds-bg-glow);
