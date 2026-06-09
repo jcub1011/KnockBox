@@ -125,6 +125,15 @@
                      Condition="Exists('$(TargetDir)$(TargetName).staticwebassets.runtime.json')" />
       <PluginPrimary Include="$(TargetDir)KnockBox.Tooling.dll" Condition="Exists('$(TargetDir)KnockBox.Tooling.dll')" />
       <PluginPrimary Include="$(TargetDir)KnockBox.Tooling.pdb" Condition="Exists('$(TargetDir)KnockBox.Tooling.pdb')" />
+      <!--
+        Private (non-host-shipped) dependencies the plugin needs inside its own
+        PluginLoadContext, e.g. a tri-split game's {Game}.Contracts DLL. These are
+        NOT classified as shared at load time (so they are not deferred to the
+        default ALC) and must sit in games/{Plugin}/ for the
+        AssemblyDependencyResolver to resolve them. A plugin csproj declares them
+        via <PluginPrivateAssembly Include="$(TargetDir)X.dll" />.
+      -->
+      <PluginPrimary Include="@(PluginPrivateAssembly)" Condition="'@(PluginPrivateAssembly)' != ''" />
       <ScopedCss Include="$(IntermediateOutputPath)scopedcss\projectbundle\$(TargetName).bundle.scp.css" />
       <WwwRootFiles Include="wwwroot\**\*.*" />
       <PluginContentFiles Include="$(TargetDir)**\*.csv" />

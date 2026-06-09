@@ -70,6 +70,10 @@ namespace KnockBox.Services.Logic.Games.Shared
 
             _lobbiesByUri.TryRemove(removed.Uri, out _);
 
+            // Tell any connected players the lobby is closing so they leave — while
+            // they are still in the SignalR group and the state is still alive.
+            await _viewCoordinator.NotifyLobbyClosedAsync(removed.Uri, removed.RouteIdentifier);
+
             // Tear down the per-lobby projection subscriber. Idempotent and also
             // triggered by the state-disposed callback below, but done explicitly
             // here so the subscription is gone the moment the lobby closes.

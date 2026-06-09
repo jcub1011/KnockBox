@@ -35,6 +35,10 @@ public sealed partial class PluginClientAssetService : IPluginClientAssetService
     // route -> declared client entry assembly (from plugin.json), if any
     private readonly ConcurrentDictionary<string, string> _routeToClientAssembly =
         new(StringComparer.OrdinalIgnoreCase);
+    // route -> declared client contract assemblies (from plugin.json), streamed
+    // alongside the entry assembly as dependencies
+    private readonly ConcurrentDictionary<string, IReadOnlyList<string>> _routeToClientContracts =
+        new(StringComparer.OrdinalIgnoreCase);
     // client dir -> build-time hash map (null sentinel: no sidecar present)
     private readonly ConcurrentDictionary<string, IReadOnlyDictionary<string, string>?> _sidecarByDir =
         new(StringComparer.OrdinalIgnoreCase);
@@ -68,6 +72,8 @@ public sealed partial class PluginClientAssetService : IPluginClientAssetService
                     _routeToFolder[manifest.RouteIdentifier] = Path.GetFullPath(folder);
                     if (!string.IsNullOrEmpty(manifest.ClientAssembly))
                         _routeToClientAssembly[manifest.RouteIdentifier] = manifest.ClientAssembly;
+                    if (manifest.ClientContracts.Count > 0)
+                        _routeToClientContracts[manifest.RouteIdentifier] = manifest.ClientContracts;
                 }
             }
         }
@@ -123,9 +129,55 @@ public sealed partial class PluginClientAssetService : IPluginClientAssetService
             sha = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(dllPath)));
         }
 
+        // Dependency assemblies (the game's contracts DLLs) the entry assembly
+        // references but the trimmed client never built — streamed + loaded first.
+        var dependencies = new List<ClientAssemblyRef>();
+        if (_routeToClientContracts.TryGetValue(routeIdentifier, out var contracts))
+        {
+            foreach (var contract in contracts)
+            {
+                if (!TryResolveAssetHash(clientDir, sidecar, contract, routeIdentifier, out var depSha))
+                    return false;
+                dependencies.Add(new ClientAssemblyRef(contract, depSha));
+            }
+        }
+
         // Convention: the GameRoot lives in the entry assembly's root namespace
         // (== assembly simple name).
-        manifest = new ClientPluginManifest(routeIdentifier, entryAssembly, entryAssembly, sha);
+        manifest = new ClientPluginManifest(routeIdentifier, entryAssembly, entryAssembly, sha, dependencies);
+        return true;
+    }
+
+    /// <summary>
+    /// Resolves the integrity hash for a staged client asset: the build-time
+    /// sidecar entry when present, else a serve-time hash of the DLL. Returns
+    /// <see langword="false"/> if the asset is missing or unhashed.
+    /// </summary>
+    private bool TryResolveAssetHash(
+        string clientDir,
+        IReadOnlyDictionary<string, string>? sidecar,
+        string assemblyName,
+        string routeIdentifier,
+        [NotNullWhen(true)] out string? sha)
+    {
+        sha = null;
+        if (sidecar is not null)
+        {
+            if (!sidecar.TryGetValue(assemblyName, out var declaredSha))
+            {
+                _logger.LogError(
+                    "Client asset [{Assembly}] has no build-time hash in [{Sidecar}] for route [{Route}].",
+                    assemblyName, HashSidecarFile, routeIdentifier);
+                return false;
+            }
+            sha = declaredSha;
+            return true;
+        }
+
+        var dllPath = Path.Combine(clientDir, assemblyName + ".dll");
+        if (!File.Exists(dllPath))
+            return false;
+        sha = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(dllPath)));
         return true;
     }
 

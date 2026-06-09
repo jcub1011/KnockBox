@@ -1,0 +1,165 @@
+a {
+    /* Critical: remove text decoration and browser default coloring */
+    text-decoration: none !important;
+    color: inherit;
+
+    /* Crucial: behave like a button/container so padding, min-width, and transforms work */
+    display: inline-grid;
+    place-items: center;
+    vertical-align: middle;
+    box-sizing: border-box;
+
+    /* Inherit style properties from parent components */
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    text-align: center;
+
+    /* Functional resets */
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-drag: none;
+    outline: none;
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+a:hover,
+a:focus,
+a:active,
+a:visited {
+    text-decoration: none !important;
+    color: inherit;
+    outline: none;
+}
+
+/* ── Enlarged room-code popup (double-click) ──────────────────────────────
+   Neutral, theme-agnostic chrome. Uses platform design tokens where present
+   but falls back to hard values so it renders correctly in any game. */
+
+.kb-rc-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgba(0, 0, 0, 0.7);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    outline: none;
+    animation: kb-rc-fade 120ms ease-out;
+}
+
+.kb-rc-card {
+    position: relative;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: auto;
+    max-width: min(90vw, 640px);
+    padding: 2.75rem 2.5rem 2rem;
+    color: var(--ink, #f4ece4);
+    background: var(--bg-color, #1f1428);
+    border: 1px solid var(--canvas-card-border, rgba(255, 255, 255, 0.12));
+    border-radius: 1rem;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    text-align: center;
+    animation: kb-rc-rise 140ms ease-out;
+}
+
+.kb-rc-label {
+    font-family: var(--font-primary, system-ui, sans-serif);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-soft, rgba(244, 236, 228, 0.65));
+}
+
+.kb-rc-code {
+    font-family: var(--font-mono, monospace);
+    font-size: clamp(2.5rem, 12vw, 6rem);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: 0.1em;
+    word-break: break-all;
+    user-select: all;
+}
+
+.kb-rc-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.kb-rc-btn {
+    font: inherit;
+    font-family: var(--font-primary, system-ui, sans-serif);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--ink, #f4ece4);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--canvas-card-border, rgba(255, 255, 255, 0.18));
+    border-radius: 0.6rem;
+    padding: 0.55rem 1.2rem;
+    cursor: pointer;
+    transition: background 120ms ease, border-color 120ms ease;
+}
+
+.kb-rc-btn:hover,
+.kb-rc-btn:focus-visible {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.32);
+    outline: none;
+}
+
+.kb-rc-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.6rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-primary, system-ui, sans-serif);
+    font-size: 1.6rem;
+    line-height: 1;
+    color: var(--ink-soft, rgba(244, 236, 228, 0.6));
+    background: transparent;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: color 120ms ease, background 120ms ease;
+}
+
+.kb-rc-close:hover,
+.kb-rc-close:focus-visible {
+    color: var(--ink, #f4ece4);
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+
+@keyframes kb-rc-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes kb-rc-rise {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .kb-rc-overlay,
+    .kb-rc-card {
+        animation: none;
+    }
+}

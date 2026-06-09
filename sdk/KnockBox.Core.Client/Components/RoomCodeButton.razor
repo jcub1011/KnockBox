@@ -1,0 +1,191 @@
+@namespace KnockBox.Core.Client.Components
+@implements IAsyncDisposable
+@*
+    WASM-safe room-code button with full interaction parity to the server's
+    KnockBox.Core RoomCodeButton: click reveals the code (overlay), double-click
+    enlarges it in a modal, right-click copies the code (Ctrl+right-click copies the
+    join link), middle-click opens the join link in a new tab, touch long-press copies.
+
+    Unlike the server version it takes Code + JoinUrl as parameters instead of pulling
+    them from server-only services (IGameSessionService / INavigationService), so a
+    runtime-loaded game UI can use it. The JS positioning module is shared with the
+    server version (served at _content/KnockBox.Core).
+*@
+
+<a href="@JoinUrl"
+   target="_blank"
+   class="@ClassName @(_isRevealed ? "revealed" : "")"
+   @ref="_buttonRef"
+   @onclick="Toggle"
+   @onclick:preventDefault="true"
+   @ondblclick="OpenModal"
+   @ondblclick:preventDefault="true"
+   @oncontextmenu="OnContextMenu"
+   @oncontextmenu:preventDefault="true"
+   @onpointerdown="OnPointerDown"
+   @onpointerup="OnPointerUp"
+   @onpointercancel="OnPointerCancel"
+   @onpointerleave="OnPointerCancel"
+   title="Click to reveal. Double-click to enlarge. Right-click/long-press to copy code. Ctrl+right-click to copy link. Middle-click to join in a new tab.">
+    <span class="@CoverClassName">@CoverText</span>
+    <span class="@ValueClassName">@Code</span>
+</a>
+
+@if (_isModalOpen)
+{
+    <div class="kb-rc-overlay" style="top:@(_modalTopPx)px"
+         @onclick="CloseModal"
+         @onkeydown="OnModalKeyDown" tabindex="-1" @ref="_overlayRef">
+        <div class="kb-rc-card" role="dialog" aria-modal="true"
+             aria-label="Room code" @onclick:stopPropagation="true">
+            <button type="button" class="kb-rc-close" aria-label="Close"
+                    @onclick="CloseModal">&times;</button>
+            <span class="kb-rc-label">@CoverText</span>
+            <span class="kb-rc-code">@Code</span>
+            <div class="kb-rc-actions">
+                <button type="button" class="kb-rc-btn" @onclick="CopyCodeAsync">Copy code</button>
+                <button type="button" class="kb-rc-btn" @onclick="CopyJoinUrlAsync">Copy link</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Inject] IJSRuntime JSRuntime { get; set; } = default!;
+    [Inject] ILogger<RoomCodeButton> Logger { get; set; } = default!;
+
+    [Parameter, EditorRequired] public string Code { get; set; } = "";
+    [Parameter] public string JoinUrl { get; set; } = "#";
+    [Parameter, EditorRequired] public string ClassName { get; set; } = "";
+    [Parameter, EditorRequired] public string CoverClassName { get; set; } = "";
+    [Parameter, EditorRequired] public string ValueClassName { get; set; } = "";
+    [Parameter] public string CoverText { get; set; } = "Join Code";
+
+    private bool _isRevealed;
+    private bool _isModalOpen;
+    private bool _modalNeedsFocus;
+    private int _modalTopPx;
+    private ElementReference _overlayRef;
+    private ElementReference _buttonRef;
+    private IJSObjectReference? _jsModule;
+    private CancellationTokenSource? _longPressCts;
+
+    private void Toggle() => _isRevealed = !_isRevealed;
+
+    private async Task OpenModal()
+    {
+        // Measure the header bottom first so the popup opens positioned below it
+        // (leaving the header visible) without a top-of-viewport flicker.
+        try
+        {
+            _jsModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/KnockBox.Core/js/roomCodeButton.js");
+            _modalTopPx = await _jsModule.InvokeAsync<int>("getHeaderBottom", _buttonRef);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to measure header offset for room code popup.");
+            _modalTopPx = 0;
+        }
+
+        _isModalOpen = true;
+        _modalNeedsFocus = true;
+    }
+
+    private void CloseModal() => _isModalOpen = false;
+
+    private void OnModalKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") CloseModal();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_isModalOpen && _modalNeedsFocus)
+        {
+            _modalNeedsFocus = false;
+            await _overlayRef.FocusAsync();
+        }
+    }
+
+    // Right-click copies the room code; Ctrl+right-click copies the full join URL.
+    private Task OnContextMenu(MouseEventArgs e) =>
+        e.CtrlKey ? CopyJoinUrlAsync() : CopyCodeAsync();
+
+    private async Task CopyCodeAsync()
+    {
+        if (string.IsNullOrEmpty(Code)) return;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", Code);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error copying lobby code.");
+        }
+    }
+
+    private async Task CopyJoinUrlAsync()
+    {
+        if (string.IsNullOrEmpty(JoinUrl) || JoinUrl == "#") return;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", JoinUrl);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error copying join URL.");
+        }
+    }
+
+    private void OnPointerDown(PointerEventArgs e)
+    {
+        // Touch long-press copies the room code.
+        if (e.PointerType == "touch")
+            StartHold(CopyCodeAsync);
+    }
+
+    private void StartHold(Func<Task> onHold)
+    {
+        CancelLongPress();
+        var cts = new CancellationTokenSource();
+        _longPressCts = cts;
+        var token = cts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(500, token);
+                await InvokeAsync(onHold);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Hold action failed.");
+            }
+        }, token);
+    }
+
+    private void OnPointerUp(PointerEventArgs e) => CancelLongPress();
+    private void OnPointerCancel(PointerEventArgs e) => CancelLongPress();
+
+    private void CancelLongPress()
+    {
+        _longPressCts?.Cancel();
+        _longPressCts?.Dispose();
+        _longPressCts = null;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        CancelLongPress();
+        if (_jsModule is not null)
+        {
+            try { await _jsModule.DisposeAsync(); }
+            catch (Exception ex) { Logger.LogDebug(ex, "Room code popup JS module disposal failed."); }
+            _jsModule = null;
+        }
+        GC.SuppressFinalize(this);
+    }
+}

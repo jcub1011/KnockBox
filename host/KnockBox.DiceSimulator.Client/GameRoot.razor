@@ -1,36 +1,54 @@
-@page "/room/dice-simulator/{ObfuscatedRoomCode}"
+@inherits HubLobbyPageBase<DiceSimulatorView>
+@inject IJSRuntime JS
+@*
+    GameRoot — the runtime-loaded WASM UI entry point for Dice Simulator.
 
-@inherits LobbyPageBase<DiceSimulatorGameState>
-@using KnockBox.DiceSimulator.Services.State.Games
-@using KnockBox.DiceSimulator.Services.State.Games.Data
+    Resolved by the client loader via {RootNamespace}.GameRoot (or the explicit
+    IGameClientModule in GameClientModule.cs) and rendered from an assembly the WASM
+    client never referenced at build time. Inheriting HubLobbyPageBase<DiceSimulatorView>
+    opens the hub, joins the lobby, deserializes each per-player projection into `View`,
+    and disposes on teardown.
+*@
 
-<PageTitle>Dice Simulator</PageTitle>
+@* The game ships its own stylesheet from the server plugin's mounted wwwroot. A
+   runtime-loaded WASM component can't use HeadContent (the HeadOutlet runs in a
+   different render mode), and the streamed .Client DLL has no RCL scoped-CSS bundle,
+   so we link the plain stylesheet here; browsers honor a body-placed stylesheet link. *@
+<link rel="stylesheet" href="_content/KnockBox.DiceSimulator/css/dice-simulator.css" />
 
-<HeadContent>
-    <script src="_content/KnockBox.DiceSimulator/js/fileExport.js"></script>
-    <link href="_content/KnockBox.DiceSimulator/KnockBox.DiceSimulator.styles.css" rel="stylesheet" />
-</HeadContent>
+<DiceSimulatorHeader Code="@LobbyCode" OnLeave="LeaveAsync" />
 
-<div class="content">
-@if (GameState == null)
+<div class="ds-root">
+@if (View is null)
 {
     <div>Loading...</div>
 }
 else
 {
-    @if (GameState.IsJoinable)
+    @if (View.IsJoinable)
     {
         <div class="card">
             <div class="joinable-state">
                 <h4>Players</h4>
                 <div class="player-list">
-                    @foreach (var entry in GameState.Players)
+                    @foreach (var entry in View.Roster)
                     {
-                        <button class="btn" title="Click to kick player."
-                                @onclick="() => GameState.KickPlayer(UserService.CurrentUser!, entry.User)">@entry.DisplayName @(entry.User.Id == GameState.Host.Id ? "(Host)" : "")</button>
+                        @if (entry.IsHost)
+                        {
+                            <button class="btn" disabled>@entry.DisplayName (Host)</button>
+                        }
+                        else if (IsHost)
+                        {
+                            <button class="btn" title="Click to kick player."
+                                    @onclick="() => KickPlayer(entry.PlayerId)">@entry.DisplayName</button>
+                        }
+                        else
+                        {
+                            <button class="btn" disabled>@entry.DisplayName</button>
+                        }
                     }
                 </div>
-                @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+                @if (IsHost)
                 {
                     <button class="btn btn-primary start-btn mt-3" @onclick="StartGame">Start Session</button>
                 }
@@ -77,13 +95,13 @@ else
             </div>
             <div class="input-row">
                 <button class="btn btn-success flex-1" @onclick="RollDice">ROLL!</button>
-                @if (UserService.CurrentUser?.Id == GameState.Host.Id)
+                @if (IsHost)
                 {
                     <button class="btn btn-danger" @onclick="ClearHistory">Clear History</button>
                 }
             </div>
             <div class="">
-                @if (GameState.RollHistory.Where(r => r.PlayerId == UserService.CurrentUser?.Id).LastOrDefault() is { } lastRoll)
+                @if (View.RollHistory.Where(r => r.PlayerId == View.RecipientId).LastOrDefault() is { } lastRoll)
                 {
                     <div class="alert alert-info">
                         <strong>Last Roll:</strong> @lastRoll.Expression = @lastRoll.Result <br/>
@@ -108,7 +126,7 @@ else
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var stats in GameState.PlayerStats.Values.OrderByDescending(s => s.TotalRolls))
+                            @foreach (var stats in View.Leaderboard)
                             {
                                 <tr>
                                     <td>@stats.PlayerName</td>
@@ -126,15 +144,15 @@ else
             <div class="card">
                 <div class="d-flex justify-content-between align-items-center">
                     <h4>Player Rolls</h4>
-                    <button class="btn btn-sm btn-outline-secondary export-btn" @onclick="ExportCsv">Export CSV ?</button>
+                    <button class="btn btn-sm btn-outline-secondary export-btn" @onclick="ExportCsv">Export CSV</button>
                 </div>
                 <div class="player-rolls-list">
-                    @foreach (var entry in GameState.RosterIncludingHost)
+                    @foreach (var entry in View.Roster)
                     {
-                        var playerId = entry.User.Id;
-                        var playerLastRoll = GameState.RollHistory.LastOrDefault(r => r.PlayerId == playerId);
-                        var playerRollCount = GameState.RollHistory.Count(r => r.PlayerId == playerId);
-                        var playerRolls = GameState.RollHistory.Where(r => r.PlayerId == playerId).ToList();
+                        var playerId = entry.PlayerId;
+                        var playerRolls = View.RollHistory.Where(r => r.PlayerId == playerId).ToList();
+                        var playerLastRoll = playerRolls.LastOrDefault();
+                        var playerRollCount = playerRolls.Count;
                         var displayRolls = playerRolls.AsEnumerable().Reverse().Take(200).ToList();
                         var isExpanded = IsPlayerExpanded(playerId);
 
@@ -154,7 +172,7 @@ else
                                 {
                                     <span class="player-roll-empty">No rolls yet</span>
                                 }
-                                <span class="player-roll-toggle">@(isExpanded ? "?" : "?")</span>
+                                <span class="player-roll-toggle">@(isExpanded ? "-" : "+")</span>
                             </div>
                         </div>
 
@@ -190,3 +208,67 @@ else
     }
 }
 </div>
+
+@code {
+    /// <summary>The lobby code from the room URL, supplied by the WASM host page.</summary>
+    [Parameter] public string Code { get; set; } = "";
+
+    /// <summary>The player's chosen display name, propagated from the home page.</summary>
+    [Parameter] public string? PlayerName { get; set; }
+
+    protected override string RouteIdentifier => "dice-simulator";
+    protected override string LobbyUri => $"room/dice-simulator/{Code}";
+    protected override string DisplayName => string.IsNullOrWhiteSpace(PlayerName) ? "Player" : PlayerName!;
+
+    private DiceRollAction RollAction { get; set; } = new();
+    private readonly HashSet<Guid> _expandedPlayerIds = [];
+
+    public GameRoot()
+        : base(new SourceGenProjectionDeserializer<DiceSimulatorView>(
+            DiceSimulatorContractsJsonContext.Default.DiceSimulatorView))
+    {
+    }
+
+    private bool IsHost => View is not null && View.RecipientId == View.HostId;
+
+    private void TogglePlayerHistory(Guid playerId)
+    {
+        if (!_expandedPlayerIds.Add(playerId))
+            _expandedPlayerIds.Remove(playerId);
+    }
+
+    private bool IsPlayerExpanded(Guid playerId) => _expandedPlayerIds.Contains(playerId);
+
+    private Task StartGame() => SubmitCommandAsync(DiceSimulatorCommands.Start);
+
+    private Task RollDice()
+        => SubmitCommandAsync(
+            DiceSimulatorCommands.RollDice,
+            JsonSerializer.Serialize(RollAction, DiceSimulatorContractsJsonContext.Default.DiceRollAction));
+
+    private Task ClearHistory() => SubmitCommandAsync(DiceSimulatorCommands.ClearHistory);
+
+    private Task KickPlayer(Guid playerId)
+        // A GUID's JSON form is just its quoted string; build it directly to avoid a
+        // reflection-based serializer call in the trimmed client.
+        => SubmitCommandAsync(DiceSimulatorCommands.KickPlayer, $"\"{playerId}\"");
+
+    private IJSObjectReference? _fileExport;
+
+    private async Task ExportCsv()
+    {
+        if (View is null)
+            return;
+
+        // Load the download helper as an ES module from the server plugin's mounted
+        // wwwroot — a <script> rendered into the body wouldn't execute.
+        _fileExport ??= await JS.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/KnockBox.DiceSimulator/js/fileExport.js");
+
+        var csvBytes = CsvExportService.GenerateCsv(View.RollHistory);
+        var base64 = Convert.ToBase64String(csvBytes);
+        var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMddTHHmmssZ");
+        var filename = $"DnD-Rolls-{Code}-{timestamp}.csv";
+        await _fileExport.InvokeVoidAsync("downloadCsvFile", filename, base64);
+    }
+}

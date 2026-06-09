@@ -14,6 +14,10 @@ transport, while keeping all authoritative game logic and the runtime plugin loa
    runtime-third-party-UI-under-trimming problem, loss of browser ALC version isolation.
 3. [`03-work-breakdown.md`](./03-work-breakdown.md) — phased plan, per-game migration order,
    verification strategy.
+4. [`04-per-game-migration-guide.md`](./04-per-game-migration-guide.md) — **the practical
+   Phase 2 recipe**: step-by-step per-game migration (DiceSimulator is the reference
+   implementation) plus the footguns hit during game #1 and how to avoid them. Start here when
+   migrating a remaining plugin.
 
 ## Why migrate
 

@@ -1,5 +1,10 @@
-namespace KnockBox.DiceSimulator.Services.State.Games.Data
+namespace KnockBox.DiceSimulator.Contracts
 {
+    /// <summary>
+    /// An immutable record of a single dice roll. Created server-side by the engine
+    /// and carried verbatim in the per-player <see cref="DiceSimulatorView"/> roll
+    /// history (the roll log is public to all players in this game).
+    /// </summary>
     public sealed record DiceRollEntry
     {
         public required Guid Id { get; init; }

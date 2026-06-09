@@ -1,4 +1,4 @@
-namespace KnockBox.DiceSimulator.Services.State.Games.Data
+namespace KnockBox.DiceSimulator.Contracts
 {
     public enum RollMode
     {

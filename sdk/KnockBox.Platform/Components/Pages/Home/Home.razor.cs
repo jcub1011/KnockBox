@@ -26,6 +26,7 @@ namespace KnockBox.Platform.Components.Pages.Home
         [Inject] ILogger<Home> Logger { get; set; } = default!;
         [Inject] IEnumerable<IGameModule> GameModules { get; set; } = default!;
         [Inject] IGameAvailabilityService GameAvailability { get; set; } = default!;
+        [Inject] NavigationManager Navigation { get; set; } = default!;
 
         /// <summary>
         /// Filtered + sorted game list for the tile grid. Disabled games are
@@ -154,6 +155,17 @@ namespace KnockBox.Platform.Components.Pages.Home
 
             await animationDelay;
 
+            // Migrated WASM games are driven entirely over the hub: the WASM host page
+            // (RuntimeGameLobby) re-joins via the hub, which owns registration + session.
+            // Release the circuit-side registration and hand off with a full-page load.
+            var lobby = registration.LobbyRegistration;
+            if (IsClientGame(lobby.RouteIdentifier))
+            {
+                registration.Dispose();
+                NavigateToWasm($"/{lobby.Uri}", user.Name);
+                return;
+            }
+
             // Leave any prior session before claiming the new slot.  If the player is
             // re-joining the same lobby, RegisterPlayer has already issued a fresh token;
             // this only clears GameSessionState so SetCurrentSession can succeed.
@@ -169,6 +181,14 @@ namespace KnockBox.Platform.Components.Pages.Home
             if (user is null)
             {
                 ShowError("Could not identify your session. Please refresh the page.");
+                return;
+            }
+
+            // Migrated WASM games create their lobby over the hub from the WASM host
+            // page (create mode); the circuit does not create a server lobby for them.
+            if (IsClientGame(routeIdentifier))
+            {
+                NavigateToWasm($"/room/{routeIdentifier}", user.Name);
                 return;
             }
 
@@ -241,6 +261,38 @@ namespace KnockBox.Platform.Components.Pages.Home
             // admin's). Marshal to the Home page's sync context before
             // touching component state.
             _ = InvokeAsync(StateHasChanged);
+        }
+
+        // ── WASM (tri-split) game launch ──────────────────────────────────────
+
+        /// <summary>
+        /// True when the route belongs to a migrated game that ships a browser-side
+        /// client UI (declares a <c>clientAssembly</c>). Such games render in the
+        /// WASM client and are launched/joined over the hub, not the circuit.
+        /// </summary>
+        private bool IsClientGame(string routeIdentifier)
+            => _sortedModules.Any(m =>
+                string.Equals(m.Manifest.RouteIdentifier, routeIdentifier, StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrEmpty(m.Manifest.ClientAssembly));
+
+        /// <summary>
+        /// Full-page navigation to a WASM route, carrying the chosen display name so
+        /// the game's hub connection presents it. forceLoad crosses the
+        /// InteractiveServer → InteractiveWebAssembly render-mode boundary cleanly.
+        /// </summary>
+        /// <remarks>
+        /// Builds an ABSOLUTE target URI. A root-relative path (e.g. "/room/...")
+        /// makes registered LocationChanging handlers (MainLayout) call
+        /// <c>ToBaseRelativePath</c> on a non-absolute URI, which throws — this bites
+        /// in the join-by-link flow, where the new tab opens on "/?join=" (not
+        /// detected as the home page, so the handler doesn't early-return).
+        /// </remarks>
+        private void NavigateToWasm(string relativePath, string? name)
+        {
+            var target = $"{Navigation.BaseUri}{relativePath.TrimStart('/')}";
+            if (!string.IsNullOrWhiteSpace(name))
+                target += $"?name={Uri.EscapeDataString(name)}";
+            Navigation.NavigateTo(target, forceLoad: true);
         }
 
         public override void Dispose()

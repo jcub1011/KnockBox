@@ -1,5 +1,7 @@
 using KnockBox.Core.Client.Hub;
+using KnockBox.Core.Primitives.Disposable;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
+using KnockBox.Core.Services.Logic.Games.Shared;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Shared;
 using KnockBox.Core.Services.State.Users;
@@ -116,11 +118,38 @@ public sealed class GameHub(
     /// </summary>
     public async Task<string?> CreateRoom(string routeIdentifier)
     {
-        if (!TryResolveCaller(out var caller, out _))
+        if (!TryResolveCaller(out var caller, out var sessionToken))
             return null;
 
         var result = await lobbyService.CreateLobbyAsync(caller, routeIdentifier, Context.ConnectionAborted);
-        return result.TryGetSuccess(out var registration) ? registration.Uri : null;
+        if (!result.TryGetSuccess(out var registration))
+            return null;
+
+        // Tie lobby closure to the host's session lifecycle. When the host's last
+        // connection drops and the eviction grace lapses, GameSessionState.Dispose
+        // runs this dispose-action → CloseLobbyAsync, which disposes the state and
+        // notifies/kicks the remaining players. A reconnect within grace cancels it.
+        // Mirrors the Blazor Server Home.CreateLobby dispose-action, for the hub.
+        var sessionResult = sessionServiceProvider.GetService<GameSessionState>(sessionToken);
+        if (sessionResult.TryGetSuccess(out var sessionReg))
+        {
+            var closeAction = new DisposableAction(
+                () => _ = lobbyService.CloseLobbyAsync(caller, registration, CancellationToken.None));
+
+            if (!sessionReg.Service.TrySetCurrentSession(new UserRegistration(caller, closeAction, registration)))
+            {
+                logger.LogWarning(
+                    "Host [{UserId}] already had an active session creating lobby [{Uri}]; " +
+                    "close-on-leave not wired for it.", caller.Id, registration.Uri);
+            }
+
+            // Release the extra reference this GetService call took; the caller's
+            // connection still holds its own (acquired in OnConnectedAsync), so the
+            // session stays alive until the host actually leaves.
+            sessionReg.LifecycleToken.Dispose();
+        }
+
+        return registration.Uri;
     }
 
     /// <summary>
@@ -150,6 +179,36 @@ public sealed class GameHub(
             return error.PublicMessage;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Returns the short, shareable lobby code for a room the caller is in (the
+    /// human code typed on the home page's join box). The URI's random GUIDs are the
+    /// access token, so any authenticated caller holding the URI may read it. Returns
+    /// <c>null</c> if identity can't be resolved or the lobby is unknown.
+    /// </summary>
+    public string? GetLobbyCode(string lobbyUri)
+    {
+        if (!TryResolveCaller(out _, out _))
+            return null;
+        return lobbyService.TryGetByUri(lobbyUri, out var registration) ? registration.Code : null;
+    }
+
+    /// <summary>
+    /// Explicit leave. When the <b>host</b> leaves, the lobby is closed immediately
+    /// (state disposed, remaining players notified to leave) rather than waiting for
+    /// the session-eviction grace timer. A non-host leaving is handled by the normal
+    /// disconnect cleanup once their client navigates away.
+    /// </summary>
+    public async Task LeaveRoom(string lobbyUri)
+    {
+        if (!TryResolveCaller(out var caller, out _))
+            return;
+        if (!lobbyService.TryGetByUri(lobbyUri, out var registration))
+            return;
+
+        if (caller.Id == registration.State.Host.Id)
+            await lobbyService.CloseLobbyAsync(caller, registration, CancellationToken.None);
     }
 
     public override Task OnDisconnectedAsync(Exception? exception)

@@ -1,0 +1,122 @@
+@page "/room/dice-simulator"
+@page "/room/dice-simulator/{Code}"
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@implements IAsyncDisposable
+@inject GameHubConnectionFactory HubFactory
+@inject IClientSessionTokenProvider TokenProvider
+@inject IClientPluginLoader PluginLoader
+@inject NavigationManager Nav
+
+@*
+    Generic WASM host page for a runtime-loaded game's UI.
+
+    Two modes:
+      - Create (no Code): opens a hub connection, asks the server to create a lobby
+        for the route, then navigates to the join URL for the returned code.
+      - Join (Code present): downloads + loads the game's client assembly and renders
+        its GameRoot. GameRoot owns its own hub connection (HubLobbyPageBase), so this
+        page only loads + renders it.
+
+    For game #1 the route is hardcoded to dice-simulator. When a 2nd game migrates,
+    generalize @page to "/room/{Route}/{Code}" and drive Route from the parameter.
+*@
+
+<PageTitle>Dice Simulator</PageTitle>
+
+@if (string.IsNullOrEmpty(Code))
+{
+    <p style="padding:1rem;">@_status</p>
+}
+else if (_loadError is not null)
+{
+    <p style="padding:1rem; color:#b00;">Failed to load game: @_loadError</p>
+}
+else if (_rootComponentType is null)
+{
+    <p style="padding:1rem;">Loading game…</p>
+}
+else
+{
+    <DynamicComponent Type="_rootComponentType" Parameters="_rootParameters" />
+}
+
+@code {
+    private const string Route = "dice-simulator";
+
+    [Parameter] public string? Code { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "name")]
+    public string? Name { get; set; }
+
+    private HubConnection? _hub;
+    private Type? _rootComponentType;
+    private string? _loadError;
+    private string _status = "Creating room…";
+    private Dictionary<string, object> _rootParameters = new();
+    private bool _started;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_started)
+            return;
+        _started = true;
+
+        if (string.IsNullOrEmpty(Code))
+            await CreateRoomAsync();
+        else
+            await LoadGameAsync();
+    }
+
+    private async Task CreateRoomAsync()
+    {
+        var token = await TokenProvider.GetOrIssueAsync(ComponentDetachedSafe());
+        _hub = HubFactory.Create(token, DisplayName(token));
+        await _hub.StartAsync();
+
+        var uri = await _hub.InvokeAsync<string?>("CreateRoom", Route);
+        if (uri is null)
+        {
+            _status = "Failed to create room.";
+            StateHasChanged();
+            return;
+        }
+
+        // uri == "room/dice-simulator/{guidA}-{guidB}"; navigate to the join URL,
+        // carrying the chosen name so the game's hub connection presents it.
+        var code = uri[(uri.LastIndexOf('/') + 1)..];
+        var target = $"/room/{Route}/{code}";
+        if (!string.IsNullOrWhiteSpace(Name))
+            target += $"?name={Uri.EscapeDataString(Name)}";
+        Nav.NavigateTo(target);
+    }
+
+    private async Task LoadGameAsync()
+    {
+        var load = await PluginLoader.LoadGameRootAsync(Route);
+        if (!load.Ok || load.RootComponentType is null)
+        {
+            _loadError = load.Error ?? "unknown error";
+            StateHasChanged();
+            return;
+        }
+
+        _rootComponentType = load.RootComponentType;
+        var parameters = new Dictionary<string, object> { ["Code"] = Code! };
+        if (!string.IsNullOrWhiteSpace(Name))
+            parameters["PlayerName"] = Name!;
+        _rootParameters = parameters;
+        StateHasChanged();
+    }
+
+    private string DisplayName(string token)
+        => string.IsNullOrWhiteSpace(Name) ? $"Player-{token[^4..]}" : Name!;
+
+    private static CancellationToken ComponentDetachedSafe() => CancellationToken.None;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hub is not null)
+            await _hub.DisposeAsync();
+    }
+}

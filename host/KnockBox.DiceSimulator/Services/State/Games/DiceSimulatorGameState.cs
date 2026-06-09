@@ -1,3 +1,4 @@
+using KnockBox.DiceSimulator.Contracts;
 using KnockBox.DiceSimulator.Services.State.Games.Data;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Games.Shared.Interfaces;

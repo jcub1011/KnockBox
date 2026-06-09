@@ -10,6 +10,16 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
+    <ProjectReference Include="..\KnockBox.DiceSimulator.Contracts\KnockBox.DiceSimulator.Contracts.csproj" />
+  </ItemGroup>
+
+  <!--
+    The Contracts DLL is a private dependency loaded into this plugin's own ALC
+    (it is not promoted to the default ALC), so it must be staged into
+    games/KnockBox.DiceSimulator/ alongside the plugin DLL. See Directory.Plugin.targets.
+  -->
+  <ItemGroup>
+    <PluginPrivateAssembly Include="$(TargetDir)KnockBox.DiceSimulator.Contracts.dll" />
   </ItemGroup>
 
   <ItemGroup>

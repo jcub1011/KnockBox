@@ -93,6 +93,15 @@
     <ProjectReference Include="..\KnockBox.SpikePlugin.Client\KnockBox.SpikePlugin.Client.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
     <!--
+      Dice Simulator browser UI (the first true tri-split game). Same
+      ReferenceOutputAssembly="false" Private="false" pattern as a server plugin:
+      built transitively (which also builds KnockBox.DiceSimulator.Contracts) and
+      staged as bytes into games/KnockBox.DiceSimulator/client/ via
+      Directory.Client.targets, but never linked into the host or the WASM client.
+    -->
+    <ProjectReference Include="..\KnockBox.DiceSimulator.Client\KnockBox.DiceSimulator.Client.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+    <!--
       Plugin projects are loaded at runtime, not linked at compile time.
       ReferenceOutputAssembly="false" keeps the host from taking a compile-time
       dependency on plugin types (preserving the runtime-discovery architecture);

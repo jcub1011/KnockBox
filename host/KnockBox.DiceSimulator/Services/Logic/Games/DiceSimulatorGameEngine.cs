@@ -1,8 +1,11 @@
+using System.Text.Json;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
+using KnockBox.Core.Services.State.Games.Shared.Projection;
+using KnockBox.DiceSimulator.Contracts;
+using KnockBox.DiceSimulator.Services.Projection;
 using KnockBox.DiceSimulator.Services.State.Games;
-using KnockBox.DiceSimulator.Services.State.Games.Data;
 using KnockBox.Core.Services.State.Games.Shared;
 using KnockBox.Core.Services.State.Users;
 
@@ -11,8 +14,74 @@ namespace KnockBox.DiceSimulator.Services.Logic.Games
     public class DiceSimulatorGameEngine(
         IRandomNumberService randomNumberService,
         ILogger<DiceSimulatorGameEngine> logger,
-        ILogger<DiceSimulatorGameState> stateLogger) : AbstractGameEngine<DiceSimulatorGameState>
+        ILogger<DiceSimulatorGameState> stateLogger)
+        : AbstractGameEngine<DiceSimulatorGameState>, IGameStateProjector, IGameCommandHandler
     {
+        private readonly DiceSimulatorStateProjector _projector = new();
+
+        // Match the hub's wire format: enums as strings, case-insensitive property
+        // names, so a client-serialized DiceRollAction payload deserializes here.
+        private static readonly JsonSerializerOptions CommandJsonOptions = new()
+        {
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
+            PropertyNameCaseInsensitive = true,
+        };
+
+        /// <summary>Per-recipient projection entry point used by the host's <c>GameViewCoordinator</c>.</summary>
+        public object? ProjectFor(AbstractGameState state, Guid recipientId)
+            => ((IGameStateProjector)_projector).ProjectFor(state, recipientId);
+
+        /// <summary>
+        /// Maps a hub command name to the same engine method a Razor page used to call
+        /// directly. Host-identity authorization lives in the invoked methods.
+        /// </summary>
+        public async ValueTask<Result> HandleCommandAsync(
+            User caller, AbstractGameState state, string command, string? payloadJson, CancellationToken ct = default)
+        {
+            if (state is not DiceSimulatorGameState s)
+                return Result.FromError("Invalid game state for Dice Simulator.");
+
+            return command switch
+            {
+                DiceSimulatorCommands.Start        => await StartAsync(caller, s, ct),
+                DiceSimulatorCommands.RollDice     => RollDiceFromPayload(caller, s, payloadJson),
+                DiceSimulatorCommands.ClearHistory => ClearHistory(caller, s),
+                DiceSimulatorCommands.KickPlayer   => KickFromPayload(caller, s, payloadJson),
+                _ => Result.FromError($"Unknown command [{command}].")
+            };
+        }
+
+        private Result RollDiceFromPayload(User caller, DiceSimulatorGameState state, string? payloadJson)
+        {
+            if (string.IsNullOrEmpty(payloadJson))
+                return Result.FromError("Missing roll payload.");
+
+            DiceRollAction? action;
+            try { action = JsonSerializer.Deserialize<DiceRollAction>(payloadJson, CommandJsonOptions); }
+            catch (JsonException) { return Result.FromError("Malformed roll payload."); }
+
+            if (action is null)
+                return Result.FromError("Malformed roll payload.");
+
+            return RollDice(caller, state, action);
+        }
+
+        private Result KickFromPayload(User caller, DiceSimulatorGameState state, string? payloadJson)
+        {
+            if (string.IsNullOrEmpty(payloadJson))
+                return Result.FromError("Missing kick payload.");
+
+            Guid targetId;
+            try { targetId = JsonSerializer.Deserialize<Guid>(payloadJson, CommandJsonOptions); }
+            catch (JsonException) { return Result.FromError("Malformed kick payload."); }
+
+            var target = state.Players.FirstOrDefault(e => e.User.Id == targetId).User;
+            if (target is null)
+                return Result.FromError("Player is not in this game.");
+
+            return state.KickPlayer(caller, target);
+        }
+
         public override async Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
             if (host is null)
@@ -144,7 +213,10 @@ namespace KnockBox.DiceSimulator.Services.Logic.Games
         
         public Result ClearHistory(User user, DiceSimulatorGameState state)
         {
-            if (user != state.Host) return Result.FromError("Only the host can clear history.");
+            // Compare by Id, not reference: in the hub model each command resolves a
+            // fresh User instance from the connection token, so reference equality
+            // (the old `user != state.Host`) would reject even the real host.
+            if (user.Id != state.Host.Id) return Result.FromError("Only the host can clear history.");
             return state.Execute(() =>
             {
                 state.ClearHistory();

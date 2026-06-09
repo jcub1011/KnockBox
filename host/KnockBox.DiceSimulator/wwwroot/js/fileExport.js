@@ -1,4 +1,6 @@
-window.downloadCsvFile = (fileName, base64Data) => {
+// ES module: imported on demand by the WASM client via JS interop
+// (IJSRuntime.InvokeAsync<IJSObjectReference>("import", ...)).
+export function downloadCsvFile(fileName, base64Data) {
     const bytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     const blob = new Blob([bytes], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -9,4 +11,4 @@ window.downloadCsvFile = (fileName, base64Data) => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-};
+}

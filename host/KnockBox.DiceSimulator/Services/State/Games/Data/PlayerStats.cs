@@ -1,3 +1,5 @@
+using KnockBox.DiceSimulator.Contracts;
+
 namespace KnockBox.DiceSimulator.Services.State.Games.Data
 {
     public class PlayerStats

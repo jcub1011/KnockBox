@@ -20,6 +20,7 @@
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
     <ProjectReference Include="..\..\sdk\KnockBox.Platform\KnockBox.Platform.csproj" />
     <ProjectReference Include="..\KnockBox.DiceSimulator\KnockBox.DiceSimulator.csproj" />
+    <ProjectReference Include="..\KnockBox.DiceSimulator.Contracts\KnockBox.DiceSimulator.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

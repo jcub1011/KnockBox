@@ -1,5 +1,17 @@
+/*
+  Dice Simulator game UI styles.
+
+  Ported from the old server page's scoped CSS (DiceSimulatorLobby.razor.css). The
+  WASM .Client assembly is streamed and loaded via LoadFromStream, so it has no RCL
+  scoped-CSS bundle. This plain stylesheet ships in the server plugin's wwwroot
+  (mounted at /_content/KnockBox.DiceSimulator/) and is <link>ed by the WASM host
+  page. Every rule is scoped under .ds-root (the game UI's outer element) so the
+  bare element selectors (h3, label, input, select, table) don't leak into the host
+  shell.
+*/
+
 /* ── Design Tokens: Fantasy Tavern ── */
-.content {
+.ds-root {
     --ds-bg: #110e1f;
     --ds-bg-glow: radial-gradient(ellipse at 30% 20%, rgba(168, 85, 247, 0.06) 0%, transparent 60%),
                   radial-gradient(ellipse at 70% 80%, rgba(232, 184, 73, 0.04) 0%, transparent 50%);
@@ -24,7 +36,7 @@
 }
 
 /* ── Layout ── */
-.content {
+.ds-root {
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -38,14 +50,14 @@
 }
 
 @media (min-width: 1024px) {
-    .content {
+    .ds-root {
         flex-direction: row;
         align-items: flex-start;
     }
 }
 
 /* ── Cards ── */
-.card {
+.ds-root .card {
     display: flex;
     flex-direction: column;
     align-content: start;
@@ -62,15 +74,15 @@
 }
 
 /* ── Lobby State ── */
-.joinable-state {
+.ds-root .joinable-state {
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
 /* ── Typography ── */
-h3,
-h4 {
+.ds-root h3,
+.ds-root h4 {
     font-weight: 900;
     text-transform: uppercase;
     text-shadow: 2px 2px 0 #0b0816, 0 0 20px rgba(232, 184, 73, 0.25);
@@ -81,12 +93,12 @@ h4 {
     letter-spacing: 1px;
 }
 
-h6 {
+.ds-root h6 {
     margin: 0;
     padding: 0;
 }
 
-label {
+.ds-root label {
     font-weight: 700;
     text-transform: uppercase;
     color: var(--ds-text-muted);
@@ -95,7 +107,7 @@ label {
 }
 
 /* ── Buttons (base) ── */
-.btn {
+.ds-root .btn {
     font-family: var(--font-primary);
     font-size: 0.95rem;
     font-weight: 700;
@@ -110,17 +122,17 @@ label {
     padding: 8px 16px;
 }
 
-.btn:hover:not(:disabled) {
+.ds-root .btn:hover:not(:disabled) {
     transform: translate(-2px, -2px);
     box-shadow: 6px 6px 0px var(--ds-shadow);
 }
 
-.btn:active:not(:disabled) {
+.ds-root .btn:active:not(:disabled) {
     transform: translate(2px, 2px);
     box-shadow: 2px 2px 0px var(--ds-shadow);
 }
 
-.btn:disabled {
+.ds-root .btn:disabled {
     opacity: 0.45;
     box-shadow: none;
     transform: none;
@@ -129,34 +141,34 @@ label {
 }
 
 /* ── Button Variants ── */
-.btn-primary {
+.ds-root .btn-primary {
     background: var(--ds-accent) !important;
     color: #fff !important;
     border-color: #7c3aed !important;
 }
 
-.btn-primary:hover:not(:disabled) {
+.ds-root .btn-primary:hover:not(:disabled) {
     background: var(--ds-accent-hover) !important;
 }
 
-.btn-outline-primary {
+.ds-root .btn-outline-primary {
     background: var(--ds-surface-raised) !important;
     color: var(--ds-text) !important;
     border-color: var(--ds-border-hard) !important;
 }
 
-.btn-outline-primary:hover:not(:disabled) {
+.ds-root .btn-outline-primary:hover:not(:disabled) {
     border-color: var(--ds-accent) !important;
     color: var(--ds-accent-hover) !important;
 }
 
-.btn-outline-primary.btn-primary {
+.ds-root .btn-outline-primary.btn-primary {
     background: var(--ds-accent) !important;
     color: #fff !important;
     border-color: #7c3aed !important;
 }
 
-.btn-success {
+.ds-root .btn-success {
     background: var(--ds-success) !important;
     color: var(--ds-success-dark) !important;
     border: 3px solid #059669 !important;
@@ -170,17 +182,17 @@ label {
     text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
-.btn-success:hover:not(:disabled) {
+.ds-root .btn-success:hover:not(:disabled) {
     transform: translate(-2px, -2px);
     box-shadow: 7px 7px 0px var(--ds-shadow), 0 0 40px var(--ds-success-glow);
 }
 
-.btn-success:active:not(:disabled) {
+.ds-root .btn-success:active:not(:disabled) {
     transform: translate(2px, 2px);
     box-shadow: 2px 2px 0px var(--ds-shadow), 0 0 16px var(--ds-success-glow);
 }
 
-.btn-danger {
+.ds-root .btn-danger {
     background: var(--ds-danger-dim) !important;
     color: #fca5a5 !important;
     border: 3px solid var(--ds-danger) !important;
@@ -188,25 +200,25 @@ label {
     padding: 10px 16px;
 }
 
-.btn-danger:hover:not(:disabled) {
+.ds-root .btn-danger:hover:not(:disabled) {
     background: var(--ds-danger) !important;
     color: #fff !important;
 }
 
-.btn-outline-secondary {
+.ds-root .btn-outline-secondary {
     background: var(--ds-surface-raised) !important;
     color: var(--ds-text-muted) !important;
     border-color: var(--ds-border-hard) !important;
     font-size: 0.85rem;
 }
 
-.btn-outline-secondary:hover:not(:disabled) {
+.ds-root .btn-outline-secondary:hover:not(:disabled) {
     color: var(--ds-gold) !important;
     border-color: var(--ds-gold-dim) !important;
 }
 
 /* ── Form Controls ── */
-.form-control {
+.ds-root .form-control {
     font-family: var(--font-mono);
     font-size: 1.1rem;
     font-weight: 600;
@@ -219,13 +231,13 @@ label {
     transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.form-control:focus {
+.ds-root .form-control:focus {
     border-color: var(--ds-accent) !important;
     box-shadow: inset 2px 2px 0px rgba(0, 0, 0, 0.2), 0 0 12px var(--ds-accent-glow);
     outline: none;
 }
 
-input[type="number"] {
+.ds-root input[type="number"] {
     font-family: var(--font-mono);
     font-size: 1.1rem;
     font-weight: 600;
@@ -240,14 +252,14 @@ input[type="number"] {
     transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-input[type="number"]:focus {
+.ds-root input[type="number"]:focus {
     border-color: var(--ds-accent) !important;
     box-shadow: inset 2px 2px 0px rgba(0, 0, 0, 0.2), 0 0 12px var(--ds-accent-glow);
     outline: none;
 }
 
 /* ── Labeled Inputs ── */
-.labeled-input {
+.ds-root .labeled-input {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -255,13 +267,13 @@ input[type="number"]:focus {
 }
 
 /* ── Dice Options ── */
-.dice-options {
+.ds-root .dice-options {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
 }
 
-.dice-options button {
+.ds-root .dice-options button {
     padding: 4px 10px;
     font-size: 1.05rem;
     min-width: 52px;
@@ -269,14 +281,14 @@ input[type="number"]:focus {
 }
 
 /* ── Input Row ── */
-.input-row {
+.ds-root .input-row {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
 }
 
 /* ── Select ── */
-select {
+.ds-root select {
     font-family: var(--font-primary);
     font-size: 1rem;
     font-weight: 700;
@@ -297,13 +309,13 @@ select {
     transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-select:focus {
+.ds-root select:focus {
     outline: none;
     border-color: var(--ds-accent) !important;
     box-shadow: 6px 6px 0px var(--ds-shadow);
 }
 
-select option {
+.ds-root select option {
     font-weight: 700;
     color: #000;
     background: #fff;
@@ -311,7 +323,7 @@ select option {
 }
 
 /* ── Expression Preview ── */
-.expression-preview {
+.ds-root .expression-preview {
     border: 3px solid var(--ds-border-hard) !important;
     border-radius: 8px;
     font-family: var(--font-mono);
@@ -326,7 +338,7 @@ select option {
 }
 
 /* ── Last Roll Alert ── */
-.alert-info {
+.ds-root .alert-info {
     background: linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(232, 184, 73, 0.08));
     border: 3px solid var(--ds-accent);
     border-radius: 8px;
@@ -339,7 +351,7 @@ select option {
 }
 
 /* ── Table ── */
-.table {
+.ds-root .table {
     background: var(--ds-surface-raised);
     border: 3px solid var(--ds-border);
     border-radius: 10px;
@@ -351,7 +363,7 @@ select option {
     box-shadow: 4px 4px 0px var(--ds-shadow);
 }
 
-.table thead th {
+.ds-root .table thead th {
     background: var(--ds-surface);
     font-weight: 800;
     text-transform: uppercase;
@@ -362,7 +374,7 @@ select option {
     color: var(--ds-gold-dim);
 }
 
-.table tbody td {
+.ds-root .table tbody td {
     border-bottom: 1px solid rgba(61, 45, 107, 0.5);
     font-weight: 600;
     padding: 10px 12px;
@@ -370,33 +382,33 @@ select option {
     font-size: 0.9rem;
 }
 
-.table tbody tr:last-child td {
+.ds-root .table tbody tr:last-child td {
     border-bottom: none;
 }
 
-.table tbody tr:hover {
+.ds-root .table tbody tr:hover {
     background: rgba(168, 85, 247, 0.06);
 }
 
-.table-responsive {
+.ds-root .table-responsive {
     border-radius: 10px;
     overflow: visible;
 }
 
 /* ── Nat highlight colors ── */
-.nat-twenty {
+.ds-root .nat-twenty {
     color: var(--ds-gold);
     font-weight: 700;
     text-shadow: 0 0 8px rgba(232, 184, 73, 0.3);
 }
 
-.nat-one {
+.ds-root .nat-one {
     color: var(--ds-danger);
     font-weight: 700;
 }
 
 /* ── Right Column ── */
-.right-column {
+.ds-root .right-column {
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -404,13 +416,13 @@ select option {
 }
 
 /* ── Player Rolls ── */
-.player-rolls-list {
+.ds-root .player-rolls-list {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-.player-roll-row {
+.ds-root .player-roll-row {
     cursor: pointer;
     border: 3px solid var(--ds-border-hard);
     border-radius: 8px;
@@ -421,19 +433,19 @@ select option {
     transition: transform 0.1s, box-shadow 0.1s;
 }
 
-.player-roll-row:hover {
+.ds-root .player-roll-row:hover {
     transform: translate(-2px, -2px);
     box-shadow: 6px 6px 0px var(--ds-shadow);
 }
 
-.player-roll-summary {
+.ds-root .player-roll-summary {
     display: flex;
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
 }
 
-.player-roll-name {
+.ds-root .player-roll-name {
     font-weight: 800;
     font-size: 1.05rem;
     color: var(--ds-gold);
@@ -441,7 +453,7 @@ select option {
     min-width: 80px;
 }
 
-.player-roll-result {
+.ds-root .player-roll-result {
     font-family: var(--font-mono);
     font-weight: 600;
     font-size: 0.95rem;
@@ -449,19 +461,19 @@ select option {
     color: var(--ds-text);
 }
 
-.player-roll-time {
+.ds-root .player-roll-time {
     font-size: 0.8rem;
     color: var(--ds-text-muted);
 }
 
-.player-roll-empty {
+.ds-root .player-roll-empty {
     font-style: italic;
     color: var(--ds-text-muted);
     flex: 1;
     font-size: 0.9rem;
 }
 
-.player-roll-toggle {
+.ds-root .player-roll-toggle {
     margin-left: auto;
     font-weight: 800;
     font-size: 0.9rem;
@@ -469,23 +481,23 @@ select option {
 }
 
 /* ── Roll History (slide wrapper) ── */
-.player-roll-history-wrapper {
+.ds-root .player-roll-history-wrapper {
     display: grid;
     grid-template-rows: 0fr;
     transition: grid-template-rows 0.3s ease;
     overflow: hidden;
 }
 
-.player-roll-history-wrapper.expanded {
+.ds-root .player-roll-history-wrapper.expanded {
     grid-template-rows: 1fr;
 }
 
-.player-roll-history-wrapper > .player-roll-history {
+.ds-root .player-roll-history-wrapper > .player-roll-history {
     min-height: 0;
     overflow: hidden;
 }
 
-.player-roll-history-wrapper.expanded > .player-roll-history {
+.ds-root .player-roll-history-wrapper.expanded > .player-roll-history {
     max-height: 300px;
     overflow-y: auto;
     margin-bottom: 8px;
@@ -494,13 +506,13 @@ select option {
     scrollbar-color: var(--ds-accent) var(--ds-surface);
 }
 
-.list {
+.ds-root .list {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-.list .list-group-item {
+.ds-root .list .list-group-item {
     border: 2px solid var(--ds-border-hard);
     border-radius: 8px !important;
     padding: 8px 12px;
@@ -509,14 +521,14 @@ select option {
     color: var(--ds-text);
 }
 
-.list .list-group-item h6 {
+.ds-root .list .list-group-item h6 {
     font-weight: 800;
     font-size: 0.95rem;
     color: var(--ds-accent-hover);
     text-transform: uppercase;
 }
 
-.list .list-group-item p {
+.ds-root .list .list-group-item p {
     font-family: var(--font-mono);
     font-size: 0.9rem;
     font-weight: 600;
@@ -524,14 +536,14 @@ select option {
     color: var(--ds-text-muted);
 }
 
-.list .list-group-item small {
+.ds-root .list .list-group-item small {
     font-weight: 500;
     color: var(--ds-text-muted);
     font-size: 0.8rem;
 }
 
 /* ── Player List (lobby) ── */
-.player-list {
+.ds-root .player-list {
     list-style: none;
     padding: 0;
     display: flex;
@@ -539,7 +551,7 @@ select option {
     gap: 12px;
 }
 
-.player-list button {
+.ds-root .player-list button {
     background: var(--ds-accent);
     color: #fff;
     padding: 10px 20px;
@@ -552,44 +564,39 @@ select option {
     transition: transform 0.1s, box-shadow 0.1s;
 }
 
-.player-list button:hover {
+.ds-root .player-list button:hover {
     transform: translate(-2px, -2px);
     box-shadow: 6px 6px 0px var(--ds-shadow);
 }
 
-.player-list button:active {
+.ds-root .player-list button:active {
     transform: translate(2px, 2px);
     box-shadow: 2px 2px 0px var(--ds-shadow);
 }
 
-.start-btn {
+.ds-root .start-btn {
     font-size: 1.35rem !important;
     padding: 12px 24px !important;
     letter-spacing: 2px;
 }
 
 /* ── Utility ── */
-.flex-1 {
+.ds-root .flex-1 {
     flex: 1;
 }
 
-.row > .col-md-4,
-.row > .col-md-8 {
-    padding-top: 1rem;
-}
-
-.export-btn {
+.ds-root .export-btn {
     font-size: 0.8rem !important;
     padding: 6px 12px !important;
 }
 
 /* ── Mobile: hide less important columns ── */
-.ds-hide-sm {
+.ds-root .ds-hide-sm {
     display: table-cell;
 }
 
 @media (max-width: 768px) {
-    .ds-hide-sm {
+    .ds-root .ds-hide-sm {
         display: none;
     }
 }
@@ -601,16 +608,191 @@ select option {
     100% { transform: scale(1); box-shadow: 4px 4px 0px var(--ds-shadow); }
 }
 
-.dice-options .btn-primary {
+.ds-root .dice-options .btn-primary {
     animation: ds-dice-pop 0.25s ease;
 }
 
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
+    .ds-root *,
+    .ds-root *::before,
+    .ds-root *::after {
         animation-duration: 0.01ms !important;
         transition-duration: 0.01ms !important;
+    }
+}
+
+/* ── Custom header (rendered as a sibling above .ds-root) ── */
+.ds-header-container {
+    --ds-bg: #110e1f;
+    --ds-gold: #e8b849;
+    --ds-accent: #a855f7;
+    --ds-text: #ede4d3;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    height: 64px;
+    /* The header sits in the article's flex column (alongside the growing game
+       content). Without this it shrinks toward 0 as the roll list grows, instead of
+       keeping its height and letting the article scroll. */
+    flex-shrink: 0;
+    background: var(--ds-bg);
+    border-bottom: 2px solid rgba(168, 85, 247, 0.3);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.7), 0 0 15px rgba(168, 85, 247, 0.15);
+    position: relative;
+    overflow: hidden;
+    z-index: 1000;
+}
+
+.ds-header-bg-glow {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% -20%, rgba(168, 85, 247, 0.2) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.ds-header-stars {
+    position: absolute;
+    inset: 0;
+    background-image:
+        radial-gradient(1px 1px at 10% 30%, rgba(232, 184, 73, 0.4), transparent),
+        radial-gradient(1px 1px at 85% 20%, rgba(168, 85, 247, 0.4), transparent),
+        radial-gradient(1px 1px at 50% 80%, rgba(232, 184, 73, 0.3), transparent);
+    pointer-events: none;
+}
+
+.ds-header-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
+}
+
+.ds-header-d20 {
+    width: 32px;
+    height: 32px;
+    position: relative;
+}
+
+.ds-header-d20-shape {
+    width: 100%;
+    height: 100%;
+    clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+    background: linear-gradient(150deg, #f5e6c4 0%, #e8b849 45%, #c49a30 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+}
+
+.ds-header-d20-num {
+    font-size: 0.8rem;
+    font-weight: 900;
+    color: #110e1f;
+    font-family: var(--font-mono);
+}
+
+.ds-header-text {
+    font-size: 1.1rem;
+    font-weight: 900;
+    color: var(--ds-gold);
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px rgba(232, 184, 73, 0.3);
+}
+
+.ds-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+    z-index: 2;
+}
+
+/* The button frame. Prefixed with .ds-header-actions so it out-specifies the
+   RoomCodeButton's scoped `a` reset (element+attr), which otherwise wins on
+   background/border/padding. display:inline-grid + place-items:center come from
+   that scoped reset, giving the cover/value overlay below a single shared cell. */
+.ds-header-actions .ds-header-code {
+    background: rgba(168, 85, 247, 0.05);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    border-radius: 4px;
+    padding: 6px 16px;
+    color: var(--ds-text);
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 130px;
+}
+
+.ds-header-actions .ds-header-code:hover {
+    background: rgba(168, 85, 247, 0.1);
+    border-color: var(--ds-accent);
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.2);
+}
+
+/* Cover ("ROOM CODE") and value (the code) overlap in the same grid cell; the
+   reveal toggles their opacity. */
+.ds-header-actions .ds-header-code-cover,
+.ds-header-actions .ds-header-code-value {
+    grid-area: 1 / 1;
+    transition: opacity 0.2s ease;
+}
+
+.ds-header-actions .ds-header-code-cover {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--ds-accent);
+    text-transform: uppercase;
+}
+
+.ds-header-actions .ds-header-code-value {
+    opacity: 0;
+    pointer-events: none;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: var(--ds-gold);
+    font-family: var(--font-mono);
+}
+
+.ds-header-actions .ds-header-code.revealed .ds-header-code-cover {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.ds-header-actions .ds-header-code.revealed .ds-header-code-value {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.ds-header-leave {
+    background: rgba(231, 76, 60, 0.1);
+    border: 1.5px solid #e74c3c;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e74c3c;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ds-header-leave:hover {
+    background: #e74c3c;
+    color: #fff;
+    box-shadow: 0 0 15px rgba(231, 76, 60, 0.4);
+    transform: rotate(15deg) scale(1.1);
+}
+
+@media (max-width: 600px) {
+    .ds-header-text {
+        display: none;
     }
 }

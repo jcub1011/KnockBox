@@ -18,7 +18,7 @@ public static class WasmRouteTable
     /// Base-relative path prefixes served as WASM pages (no leading slash, matching
     /// <c>NavigationManager.ToBaseRelativePath</c> output). Compared case-insensitively.
     /// </summary>
-    private static readonly string[] Prefixes = ["spike/wasm", "shell"];
+    private static readonly string[] Prefixes = ["spike/wasm", "shell", "room/dice-simulator"];
 
     /// <summary>
     /// Returns whether <paramref name="baseRelativePath"/> (e.g. the result of

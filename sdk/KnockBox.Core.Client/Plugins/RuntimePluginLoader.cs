@@ -36,7 +36,18 @@ public sealed class RuntimePluginLoader(HttpClient http, ILogger<RuntimePluginLo
             if (manifest is null)
                 return GameRootLoadResult.Failure($"No client manifest at [{manifestUri}].");
 
-            var assembly = await LoadAssemblyAsync(routeIdentifier, manifest, ct);
+            // Load dependency assemblies (e.g. the game's {Game}.Contracts DLL) into
+            // the default ALC BEFORE the entry assembly, so the entry's references
+            // resolve against already-loaded assemblies. The browser has one load
+            // context, so this is just sequential LoadFromStream calls.
+            foreach (var dep in manifest.Dependencies ?? [])
+            {
+                var depAssembly = await LoadAssemblyAsync(routeIdentifier, dep.Name, dep.Sha256, ct);
+                if (depAssembly is null)
+                    return GameRootLoadResult.Failure($"Failed to load client dependency [{dep.Name}].");
+            }
+
+            var assembly = await LoadAssemblyAsync(routeIdentifier, manifest.EntryAssembly, manifest.Sha256, ct);
             if (assembly is null)
                 return GameRootLoadResult.Failure($"Failed to load client assembly [{manifest.EntryAssembly}].");
 
@@ -97,28 +108,28 @@ public sealed class RuntimePluginLoader(HttpClient http, ILogger<RuntimePluginLo
     }
 
     private async Task<Assembly?> LoadAssemblyAsync(
-        string routeIdentifier, ClientPluginManifest manifest, CancellationToken ct)
+        string routeIdentifier, string assemblyName, string expectedSha256, CancellationToken ct)
     {
-        if (_loaded.TryGetValue(manifest.EntryAssembly, out var cached))
+        if (_loaded.TryGetValue(assemblyName, out var cached))
             return cached;
 
-        var dllUri = $"_plugins/{routeIdentifier}/client/{manifest.EntryAssembly}.dll";
+        var dllUri = $"_plugins/{routeIdentifier}/client/{assemblyName}.dll";
         var bytes = await http.GetByteArrayAsync(dllUri, ct);
 
         // Integrity gate: verify the downloaded bytes against the server-declared
         // hash BEFORE handing arbitrary IL to the runtime. Runtime-streamed plugin
         // DLLs don't get the framework's automatic SRI, so we restore it here.
         var actual = Convert.ToHexString(SHA256.HashData(bytes));
-        if (!string.Equals(actual, manifest.Sha256, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(actual, expectedSha256, StringComparison.OrdinalIgnoreCase))
         {
             logger.LogError(
                 "Integrity check failed for [{Assembly}]: expected {Expected}, got {Actual}.",
-                manifest.EntryAssembly, manifest.Sha256, actual);
+                assemblyName, expectedSha256, actual);
             return null;
         }
 
         using var stream = new MemoryStream(bytes, writable: false);
         var assembly = AssemblyLoadContext.Default.LoadFromStream(stream);
-        return _loaded.GetOrAdd(manifest.EntryAssembly, assembly);
+        return _loaded.GetOrAdd(assemblyName, assembly);
     }
 }

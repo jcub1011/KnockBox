@@ -102,6 +102,24 @@ public sealed class GameViewCoordinator(
         }
     }
 
+    /// <summary>
+    /// Notifies every connection in a lobby that it has closed, so their clients can
+    /// leave. Call <b>before</b> disposing the state, while connections are still in
+    /// the group. Best-effort: a send failure is logged, not thrown.
+    /// </summary>
+    public async Task NotifyLobbyClosedAsync(string lobbyUri, string routeIdentifier)
+    {
+        try
+        {
+            await hubContext.Clients.Group(lobbyUri)
+                .ReceiveEvent(routeIdentifier, GameClientEvents.LobbyClosed, "");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to notify lobby [{Uri}] of closure.", lobbyUri);
+        }
+    }
+
     /// <summary>Disposes a lobby's subscription once its last connection has left.</summary>
     public void RemoveSubscription(string lobbyUri)
     {

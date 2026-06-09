@@ -8,5 +8,10 @@
   "capabilities": [],
   "backgroundColor": "#110e1f",
   "fontColor": "#ede4d3",
-  "tileAsset": "tile.svg"
+  "tileAsset": "tile.svg",
+  "clientAssembly": "KnockBox.DiceSimulator.Client",
+  "clientContracts": ["KnockBox.DiceSimulator.Contracts"],
+  "clientAssets": [
+    { "name": "KnockBox.DiceSimulator.Client", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+  ]
 }

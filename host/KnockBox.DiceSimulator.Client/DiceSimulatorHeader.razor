@@ -1,0 +1,60 @@
+@inject NavigationManager Nav
+@*
+    The game's custom header. The original server header used server-only services
+    (INavigationService, IGameSessionService) and the server RoomCodeButton, which a
+    .Client assembly may not reference (KB1005). This WASM-safe version uses
+    NavigationManager to leave and the WASM RoomCodeButton (KnockBox.Core.Client) for
+    full room-code parity: reveal-on-click, double-click overlay, copy code/link,
+    long-press, middle-click join.
+*@
+
+<div class="ds-header-container">
+    <div class="ds-header-bg-glow" aria-hidden="true"></div>
+    <div class="ds-header-stars" aria-hidden="true"></div>
+
+    <div class="ds-header-brand" role="button" tabindex="0" @onclick="Leave" title="Return home">
+        <div class="ds-header-d20">
+            <div class="ds-header-d20-shape">
+                <span class="ds-header-d20-num">20</span>
+            </div>
+        </div>
+        <span class="ds-header-text">DICE SIMULATOR</span>
+    </div>
+
+    <div class="ds-header-actions">
+        <RoomCodeButton Code="@(Code ?? string.Empty)"
+                        JoinUrl="@JoinUrl"
+                        ClassName="ds-header-code"
+                        CoverClassName="ds-header-code-cover"
+                        ValueClassName="ds-header-code-value"
+                        CoverText="Room Code" />
+        <button class="ds-header-leave" @onclick="Leave" title="Leave Session" aria-label="Leave Session">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        </button>
+    </div>
+</div>
+
+@code {
+    /// <summary>The short, shareable lobby code (resolved from the hub by GameRoot).</summary>
+    [Parameter] public string? Code { get; set; }
+
+    /// <summary>
+    /// Invoked when the player leaves (brand or leave button). GameRoot wires this to
+    /// the base LeaveAsync, which tells the hub (closing the lobby if host) then
+    /// navigates home. Falls back to a plain navigation if no handler is supplied.
+    /// </summary>
+    [Parameter] public EventCallback OnLeave { get; set; }
+
+    // A join link another player can open: lands on home with the join code, which
+    // routes WASM games on to the room. "#" until the code resolves.
+    private string JoinUrl =>
+        string.IsNullOrEmpty(Code) ? "#" : $"{Nav.BaseUri}?join={Uri.EscapeDataString(Code)}";
+
+    private async Task Leave()
+    {
+        if (OnLeave.HasDelegate)
+            await OnLeave.InvokeAsync();
+        else
+            Nav.NavigateTo("/", forceLoad: true);
+    }
+}

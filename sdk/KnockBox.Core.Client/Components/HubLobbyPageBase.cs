@@ -21,12 +21,14 @@ public abstract class HubLobbyPageBase<TView> : DisposableComponent, IAsyncDispo
     private readonly IProjectionDeserializer<TView> _deserializer;
     private HubConnection? _hub;
     private IDisposable? _receiveViewRegistration;
+    private IDisposable? _receiveEventRegistration;
     private long _lastVersion = -1;
     private ILogger? _logger;
 
     [Inject] protected GameHubConnectionFactory ConnectionFactory { get; set; } = default!;
     [Inject] protected IClientSessionTokenProvider TokenProvider { get; set; } = default!;
     [Inject] protected ILoggerFactory LoggerFactory { get; set; } = default!;
+    [Inject] protected NavigationManager Navigation { get; set; } = default!;
 
     /// <summary>Route segment of the game (matches the server plugin's RouteIdentifier).</summary>
     protected abstract string RouteIdentifier { get; }
@@ -39,6 +41,12 @@ public abstract class HubLobbyPageBase<TView> : DisposableComponent, IAsyncDispo
 
     /// <summary>The latest projected view, or <see langword="default"/> before the first projection.</summary>
     protected TView? View { get; private set; }
+
+    /// <summary>
+    /// The short, shareable lobby code (the human code typed on the home join box),
+    /// fetched from the hub after joining. <see langword="null"/> until resolved.
+    /// </summary>
+    protected string? LobbyCode { get; private set; }
 
     /// <summary>The live hub connection. Throws if accessed before initialization.</summary>
     protected HubConnection Hub =>
@@ -57,6 +65,8 @@ public abstract class HubLobbyPageBase<TView> : DisposableComponent, IAsyncDispo
         _hub = ConnectionFactory.Create(token, DisplayName);
         _receiveViewRegistration = _hub.On<string, long, string>(
             nameof(IGameClient.ReceiveView), OnReceiveViewAsync);
+        _receiveEventRegistration = _hub.On<string, string, string>(
+            nameof(IGameClient.ReceiveEvent), OnReceiveEventAsync);
 
         await _hub.StartAsync(ComponentDetached);
         await OnHubConnectedAsync();
@@ -73,13 +83,39 @@ public abstract class HubLobbyPageBase<TView> : DisposableComponent, IAsyncDispo
     {
         var error = await Hub.InvokeAsync<string?>("JoinRoom", LobbyUri, ComponentDetached);
         if (error is not null)
+        {
             await OnJoinFailedAsync(error);
+            return;
+        }
+
+        // Resolve the shareable short code so the game UI can show/copy it.
+        LobbyCode = await Hub.InvokeAsync<string?>("GetLobbyCode", LobbyUri, ComponentDetached);
     }
 
     /// <summary>Submits a typed command to the server engine for this lobby.</summary>
     protected Task<string?> SubmitCommandAsync(
         string command, string? payloadJson = null)
         => Hub.InvokeAsync<string?>("SubmitCommand", LobbyUri, command, payloadJson, ComponentDetached);
+
+    /// <summary>
+    /// Leaves the lobby and navigates home. Tells the server first (so a leaving host
+    /// closes the lobby immediately instead of waiting out the grace timer), then
+    /// navigates regardless of whether that call succeeds.
+    /// </summary>
+    protected async Task LeaveAsync()
+    {
+        try
+        {
+            if (_hub is not null)
+                await _hub.InvokeAsync("LeaveRoom", LobbyUri, ComponentDetached);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(ex, "LeaveRoom call failed; navigating home anyway.");
+        }
+
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
 
     private async Task OnReceiveViewAsync(string routeIdentifier, long version, string payloadJson)
     {
@@ -107,6 +143,31 @@ public abstract class HubLobbyPageBase<TView> : DisposableComponent, IAsyncDispo
         await InvokeAsync(StateHasChanged);
     }
 
+    private async Task OnReceiveEventAsync(string routeIdentifier, string eventName, string payloadJson)
+    {
+        // Ignore events for other games sharing the connection.
+        if (!string.Equals(routeIdentifier, RouteIdentifier, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (string.Equals(eventName, GameClientEvents.LobbyClosed, StringComparison.Ordinal))
+            await OnLobbyClosedAsync();
+        else
+            await OnEventReceivedAsync(eventName, payloadJson);
+    }
+
+    /// <summary>
+    /// Fired when the server closes the lobby (e.g. the host left). Default leaves
+    /// the room by navigating home; override to customise (e.g. show a message first).
+    /// </summary>
+    protected virtual Task OnLobbyClosedAsync()
+    {
+        Navigation.NavigateTo("/", forceLoad: true);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Hook fired for a one-shot server event other than lobby-closed.</summary>
+    protected virtual Task OnEventReceivedAsync(string eventName, string payloadJson) => Task.CompletedTask;
+
     /// <summary>Hook fired after a new projection is applied to <see cref="View"/>.</summary>
     protected virtual Task OnViewReceivedAsync(TView? view) => Task.CompletedTask;
 
@@ -116,6 +177,7 @@ public abstract class HubLobbyPageBase<TView> : DisposableComponent, IAsyncDispo
     public async ValueTask DisposeAsync()
     {
         _receiveViewRegistration?.Dispose();
+        _receiveEventRegistration?.Dispose();
         if (_hub is not null)
             await _hub.DisposeAsync();
 
