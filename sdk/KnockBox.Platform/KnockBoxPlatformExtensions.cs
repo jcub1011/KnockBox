@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.Loader;
 using KnockBox.Core.Plugins;
@@ -17,6 +18,7 @@ using KnockBox.Services.Registrations.Validators;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -91,6 +93,31 @@ public static class KnockBoxPlatformExtensions
         // protocol, faster to (de)serialize. Transparent to handlers and to
         // StateChangedEventManager subscribers.
         builder.Services.AddSignalR().AddMessagePackProtocol();
+
+        // Compress the runtime-streamed plugin client DLLs — a migrated game's UI +
+        // contracts assemblies download on room entry, and IL compresses ~60% with Brotli.
+        // The browser's fetch decompresses transparently, so RuntimePluginLoader is unchanged.
+        // SCOPE (MimeTypes set, not appended): the streamed-DLL endpoint
+        // (application/octet-stream) + dynamic JSON (/api/games, client manifests). Excluded on
+        // purpose: the Blazor framework AND the plugin RCL static assets (css/js under
+        // /_content/*) are served by MapStaticAssets, which serves its OWN build-time
+        // precompressed (br/gz) variants on publish — listing them here would just race that.
+        // text/html is excluded so authenticated SSR responses are never compressed (BREACH-safe).
+        builder.Services.AddResponseCompression(o =>
+        {
+            o.EnableForHttps = true; // off by default; these assets carry no secrets
+            o.Providers.Add<BrotliCompressionProvider>();
+            o.Providers.Add<GzipCompressionProvider>();
+            o.MimeTypes =
+            [
+                "application/octet-stream",   // streamed plugin client/contracts DLLs (Results.Bytes)
+                "application/json",           // /api/games + client manifests (public)
+            ];
+        });
+        // Fastest level: Brotli-Optimal is far too slow per request, and these assets are
+        // immutable per build + browser-cached after first load, so size-per-CPU favors Fastest.
+        builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+        builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
 
         builder.Services.AddRazorComponents()
             .AddInteractiveWebAssemblyComponents()
@@ -288,6 +315,11 @@ public static class KnockBoxPlatformExtensions
     {
         app.UseSerilogRequestLogging();
 
+        // Must run upstream of the static-file + plugin-asset serving (MapStaticAssets,
+        // the plugin UseStaticFiles mounts, and the /_plugins/.../client/*.dll endpoint),
+        // which all run later (this method is invoked before MapKnockBoxPlatformEndpoints).
+        app.UseResponseCompression();
+
         if (!app.Environment.IsDevelopment())
         {
             app.UseExceptionHandler("/Error");
@@ -421,6 +453,9 @@ public static class KnockBoxPlatformExtensions
         app.MapGet("/_plugins/{routeIdentifier}/client/{assembly}.dll",
             (string routeIdentifier, string assembly, Plugins.IPluginClientAssetService assets) =>
             {
+                // UseResponseCompression Brotli-compresses this application/octet-stream IL
+                // (~60%) before it reaches the browser; the browser's fetch decompresses
+                // transparently, so RuntimePluginLoader sees the original bytes.
                 return assets.TryGetAssemblyPath(routeIdentifier, assembly, out var path)
                     ? Results.File(path, "application/octet-stream")
                     : Results.NotFound();
