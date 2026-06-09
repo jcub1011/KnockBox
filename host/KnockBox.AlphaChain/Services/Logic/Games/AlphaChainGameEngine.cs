@@ -202,18 +202,29 @@ namespace KnockBox.AlphaChain.Services.Logic.Games
 
             var bench = new AlphaChainBenchScenario(rng, evaluator, modifierFactory, logger, stateLogger);
             await bench.ResetAsync(AlphaChainBenchScenario.MinPlayers);
-            state.Bench = bench;
-            // Close the lobby so no one can join while the god-mode bench is active; the Execute also
-            // fans out the IsBench=true projection.
-            return state.Execute(() => state.SetJoinable(false));
+            // Assign Bench inside the lock alongside SetJoinable so the field mutation can't race a
+            // concurrent WithExclusiveRead projection; the Execute also fans out the IsBench=true projection.
+            return state.Execute(() =>
+            {
+                state.Bench = bench;
+                state.SetJoinable(false);
+            });
         }
 
         private Result BenchExit(User caller, AlphaChainGameState state)
         {
             if (caller.Id != state.Host.Id) return Result.FromError("Only the host can close the Testing Bay.");
-            state.Bench?.Dispose();
-            state.Bench = null;
-            return state.Execute(() => state.SetJoinable(true));
+            // Null the field inside the lock and dispose the captured reference after releasing it, so a
+            // concurrent projection never observes a disposed bench (and Dispose stays off the lock).
+            AlphaChainBenchScenario? old = null;
+            var result = state.Execute(() =>
+            {
+                old = state.Bench;
+                state.Bench = null;
+                state.SetJoinable(true);
+            });
+            old?.Dispose();
+            return result;
         }
 
         private async Task<Result> BenchResetFromPayload(User caller, AlphaChainGameState state, string? payloadJson)

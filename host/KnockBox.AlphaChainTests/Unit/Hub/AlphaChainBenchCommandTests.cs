@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using KnockBox.AlphaChain.Pages.Bench;
 using KnockBox.AlphaChain.Services.Logic.Games;
 using KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library;
 using KnockBox.AlphaChain.Services.Logic.Games.Evaluation;
@@ -148,6 +149,62 @@ namespace KnockBox.AlphaChain.Tests.Unit.Hub
             CollectionAssert.AreEqual(
                 new[] { ModifierId.Vanilla, ModifierId.Speedracer },
                 bay.Select(c => c.Id).ToArray());
+        }
+
+        [TestMethod]
+        public async Task BenchReset_WithNewPlayerCount_ReprojectsThatManyPlayers()
+        {
+            using var state = await HostAloneAsync();
+            await Hub.HandleCommandAsync(_host, state, AlphaChainCommands.BenchEnter, null);
+            Assert.HasCount(AlphaChainBenchScenario.MinPlayers, Project(state, _host.Id).Players);
+
+            var result = await Hub.HandleCommandAsync(_host, state, AlphaChainCommands.BenchReset,
+                Json(new BenchResetPayload(4)));
+
+            Assert.IsTrue(result.IsSuccess);
+            Assert.HasCount(4, Project(state, _host.Id).Players);
+        }
+
+        [TestMethod]
+        public async Task BenchSetBan_ThenProject_SurfacesUpperCasedBannedLetter()
+        {
+            using var state = await HostAloneAsync();
+            await Hub.HandleCommandAsync(_host, state, AlphaChainCommands.BenchEnter, null);
+
+            var result = await Hub.HandleCommandAsync(_host, state, AlphaChainCommands.BenchSetBan,
+                Json(new BenchBanPayload("z")));
+
+            Assert.IsTrue(result.IsSuccess);
+            // The projector upper-cases the (lower-case) stored ban for display.
+            Assert.AreEqual("Z", Project(state, _host.Id).BannedLetter);
+        }
+
+        [TestMethod]
+        public async Task BenchSetScore_ThenProject_ReflectsTheScore()
+        {
+            using var state = await HostAloneAsync();
+            await Hub.HandleCommandAsync(_host, state, AlphaChainCommands.BenchEnter, null);
+            var target = Project(state, _host.Id).Players[0].UserId;
+
+            var result = await Hub.HandleCommandAsync(_host, state, AlphaChainCommands.BenchSetScore,
+                Json(new BenchScorePayload(target, 42)));
+
+            Assert.IsTrue(result.IsSuccess);
+            Assert.AreEqual(42, Project(state, _host.Id).Players.Single(p => p.UserId == target).Score);
+        }
+
+        [TestMethod]
+        public async Task BenchSkip_AdvancesTheActiveSeat()
+        {
+            using var state = await HostAloneAsync();
+            await Hub.HandleCommandAsync(_host, state, AlphaChainCommands.BenchEnter, null);
+            var before = Project(state, _host.Id).CurrentPlayerId;
+
+            var result = await Hub.HandleCommandAsync(_host, state, AlphaChainCommands.BenchSkip, null);
+
+            Assert.IsTrue(result.IsSuccess);
+            Assert.AreNotEqual(before, Project(state, _host.Id).CurrentPlayerId,
+                "Skipping hands the turn to the next seat without playing a word.");
         }
 
         [TestMethod]

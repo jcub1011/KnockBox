@@ -101,6 +101,48 @@ namespace KnockBox.AlphaChain.Tests.Unit.Hub
             Assert.AreEqual(30, Projector.View(state, _host.Id).Settings.ShotClockSeconds);
         }
 
+        // ── Host kicks a lobby player ──
+
+        [TestMethod]
+        public async Task KickPlayer_ByHost_RemovesThePlayerFromTheLobby()
+        {
+            using var state = await UnstartedAsync(2);
+            var target = state.Players[0].User.Id;
+
+            var result = await Hub.HandleCommandAsync(
+                FreshHost(), state, AlphaChainCommands.KickPlayer, Json(new TargetPayload(target)));
+
+            Assert.IsTrue(result.IsSuccess);
+            Assert.IsFalse(state.Players.Any(e => e.User.Id == target), "The kicked player leaves the lobby roster.");
+        }
+
+        [TestMethod]
+        public async Task KickPlayer_ByNonHost_IsRejected_AndPlayerStays()
+        {
+            using var state = await UnstartedAsync(2);
+            var target = state.Players[0].User.Id;
+            var stranger = UserFactory.Create("Stranger", Guid.NewGuid());
+
+            var result = await Hub.HandleCommandAsync(
+                stranger, state, AlphaChainCommands.KickPlayer, Json(new TargetPayload(target)));
+
+            Assert.IsTrue(result.IsFailure, "Only the host may kick.");
+            Assert.IsTrue(state.Players.Any(e => e.User.Id == target));
+        }
+
+        [TestMethod]
+        public async Task KickPlayer_UnknownTarget_ReturnsNotInLobby()
+        {
+            using var state = await UnstartedAsync(2);
+
+            var result = await Hub.HandleCommandAsync(
+                FreshHost(), state, AlphaChainCommands.KickPlayer, Json(new TargetPayload(Guid.NewGuid())));
+
+            Assert.IsTrue(result.IsFailure);
+            Assert.IsTrue(result.TryGetFailure(out var error));
+            Assert.AreEqual("Player is not in this lobby.", error.PublicMessage);
+        }
+
         // ── In-round commands + projection reflects the mutation ──
 
         [TestMethod]
