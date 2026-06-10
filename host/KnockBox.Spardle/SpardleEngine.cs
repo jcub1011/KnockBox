@@ -1,10 +1,15 @@
 using System.Collections.Immutable;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Games.Shared.Projection;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.Spardle.Contracts;
 using KnockBox.Spardle.Models;
+using KnockBox.Spardle.Services.Projection;
 using KnockBox.WordService.Contracts;
 using Microsoft.Extensions.Logging;
 
@@ -13,9 +18,164 @@ namespace KnockBox.Spardle;
 public class SpardleEngine(
     IWordListService wordListService,
     IRandomNumberService rng,
-    ILoggerFactory loggerFactory) : AbstractGameEngine<SpardleState>(1, 20)
+    ILoggerFactory loggerFactory)
+    : AbstractGameEngine<SpardleState>(1, 20),
+      IGameStateProjector, IGameCommandHandler, IGameUploadHandler
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger<SpardleEngine>();
+
+    // Per-recipient projector + the wire-command JSON options (string enums +
+    // case-insensitive so the browser's source-gen JSON parses on the server). The
+    // hub resolves all three interfaces off this keyed engine instance; per-room
+    // data lives on SpardleState, so the projector is stateless and shared.
+    // Min/max mirror the base ctor's (1, 20).
+    private readonly SpardleStateProjector _projector = new(1, 20);
+
+    private static readonly JsonSerializerOptions CommandJsonOptions = new()
+    {
+        Converters = { new JsonStringEnumConverter() },
+        PropertyNameCaseInsensitive = true,
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Hub surface (WASM tri-split): per-recipient projection, command dispatch,
+    // and file upload. The Razor UI moved to KnockBox.Spardle.Client; these adapt
+    // the existing engine methods to what the hub/upload endpoint deliver. Lobby
+    // creation flows through GameHub.CreateRoom → CreateStateAsync (not a command).
+    // The FSM still advances on the engine's own ScheduleCallback timers (no
+    // IServerTickHandler needed); every ExecuteAsync re-projects via the
+    // GameViewCoordinator subscription.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// <inheritdoc />
+    public object? ProjectFor(AbstractGameState state, Guid recipientId)
+        => ((IGameStateProjector)_projector).ProjectFor(state, recipientId);
+
+    /// <inheritdoc />
+    public async ValueTask<Result> HandleCommandAsync(
+        User caller, AbstractGameState state, string command, string? payloadJson, CancellationToken ct = default)
+    {
+        if (state is not SpardleState s)
+            return Result.FromError("Invalid game state for Spardle.");
+
+        return command switch
+        {
+            SpardleCommands.Start          => await StartFromPayload(caller, s, payloadJson, ct),
+            SpardleCommands.SubmitGuess    => SubmitGuessFromPayload(caller, s, payloadJson),
+            SpardleCommands.GiveUp         => GiveUp(s, caller),
+            SpardleCommands.UpdateSettings => UpdateSettingsFromPayload(caller, s, payloadJson),
+            SpardleCommands.ReturnToLobby  => ReturnToLobby(caller, s),
+            SpardleCommands.KickPlayer     => KickFromPayload(caller, s, payloadJson),
+            _ => Result.FromError($"Unknown command [{command}].")
+        };
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<Result> HandleUploadAsync(
+        User caller, AbstractGameState state, string uploadKind, string fileName, Stream content, CancellationToken ct = default)
+    {
+        if (state is not SpardleState s)
+            return Result.FromError("Invalid game state for Spardle.");
+        if (uploadKind != SpardleCommands.WordPoolUploadKind)
+            return Result.FromError($"Unknown upload kind [{uploadKind}].");
+        // Compare by id, never by reference: the endpoint resolves a fresh User.
+        if (caller.Id != s.Host.Id)
+            return Result.FromError("Only the host can upload a word pool.");
+        if (!s.IsJoinable)
+            return Result.FromError("The word pool can only be set from the lobby.");
+
+        var words = await ParseWordPoolAsync(content, ct);
+        if (words.Count == 0)
+            return Result.FromError("No valid words found in the uploaded file.");
+
+        var apply = s.Execute(() => s.CustomWordPool = words);
+        if (apply.TryGetFailure(out var err))
+            return Result.FromError(err);
+        return Result.Success;
+    }
+
+    // The lobby's one start-time choice (host-plays-along) is carried in the payload
+    // because the WASM client can't mutate state. Applied here via UpdateSettings (so
+    // StartAsyncCore reads it when fixing HostIsParticipant) before delegating to
+    // StartAsync, which itself rejects a non-host caller.
+    private async Task<Result> StartFromPayload(User caller, SpardleState state, string? payloadJson, CancellationToken ct)
+    {
+        var p = Deserialize<StartPayload>(payloadJson) ?? new StartPayload(false);
+
+        if (caller.Id == state.Host.Id
+            && state.UpdateSettings(s => s with { HostPlaysAlong = p.HostPlaysAlong }).TryGetFailure(out var settingsError))
+            return settingsError;
+
+        return await StartAsync(caller, state, ct);
+    }
+
+    private Result SubmitGuessFromPayload(User caller, SpardleState state, string? payloadJson)
+    {
+        if (Deserialize<SubmitGuessPayload>(payloadJson) is not { } p)
+            return Result.FromError("Malformed submit-guess payload.");
+        return SubmitGuess(state, caller, p.Word ?? "");
+    }
+
+    private Result UpdateSettingsFromPayload(User caller, SpardleState state, string? payloadJson)
+    {
+        if (caller.Id != state.Host.Id)
+            return Result.FromError("Only the host can change the settings.");
+        if (Deserialize<SpardleSettingsView>(payloadJson) is not { } view)
+            return Result.FromError("Malformed settings payload.");
+
+        var result = state.UpdateSettings(cfg => cfg.Apply(view));
+
+        // Switching to a library-backed source clears any leftover custom pool: GenerateRoundQueue
+        // prefers a non-empty CustomWordPool regardless of mode, so a stale pool would silently
+        // override NYT/FullDictionary. (The old lobby cleared it on the mode dropdown change.)
+        if (result.IsSuccess
+            && view.WordPoolMode is SpardleWordSource.NytStandard or SpardleWordSource.FullDictionary
+            && state.CustomWordPool.Count > 0)
+        {
+            state.Execute(() => state.CustomWordPool = ImmutableList<string>.Empty);
+        }
+
+        return result;
+    }
+
+    private Result KickFromPayload(User caller, SpardleState state, string? payloadJson)
+    {
+        if (Deserialize<KickPlayerPayload>(payloadJson) is not { } p)
+            return Result.FromError("Malformed kick payload.");
+        User? target = null;
+        foreach (var entry in state.RosterIncludingHost)
+            if (entry.User.Id == p.PlayerId) { target = entry.User; break; }
+        if (target is null)
+            return Result.FromError("That player is not in the lobby.");
+        return state.KickPlayer(caller, target);
+    }
+
+    private static T? Deserialize<T>(string? json)
+        => string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, CommandJsonOptions);
+
+    // Parses the uploaded word-pool file (comma- and/or newline-separated). Words are
+    // lowercased to match guess evaluation (guesses are lowercased before the pool
+    // lookup), de-duplicated preserving order, and bounded to 1–64 letters.
+    private static async Task<ImmutableList<string>> ParseWordPoolAsync(Stream content, CancellationToken ct)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var words = ImmutableList.CreateBuilder<string>();
+
+        using var reader = new StreamReader(content);
+        string? line;
+        while ((line = await reader.ReadLineAsync(ct)) is not null)
+        {
+            foreach (var raw in line.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            {
+                var w = raw.ToLowerInvariant();
+                if (w.Length is < 1 or > 64) continue;
+                if (!w.All(char.IsLetter)) continue;
+                if (seen.Add(w)) words.Add(w);
+            }
+        }
+
+        return words.ToImmutable();
+    }
 
     public override Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
     {

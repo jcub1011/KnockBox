@@ -210,6 +210,24 @@ The old scoped `.razor.css` does **not** ship: `StaticWebAssetsEnabled=false` pr
    <link rel="stylesheet" href="_content/KnockBox.{Game}/css/{game}.css" />
    ```
 
+> **Footgun — web fonts loaded via the server page's `<HeadContent>` silently fall back.** If the
+> old server page loaded fonts with `<HeadContent>` `<link>` tags (e.g. a Google Fonts stylesheet)
+> rather than an `@import` in its theme CSS, those tags do **not** come across — `<HeadContent>`
+> doesn't ship in the WASM component, so the game renders in a fallback font. Re-add the font
+> `<link>` (and any `preconnect` hints) in `GameRoot.razor` next to the CSS links — a body-placed
+> `<link rel="stylesheet">` is honored just like the stylesheet links:
+> ```razor
+> <link rel="preconnect" href="https://fonts.googleapis.com" />
+> <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+> <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=...&display=swap" />
+> ```
+> Alternatively `@import` the fonts at the **top** of the server theme CSS (LinkedList does this) so
+> they ride the theme stylesheet you already link. **Check which mechanism the server page used.**
+> Spardle hit this; it was build/test/publish-clean and only showed at runtime. No fix is needed for
+> a game that uses only the **global** `var(--font-display|primary|title|mono)` — those are defined in
+> `KnockBox.Platform/wwwroot/app.css` (which `@import`s them) and loaded on every route including WASM
+> ones, so DiceSimulator/CardCounter/AlphaChain inherit them for free.
+
 > **Footgun — header scroll/shrink behaviour.** WASM game UI renders its own header + content
 > directly inside `MainLayout`'s `<article>`, a `flex-direction:column` flex parent. Two rules
 > keep the header pinned in view (handled by shared infra + a per-game convention):
@@ -383,6 +401,51 @@ Then `dotnet run` and check at runtime (these catch the load/serve footguns that
 
 ---
 
+## 11. Accepting file uploads (optional)
+
+A migrated game's UI talks to `GameHub`, whose `MaximumReceiveMessageSize` caps a single
+message well below a real file, and a WASM component has no Blazor Server circuit (so
+`InputFile`→server streaming is unavailable). For files, use the platform's **generic upload
+endpoint** instead of the hub — it's shared, so you implement one method and never re-plumb
+auth, routing, or size handling.
+
+**Server — implement `IGameUploadHandler` on your engine** (in
+`sdk/KnockBox.Core/.../Engines/Shared/IGameUploadHandler.cs`):
+
+```csharp
+public ValueTask<Result> HandleUploadAsync(
+    User caller, AbstractGameState state, string uploadKind,
+    string fileName, Stream content, CancellationToken ct = default)
+{
+    if (uploadKind != "word-pool") return ...;          // your discriminator(s)
+    if (caller.Id != state.Host.Id) return ...;          // host-gate yourself (fresh User per request)
+    // read `content` incrementally, then mutate inside state.Execute(...) → triggers re-projection
+}
+```
+
+For several upload kinds keyed by an enum, derive from `GameUploadHandlerBase<TKind>` — it
+parses the wire string into your enum and dispatches to a typed overload (a single `string`
+kind on the wire, exactly like `IGameCommandHandler`'s `string command`).
+
+**Client — inject `PluginUploadClient`** (registered by `AddKnockBoxClient`) and stream the
+file from the browser:
+
+```csharp
+@inject PluginUploadClient Uploads
+// from an InputFile change handler:
+var error = await Uploads.UploadAsync(LobbyUri, "word-pool", file.Name,
+    file.OpenReadStream(maxBytes, ct), ct);   // null on success, else a message to surface
+```
+
+The platform endpoint (`POST /api/games/upload`) authenticates the caller from the signed
+session token (same identity the hub uses), resolves the room, enforces
+`KnockBoxPlatformOptions.MaxUploadBytes` (default 2 MB → `413`), and streams the body to your
+handler. Distinct from the raw `IGameEngineHttpHandler` (`/api/plugins/{route}/...`), which is
+unauthenticated and leaves body/size handling to you — reach for `IGameUploadHandler` whenever
+the request is "a host uploads a file."
+
+---
+
 ## Per-game checklist
 
 - [ ] `{Game}.Contracts` project: moved data types, view DTO (with `RecipientId`), command
@@ -393,7 +456,8 @@ Then `dotnet run` and check at runtime (these catch the load/serve footguns that
 - [ ] `{Game}.Client` project: csproj (`StaticWebAssetsEnabled=false`, `<ClientContractAssembly>`,
       import `Directory.Client.targets`), `_Imports`, `GameClientModule`, `GameRoot : HubLobbyPageBase<TView>`.
 - [ ] CSS de-scoped under a root class in server `wwwroot/css`, `<link>`ed from `GameRoot`;
-      header `flex-shrink:0`; JS as ES module.
+      header `flex-shrink:0`; JS as ES module; **fonts re-linked in `GameRoot`** if the server page
+      loaded them via `<HeadContent>` (custom fonts only — global `var(--font-*)` come free).
 - [ ] Custom header recreated (WASM-safe `RoomCodeButton`, `OnLeave="LeaveAsync"`, `Code="@LobbyCode"`).
 - [ ] `plugin.json` client fields; host csproj client `ProjectReference`; slnx entries.
 - [ ] `WasmRouteTable` prefix; `RuntimeGameLobby` serves the route.

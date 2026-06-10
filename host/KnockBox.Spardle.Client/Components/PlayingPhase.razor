@@ -1,0 +1,246 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@*
+    The competitor's playing screen. Owns the CLIENT-side current-guess buffer (no per-keystroke
+    round-trip), the physical-keyboard interop, and the transient guess-feedback toast/shake. Only a
+    confirmed guess (ENTER) hits the hub via Submit("submit-guess"). All board data comes from the
+    projected View.MyBoard / View.Rivals — never the secret word.
+*@
+<div class="spd-play" @key="View.CurrentRound">
+    <div class="spd-play-curtain" aria-hidden="true">
+        <span class="spd-display spd-play-curtain-text">SPAR!</span>
+    </div>
+
+    <header class="spd-play-top">
+        <div class="spd-play-round">
+            <span class="spd-play-round-label">ROUND</span>
+            <span class="spd-play-round-value spd-display">@View.CurrentRound</span>
+            <span class="spd-play-round-total">/ @View.TotalRounds</span>
+        </div>
+
+        <SpardleRoundTimer ExpiresAt="View.PhaseExpiresAtUtc" Duration="TimeSpan.FromSeconds(View.Settings.RoundTimerSeconds)" />
+
+        <div class="spd-play-top-actions">
+            @if (CanGiveUp)
+            {
+                <button type="button"
+                        class="spd-give-up-btn @(_giveUpArmed ? "spd-give-up-armed" : "")"
+                        @onclick="OnGiveUpClicked"
+                        title="@(_giveUpArmed ? "Tap again to confirm" : "End your round early")">
+                    @(_giveUpArmed ? "YOU SURE?" : "GIVE UP")
+                </button>
+            }
+
+            <button type="button"
+                    class="spd-play-hc-toggle @(HighContrast ? "spd-play-hc-on" : "")"
+                    @onclick="OnToggleContrast"
+                    title="Toggle high-contrast colours">
+                <span class="spd-play-hc-dot"></span>
+                <span>HC</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="spd-play-main">
+        <section class="spd-play-board">
+            <SpardleGrid Guesses="Board?.Guesses ?? []"
+                         WordLength="View.WordLength"
+                         MaxGuesses="View.MaxGuesses"
+                         CurrentGuess="@_currentGuess"
+                         InvalidGuess="_invalidGuess"
+                         HasFinished="Board?.HasFinishedRound ?? false"
+                         IsRoundActive="View.IsRoundActive" />
+
+            <SpardleKeyboard OnKeyPressed="HandleKey" Guesses="Board?.Guesses ?? []" />
+        </section>
+
+        <aside class="spd-play-leaderboard-slot">
+            <SpardleOpponentsPanel Rivals="View.Rivals" MyBoard="Board" WinCondition="View.Settings.WinCondition" />
+        </aside>
+    </main>
+
+    <SpardleToast Message="@_toastMessage" Tone="_toastTone" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SpardleView View { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+    [Parameter] public bool HighContrast { get; set; }
+    [Parameter] public EventCallback OnToggleContrast { get; set; }
+
+    private MyBoardView? Board => View.MyBoard;
+    private bool CanGiveUp => View.IsRoundActive && Board is { HasFinishedRound: false };
+
+    private string _currentGuess = string.Empty;
+    private int _lastRound = -1;
+
+    private string? _toastMessage;
+    private SpardleToast.ToastTone _toastTone = SpardleToast.ToastTone.Danger;
+    private bool _invalidGuess;
+    private CancellationTokenSource? _toastCts;
+    private CancellationTokenSource? _shakeCts;
+
+    private bool _giveUpArmed;
+    private CancellationTokenSource? _giveUpResetCts;
+
+    private IJSObjectReference? _keyboardModule;
+    private DotNetObjectReference<PlayingPhase>? _selfRef;
+    private bool _disposed;
+
+    protected override void OnParametersSet()
+    {
+        // Reset the client-owned guess buffer only when the ROUND changes (a value, not the View
+        // reference): every projection delivers a fresh View, so keying off the reference would wipe
+        // a half-typed guess on every opponent update. Also clear once we've finished the round.
+        if (View.CurrentRound != _lastRound)
+        {
+            _lastRound = View.CurrentRound;
+            _currentGuess = string.Empty;
+        }
+        else if (Board?.HasFinishedRound == true && _currentGuess.Length > 0)
+        {
+            _currentGuess = string.Empty;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _selfRef = DotNetObjectReference.Create(this);
+                _keyboardModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import", "./_content/KnockBox.Spardle/js/spardle-keyboard.js");
+                await _keyboardModule.InvokeVoidAsync("register", _selfRef);
+            }
+            catch (Exception) { /* interop unavailable; on-screen keyboard still works */ }
+        }
+    }
+
+    [JSInvokable]
+    public Task OnPhysicalKey(string key) => InvokeAsync(() => HandleKey(key));
+
+    private async Task HandleKey(string key)
+    {
+        if (!View.IsRoundActive || Board is null || Board.HasFinishedRound) return;
+        int wordLen = View.WordLength;
+
+        if (key == "ENTER")
+        {
+            if (_currentGuess.Length != wordLen)
+            {
+                ShowToast($"NEEDS {wordLen} LETTERS", SpardleToast.ToastTone.Warn);
+                TriggerShake();
+                return;
+            }
+
+            var payload = JsonSerializer.Serialize(
+                new SubmitGuessPayload(_currentGuess), SpardleContractsJsonContext.Default.SubmitGuessPayload);
+            var error = await Submit(SpardleCommands.SubmitGuess, payload);
+            if (error is null)
+            {
+                _currentGuess = string.Empty;
+            }
+            else
+            {
+                ShowToast(error.ToUpperInvariant(), SpardleToast.ToastTone.Danger);
+                TriggerShake();
+            }
+            StateHasChanged();
+        }
+        else if (key == "BACKSPACE")
+        {
+            if (_currentGuess.Length > 0)
+            {
+                _currentGuess = _currentGuess[..^1];
+                StateHasChanged();
+            }
+        }
+        else if (key.Length == 1 && char.IsLetter(key[0]) && _currentGuess.Length < wordLen)
+        {
+            _currentGuess += char.ToLowerInvariant(key[0]);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnGiveUpClicked()
+    {
+        if (!_giveUpArmed)
+        {
+            _giveUpResetCts?.Cancel();
+            _giveUpResetCts = new CancellationTokenSource();
+            var token = _giveUpResetCts.Token;
+            _giveUpArmed = true;
+            try
+            {
+                await Task.Delay(5000, token);
+                if (_disposed || token.IsCancellationRequested) return;
+                _giveUpArmed = false;
+                StateHasChanged();
+            }
+            catch (OperationCanceledException) { /* superseded */ }
+            return;
+        }
+
+        _giveUpResetCts?.Cancel();
+        _giveUpArmed = false;
+        await Submit(SpardleCommands.GiveUp, null);
+    }
+
+    private void ShowToast(string message, SpardleToast.ToastTone tone)
+    {
+        _toastCts?.Cancel();
+        _toastCts = new CancellationTokenSource();
+        var token = _toastCts.Token;
+        _toastMessage = message;
+        _toastTone = tone;
+        _ = DismissToastAfter(token);
+    }
+
+    private async Task DismissToastAfter(CancellationToken token)
+    {
+        try { await Task.Delay(1800, token); }
+        catch (OperationCanceledException) { return; }
+        if (token.IsCancellationRequested) return;
+        _toastMessage = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void TriggerShake()
+    {
+        _shakeCts?.Cancel();
+        _shakeCts = new CancellationTokenSource();
+        var token = _shakeCts.Token;
+        _invalidGuess = true;
+        _ = ClearShakeAfter(token);
+    }
+
+    private async Task ClearShakeAfter(CancellationToken token)
+    {
+        try { await Task.Delay(500, token); }
+        catch (OperationCanceledException) { return; }
+        if (token.IsCancellationRequested) return;
+        _invalidGuess = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _toastCts?.Cancel();
+        _shakeCts?.Cancel();
+        _giveUpResetCts?.Cancel();
+
+        if (_keyboardModule is not null)
+        {
+            try
+            {
+                await _keyboardModule.InvokeVoidAsync("unregister");
+                await _keyboardModule.DisposeAsync();
+            }
+            catch { /* runtime torn down */ }
+        }
+        _selfRef?.Dispose();
+    }
+}

@@ -1,7 +1,5 @@
 using KnockBox.Core.Plugins;
-using KnockBox.Spardle.Components;
 using KnockBox.Spardle.Services.Storage;
-using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Spardle;
 
@@ -19,9 +17,6 @@ public class SpardleModule : IGameModule
         registration.AddScoped<SpardleStorage, SpardleStorage>();
     }
 
-    public RenderFragment? GetCustomHeader() => builder =>
-    {
-        builder.OpenComponent<SpardleHeader>(0);
-        builder.CloseComponent();
-    };
+    // No GetCustomHeader — the UI (header included) now lives in the WASM client
+    // KnockBox.Spardle.Client.
 }

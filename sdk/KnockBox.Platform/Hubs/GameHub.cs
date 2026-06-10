@@ -239,17 +239,10 @@ public sealed class GameHub(
         caller = null!;
         sessionToken = default;
 
-        var http = Context.GetHttpContext();
-        if (http is null)
+        if (!HubCallerResolver.TryResolveUser(Context.GetHttpContext(), identityTokens, out caller))
             return false;
 
-        var token = http.Request.Query["access_token"].ToString();
-        if (!identityTokens.TryResolve(token, out var userId))
-            return false;
-
-        var name = http.Request.Query["userName"].ToString();
-        caller = UserFactory.Create(string.IsNullOrWhiteSpace(name) ? "Player" : name, userId);
-        sessionToken = new SessionToken(userId);
+        sessionToken = new SessionToken(caller.Id);
         return true;
     }
 

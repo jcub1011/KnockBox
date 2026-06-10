@@ -1,0 +1,56 @@
+@*
+    Pre-round splash: round number, the upcoming word's length/guess budget, win mode, and a
+    countdown ring driven by the projected deadline.
+*@
+<div class="spd-intro" @key="View.CurrentRound">
+    <div class="spd-intro-scanlines"></div>
+
+    <div class="spd-intro-rail spd-intro-rail-top"></div>
+    <div class="spd-intro-rail spd-intro-rail-bot"></div>
+
+    <div class="spd-intro-stack">
+        <span class="spd-intro-label spd-display">ROUND</span>
+        <span class="spd-intro-number spd-display">@((View.CurrentRound + 1).ToString("00"))</span>
+        <span class="spd-intro-of spd-display">OF @View.TotalRounds.ToString("00")</span>
+        <div class="spd-intro-stats">
+            <div class="spd-intro-stat">
+                <span class="spd-intro-stat-label">LENGTH</span>
+                <span class="spd-intro-stat-value spd-mono">@View.WordLength</span>
+            </div>
+            <div class="spd-intro-stat">
+                <span class="spd-intro-stat-label">GUESSES</span>
+                <span class="spd-intro-stat-value spd-mono">@View.MaxGuesses</span>
+            </div>
+            <div class="spd-intro-stat">
+                <span class="spd-intro-stat-label">WIN</span>
+                <span class="spd-intro-stat-value spd-mono">@(View.Settings.WinCondition == WinConditionMode.Sprinter ? "SPRINT" : "TACTIC")</span>
+            </div>
+        </div>
+
+        @if (View.PhaseExpiresAtUtc is { } expires)
+        {
+            <CountdownClock EndTimeUtc="expires" Duration="TimeSpan.FromSeconds(View.Settings.TransitionDurationSeconds)" Context="countdown">
+                @{
+                    int digit = Math.Max(0, (int)Math.Ceiling(countdown.RemainingSeconds));
+                    float pct = Math.Clamp(countdown.Fraction, 0f, 1f);
+                    float dash = 283f;
+                    float offset = dash * (1f - pct);
+                }
+                <div class="spd-intro-countdown">
+                    <svg viewBox="0 0 100 100" class="spd-intro-ring" aria-hidden="true">
+                        <circle cx="50" cy="50" r="45" class="spd-intro-ring-track" />
+                        <circle cx="50" cy="50" r="45" class="spd-intro-ring-fill"
+                                stroke-dasharray="@dash.ToString("F0")"
+                                stroke-dashoffset="@offset.ToString("F2")" />
+                    </svg>
+                    <span class="spd-intro-digit spd-display" @key="digit">@digit</span>
+                </div>
+                <span class="spd-intro-getready spd-display">GET READY</span>
+            </CountdownClock>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SpardleView View { get; set; } = default!;
+}

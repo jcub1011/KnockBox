@@ -1,0 +1,97 @@
+@*
+    Between-rounds results: the revealed answer (if enabled), the per-player outcome board ordered by
+    cumulative score, and a countdown to the next round / final results.
+*@
+@{
+    var lastRound = View.LastRoundResult;
+    bool isFinalRound = View.CurrentRound >= View.TotalRounds;
+}
+
+<div class="spd-results" @key="View.CurrentRound">
+    <div class="spd-results-scrim"></div>
+
+    <div class="spd-results-card">
+        <header class="spd-results-head">
+            <span class="spd-results-head-label spd-display">ROUND @View.CurrentRound</span>
+            <span class="spd-results-head-status spd-display">COMPLETE</span>
+        </header>
+
+        @if (!string.IsNullOrEmpty(View.Answer))
+        {
+            <div class="spd-results-answer-wrap">
+                <span class="spd-results-answer-label spd-display">THE WORD</span>
+                <div class="spd-results-answer">
+                    @for (int i = 0; i < View.Answer!.Length; i++)
+                    {
+                        <div class="spd-results-tile spd-tile-flipped spd-tile-correct" style="--col:@i;">
+                            <span class="spd-tile-face">@char.ToUpperInvariant(View.Answer[i])</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="spd-results-board">
+            <div class="spd-results-board-head">
+                <span>RANK</span>
+                <span>PLAYER</span>
+                <span>GUESSES</span>
+                <span>ROUND</span>
+                <span>TOTAL</span>
+            </div>
+            @if (lastRound is not null)
+            {
+                int rowIdx = 0;
+                var orderedOutcomes = lastRound.Outcomes
+                    .OrderByDescending(o => o.TotalScore)
+                    .ThenBy(o => o.Dnf ? 999 : o.Placement)
+                    .ThenBy(o => o.DisplayName, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                foreach (var outcome in orderedOutcomes)
+                {
+                    bool isMe = outcome.UserId == View.RecipientId;
+                    string rankClass = outcome.Dnf ? "spd-results-rank-dnf"
+                        : outcome.Placement == 1 ? "spd-results-rank-gold"
+                        : outcome.Placement == 2 ? "spd-results-rank-silver"
+                        : outcome.Placement == 3 ? "spd-results-rank-bronze"
+                        : "spd-results-rank-other";
+                    <div class="spd-results-row @(isMe ? "spd-results-row-me" : "")"
+                         @key="outcome.UserId"
+                         style="--row-idx:@rowIdx;">
+                        <span class="spd-results-rank @rankClass">
+                            @(outcome.Dnf ? "—" : outcome.Placement.ToString())
+                        </span>
+                        <span class="spd-results-name">@outcome.DisplayName</span>
+                        <span class="spd-results-guesses spd-mono">@(outcome.Dnf ? "DNF" : outcome.GuessCount.ToString())</span>
+                        <span class="spd-results-points">
+                            <span class="spd-results-points-chip @(outcome.PointsAwarded > 0 ? "" : "spd-results-points-zero")">
+                                +@outcome.PointsAwarded
+                            </span>
+                        </span>
+                        <span class="spd-results-total spd-display">@outcome.TotalScore</span>
+                    </div>
+                    rowIdx++;
+                }
+            }
+        </div>
+
+        @if (View.PhaseExpiresAtUtc is { } expires)
+        {
+            <CountdownClock EndTimeUtc="expires" Duration="TimeSpan.FromSeconds(View.Settings.TransitionDurationSeconds)" Context="countdown">
+                @{
+                    int sec = Math.Max(0, (int)Math.Ceiling(countdown.RemainingSeconds));
+                }
+                <div class="spd-results-next">
+                    <span class="spd-results-next-label spd-display">
+                        @(isFinalRound ? "FINAL RESULTS IN" : "NEXT ROUND IN")
+                    </span>
+                    <span class="spd-results-next-digit spd-display" @key="sec">@sec</span>
+                </div>
+            </CountdownClock>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SpardleView View { get; set; } = default!;
+}

@@ -19,6 +19,16 @@ public sealed class KnockBoxPlatformOptions
     /// <summary>Branding strings used by the built-in home page and header.</summary>
     public BrandingOptions Branding { get; } = new();
 
+    /// <summary>
+    /// Maximum size, in bytes, of a single file accepted by the generic plugin
+    /// upload endpoint (<c>POST /api/games/upload</c>). The dispatcher rejects a
+    /// larger body with <c>413 Payload Too Large</c>. Defaults to 2 MB, which
+    /// covers the first-party CSV word-pool upload with headroom; a host can raise
+    /// it for plugins that need bigger uploads. (Kestrel's own request-body limit
+    /// remains the outer hard cap.)
+    /// </summary>
+    public long MaxUploadBytes { get; set; } = 2 * 1024 * 1024;
+
     /// <summary>How game plugins are discovered. Defaults to directory scanning.</summary>
     public PluginDiscoveryMode PluginDiscovery { get; set; } = PluginDiscoveryMode.Directory;
 

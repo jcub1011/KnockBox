@@ -21,10 +21,23 @@
       loads before any game plugin.
     -->
     <ProjectReference Include="..\KnockBox.WordService.Contracts\KnockBox.WordService.Contracts.csproj" />
+    <!--
+      The shared contract DTOs (moved gameplay types + the wire view/commands/
+      settings the WASM client binds). Referenced at compile time AND staged as a
+      PRIVATE ALC dependency below so the plugin's load context can resolve it at
+      runtime — without the PluginPrivateAssembly item the plugin silently fails to
+      load and the tile vanishes from the home page.
+    -->
+    <ProjectReference Include="..\KnockBox.Spardle.Contracts\KnockBox.Spardle.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PluginPrivateAssembly Include="$(TargetDir)KnockBox.Spardle.Contracts.dll" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Microsoft.Extensions.Logging" />
+    <Using Include="KnockBox.Spardle.Contracts" />
   </ItemGroup>
 
   <ItemGroup>

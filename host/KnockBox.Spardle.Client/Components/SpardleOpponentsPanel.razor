@@ -1,0 +1,97 @@
+@*
+    In-round LEADERS panel. Builds the ranked leaderboard from the projected progress entries: the
+    recipient's own row (MyBoard) merged with the count-only rival rows, sorted by the server-assigned
+    Rank. Shows the top N plus the recipient as an overflow row if they're below the cut.
+*@
+<div class="spd-opp-panel">
+    <div class="spd-opp-heading">
+        <span class="spd-opp-heading-glyph">⚔</span>
+        LEADERS
+    </div>
+
+    @{
+        var ranked = BuildLeaderboard();
+        var me = ranked.FirstOrDefault(e => e.IsMe);
+        var topCount = Math.Min(ranked.Count, TopCount);
+        var showSelfOverflow = me is not null && me.Rank > TopCount;
+    }
+
+    @if (ranked.Count == 0)
+    {
+        <div class="spd-opp-empty">No players yet.</div>
+    }
+    else
+    {
+        <div class="spd-opp-list">
+            @for (int i = 0; i < topCount; i++)
+            {
+                @RenderRow(ranked[i])
+            }
+
+            @if (showSelfOverflow)
+            {
+                <div class="spd-opp-divider" aria-hidden="true">⋯</div>
+                @RenderRow(me!)
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private const int TopCount = 5;
+
+    [Parameter] public IReadOnlyList<RivalView> Rivals { get; set; } = [];
+    [Parameter] public MyBoardView? MyBoard { get; set; }
+    [Parameter] public WinConditionMode WinCondition { get; set; }
+
+    private sealed record Entry(
+        int Rank, string DisplayName, int GuessCount, bool HasFinished, bool Solved, bool Dnf,
+        int TotalScore, int? ElapsedMs, bool IsMe);
+
+    private List<Entry> BuildLeaderboard()
+    {
+        var entries = Rivals
+            .Select(r => new Entry(r.Rank, r.DisplayName, r.GuessCount, r.HasFinishedRound, r.Solved,
+                r.Dnf, r.TotalScore, r.FinishedAtElapsedMs, IsMe: false))
+            .ToList();
+
+        if (MyBoard is { } mb)
+        {
+            entries.Add(new Entry(mb.Rank, mb.DisplayName, mb.Guesses.Count, mb.HasFinishedRound,
+                mb.Solved, mb.Dnf, mb.TotalScore, mb.FinishedAtElapsedMs, IsMe: true));
+        }
+
+        return entries.OrderBy(e => e.Rank).ToList();
+    }
+
+    private string FormatBadge(Entry e)
+    {
+        if (e.Dnf) return "DNF";
+        if (!e.HasFinished) return e.GuessCount.ToString();
+        if (WinCondition == WinConditionMode.Sprinter && e.ElapsedMs is int ms)
+        {
+            var elapsed = TimeSpan.FromMilliseconds(ms);
+            return $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:D2}";
+        }
+        return "✓";
+    }
+
+    private RenderFragment RenderRow(Entry e) => __builder =>
+    {
+        var stateClass = e.Dnf ? "spd-opp-row-dnf" : e.HasFinished ? "spd-opp-row-solved" : "spd-opp-row-live";
+        var rankTierClass = e.Rank switch
+        {
+            1 => "spd-opp-rank-gold",
+            2 => "spd-opp-rank-silver",
+            3 => "spd-opp-rank-bronze",
+            _ => ""
+        };
+
+        <div class="spd-opp-row @stateClass @(e.IsMe ? "spd-opp-row-me" : "")">
+            <span class="spd-opp-rank @rankTierClass">@e.Rank</span>
+            <span class="spd-opp-name">@e.DisplayName</span>
+            <span class="spd-opp-badge">@FormatBadge(e)</span>
+            <span class="spd-opp-score spd-mono">@e.TotalScore</span>
+        </div>
+    };
+}

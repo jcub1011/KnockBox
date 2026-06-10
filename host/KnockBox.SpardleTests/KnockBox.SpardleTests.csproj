@@ -17,6 +17,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\KnockBox.Spardle\KnockBox.Spardle.csproj" />
+    <!-- The shared contract DTOs (view/commands/settings + the moved enums/GuessResult) so the
+         projector + hub-command + upload tests can reference them directly. -->
+    <ProjectReference Include="..\KnockBox.Spardle.Contracts\KnockBox.Spardle.Contracts.csproj" />
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
     <!--
       Tests that exercise SpardleEngine against the real word service need the

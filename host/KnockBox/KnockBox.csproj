@@ -130,6 +130,13 @@
     <ProjectReference Include="..\KnockBox.LinkedList.Client\KnockBox.LinkedList.Client.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
     <!--
+      Spardle browser UI (game #6 tri-split). Built transitively (also builds
+      KnockBox.Spardle.Contracts) and staged into games/KnockBox.Spardle/client/
+      via Directory.Client.targets; never linked into the host or the WASM client.
+    -->
+    <ProjectReference Include="..\KnockBox.Spardle.Client\KnockBox.Spardle.Client.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+    <!--
       Plugin projects are loaded at runtime, not linked at compile time.
       ReferenceOutputAssembly="false" keeps the host from taking a compile-time
       dependency on plugin types (preserving the runtime-discovery architecture);

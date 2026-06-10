@@ -1,0 +1,37 @@
+@*
+    Round countdown driven by the server-projected deadline (PhaseExpiresAtUtc) + the round
+    duration. Null deadline or zero duration → unlimited.
+*@
+@if (ExpiresAt is null || Duration <= TimeSpan.Zero)
+{
+    <div class="spd-timer spd-timer-unlimited">
+        <span class="spd-timer-icon">∞</span>
+        <span class="spd-timer-label">UNLIMITED</span>
+    </div>
+}
+else
+{
+    <CountdownClock EndTimeUtc="ExpiresAt.Value" Duration="Duration" Context="countdown">
+        @{
+            int totalSec = (int)Math.Ceiling(countdown.RemainingSeconds);
+            int mins = totalSec / 60;
+            int secs = totalSec % 60;
+            float pct = Math.Clamp(countdown.Fraction, 0f, 1f);
+            bool urgent = countdown.RemainingSeconds < 10;
+        }
+        <div class="spd-timer @(urgent ? "spd-timer-urgent" : "")">
+            <div class="spd-timer-bar">
+                <div class="spd-timer-fill" style="width: @(pct * 100)%;"></div>
+            </div>
+            <div class="spd-timer-digits">
+                <span class="spd-timer-icon">⏱</span>
+                <span class="spd-timer-value">@mins:@secs.ToString("D2")</span>
+            </div>
+        </div>
+    </CountdownClock>
+}
+
+@code {
+    [Parameter] public DateTimeOffset? ExpiresAt { get; set; }
+    [Parameter] public TimeSpan Duration { get; set; }
+}

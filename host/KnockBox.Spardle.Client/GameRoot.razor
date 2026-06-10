@@ -1,0 +1,161 @@
+@inherits HubLobbyPageBase<SpardleView>
+@inject PluginUploadClient Uploads
+@inject IJSRuntime JS
+@*
+    GameRoot — the runtime-loaded WASM UI entry point for Spardle. Inheriting
+    HubLobbyPageBase<SpardleView> opens the hub, joins the lobby, deserializes each per-player
+    projection into `View`, and disposes on teardown. It owns the cross-phase high-contrast toggle
+    (persisted to localStorage) and the word-pool upload path, and dispatches to the phase components
+    exactly as the old server SpardleRoom's phase switch did.
+*@
+
+@* Streamed .Client DLL has no scoped bundle and can't use HeadContent, so link the fonts (the server
+   page loaded these in HeadContent — spardle-theme.css does NOT @import them), the theme tokens, and
+   the de-scoped stylesheet from the server plugin's mounted wwwroot. Body-placed <link>s are honored. *@
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One+SC&family=JetBrains+Mono:wght@500;700&family=Manrope:wght@400;600;800&display=swap" />
+<link rel="stylesheet" href="_content/KnockBox.Spardle/css/spardle-theme.css" />
+<link rel="stylesheet" href="_content/KnockBox.Spardle/css/spardle.css" />
+
+<SpardleHeader Code="@LobbyCode" OnLeave="LeaveAsync" />
+
+<div class="spd-root @(_highContrast ? "spd-hc" : "")">
+@if (_errorMessage is not null)
+{
+    <div @key="_errorKey" class="spd-error-toast">
+        <span class="spd-error-icon">⚠️</span>
+        <span>@_errorMessage</span>
+    </div>
+}
+
+@if (View is null)
+{
+    <div class="spd-loading">
+        <span class="spd-loading-mark spd-display">SPARDLE</span>
+        <span class="spd-loading-sub">Entering the arena…</span>
+    </div>
+}
+else if (View.IsJoinable)
+{
+    <LobbyPhase View="View" Submit="SubmitAsync" UploadWordPool="UploadWordPoolAsync" OnError="ShowError" />
+}
+else
+{
+    @switch (View.Phase)
+    {
+        case GamePhase.RoundIntro:
+            <RoundIntro View="View" />
+            break;
+        case GamePhase.Playing:
+            @if (View.IsHostObserver)
+            {
+                <HostObserverPlayingView View="View" HighContrast="_highContrast" OnToggleContrast="ToggleContrast" />
+            }
+            else
+            {
+                <PlayingPhase View="View" Submit="SubmitAsync"
+                              HighContrast="_highContrast" OnToggleContrast="ToggleContrast" />
+            }
+            break;
+        case GamePhase.RoundResults:
+            <RoundResults View="View" />
+            break;
+        case GamePhase.GameOver:
+            <GameOver View="View" Submit="SubmitAsync" OnError="ShowError" />
+            break;
+        default:
+            <div class="spd-loading"><span class="spd-loading-sub">Setting up…</span></div>
+            break;
+    }
+}
+</div>
+
+@code {
+    /// <summary>The lobby code from the room URL, supplied by the WASM host page.</summary>
+    [Parameter] public string Code { get; set; } = "";
+
+    /// <summary>The player's chosen display name, propagated from the home page.</summary>
+    [Parameter] public string? PlayerName { get; set; }
+
+    protected override string RouteIdentifier => "spardle";
+    protected override string LobbyUri => $"room/spardle/{Code}";
+    protected override string DisplayName => string.IsNullOrWhiteSpace(PlayerName) ? "Player" : PlayerName!;
+
+    public GameRoot()
+        : base(new SourceGenProjectionDeserializer<SpardleView>(
+            SpardleContractsJsonContext.Default.SpardleView))
+    {
+    }
+
+    // One submit path for every phase. Returns the hub reply (null on success, an error message on
+    // rejection) so a view can surface a rejected guess / failed start inline.
+    private Task<string?> SubmitAsync(string command, string? payload) => SubmitCommandAsync(command, payload);
+
+    // Streams the host's word-pool file/text to the generic upload endpoint. Returns null on success
+    // or an error message. The lobby URI is known here (the base owns it); the engine parses + stores.
+    private Task<string?> UploadWordPoolAsync(string fileName, Stream content)
+        => Uploads.UploadAsync(LobbyUri, SpardleCommands.WordPoolUploadKind, fileName, content);
+
+    // ── High-contrast toggle (client/localStorage only — not a hub command) ──
+    private bool _highContrast;
+    private IJSObjectReference? _storageModule;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _storageModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import", "./_content/KnockBox.Spardle/js/spardle-storage.js");
+                _highContrast = await _storageModule.InvokeAsync<bool>("loadHc");
+                StateHasChanged();
+            }
+            catch (Exception) { /* interop unavailable; default off */ }
+        }
+    }
+
+    private async Task ToggleContrast()
+    {
+        _highContrast = !_highContrast;
+        if (_storageModule is not null)
+        {
+            try { await _storageModule.InvokeVoidAsync("saveHc", _highContrast); }
+            catch { /* ignore */ }
+        }
+        StateHasChanged();
+    }
+
+    protected override async ValueTask DisposeAsyncCore()
+    {
+        if (_storageModule is not null)
+        {
+            try { await _storageModule.DisposeAsync(); }
+            catch { /* circuit/runtime torn down */ }
+        }
+    }
+
+    // ── Transient submission-rejection toast (client timer, key-guarded) ─────
+    private string? _errorMessage;
+    private int _errorKey;
+    private static readonly TimeSpan ErrorToastDuration = TimeSpan.FromSeconds(3);
+
+    private void ShowError(string message)
+    {
+        _errorMessage = message;
+        _errorKey++;
+        int captured = _errorKey;
+        StateHasChanged();
+        _ = ClearErrorAfterDelay(captured);
+    }
+
+    private async Task ClearErrorAfterDelay(int captured)
+    {
+        try { await Task.Delay(ErrorToastDuration, ComponentDetached); }
+        catch (OperationCanceledException) { return; }
+        if (_errorKey != captured) return;
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+    }
+}

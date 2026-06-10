@@ -1,0 +1,421 @@
+@inject IJSRuntime JS
+@*
+    Lobby. The host sees the roster + start buttons + a settings drawer; everyone else waits. Settings
+    are a CLIENT-owned draft synced to the server via the update-settings command and persisted to
+    localStorage. The custom word pool (CSV / typed) is streamed to the server via the generic upload
+    endpoint (UploadWordPool) rather than a hub message — the server parses + stores it and the
+    accepted count comes back on View.CustomWordCount.
+*@
+<div class="spd-lobby">
+    <div class="spd-lobby-stage">
+        <div class="spd-lobby-brand">
+            <span class="spd-lobby-brand-spar">SPAR</span><span class="spd-lobby-brand-dash">–</span><span class="spd-lobby-brand-dle">DLE</span>
+        </div>
+        <div class="spd-lobby-tagline">HEAD-TO-HEAD WORD COMBAT</div>
+
+        @{ int idx = 0; }
+        <div class="spd-lobby-challengers">
+            <div class="spd-lobby-challengers-label">CHALLENGERS (@View.Roster.Count)</div>
+            <div class="spd-lobby-challengers-list">
+                @foreach (var entry in View.Roster)
+                {
+                    bool isMe = entry.UserId == View.RecipientId;
+                    string accent = $"spd-opp-{(idx++ % 4) switch { 0 => "a", 1 => "b", 2 => "c", _ => "d" }}";
+                    <div class="spd-lobby-chip @accent @(isMe ? "spd-lobby-chip-me" : "")">
+                        <span class="spd-lobby-chip-avatar">@Initials(entry.DisplayName)</span>
+                        <span class="spd-lobby-chip-name">@entry.DisplayName</span>
+                        @if (entry.IsHost)
+                        {
+                            <span class="spd-lobby-chip-badge">HOST</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (View.RecipientIsHost)
+        {
+            <button class="spd-btn spd-btn-primary spd-btn-lg spd-lobby-start" @onclick="() => StartGame(false)"
+                    disabled="@(!CanStart)" title="Start the match — you run the shared display and don't play">
+                ⚔ ENTER THE ARENA
+            </button>
+            <button class="spd-btn spd-btn-ghost spd-btn-lg spd-lobby-start" @onclick="() => StartGame(true)"
+                    disabled="@(!CanStart)" title="Start the match and fight as a challenger">
+                🗡 ENTER AS CHALLENGER
+            </button>
+            @if (!CanStart)
+            {
+                <p class="spd-lobby-hint">Configure at least one word in the pool.</p>
+            }
+            @if (!string.IsNullOrEmpty(_startError))
+            {
+                <p class="spd-lobby-hint spd-lobby-hint-error">@_startError</p>
+            }
+            <button class="spd-lobby-settings-gear" @onclick="() => _settingsOpen = !_settingsOpen" title="Match Rules">⚙</button>
+        }
+        else
+        {
+            <p class="spd-lobby-waiting">Waiting for the host to open the arena…</p>
+        }
+    </div>
+
+    @if (View.RecipientIsHost)
+    {
+        @if (_settingsOpen)
+        {
+            <div class="spd-lobby-backdrop" @onclick="() => _settingsOpen = false"></div>
+        }
+        <aside class="spd-lobby-drawer @(_settingsOpen ? "spd-lobby-drawer-open" : "")">
+            <div class="spd-lobby-drawer-head">
+                <h3 class="spd-display spd-lobby-drawer-title">Match Rules</h3>
+                <button class="spd-lobby-drawer-close" @onclick="() => _settingsOpen = false" title="Close">✕</button>
+            </div>
+
+            <div class="spd-lobby-drawer-body">
+                <section>
+                    <h4 class="spd-lobby-section-title">Word Pool</h4>
+                    <div class="spd-lobby-field-grid">
+                        <label class="spd-lobby-field">
+                            <span>Source</span>
+                            <select @bind:get="_draft.WordPoolMode" @bind:set="SetWordPoolMode">
+                                <option value="@SpardleWordSource.NytStandard">NYT Standard</option>
+                                <option value="@SpardleWordSource.FullDictionary">Full Dictionary</option>
+                                <option value="@SpardleWordSource.HostDefined">Host Defined</option>
+                                <option value="@SpardleWordSource.CsvUpload">CSV Upload</option>
+                            </select>
+                        </label>
+                        @if (_draft.WordPoolMode == SpardleWordSource.CsvUpload)
+                        {
+                            <label class="spd-lobby-field spd-lobby-field-full">
+                                <span>CSV File (max 2MB)</span>
+                                <InputFile OnChange="OnCsvSelected" accept=".csv,text/csv,text/plain" class="spd-csv-picker-input" />
+                                @if (View.CustomWordCount > 0 && string.IsNullOrEmpty(_poolError))
+                                {
+                                    <p class="spd-lobby-hint spd-csv-count">@View.CustomWordCount word@(View.CustomWordCount == 1 ? "" : "s") uploaded</p>
+                                }
+                                @if (!string.IsNullOrEmpty(_poolError))
+                                {
+                                    <p class="spd-lobby-hint spd-lobby-hint-error">@_poolError</p>
+                                }
+                            </label>
+                        }
+                        <label class="spd-lobby-field">
+                            <span>Order</span>
+                            <select @bind:get="_draft.WordOrderMode" @bind:set="SetWordOrderMode">
+                                <option value="@WordOrderMode.RandomNoRepeats">Random (No Repeats)</option>
+                                <option value="@WordOrderMode.RandomWithRepeats">Random (With Repeats)</option>
+                                <option value="@WordOrderMode.ListOrder">List Order</option>
+                                <option value="@WordOrderMode.ReverseListOrder">Reverse List Order</option>
+                            </select>
+                        </label>
+                        @if (_draft.WordPoolMode == SpardleWordSource.FullDictionary)
+                        {
+                            <label class="spd-lobby-field spd-lobby-field-row">
+                                <span>Constant Word Length</span>
+                                <input type="checkbox" @bind:get="_draft.ConstantWordLength" @bind:set="SetConstantWordLength" />
+                            </label>
+
+                            @if (_draft.ConstantWordLength)
+                            {
+                                <label class="spd-lobby-field">
+                                    <span>Word Length</span>
+                                    <select @bind:get="_draft.TargetWordLength" @bind:set="SetTargetWordLength">
+                                        @foreach (var len in WordLengths)
+                                        {
+                                            <option value="@len">@len</option>
+                                        }
+                                    </select>
+                                </label>
+                            }
+                            else
+                            {
+                                <label class="spd-lobby-field">
+                                    <span>Min Length</span>
+                                    <select @bind:get="_draft.MinWordLength" @bind:set="SetMinWordLength">
+                                        @foreach (var len in WordLengths)
+                                        {
+                                            <option value="@len">@len</option>
+                                        }
+                                    </select>
+                                </label>
+                                <label class="spd-lobby-field">
+                                    <span>Max Length</span>
+                                    <select @bind:get="_draft.MaxWordLength" @bind:set="SetMaxWordLength">
+                                        @foreach (var len in WordLengths)
+                                        {
+                                            <option value="@len">@len</option>
+                                        }
+                                    </select>
+                                </label>
+                            }
+                        }
+                        @if (_draft.WordPoolMode == SpardleWordSource.HostDefined)
+                        {
+                            <label class="spd-lobby-field spd-lobby-field-full">
+                                <span>Custom Words (one per line)</span>
+                                <textarea class="spd-lobby-textarea spd-mono" rows="5"
+                                          value="@_customPoolText" @onchange="OnCustomPoolChanged"></textarea>
+                                @if (View.CustomWordCount > 0 && string.IsNullOrEmpty(_poolError))
+                                {
+                                    <p class="spd-lobby-hint spd-csv-count">@View.CustomWordCount word@(View.CustomWordCount == 1 ? "" : "s") accepted</p>
+                                }
+                                @if (!string.IsNullOrEmpty(_poolError))
+                                {
+                                    <p class="spd-lobby-hint spd-lobby-hint-error">@_poolError</p>
+                                }
+                            </label>
+                        }
+                    </div>
+                </section>
+
+                <section>
+                    <h4 class="spd-lobby-section-title">Rounds &amp; Timing</h4>
+                    <div class="spd-lobby-field-grid">
+                        <label class="spd-lobby-field">
+                            <span>Total Rounds</span>
+                            <input type="number" min="1" max="50" @bind:get="_draft.TotalRounds" @bind:set="SetTotalRounds" />
+                        </label>
+                        <label class="spd-lobby-field">
+                            <span>Round Timer (seconds)</span>
+                            <input type="number" min="30" max="600" step="5"
+                                   @bind:get="_draft.RoundTimerSeconds" @bind:set="SetRoundTimerSeconds"
+                                   disabled="@_unlimitedTimer" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Unlimited Timer</span>
+                            <input type="checkbox" @bind:get="_unlimitedTimer" @bind:set="SetUnlimitedTimer" />
+                        </label>
+                        <label class="spd-lobby-field">
+                            <span>Transition Between Rounds</span>
+                            <input type="number" min="2" max="15" step="1"
+                                   @bind:get="_draft.TransitionDurationSeconds" @bind:set="SetTransition" />
+                        </label>
+                    </div>
+                </section>
+
+                <section>
+                    <h4 class="spd-lobby-section-title">Win Condition</h4>
+                    <div class="spd-lobby-field-grid">
+                        <label class="spd-lobby-field">
+                            <span>Mode</span>
+                            <select @bind:get="_draft.WinCondition" @bind:set="SetWinCondition">
+                                <option value="@WinConditionMode.Sprinter">Sprinter (first to solve)</option>
+                                <option value="@WinConditionMode.Tactician">Tactician (fewest guesses)</option>
+                            </select>
+                        </label>
+                        <label class="spd-lobby-field">
+                            <span>Difficulty Multiplier (k)</span>
+                            <select @bind:get="_draft.DifficultyMultiplier" @bind:set="SetDifficulty">
+                                <option value="1">Gentle (k = 1)</option>
+                                <option value="2">Standard (k = 2)</option>
+                                <option value="3">Brutal (k = 3)</option>
+                            </select>
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Hard Mode</span>
+                            <input type="checkbox" @bind:get="_draft.HardModeEnabled" @bind:set="SetHardMode" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Wait For All Players</span>
+                            <input type="checkbox" @bind:get="_draft.WaitForAll" @bind:set="SetWaitForAll" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Reveal Answer</span>
+                            <input type="checkbox" @bind:get="_draft.RevealAnswer" @bind:set="SetRevealAnswer" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Dictionary Fallback</span>
+                            <input type="checkbox" @bind:get="_draft.AllowDictionaryFallback" @bind:set="SetDictionaryFallback" />
+                        </label>
+                        <label class="spd-lobby-field spd-lobby-field-row">
+                            <span>Allow Compound Words</span>
+                            <input type="checkbox" @bind:get="_draft.AllowCompoundWords" @bind:set="SetAllowCompoundWords" />
+                        </label>
+                    </div>
+                </section>
+
+                <div class="spd-lobby-drawer-footer">
+                    <button type="button" class="spd-btn @(_resetArmed ? "spd-btn-danger" : "spd-btn-ghost")"
+                            @onclick="ResetToDefaults">
+                        @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+                    </button>
+                </div>
+            </div>
+        </aside>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SpardleView View { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<string, Stream, Task<string?>> UploadWordPool { get; set; } = default!;
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private const string SettingsKey = "spardle.settings";
+    // The client has no IWordListService, so it offers a sensible static length range for the
+    // FullDictionary selectors (the engine clamps to 1–64 and tolerates a length with no words).
+    private static readonly int[] WordLengths = [.. Enumerable.Range(3, 13)];
+
+    private SpardleSettingsView _draft = new();
+    private bool _settingsOpen;
+    private bool _unlimitedTimer;
+    private bool _loadedFromStorage;
+    private string _customPoolText = string.Empty;
+    private string? _poolError;
+    private string? _startError;
+    private CancellationTokenSource? _startErrorCts;
+    private bool _resetArmed;
+    private int _resetGeneration;
+
+    private bool CanStart => View.HasCustomWordPool
+        || _draft.WordPoolMode is SpardleWordSource.NytStandard or SpardleWordSource.FullDictionary;
+
+    protected override void OnInitialized()
+    {
+        _draft = View.Settings;
+        _unlimitedTimer = _draft.RoundTimerSeconds <= 0;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Restore the host's previously saved rules (localStorage needs JS interop). Host-only —
+        // only the host edits/persists these. The custom pool is intentionally NOT persisted.
+        if (firstRender && View.RecipientIsHost && !_loadedFromStorage)
+        {
+            _loadedFromStorage = true;
+            try
+            {
+                var json = await JS.InvokeAsync<string?>("localStorage.getItem", SettingsKey);
+                if (!string.IsNullOrWhiteSpace(json)
+                    && JsonSerializer.Deserialize(json, SpardleContractsJsonContext.Default.SpardleSettingsView) is { } saved)
+                {
+                    _draft = saved;
+                    _unlimitedTimer = _draft.RoundTimerSeconds <= 0;
+                    await Submit(SpardleCommands.UpdateSettings, json);
+                    StateHasChanged();
+                }
+            }
+            catch { /* interop unavailable; engine defaults stand */ }
+        }
+    }
+
+    private void Set(Func<SpardleSettingsView, SpardleSettingsView> mutate)
+    {
+        _draft = mutate(_draft);
+        StateHasChanged();
+        _ = PushAsync();
+    }
+
+    private async Task PushAsync()
+    {
+        var json = JsonSerializer.Serialize(_draft, SpardleContractsJsonContext.Default.SpardleSettingsView);
+        await Submit(SpardleCommands.UpdateSettings, json);
+        try { await JS.InvokeVoidAsync("localStorage.setItem", SettingsKey, json); } catch { }
+    }
+
+    private void SetWordPoolMode(SpardleWordSource v) => Set(s => s with { WordPoolMode = v });
+    private void SetWordOrderMode(WordOrderMode v) => Set(s => s with { WordOrderMode = v });
+    private void SetConstantWordLength(bool v) => Set(s => s with { ConstantWordLength = v });
+    private void SetTargetWordLength(int v) => Set(s => s with { TargetWordLength = v });
+    private void SetWinCondition(WinConditionMode v) => Set(s => s with { WinCondition = v });
+    private void SetDifficulty(double v) => Set(s => s with { DifficultyMultiplier = v });
+    private void SetHardMode(bool v) => Set(s => s with { HardModeEnabled = v });
+    private void SetWaitForAll(bool v) => Set(s => s with { WaitForAll = v });
+    private void SetRevealAnswer(bool v) => Set(s => s with { RevealAnswer = v });
+    private void SetDictionaryFallback(bool v) => Set(s => s with { AllowDictionaryFallback = v });
+    private void SetAllowCompoundWords(bool v) => Set(s => s with { AllowCompoundWords = v });
+    private void SetTotalRounds(int v) => Set(s => s with { TotalRounds = v });
+    private void SetRoundTimerSeconds(int v) => Set(s => s with { RoundTimerSeconds = Math.Clamp(v, 30, 600) });
+    private void SetTransition(int v) => Set(s => s with { TransitionDurationSeconds = Math.Clamp(v, 2, 15) });
+
+    private void SetMinWordLength(int v) => Set(s =>
+        s with { MinWordLength = v, MaxWordLength = s.MaxWordLength < v ? v : s.MaxWordLength });
+    private void SetMaxWordLength(int v) => Set(s =>
+        s with { MaxWordLength = v, MinWordLength = s.MinWordLength > v ? v : s.MinWordLength });
+
+    private void SetUnlimitedTimer(bool v)
+    {
+        _unlimitedTimer = v;
+        Set(s => s with { RoundTimerSeconds = v ? 0 : 180 });
+    }
+
+    private void ResetToDefaults()
+    {
+        if (!_resetArmed)
+        {
+            _resetArmed = true;
+            _ = DisarmResetAfterDelay(++_resetGeneration);
+            return;
+        }
+        _resetArmed = false;
+        _resetGeneration++;
+        _draft = new SpardleSettingsView();
+        _unlimitedTimer = _draft.RoundTimerSeconds <= 0;
+        StateHasChanged();
+        _ = PushAsync();
+    }
+
+    private async Task DisarmResetAfterDelay(int generation)
+    {
+        try { await Task.Delay(TimeSpan.FromSeconds(3)); }
+        catch (OperationCanceledException) { return; }
+        if (generation != _resetGeneration) return;
+        _resetArmed = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnCsvSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null) return;
+        _poolError = null;
+        try
+        {
+            await using var stream = file.OpenReadStream(2 * 1024 * 1024);
+            _poolError = await UploadWordPool(file.Name, stream);
+        }
+        catch (Exception)
+        {
+            _poolError = "Failed to read the file.";
+        }
+        StateHasChanged();
+    }
+
+    private async Task OnCustomPoolChanged(ChangeEventArgs e)
+    {
+        _customPoolText = e.Value?.ToString() ?? string.Empty;
+        _poolError = null;
+        var bytes = System.Text.Encoding.UTF8.GetBytes(_customPoolText);
+        await using var stream = new MemoryStream(bytes);
+        _poolError = await UploadWordPool("words.txt", stream);
+        StateHasChanged();
+    }
+
+    private async Task StartGame(bool hostPlays)
+    {
+        var payload = JsonSerializer.Serialize(new StartPayload(hostPlays), SpardleContractsJsonContext.Default.StartPayload);
+        var error = await Submit(SpardleCommands.Start, payload);
+        if (error is not null)
+        {
+            _startErrorCts?.Cancel();
+            _startErrorCts = new CancellationTokenSource();
+            var token = _startErrorCts.Token;
+            _startError = error;
+            StateHasChanged();
+            try
+            {
+                await Task.Delay(3000, token);
+                if (!token.IsCancellationRequested) { _startError = null; await InvokeAsync(StateHasChanged); }
+            }
+            catch (OperationCanceledException) { /* superseded */ }
+        }
+    }
+
+    private static string Initials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return char.ToUpperInvariant(parts[0][0]).ToString();
+        return $"{char.ToUpperInvariant(parts[0][0])}{char.ToUpperInvariant(parts[1][0])}";
+    }
+}

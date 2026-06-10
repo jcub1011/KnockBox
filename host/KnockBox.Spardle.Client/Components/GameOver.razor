@@ -1,0 +1,103 @@
+@*
+    Final standings: podium for the top three + a full leaderboard. The host can return the match to
+    the joinable lobby (a hub command); everyone else waits.
+*@
+@{
+    var roster = View.Standings;
+    var first = roster.ElementAtOrDefault(0);
+    var second = roster.ElementAtOrDefault(1);
+    var third = roster.ElementAtOrDefault(2);
+}
+
+<div class="spd-over">
+    <div class="spd-over-banner">
+        <span class="spd-display spd-over-banner-main">MATCH OVER</span>
+        <span class="spd-display spd-over-banner-sub">FINAL STANDINGS</span>
+    </div>
+
+    <div class="spd-over-podium">
+        @if (second is not null)
+        {
+            <div class="spd-over-podium-block spd-over-second">
+                <div class="spd-over-podium-crown">🥈</div>
+                <div class="spd-over-podium-name">@second.DisplayName</div>
+                <div class="spd-over-podium-score spd-display">@second.TotalScore</div>
+                <div class="spd-over-podium-bar"></div>
+            </div>
+        }
+        @if (first is not null)
+        {
+            <div class="spd-over-podium-block spd-over-first">
+                <div class="spd-over-podium-crown spd-over-podium-crown-first">👑</div>
+                <div class="spd-over-podium-name">@first.DisplayName</div>
+                <div class="spd-over-podium-score spd-display">@first.TotalScore</div>
+                <div class="spd-over-podium-bar"></div>
+            </div>
+        }
+        @if (third is not null)
+        {
+            <div class="spd-over-podium-block spd-over-third">
+                <div class="spd-over-podium-crown">🥉</div>
+                <div class="spd-over-podium-name">@third.DisplayName</div>
+                <div class="spd-over-podium-score spd-display">@third.TotalScore</div>
+                <div class="spd-over-podium-bar"></div>
+            </div>
+        }
+    </div>
+
+    <div class="spd-over-board">
+        <div class="spd-over-board-head">
+            <span>#</span>
+            <span>PLAYER</span>
+            <span>ROUNDS WON</span>
+            <span>TOTAL</span>
+        </div>
+        @foreach (var row in roster)
+        {
+            bool isMe = row.UserId == View.RecipientId;
+            <div class="spd-over-board-row @(isMe ? "spd-over-board-me" : "")" style="--row-idx:@row.Rank;">
+                <span class="spd-over-board-rank spd-display">@row.Rank</span>
+                <span class="spd-over-board-name">@row.DisplayName</span>
+                <span class="spd-over-board-won spd-mono">@row.RoundsWon</span>
+                <span class="spd-over-board-total spd-display">@row.TotalScore</span>
+            </div>
+        }
+    </div>
+
+    <div class="spd-over-actions">
+        @if (View.RecipientIsHost)
+        {
+            <button class="spd-btn spd-btn-primary spd-btn-lg spd-over-exit" @onclick="ReturnToLobby" disabled="@_returning">
+                RETURN TO LOBBY
+            </button>
+        }
+        else
+        {
+            <span class="spd-over-wait">Waiting for host…</span>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SpardleView View { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private bool _returning;
+
+    private async Task ReturnToLobby()
+    {
+        if (_returning) return;
+        _returning = true;
+        try
+        {
+            var error = await Submit(SpardleCommands.ReturnToLobby, null);
+            if (error is not null && OnError.HasDelegate)
+                await OnError.InvokeAsync(error);
+        }
+        finally
+        {
+            _returning = false;
+        }
+    }
+}

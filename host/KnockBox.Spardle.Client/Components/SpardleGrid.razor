@@ -1,0 +1,95 @@
+@*
+    The player's own board. Reads the projected board data (guesses + statuses + sizing) — never the
+    secret target word. High-contrast colours come from the .spd-hc variable overrides cascading down
+    from .spd-root, so no per-grid HC class is needed.
+*@
+<div class="spd-grid-wrap">
+    <div class="spd-grid" style="--spd-cols:@WordLength;--spd-rows:@MaxGuesses;">
+        @foreach (var guess in Guesses)
+        {
+            <div class="spd-row @(guess.IsCorrect ? "spd-row-won" : "")">
+                @for (int i = 0; i < guess.Word.Length; i++)
+                {
+                    var statusClass = guess.Statuses[i] switch
+                    {
+                        LetterStatus.Correct => "spd-tile-correct",
+                        LetterStatus.Present => "spd-tile-present",
+                        _ => "spd-tile-absent"
+                    };
+                    <div class="spd-tile spd-tile-flipped @statusClass" style="--col:@i;">
+                        <span class="spd-tile-face">@guess.Word[i].ToString().ToUpperInvariant()</span>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (!HasFinished && IsRoundActive)
+        {
+            <div class="spd-row spd-row-current @(InvalidGuess ? "spd-row-shake" : "")">
+                @for (int i = 0; i < WordLength; i++)
+                {
+                    bool filled = i < CurrentGuess.Length;
+                    <div class="spd-tile @(filled ? "spd-tile-filled" : "spd-tile-empty")" style="--col:@i;">
+                        @if (filled)
+                        {
+                            <span class="spd-tile-face">@CurrentGuess[i].ToString().ToUpperInvariant()</span>
+                        }
+                    </div>
+                }
+            </div>
+
+            @for (int row = Guesses.Count + 1; row < MaxGuesses; row++)
+            {
+                <div class="spd-row spd-row-placeholder">
+                    @for (int i = 0; i < WordLength; i++)
+                    {
+                        <div class="spd-tile spd-tile-empty" style="--col:@i;"></div>
+                    }
+                </div>
+            }
+        }
+        else if (HasFinished)
+        {
+            @for (int row = Guesses.Count; row < MaxGuesses; row++)
+            {
+                <div class="spd-row spd-row-placeholder">
+                    @for (int i = 0; i < WordLength; i++)
+                    {
+                        <div class="spd-tile spd-tile-empty" style="--col:@i;"></div>
+                    }
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@if (WordLength > 5 && IsRoundActive)
+{
+    <div class="spd-legacy-bar" aria-label="Confirmed letter positions">
+        @for (int i = 0; i < WordLength; i++)
+        {
+            char? confirmed = null;
+            foreach (var g in Guesses)
+            {
+                if (i < g.Statuses.Length && g.Statuses[i] == LetterStatus.Correct)
+                {
+                    confirmed = char.ToUpperInvariant(g.Word[i]);
+                    break;
+                }
+            }
+            <span class="spd-legacy-slot @(confirmed.HasValue ? "spd-legacy-filled" : "")">
+                @(confirmed?.ToString() ?? "_")
+            </span>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<GuessResult> Guesses { get; set; } = [];
+    [Parameter] public int WordLength { get; set; }
+    [Parameter] public int MaxGuesses { get; set; }
+    [Parameter] public string CurrentGuess { get; set; } = string.Empty;
+    [Parameter] public bool InvalidGuess { get; set; }
+    [Parameter] public bool HasFinished { get; set; }
+    [Parameter] public bool IsRoundActive { get; set; }
+}

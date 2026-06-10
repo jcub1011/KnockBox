@@ -23,6 +23,10 @@ public static class KnockBoxClientServiceCollectionExtensions
         services.AddSingleton(_ => new GameHubConnectionFactory(baseUri));
         services.AddSingleton<IClientSessionTokenProvider, ClientSessionTokenProvider>();
 
+        // Streams plugin file uploads to POST /api/games/upload (any game client
+        // may @inject it). Reuses the host-origin HttpClient + the session token.
+        services.AddSingleton<PluginUploadClient>();
+
         return services;
     }
 }

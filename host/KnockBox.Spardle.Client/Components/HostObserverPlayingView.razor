@@ -1,0 +1,150 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@*
+    The display-only host's gallery: every competitor's board (projected as View.AllBoards, already
+    ranked) rendered as a mini-grid, with a FLIP reorder animation as ranks shuffle. Reads only
+    projected progress — the host-observer is the one recipient allowed full boards.
+*@
+<div class="spd-obs" @key="View.CurrentRound">
+    <header class="spd-obs-top">
+        <div class="spd-obs-round">
+            <span class="spd-obs-round-label">ROUND</span>
+            <span class="spd-obs-round-value spd-display">@View.CurrentRound</span>
+            <span class="spd-obs-round-total">/ @View.TotalRounds</span>
+        </div>
+
+        <SpardleRoundTimer ExpiresAt="View.PhaseExpiresAtUtc" Duration="TimeSpan.FromSeconds(View.Settings.RoundTimerSeconds)" />
+
+        <button type="button"
+                class="spd-obs-hc-toggle @(HighContrast ? "spd-obs-hc-on" : "")"
+                @onclick="OnToggleContrast"
+                title="Toggle high-contrast colours">
+            <span class="spd-obs-hc-dot"></span>
+            <span>HC</span>
+        </button>
+    </header>
+
+    @{
+        int wordLen = View.WordLength;
+        int maxGuesses = View.MaxGuesses;
+        var accents = new[] { "spd-obs-a", "spd-obs-b", "spd-obs-c", "spd-obs-d" };
+        int accentIdx = 0;
+    }
+
+    <main class="spd-obs-gallery" style="--spd-cols:@wordLen;">
+        @foreach (var board in View.AllBoards)
+        {
+            var accent = accents[accentIdx++ % accents.Length];
+
+            string statusTag;
+            string statusClass;
+            if (board.Dnf) { statusTag = "DNF"; statusClass = "spd-obs-dnf"; }
+            else if (board.HasFinishedRound) { statusTag = FormatSolvedTag(board.FinishedAtElapsedMs); statusClass = "spd-obs-solved"; }
+            else { statusTag = "GUESSING…"; statusClass = "spd-obs-active"; }
+
+            var isSolved = board.Solved;
+            var solvedRowIdx = isSolved && board.Guesses.Count > 0 ? board.Guesses.Count - 1 : -1;
+            var outcomeCls = isSolved ? "spd-obs-card-solved" : board.Dnf ? "spd-obs-card-dnf" : "";
+
+            <section class="spd-obs-card @accent @outcomeCls"
+                     @key="board.UserId"
+                     data-spd-id="@board.UserId">
+                <div class="spd-obs-card-top">
+                    <span class="spd-obs-avatar">@Initials(board.DisplayName)</span>
+                    <span class="spd-obs-name">@board.DisplayName</span>
+                    <span class="spd-obs-count spd-mono">@board.Guesses.Count/@maxGuesses</span>
+                </div>
+
+                <div class="spd-obs-mini" style="--spd-cols:@wordLen; --spd-rows:@maxGuesses;">
+                    @for (int gIdx = 0; gIdx < board.Guesses.Count; gIdx++)
+                    {
+                        var guess = board.Guesses[gIdx];
+                        var winnerCls = gIdx == solvedRowIdx ? "spd-obs-row-winner" : "";
+                        <div class="spd-obs-row @winnerCls">
+                            @for (int i = 0; i < guess.Statuses.Length; i++)
+                            {
+                                var statusClassName = guess.Statuses[i] switch
+                                {
+                                    LetterStatus.Correct => "spd-obs-tile-correct",
+                                    LetterStatus.Present => "spd-obs-tile-present",
+                                    _ => "spd-obs-tile-absent"
+                                };
+                                <div class="spd-obs-tile @statusClassName"></div>
+                            }
+                        </div>
+                    }
+                    @for (int row = board.Guesses.Count; row < maxGuesses; row++)
+                    {
+                        <div class="spd-obs-row">
+                            @for (int i = 0; i < wordLen; i++)
+                            {
+                                <div class="spd-obs-tile spd-obs-tile-empty"></div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div class="spd-obs-status @statusClass">@statusTag</div>
+            </section>
+        }
+    </main>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SpardleView View { get; set; } = default!;
+    [Parameter] public bool HighContrast { get; set; }
+    [Parameter] public EventCallback OnToggleContrast { get; set; }
+
+    private const int FlipDurationMs = 450;
+    private const string FlipRootSelector = ".spd-obs-gallery";
+
+    private IJSObjectReference? _flipModule;
+    private bool _flipInFlight;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_flipModule is null)
+        {
+            try
+            {
+                _flipModule = await JS.InvokeAsync<IJSObjectReference>(
+                    "import", "./_content/KnockBox.Spardle/js/spardle-host-flip.js");
+            }
+            catch (Exception) { return; }
+        }
+
+        if (_flipInFlight) return;
+        _flipInFlight = true;
+        try
+        {
+            await _flipModule.InvokeVoidAsync(
+                "reorder", FlipRootSelector, ".spd-obs-card", "data-spd-id", FlipDurationMs, View.CurrentRound);
+        }
+        catch (Exception) { /* runtime torn down / superseded */ }
+        finally { _flipInFlight = false; }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_flipModule is not null)
+        {
+            try { await _flipModule.InvokeVoidAsync("clear", FlipRootSelector); } catch { }
+            try { await _flipModule.DisposeAsync(); } catch { }
+        }
+    }
+
+    private static string Initials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return char.ToUpperInvariant(parts[0][0]).ToString();
+        return $"{char.ToUpperInvariant(parts[0][0])}{char.ToUpperInvariant(parts[1][0])}";
+    }
+
+    private static string FormatSolvedTag(int? elapsedMs)
+    {
+        if (elapsedMs is not int ms) return "SOLVED";
+        var elapsed = TimeSpan.FromMilliseconds(ms);
+        return $"SOLVED {(int)elapsed.TotalMinutes}:{elapsed.Seconds:D2}";
+    }
+}

@@ -281,6 +281,12 @@ public static class KnockBoxPlatformExtensions
         // via keyed DI and rooms via ILobbyService.TryGetByUri.
         builder.Services.AddSingleton<PluginHttpDispatcher>();
 
+        // Generic plugin file-upload dispatcher singleton — backs the
+        // `/api/games/upload` endpoint. Authenticates the caller via the signed
+        // session token, resolves the room, enforces options.MaxUploadBytes, and
+        // streams the body to an engine implementing IGameUploadHandler.
+        builder.Services.AddSingleton<PluginUploadDispatcher>();
+
         // Logic registrations (platform version — no admin services).
         // `LogicRegistrations` is static, so we can't use the generic overload —
         // typeof(...).FullName keeps the logger category in sync with renames
@@ -395,6 +401,18 @@ public static class KnockBoxPlatformExtensions
 
         // Realtime transport for the WASM client.
         app.MapHub<Hubs.GameHub>("/hubs/game");
+
+        // Generic plugin file-upload endpoint. The body is the raw file bytes;
+        // lobbyUri/kind/fileName ride the query string and the signed session
+        // token rides the Authorization header (so it's not a cookie-based form
+        // post — antiforgery is disabled and identity comes from the token).
+        // Inert until a game opts in by implementing IGameUploadHandler.
+        app.MapPost("/api/games/upload",
+                async (HttpContext ctx, string lobbyUri, string kind, string? fileName,
+                       Plugins.PluginUploadDispatcher dispatcher, CancellationToken ct) =>
+                    await dispatcher.DispatchAsync(ctx, lobbyUri, kind, fileName ?? "upload", ct))
+            .AllowAnonymous()
+            .DisableAntiforgery();
 
         // Mints a per-tab identity token the WASM client stores in sessionStorage
         // and presents on its hub handshake. Anonymous + no cookie: the token is a

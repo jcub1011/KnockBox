@@ -25,11 +25,18 @@ export function register(dotNetRef) {
             return;
         }
         ev.preventDefault();
-        try {
-            activeRef.invokeMethodAsync('OnPhysicalKey', key);
-        } catch (err) {
-            // Ref was disposed between dispatches; ignore.
-        }
+        // Defer the .NET call out of the synchronous keydown handler. On WASM a keydown that fires
+        // while Blazor is mid-render (e.g. an opponent's projection re-rendering the grid) would
+        // reenter the locked heap — "Assertion failed - heap is currently locked". setTimeout(…,0)
+        // lets the current render settle first. (Server circuits were immune; this is WASM-only.)
+        const ref = activeRef;
+        setTimeout(() => {
+            try {
+                ref.invokeMethodAsync('OnPhysicalKey', key);
+            } catch (err) {
+                // Ref was disposed between dispatches; ignore.
+            }
+        }, 0);
     };
     document.addEventListener('keydown', handler);
 }

@@ -8,5 +8,10 @@
   "capabilities": [],
   "tileAsset": "tile.svg",
   "backgroundColor": "#070912",
-  "fontColor": "#f4f6ff"
+  "fontColor": "#f4f6ff",
+  "clientAssembly": "KnockBox.Spardle.Client",
+  "clientContracts": ["KnockBox.Spardle.Contracts"],
+  "clientAssets": [
+    { "name": "KnockBox.Spardle.Client", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+  ]
 }
