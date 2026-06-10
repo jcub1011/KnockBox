@@ -19,7 +19,7 @@ namespace KnockBox.Codeword.Services.State.PlayLog
         /// </summary>
         public static IReadOnlyDictionary<string, string> Build(CodewordGameState state, Guid? currentUserId)
         {
-            var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
+            var metadata = new Dictionary<string, string>
             {
                 ["Games Played"] = state.Settings.TotalGames.ToString(),
                 ["Outcome"] = DescribeOutcome(state.WinResult),

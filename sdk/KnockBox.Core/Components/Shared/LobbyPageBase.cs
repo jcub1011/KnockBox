@@ -194,7 +194,17 @@ namespace KnockBox.Core.Components.Shared
         {
             if (_playLogged || !_initialized || _kickHandled) return;
 
-            var log = BuildEndOfGamePlayLog();
+            // Read the terminal state under the state read lock so the build can't
+            // observe a torn/concurrently-mutated snapshot (honors AbstractGameState's
+            // "all reads go through WithExclusiveRead" invariant). WithExclusiveReadAsync
+            // no-ops gracefully on a disposed state, leaving log null.
+            GameLog? log = null;
+            await GameState.WithExclusiveReadAsync(() =>
+            {
+                log = BuildEndOfGamePlayLog();
+                return ValueTask.CompletedTask;
+            });
+
             if (log is null)
             {
                 _sawPreLog = true;
@@ -229,7 +239,13 @@ namespace KnockBox.Core.Components.Shared
         private void TryLogOnLeave()
         {
             if (_playLogged || !_initialized || _kickHandled) return;
-            if (BuildOnLeavePlayLog() is not { } leaveLog) return;
+
+            // Read under the state read lock, matching TryLogEndOfGameAsync. The
+            // synchronous WithExclusiveRead is used here because Dispose is sync;
+            // it no-ops gracefully if the state is already disposed, leaving leaveLog null.
+            GameLog? leaveLog = null;
+            GameState.WithExclusiveRead(() => leaveLog = BuildOnLeavePlayLog());
+            if (leaveLog is null) return;
 
             _playLogged = true;
             _ = PlayLog.StoreLogAsync(StampRole(leaveLog));

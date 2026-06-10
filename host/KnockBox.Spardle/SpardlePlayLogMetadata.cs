@@ -21,7 +21,7 @@ internal static class SpardlePlayLogMetadata
     /// </summary>
     public static IReadOnlyDictionary<string, string> Build(SpardleState state, Guid? currentUserId)
     {
-        var metadata = new Dictionary<string, string>(StringComparer.Ordinal)
+        var metadata = new Dictionary<string, string>
         {
             ["Rounds Played"] = state.RoundHistory.Count.ToString(),
         };
