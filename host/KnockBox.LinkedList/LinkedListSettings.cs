@@ -1,10 +1,7 @@
 namespace KnockBox.LinkedList;
 
-/// <summary>How a finished round/match is scored.</summary>
-public enum ScoringMode { FewestGuesses, FastestTime }
-
-/// <summary>Whether everyone shares one chain or competes in groups.</summary>
-public enum PlayerStructure { Collective, Groups }
+// ScoringMode and PlayerStructure moved to the KnockBox.LinkedList.Contracts assembly
+// (same KnockBox.LinkedList namespace) so the wire DTOs and the server bind one CLR type.
 
 /// <summary>
 /// Host-configurable match rules for a Linked List game. Held by

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Shared contract DTOs for the KnockBox.LinkedList tri-split game: the pure data
+    types both runtimes need (the chain/rejection/submission/superlative/standing
+    records, the scoring/structure/phase enums), the host-editable settings view +
+    the commands the browser UI sends, and the per-player view the server projects
+    back. This assembly loads in BOTH runtimes — compiled against by the server
+    plugin AND streamed to the browser alongside the client UI — so both sides bind
+    the same CLR types.
+
+    CRITICAL: this project has ZERO KnockBox.* references and imports no plugin
+    targets (mirrors KnockBox.Tracery.Contracts). It is pure DTOs/enums only.
+    Source-generated JSON keeps the DTOs trim-safe in the WASM client.
+
+    The moved gameplay types (the scoring/structure enums, the phase enum, and the
+    chain/rejection/submission/superlative/standing records) intentionally keep
+    their original namespaces (KnockBox.LinkedList and
+    KnockBox.LinkedList.Services.State.Games) so the server plugin (which already
+    `using`s them pervasively) binds them across the assembly boundary with no
+    churn. The new wire DTOs live in the KnockBox.LinkedList.Contracts namespace.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Description>Shared contract DTOs for the KnockBox.LinkedList tri-split game.</Description>
+  </PropertyGroup>
+
+</Project>

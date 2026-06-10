@@ -32,6 +32,8 @@
   <Project Path="KnockBox.HiddenAgenda/KnockBox.HiddenAgenda.csproj" />
   <Project Path="KnockBox.HiddenAgendaTests/KnockBox.HiddenAgendaTests.csproj" />
   <Project Path="KnockBox.LinkedList/KnockBox.LinkedList.csproj" />
+  <Project Path="KnockBox.LinkedList.Contracts/KnockBox.LinkedList.Contracts.csproj" />
+  <Project Path="KnockBox.LinkedList.Client/KnockBox.LinkedList.Client.csproj" />
   <Project Path="KnockBox.LinkedListTests/KnockBox.LinkedListTests.csproj" />
   <Project Path="KnockBox.Operator/KnockBox.Operator.csproj" />
   <Project Path="KnockBox.OperatorTests/KnockBox.OperatorTests.csproj" />

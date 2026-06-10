@@ -1,0 +1,461 @@
+@inherits DisposableComponent
+@inject IJSRuntime JS
+@*
+    The pre-game lobby: the player roster (host can kick), the host's settings drawer, the Groups-mode
+    team builder, and the start controls. Settings are edited against a client-owned draft for instant
+    feedback, sent to the authoritative server (UpdateSettings) and persisted to the host's browser
+    localStorage. The start-time setup the server can't be told mid-edit (teams / words / first
+    Auditor) is also client-owned and carried in the Start command payload.
+*@
+
+<div class="ll-lobby">
+    <div class="ll-lobby-header">
+        <h2 class="ll-title">Linked List</h2>
+        @if (IsHost)
+        {
+            <button class="ll-gear-btn" @onclick="ToggleSettings" title="Game settings">⚙️</button>
+        }
+    </div>
+
+    <div class="ll-players-card">
+        <h4>Players (@PlayerCount)</h4>
+        <div class="ll-player-list">
+            @foreach (var entry in View.Roster)
+            {
+                bool isHostEntry = entry.IsHost;
+                bool isMe = entry.UserId == View.RecipientId;
+                bool canKick = IsHost && !isHostEntry;
+                <div class="ll-player @(isMe ? "ll-player-me" : "")">
+                    <span class="ll-player-name">@entry.DisplayName</span>
+                    @if (isHostEntry)
+                    {
+                        <span class="ll-host-badge">HOST</span>
+                    }
+                    @if (canKick)
+                    {
+                        <button class="ll-kick-btn" title="Kick player"
+                                @onclick="() => KickPlayer(entry.UserId)">✕</button>
+                    }
+                </div>
+            }
+        </div>
+
+        <p class="ll-player-count">
+            @PlayerCount player@(PlayerCount == 1 ? "" : "s") (need @View.MinPlayerCount–@View.MaxPlayerCount)
+        </p>
+
+        @if (IsHost)
+        {
+            <button class="ll-btn ll-btn-primary" @onclick="() => StartGame(false)" disabled="@(!CanStart)"
+                    title="@(CanStart ? "Start the game — you run the display and don't play" : $"Need {View.MinPlayerCount}–{View.MaxPlayerCount} players")">
+                Start Game
+            </button>
+            <button class="ll-btn ll-btn-primary" @onclick="() => StartGame(true)" disabled="@(!CanStartAsPlayer)"
+                    title="@(CanStartAsPlayer ? "Start the game and play along — you count toward the player total" : $"Need {View.MinPlayerCount}–{View.MaxPlayerCount} players including you")">
+                Start Game As Player
+            </button>
+            @if (!CanStart && !CanStartAsPlayer)
+            {
+                <p class="ll-hint">⚠️ Need @View.MinPlayerCount–@View.MaxPlayerCount players to start.</p>
+            }
+            @if (!string.IsNullOrEmpty(_startError))
+            {
+                <p class="ll-hint">⚠️ @_startError</p>
+            }
+        }
+        else
+        {
+            <p class="ll-hint">Waiting for the host to start…</p>
+        }
+    </div>
+
+    @if (IsHost)
+    {
+        @if (SettingsOpen)
+        {
+            <div class="ll-settings-backdrop" @onclick="ToggleSettings"></div>
+        }
+        <div class="ll-settings-drawer @(SettingsOpen ? "ll-settings-drawer-open" : "")">
+            <div class="ll-settings-header">
+                <h3>⚙️ Game Settings</h3>
+                <button class="ll-close-btn" @onclick="ToggleSettings" title="Close">✕</button>
+            </div>
+            <div class="ll-settings-body">
+
+                <h4 class="ll-section-title">Scoring &amp; structure</h4>
+                <label class="ll-field">
+                    <span>Scoring mode</span>
+                    <select class="ll-input" value="@S.ScoringMode" @onchange="SetMode">
+                        <option value="@ScoringMode.FewestGuesses">Fewest Guesses</option>
+                        <option value="@ScoringMode.FastestTime">Fastest Time</option>
+                    </select>
+                </label>
+                <label class="ll-field">
+                    <span>Player structure</span>
+                    <select class="ll-input" value="@S.PlayerStructure" @onchange="SetStructure">
+                        <option value="@PlayerStructure.Collective">Collective (co-op)</option>
+                        <option value="@PlayerStructure.Groups">Groups (competitive)</option>
+                    </select>
+                </label>
+
+                <h4 class="ll-section-title">Rules</h4>
+                <label class="ll-field">
+                    <span>Rounds per match</span>
+                    <input type="number" min="1" class="ll-input" value="@S.RoundsPerMatch"
+                           @onchange="e => SetInt(e, v => s => s with { RoundsPerMatch = v < 1 ? 1 : v })" />
+                </label>
+                <label class="ll-field">
+                    <span>Rejection cap per turn (0 = off)</span>
+                    <input type="number" min="0" class="ll-input" value="@S.RejectionCap"
+                           @onchange="e => SetInt(e, v => s => s with { RejectionCap = v < 0 ? 0 : v })" />
+                </label>
+                <label class="ll-field ll-field-row">
+                    <span>Block repeat pairs (loops)</span>
+                    <input type="checkbox" checked="@S.NoImmediateRepeat"
+                           @onchange="e => Update(s => s with { NoImmediateRepeat = (bool)(e.Value ?? false) })" />
+                </label>
+
+                @if (S.PlayerStructure == PlayerStructure.Collective)
+                {
+                    <label class="ll-field ll-field-row">
+                        <span>Set a par (target)</span>
+                        <input type="checkbox" checked="@(S.Par is not null)"
+                               @onchange="e => Update(s => s with { Par = (bool)(e.Value ?? false) ? (s.Par ?? 10) : null })" />
+                    </label>
+                    @if (S.Par is not null)
+                    {
+                        <label class="ll-field">
+                            <span>Par</span>
+                            <input type="number" min="1" class="ll-input" value="@(S.Par ?? 10)"
+                                   @onchange="e => SetInt(e, v => s => s with { Par = v < 1 ? 1 : v })" />
+                        </label>
+                    }
+                }
+                else
+                {
+                    var teams = ReconcileTeams();
+                    var validity = ValidateTeams(teams);
+                    <h4 class="ll-section-title">Teams</h4>
+                    <label class="ll-field">
+                        <span>Number of groups</span>
+                        <input type="number" min="2" max="@MaxGroupCount" class="ll-input" value="@GroupCountInput"
+                               @onchange="e => { if (int.TryParse(e.Value?.ToString(), out var v)) SetGroupCount(v); }" />
+                    </label>
+                    <button class="ll-btn ll-btn-ghost ll-balance-btn" @onclick="AutoBalanceTeams">⚖️ Auto-balance</button>
+
+                    <div class="ll-teams">
+                        @for (int gi = 0; gi < teams.Count; gi++)
+                        {
+                            var groupIndex = gi;
+                            var members = teams[groupIndex];
+                            <div class="ll-team-card" style="--ll-route: var(--ll-route-@(groupIndex % 6))">
+                                <div class="ll-team-head">
+                                    <span class="ll-team-name">@GroupLabel(groupIndex)</span>
+                                    <span class="ll-team-count">@members.Count player@(members.Count == 1 ? "" : "s")</span>
+                                </div>
+                                @foreach (var pid in members)
+                                {
+                                    <div class="ll-team-member">
+                                        <span class="ll-team-member-name">@DisplayNameOf(pid)</span>
+                                        <select class="ll-input ll-team-select"
+                                                @onchange="e => AssignPlayerToGroup(pid, int.TryParse(e.Value?.ToString(), out var v) ? v : groupIndex)">
+                                            @for (int t = 0; t < teams.Count; t++)
+                                            {
+                                                <option value="@t" selected="@(t == groupIndex)">@GroupLabel(t)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                }
+                                @if (members.Count == 0)
+                                {
+                                    <p class="ll-hint">No players — move someone here.</p>
+                                }
+                            </div>
+                        }
+                    </div>
+                    @if (!validity.Ok)
+                    {
+                        <p class="ll-hint">⚠️ @validity.Message</p>
+                    }
+                }
+
+                <h4 class="ll-section-title">Start &amp; destination</h4>
+                <label class="ll-field">
+                    <span>Start word (blank = random)</span>
+                    <input type="text" class="ll-input" value="@_startWord" placeholder="random"
+                           @onchange="e => _startWord = e.Value?.ToString() ?? string.Empty" />
+                </label>
+                <label class="ll-field">
+                    <span>Destination word (blank = random)</span>
+                    <input type="text" class="ll-input" value="@_destWord" placeholder="random"
+                           @onchange="e => _destWord = e.Value?.ToString() ?? string.Empty" />
+                </label>
+
+                <h4 class="ll-section-title">First Auditor</h4>
+                <label class="ll-field">
+                    <span>Auditor (blank = auto)</span>
+                    <select class="ll-input" value="@_auditorId" @onchange="e => _auditorId = e.Value?.ToString() ?? string.Empty">
+                        <option value="">— auto-assign —</option>
+                        @foreach (var entry in View.Roster.Where(r => !r.IsHost))
+                        {
+                            <option value="@entry.UserId">@entry.DisplayName</option>
+                        }
+                    </select>
+                </label>
+
+                <div class="ll-settings-footer">
+                    <button class="ll-btn ll-btn-ghost ll-reset-btn" @onclick="ResetSettings"
+                            title="Restore all rules to their defaults">
+                        ↺ Reset settings to default
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public LinkedListView View { get; set; } = default!;
+
+    /// <summary>Sends a command to the hub; returns the reply (null on success, else an error).</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+
+    private const string StorageKey = "linked-list.settings";
+
+    private bool IsHost => View.RecipientIsHost;
+    protected bool SettingsOpen { get; private set; }
+
+    // Client-owned settings draft (the persisted, host-editable subset): bound to the server
+    // projection until the host first edits, after which the host's draft wins so an in-flight edit
+    // isn't clobbered by the echoed projection. Mirrors the Tracery lobby pattern.
+    private LinkedListSettingsView _draft = new();
+    private LinkedListSettingsView S => _draft;
+    private bool _userHasEdited;
+    private bool _loaded;
+    private Task? _saveTask;
+
+    // Start-time setup the server can't be told mid-edit — carried with the Start command.
+    private List<List<Guid>> _teams = [];
+    private string _startWord = "";
+    private string _destWord = "";
+    private string _auditorId = "";
+    private string? _startError;
+
+    protected override void OnParametersSet()
+    {
+        if (!_userHasEdited)
+            _draft = View.Settings;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // localStorage needs JS interop, so the host's saved rules load here. Host-only.
+        if (firstRender && IsHost && !_loaded)
+        {
+            _loaded = true;
+            await LoadSettingsAsync();
+        }
+    }
+
+    protected void ToggleSettings() => SettingsOpen = !SettingsOpen;
+
+    // ── Settings sync (instant local draft → authoritative server → localStorage) ──
+
+    private void Update(Func<LinkedListSettingsView, LinkedListSettingsView> mutate)
+    {
+        _userHasEdited = true;
+        _draft = mutate(_draft);
+        StateHasChanged();
+        var json = JsonSerializer.Serialize(_draft, LinkedListContractsJsonContext.Default.LinkedListSettingsView);
+        _ = Submit(LinkedListCommands.UpdateSettings, json);
+        PersistSettings(json);
+    }
+
+    private void SetInt(ChangeEventArgs e, Func<int, Func<LinkedListSettingsView, LinkedListSettingsView>> mutate)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var v))
+            Update(mutate(v));
+    }
+
+    private void SetMode(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<ScoringMode>(e.Value?.ToString(), out var m))
+            Update(s => s with { ScoringMode = m });
+    }
+
+    private void SetStructure(ChangeEventArgs e)
+    {
+        if (!Enum.TryParse<PlayerStructure>(e.Value?.ToString(), out var ps)) return;
+        Update(s => s with { PlayerStructure = ps });
+        // Seed a sensible default team layout the first time Groups is chosen.
+        if (ps == PlayerStructure.Groups && _teams.Count == 0)
+            AutoBalanceTeams();
+    }
+
+    private void ResetSettings() => Update(_ => new LinkedListSettingsView());
+
+    private async Task LoadSettingsAsync()
+    {
+        string? json;
+        try { json = await JS.InvokeAsync<string?>("localStorage.getItem", ComponentDetached, StorageKey); }
+        catch { return; }
+
+        if (string.IsNullOrEmpty(json) || _userHasEdited) return;
+
+        LinkedListSettingsView? saved;
+        try { saved = JsonSerializer.Deserialize(json, LinkedListContractsJsonContext.Default.LinkedListSettingsView); }
+        catch { return; }
+        if (saved is null) return;
+
+        _draft = saved;
+        await Submit(LinkedListCommands.UpdateSettings,
+            JsonSerializer.Serialize(saved, LinkedListContractsJsonContext.Default.LinkedListSettingsView));
+        StateHasChanged();
+    }
+
+    private void PersistSettings(string json) => _saveTask = SaveSettingsAsync(json, _saveTask);
+
+    private async Task SaveSettingsAsync(string json, Task? prior)
+    {
+        if (prior is not null)
+        {
+            try { await prior; } catch { /* prior failure already swallowed */ }
+        }
+        try { await JS.InvokeVoidAsync("localStorage.setItem", ComponentDetached, StorageKey, json); }
+        catch { /* storage unavailable / cancelled */ }
+    }
+
+    // ── Roster / start gates ──────────────────────────────────────────────────
+
+    /// <summary>Registered players (never the host) — the count both start gates measure against.</summary>
+    private int PlayerCount => View.Roster.Count(r => !r.IsHost);
+
+    private bool CanStart =>
+        PlayerCount >= View.MinPlayerCount
+        && PlayerCount <= View.MaxPlayerCount
+        && (S.PlayerStructure != PlayerStructure.Groups || ValidateTeams(ReconcileTeams()).Ok);
+
+    private bool CanStartAsPlayer =>
+        PlayerCount + 1 >= View.MinPlayerCount
+        && PlayerCount + 1 <= View.MaxPlayerCount
+        && (S.PlayerStructure != PlayerStructure.Groups || ValidateTeams(ReconcileTeamsIncludingHost()).Ok);
+
+    private Task KickPlayer(Guid id)
+        => Submit(LinkedListCommands.KickPlayer,
+            JsonSerializer.Serialize(new KickPlayerPayload(id), LinkedListContractsJsonContext.Default.KickPlayerPayload));
+
+    private async Task StartGame(bool hostPlays)
+    {
+        _startError = null;
+
+        List<List<Guid>>? assignments = null;
+        if (S.PlayerStructure == PlayerStructure.Groups)
+        {
+            var teams = hostPlays ? ReconcileTeamsIncludingHost() : ReconcileTeams();
+            assignments = teams;
+        }
+
+        Guid? auditorId = Guid.TryParse(_auditorId, out var a) && a != Guid.Empty ? a : null;
+        var payload = new StartPayload(
+            hostPlays,
+            assignments,
+            auditorId,
+            string.IsNullOrWhiteSpace(_startWord) ? null : _startWord,
+            string.IsNullOrWhiteSpace(_destWord) ? null : _destWord);
+
+        var error = await Submit(LinkedListCommands.Start,
+            JsonSerializer.Serialize(payload, LinkedListContractsJsonContext.Default.StartPayload));
+        if (!string.IsNullOrEmpty(error))
+        {
+            _startError = error;
+            StateHasChanged();
+        }
+    }
+
+    // ── Team draft (Groups mode), ported from the server lobby (client-owned) ──
+
+    private List<Guid> ParticipantIds => [.. View.Roster.Where(r => !r.IsHost).Select(r => r.UserId)];
+
+    private int GroupCount => Math.Max(2, _teams.Count);
+    private int MaxGroupCount => Math.Max(2, ParticipantIds.Count / 2);
+    private int GroupCountInput => GroupCount;
+
+    private void SetGroupCount(int count)
+    {
+        count = Math.Clamp(count, 2, MaxGroupCount);
+        _teams = AutoBalanceGroups(ParticipantIds, count);
+        StateHasChanged();
+    }
+
+    private void AutoBalanceTeams()
+    {
+        _teams = AutoBalanceGroups(ParticipantIds, GroupCount);
+        StateHasChanged();
+    }
+
+    private void AssignPlayerToGroup(Guid playerId, int groupIndex)
+    {
+        var teams = ReconcileTeams();
+        foreach (var t in teams) t.Remove(playerId);
+        if (groupIndex < 0 || groupIndex >= teams.Count) groupIndex = 0;
+        teams[groupIndex].Add(playerId);
+        _teams = teams;
+        StateHasChanged();
+    }
+
+    private static string GroupLabel(int index) => $"Group {(char)('A' + index)}";
+
+    private string DisplayNameOf(Guid playerId)
+        => View.Roster.FirstOrDefault(r => r.UserId == playerId)?.DisplayName ?? "Player";
+
+    /// <summary>Pure (no-mutate) view of the teams reconciled against the current roster: members who
+    /// left are dropped and players with no team join the smallest one. Safe to call during render.</summary>
+    private List<List<Guid>> ReconcileTeams() => ReconcileTeamsFor(ParticipantIds);
+
+    /// <summary>Team layout for the "start as player" gate: the host is dropped into the smallest team
+    /// first, mirroring how StartGame(true) seats them.</summary>
+    private List<List<Guid>> ReconcileTeamsIncludingHost()
+    {
+        var ids = ParticipantIds.ToList();
+        ids.Add(View.HostId);
+        return ReconcileTeamsFor(ids);
+    }
+
+    private List<List<Guid>> ReconcileTeamsFor(IReadOnlyList<Guid> participantIds)
+    {
+        var ids = participantIds.ToHashSet();
+        var teams = _teams.Count > 0
+            ? _teams.Select(t => new List<Guid>(t)).ToList()
+            : AutoBalanceGroups(participantIds, 2);
+
+        foreach (var t in teams) t.RemoveAll(id => !ids.Contains(id));
+        while (teams.Count < 2) teams.Add([]);
+
+        var assigned = teams.SelectMany(t => t).ToHashSet();
+        foreach (var id in participantIds)
+        {
+            if (assigned.Add(id))
+                teams.OrderBy(t => t.Count).First().Add(id);
+        }
+        return teams;
+    }
+
+    private static (bool Ok, string? Message) ValidateTeams(List<List<Guid>> teams)
+    {
+        if (teams.Count < 2) return (false, "Need at least 2 groups.");
+        if (teams.Any(t => t.Count < 2)) return (false, "Each group needs at least 2 players.");
+        return (true, null);
+    }
+
+    // Round-robins players across `groupCount` teams. Ported from LinkedListGameEngine.AutoBalanceGroups
+    // (the server helper can't be referenced from a .Client assembly — KB1005).
+    private static List<List<Guid>> AutoBalanceGroups(IReadOnlyList<Guid> playerIds, int groupCount)
+    {
+        if (groupCount < 1) groupCount = 1;
+        var teams = new List<List<Guid>>();
+        for (int i = 0; i < groupCount; i++) teams.Add([]);
+        for (int i = 0; i < playerIds.Count; i++) teams[i % groupCount].Add(playerIds[i]);
+        return teams;
+    }
+}

@@ -1,0 +1,47 @@
+@inject NavigationManager Nav
+@*
+    Linked List's custom header, WASM-safe. The server header used server-only services
+    (INavigationService, IGameSessionService) and the server RoomCodeButton, none of which a
+    .Client assembly may reference (KB1005). This version uses NavigationManager to leave and the
+    WASM RoomCodeButton (KnockBox.Core.Client) for full room-code parity. The brushed-steel
+    nameplate markup is unchanged from the server component.
+*@
+
+<div class="ll-header">
+    <a class="ll-header-brand" role="button" tabindex="0" @onclick="Leave" title="Click to return home">
+        <span class="ll-glyph ll-glyph-start" aria-hidden="true">◆</span><span class="ll-glyph ll-glyph-ring" aria-hidden="true">◯</span><span class="ll-header-title">LINKED LIST</span><span class="ll-glyph ll-glyph-ring" aria-hidden="true">◯</span><span class="ll-glyph ll-glyph-dest" aria-hidden="true">◉</span>
+    </a>
+    <div class="ll-header-actions">
+        <RoomCodeButton Code="@(Code ?? string.Empty)"
+                        JoinUrl="@JoinUrl"
+                        ClassName="ll-header-code"
+                        CoverClassName="ll-header-code-cover"
+                        ValueClassName="ll-header-code-value"
+                        CoverText="Join Code" />
+        <button class="ll-header-leave" @onclick="Leave" title="Leave Session" aria-label="Leave Session">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        </button>
+    </div>
+</div>
+
+@code {
+    /// <summary>The short, shareable lobby code (resolved from the hub by GameRoot).</summary>
+    [Parameter] public string? Code { get; set; }
+
+    /// <summary>
+    /// Invoked when the player leaves (brand or leave button). GameRoot wires this to the base
+    /// LeaveAsync, which tells the hub (closing the lobby if host) then navigates home.
+    /// </summary>
+    [Parameter] public EventCallback OnLeave { get; set; }
+
+    private string JoinUrl =>
+        string.IsNullOrEmpty(Code) ? "#" : $"{Nav.BaseUri}?join={Uri.EscapeDataString(Code)}";
+
+    private async Task Leave()
+    {
+        if (OnLeave.HasDelegate)
+            await OnLeave.InvokeAsync();
+        else
+            Nav.NavigateTo("/", forceLoad: true);
+    }
+}

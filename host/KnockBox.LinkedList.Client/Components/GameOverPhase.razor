@@ -1,24 +1,27 @@
-@using KnockBox.LinkedList.Services.State.Games
+@*
+    The end-of-match results: superlatives, group standings (competitive), the ranked "Linksmiths"
+    scoreboard, and the final chain — all from the projected view. The host returns to the lobby via
+    the hub (ReturnToLobby).
+*@
 
 @{
-    var myId = UserService.CurrentUser?.Id ?? Guid.Empty;
+    var myId = View.RecipientId;
     var ranked = RankedPlayers;
+    var finalChain = View.AllGroups.FirstOrDefault();
 }
 
 <div class="ll-gameover">
 
-    @* ── Headline ── *@
     <div class="ll-go-banner">
         <span class="ll-go-emoji">🏆</span>
         <h3 class="ll-go-headline">The Final Chain</h3>
-        <p class="ll-go-sub">@GameState.RoundNumber round@(GameState.RoundNumber == 1 ? "" : "s") played</p>
+        <p class="ll-go-sub">@View.RoundNumber round@(View.RoundNumber == 1 ? "" : "s") played</p>
     </div>
 
-    @* ── Superlatives ── *@
-    @if (GameState.Superlatives.Count > 0)
+    @if (View.Superlatives.Count > 0)
     {
         <div class="ll-go-superlatives">
-            @foreach (var s in GameState.Superlatives)
+            @foreach (var s in View.Superlatives)
             {
                 <div class="ll-superlative-card">
                     <span class="ll-superlative-emoji">@s.Emoji</span>
@@ -32,8 +35,7 @@
         </div>
     }
 
-    @* ── Group standings (competitive, §8.2) ── *@
-    @if (IsGroups && Standings.Count > 0)
+    @if (IsGroups && View.Standings.Count > 0)
     {
         <div class="ll-go-scoreboard">
             <h4 class="ll-go-section-title">Final Group Standings</h4>
@@ -47,9 +49,9 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var s in Standings)
+                    @foreach (var s in View.Standings)
                     {
-                        <tr class="@(s.Rank == 1 ? "ll-standings-top" : "")" style="--ll-route: var(--ll-route-@(GameState.Groups.FindIndex(grp => grp.GroupId == s.GroupId) % 6))">
+                        <tr class="@(s.Rank == 1 ? "ll-standings-top" : "")" style="--ll-route: var(--ll-route-@(ColorIndexOf(s.GroupId) % 6))">
                             <td>@RankMedal(s.Rank)</td>
                             <td>
                                 @s.GroupName
@@ -71,7 +73,6 @@
         </div>
     }
 
-    @* ── Ranked scoreboard ── *@
     <div class="ll-go-scoreboard">
         <h4 class="ll-go-section-title">Linksmiths</h4>
         <div class="ll-go-rows">
@@ -89,7 +90,7 @@
                         {
                             <span class="ll-go-stat" title="Loop pairs">🔁 @ps.LoopPairsMade</span>
                         }
-                        @if (GameState.Settings.ScoringMode == ScoringMode.FastestTime && ps.FastestContribution is { } fc)
+                        @if (View.Settings.ScoringMode == ScoringMode.FastestTime && ps.FastestContribution is { } fc)
                         {
                             <span class="ll-go-stat" title="Fastest pair">⚡ @FormatElapsed(fc)</span>
                         }
@@ -100,14 +101,13 @@
         </div>
     </div>
 
-    @* ── Final chain ── *@
-    @if (GameState.Chain.Count > 0)
+    @if (finalChain is not null && finalChain.Chain.Count > 0)
     {
         <div class="ll-chain-card">
             <h4 class="ll-chain-title">Final Chain</h4>
             <div class="ll-chain">
-                <span class="ll-anchor ll-anchor-start">@GameState.StartWord</span>
-                @foreach (var link in GameState.Chain)
+                <span class="ll-anchor ll-anchor-start">@View.StartWord</span>
+                @foreach (var link in finalChain.Chain)
                 {
                     <span class="ll-connector">─</span>
                     <span class="ll-link @(link.IsLoop ? "ll-link-loop" : "")">
@@ -119,20 +119,19 @@
                         }
                     </span>
                 }
-                <span class="ll-connector @(GameState.DestinationReached ? "" : "ll-connector-pending")">─</span>
-                <span class="ll-anchor ll-anchor-dest @(GameState.DestinationReached ? "ll-anchor-reached" : "")">
-                    @GameState.DestinationWord
+                <span class="ll-connector @(finalChain.DestinationReached ? "" : "ll-connector-pending")">─</span>
+                <span class="ll-anchor ll-anchor-dest @(finalChain.DestinationReached ? "ll-anchor-reached" : "")">
+                    @View.DestinationWord
                 </span>
             </div>
         </div>
     }
 
-    @* ── Host controls ── *@
     @if (IsHost)
     {
         <div class="ll-go-actions">
-            <button class="ll-btn ll-btn-primary" @onclick="ReturnToLobby" disabled="@_starting">
-                @(_starting ? "Returning…" : "Return to Lobby")
+            <button class="ll-btn ll-btn-primary" @onclick="ReturnToLobby" disabled="@_busy">
+                @(_busy ? "Returning…" : "Return to Lobby")
             </button>
         </div>
     }
@@ -141,3 +140,54 @@
         <p class="ll-go-wait">Waiting for the host…</p>
     }
 </div>
+
+@code {
+    [Parameter, EditorRequired] public LinkedListView View { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private bool _busy;
+
+    private bool IsHost => View.RecipientId == View.HostId;
+    private bool IsGroups => View.Settings.PlayerStructure == PlayerStructure.Groups;
+    private bool PrimaryIsTime => View.Settings.ScoringMode == ScoringMode.FastestTime;
+
+    /// <summary>Players ranked for the scoreboard — by accepted pairs (most helpful first), fewest
+    /// rejections breaking ties, then display name. Mirrors the old GameOver page's RankedPlayers.</summary>
+    private IReadOnlyList<LinkedListPlayerScore> RankedPlayers =>
+        [.. View.Scores
+            .OrderByDescending(p => p.AcceptedPairs)
+            .ThenBy(p => p.RejectionsReceived)
+            .ThenBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)];
+
+    private int ColorIndexOf(string groupId) => View.AllGroups.FirstOrDefault(g => g.GroupId == groupId)?.ColorIndex ?? 0;
+
+    private static string RankMedal(int rank) => rank switch
+    {
+        1 => "🥇",
+        2 => "🥈",
+        3 => "🥉",
+        _ => $"#{rank}",
+    };
+
+    private async Task ReturnToLobby()
+    {
+        if (_busy) return;
+        _busy = true;
+        try
+        {
+            var error = await Submit(LinkedListCommands.ReturnToLobby, null);
+            if (!string.IsNullOrEmpty(error))
+                await OnError.InvokeAsync(error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string FormatElapsed(TimeSpan elapsed)
+        => elapsed >= TimeSpan.FromHours(1)
+            ? $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}"
+            : $"{elapsed.Minutes}:{elapsed.Seconds:00}";
+}

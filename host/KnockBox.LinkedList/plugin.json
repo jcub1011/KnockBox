@@ -8,5 +8,10 @@
   "capabilities": [],
   "tileAsset": "tile.svg",
   "backgroundColor": "#0d1018",
-  "fontColor": "#eef3f9"
+  "fontColor": "#eef3f9",
+  "clientAssembly": "KnockBox.LinkedList.Client",
+  "clientContracts": ["KnockBox.LinkedList.Contracts"],
+  "clientAssets": [
+    { "name": "KnockBox.LinkedList.Client", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
+  ]
 }

@@ -1,8 +1,13 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Games.Shared.Projection;
 using KnockBox.Core.Services.State.Users;
+using KnockBox.LinkedList.Contracts;
+using KnockBox.LinkedList.Services.Projection;
 using KnockBox.LinkedList.Services.State.Games;
 
 namespace KnockBox.LinkedList.Services.Logic.Games
@@ -12,8 +17,128 @@ namespace KnockBox.LinkedList.Services.Logic.Games
         IRandomNumberService randomNumberService,
         ILogger<LinkedListGameEngine> logger,
         ILogger<LinkedListGameState> stateLogger)
-        : AbstractGameEngine<LinkedListGameState>(minPlayerCount: 3, maxPlayerCount: 10)
+        : AbstractGameEngine<LinkedListGameState>(minPlayerCount: 3, maxPlayerCount: 10),
+          IGameStateProjector, IGameCommandHandler
     {
+        // Per-recipient projector + the wire-command JSON options (string enums + case-insensitive
+        // so the browser's source-gen JSON parses on the server). The hub resolves both interfaces
+        // off this keyed engine instance; per-room data lives on LinkedListGameState, so the
+        // projector is stateless and shared. Min/max mirror the base ctor's (3, 10).
+        private readonly LinkedListStateProjector _projector = new(3, 10);
+
+        private static readonly JsonSerializerOptions CommandJsonOptions = new()
+        {
+            Converters = { new JsonStringEnumConverter() },
+            PropertyNameCaseInsensitive = true,
+        };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // Hub surface (WASM tri-split): per-recipient projection + command dispatch.
+        // The Razor UI moved to KnockBox.LinkedList.Client; these adapt the existing
+        // engine methods to the (command, payloadJson) the hub delivers. Lobby
+        // creation is NOT a command — it flows through GameHub.CreateRoom →
+        // CreateStateAsync. The per-turn timeout still fires on the engine's own
+        // ScheduleCallback timer (no IServerTickHandler needed), and every
+        // ExecuteAsync re-projects via the GameViewCoordinator subscription.
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <inheritdoc />
+        public object? ProjectFor(AbstractGameState state, Guid recipientId)
+            => ((IGameStateProjector)_projector).ProjectFor(state, recipientId);
+
+        /// <inheritdoc />
+        public async ValueTask<Result> HandleCommandAsync(
+            User caller, AbstractGameState state, string command, string? payloadJson, CancellationToken ct = default)
+        {
+            if (state is not LinkedListGameState s)
+                return Result.FromError("Invalid game state for Linked List.");
+
+            return command switch
+            {
+                LinkedListCommands.Start          => await StartFromPayload(caller, s, payloadJson, ct),
+                LinkedListCommands.SubmitPair     => SubmitPairFromPayload(caller, s, payloadJson),
+                LinkedListCommands.Approve        => Approve(caller, s),
+                LinkedListCommands.Reject         => Reject(caller, s),
+                LinkedListCommands.EndRound       => EndRound(caller, s),
+                LinkedListCommands.NextRound      => HostGated(caller, s, () => RotateAuditorAndStartRound(s)),
+                LinkedListCommands.EndMatch       => HostGated(caller, s, () => EndMatch(s)),
+                LinkedListCommands.ReturnToLobby  => ReturnToLobby(caller, s),
+                LinkedListCommands.KickPlayer     => KickFromPayload(caller, s, payloadJson),
+                LinkedListCommands.UpdateSettings => UpdateSettingsFromPayload(caller, s, payloadJson),
+                _ => Result.FromError($"Unknown command [{command}].")
+            };
+        }
+
+        // The lobby's start-time setup (host-plays, teams, first Auditor, word overrides) is carried
+        // in the payload because the WASM client can't mutate state. Applied here — host-plays via
+        // UpdateSettings (so HostIsParticipant flips), the rest in one Execute — before StartAsync
+        // reads them in StartAsyncCore. StartAsync itself rejects a non-host caller.
+        private async Task<Result> StartFromPayload(User caller, LinkedListGameState state, string? payloadJson, CancellationToken ct)
+        {
+            var p = Deserialize<StartPayload>(payloadJson) ?? new StartPayload(false, null, null, null, null);
+
+            if (caller.Id == state.Host.Id
+                && state.UpdateSettings(s => s with { HostPlays = p.HostPlays }).TryGetFailure(out var settingsError))
+                return settingsError;
+
+            var apply = state.Execute(() =>
+            {
+                if (p.GroupAssignments is not null)
+                {
+                    state.GroupAssignments.Clear();
+                    foreach (var team in p.GroupAssignments)
+                        state.GroupAssignments.Add([.. team]);
+                }
+                if (p.FirstAuditorId is { } auditorId)
+                    state.AuditorPlayerId = auditorId;
+                if (!string.IsNullOrWhiteSpace(p.StartWordOverride))
+                    state.StartWord = p.StartWordOverride.Trim().ToUpperInvariant();
+                if (!string.IsNullOrWhiteSpace(p.DestinationWordOverride))
+                    state.DestinationWord = p.DestinationWordOverride.Trim().ToUpperInvariant();
+            });
+            if (apply.TryGetFailure(out var applyError))
+                return Result.FromError(applyError);
+
+            return await StartAsync(caller, state, ct);
+        }
+
+        private Result SubmitPairFromPayload(User caller, LinkedListGameState state, string? payloadJson)
+        {
+            if (Deserialize<SubmitPairPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed submit-pair payload.");
+            return SubmitPair(caller, state, p.Word ?? "");
+        }
+
+        private Result UpdateSettingsFromPayload(User caller, LinkedListGameState state, string? payloadJson)
+        {
+            // Compare by id, never by reference: the hub resolves a fresh User per command.
+            if (caller.Id != state.Host.Id)
+                return Result.FromError("Only the host can change the settings.");
+            if (Deserialize<LinkedListSettingsView>(payloadJson) is not { } view)
+                return Result.FromError("Malformed settings payload.");
+            return state.UpdateSettings(cfg => cfg.Apply(view));
+        }
+
+        private Result KickFromPayload(User caller, LinkedListGameState state, string? payloadJson)
+        {
+            if (Deserialize<KickPlayerPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed kick payload.");
+            User? target = null;
+            foreach (var entry in state.RosterIncludingHost)
+                if (entry.User.Id == p.PlayerId) { target = entry.User; break; }
+            if (target is null)
+                return Result.FromError("That player is not in the lobby.");
+            return state.KickPlayer(caller, target);
+        }
+
+        // NextRound / EndMatch advance the match but the engine methods don't self-gate on the host
+        // (the old RoundOver page gated before calling), so the hub enforces it here by id.
+        private static Result HostGated(User caller, LinkedListGameState state, Func<Result> action)
+            => caller.Id == state.Host.Id ? action() : Result.FromError("Only the host can do that.");
+
+        private static T? Deserialize<T>(string? json)
+            => string.IsNullOrEmpty(json) ? default : JsonSerializer.Deserialize<T>(json, CommandJsonOptions);
+
         public override Task<ValueResult<AbstractGameState>> CreateStateAsync(User host, CancellationToken ct = default)
         {
             if (host is null)

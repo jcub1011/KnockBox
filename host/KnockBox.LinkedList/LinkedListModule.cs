@@ -1,9 +1,7 @@
 using KnockBox.Core.Plugins;
-using KnockBox.LinkedList.Components;
 using KnockBox.LinkedList.Services.Logic;
 using KnockBox.LinkedList.Services.Logic.Games;
 using KnockBox.LinkedList.Services.Storage;
-using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.LinkedList
 {
@@ -19,10 +17,9 @@ namespace KnockBox.LinkedList
             registration.AddScoped<LinkedListStorage, LinkedListStorage>();
         }
 
-        public RenderFragment? GetCustomHeader() => builder =>
-        {
-            builder.OpenComponent<LinkedListHeader>(0);
-            builder.CloseComponent();
-        };
+        // The game UI now lives in the WASM client (KnockBox.LinkedList.Client); the server registers
+        // only the engine. The hub resolves its IGameStateProjector / IGameCommandHandler off the
+        // keyed AbstractGameEngine, and the WASM client renders the custom header — so there is no
+        // server-side GetCustomHeader.
     }
 }

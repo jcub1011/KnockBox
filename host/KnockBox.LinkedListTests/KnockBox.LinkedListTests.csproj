@@ -20,6 +20,9 @@
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
     <ProjectReference Include="..\..\sdk\KnockBox.Platform\KnockBox.Platform.csproj" />
     <ProjectReference Include="..\KnockBox.LinkedList\KnockBox.LinkedList.csproj" />
+    <!-- The tri-split wire DTOs (LinkedListView, command payloads, the source-gen JSON context)
+         the projector + hub command tests assert against. -->
+    <ProjectReference Include="..\KnockBox.LinkedList.Contracts\KnockBox.LinkedList.Contracts.csproj" />
     <ProjectReference Include="..\KnockBox.WordService.Contracts\KnockBox.WordService.Contracts.csproj" />
   </ItemGroup>
 

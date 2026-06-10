@@ -1,0 +1,101 @@
+@inherits HubLobbyPageBase<LinkedListView>
+@*
+    GameRoot — the runtime-loaded WASM UI entry point for Linked List. Inheriting
+    HubLobbyPageBase<LinkedListView> opens the hub, joins the lobby, deserializes each per-player
+    projection into `View`, and disposes on teardown. It dispatches to the phase components exactly
+    as the old server LinkedListLobby page's phase switch did.
+*@
+
+@* The game ships its stylesheets from the server plugin's mounted wwwroot; a runtime-loaded WASM
+   component can't use HeadContent and the streamed .Client DLL has no scoped bundle, so we link the
+   theme tokens (which @import the fonts) + the de-scoped component stylesheet here from the markup. *@
+<link rel="stylesheet" href="_content/KnockBox.LinkedList/css/linked-list-theme.css" />
+<link rel="stylesheet" href="_content/KnockBox.LinkedList/css/linked-list.css" />
+
+<LinkedListHeader Code="@LobbyCode" OnLeave="LeaveAsync" />
+
+<div class="ll-root">
+@if (_errorMessage is not null)
+{
+    <div @key="_errorKey" class="ll-error-toast">
+        <span class="ll-error-icon">⚠️</span>
+        <span>@_errorMessage</span>
+    </div>
+}
+
+@if (View is null)
+{
+    <div class="ll-card"><p>Loading…</p></div>
+}
+else if (View.IsJoinable)
+{
+    <LobbyPhase View="View" Submit="SubmitAsync" />
+}
+else
+{
+    @switch (View.Phase)
+    {
+        case LinkedListGamePhase.Playing:
+            <PlayingPhase View="View" Submit="SubmitAsync" OnError="ShowError" />
+            break;
+        case LinkedListGamePhase.RoundOver:
+            <RoundOverPhase View="View" Submit="SubmitAsync" OnError="ShowError" />
+            break;
+        case LinkedListGamePhase.GameOver:
+            <GameOverPhase View="View" Submit="SubmitAsync" OnError="ShowError" />
+            break;
+        default:
+            <div class="ll-card"><p>Setting up…</p></div>
+            break;
+    }
+}
+</div>
+
+@code {
+    /// <summary>The lobby code from the room URL, supplied by the WASM host page.</summary>
+    [Parameter] public string Code { get; set; } = "";
+
+    /// <summary>The player's chosen display name, propagated from the home page.</summary>
+    [Parameter] public string? PlayerName { get; set; }
+
+    protected override string RouteIdentifier => "linked-list";
+    protected override string LobbyUri => $"room/linked-list/{Code}";
+    protected override string DisplayName => string.IsNullOrWhiteSpace(PlayerName) ? "Player" : PlayerName!;
+
+    public GameRoot()
+        : base(new SourceGenProjectionDeserializer<LinkedListView>(
+            LinkedListContractsJsonContext.Default.LinkedListView))
+    {
+    }
+
+    // One submit path for every phase. Returns the hub reply (null on success, an error message on
+    // rejection) so a view can surface a rejected word / failed start inline; fire-and-forget callers
+    // simply ignore the result.
+    private Task<string?> SubmitAsync(string command, string? payload) => SubmitCommandAsync(command, payload);
+
+    private string? _errorMessage;
+    private int _errorKey;
+
+    // Mirrors the CSS .ll-error-toast animation duration in linked-list.css.
+    private static readonly TimeSpan ErrorToastDuration = TimeSpan.FromSeconds(3);
+
+    // Surfaces a transient submission-rejection toast. Client-side timer (no server round-trip),
+    // guarded by a captured key so a rapid second error doesn't clear the first prematurely.
+    private void ShowError(string message)
+    {
+        _errorMessage = message;
+        _errorKey++;
+        int captured = _errorKey;
+        StateHasChanged();
+        _ = ClearErrorAfterDelay(captured);
+    }
+
+    private async Task ClearErrorAfterDelay(int captured)
+    {
+        try { await Task.Delay(ErrorToastDuration, ComponentDetached); }
+        catch (OperationCanceledException) { return; }
+        if (_errorKey != captured) return;
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+    }
+}

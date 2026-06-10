@@ -1,0 +1,397 @@
+@*
+    The live chain. Reads everything off the projected LinkedListView — never the server state.
+    Collective renders the single shared chain (View.MyGroup); Groups renders the recipient's own
+    group (View.MyGroup) with rivals as count-only chips, the Auditor sees only the front audit-queue
+    group (View.AuditingGroup), and the host-observer sees every group (View.AllGroups). Submissions /
+    audit decisions go to the hub via the Submit callback.
+*@
+
+@{
+    var myId = View.RecipientId;
+    var isHostSpectator = View.IsHostObserver;
+    var isAuditor = View.RecipientIsAuditor;
+    var auditorName = View.AuditorName;
+    bool timed = View.Settings.ScoringMode == ScoringMode.FastestTime && View.Settings.EnableTimers;
+    var perTurnClock = TimeSpan.FromSeconds(View.Settings.PerTurnClockSeconds);
+
+    // Reusable chain view for one group's chain.
+    RenderFragment<GroupChainView> chainView = g =>
+    @<div class="ll-chain">
+        <span class="ll-anchor ll-anchor-start">@View.StartWord</span>
+        @foreach (var link in g.Chain)
+        {
+            <span class="ll-connector">─</span>
+            <span class="ll-link @(link.IsLoop ? "ll-link-loop" : "")">
+                <span class="ll-link-pair">@link.FromWord → @link.ToWord</span>
+                <span class="ll-link-by">@link.PlayerName</span>
+                @if (link.IsLoop)
+                {
+                    <span class="ll-loop-badge" title="This pair already appeared in the chain">↺ kink</span>
+                }
+            </span>
+        }
+        <span class="ll-connector @(g.DestinationReached ? "" : "ll-connector-pending")">─</span>
+        <span class="ll-anchor ll-anchor-dest @(g.DestinationReached ? "ll-anchor-reached" : "")">
+            @View.DestinationWord
+        </span>
+    </div>;
+}
+
+<div class="ll-play">
+
+    @* ── Journey banner: start → destination ── *@
+    <div class="ll-journey">
+        <span class="ll-journey-word ll-journey-start">@View.StartWord</span>
+        <span class="ll-journey-arrow">➜</span>
+        <span class="ll-journey-word ll-journey-dest">@View.DestinationWord</span>
+    </div>
+
+    @* ── Round + Auditor strip ── *@
+    <div class="ll-meta-strip">
+        <span class="ll-round-chip">Round @View.RoundNumber / @View.Settings.RoundsPerMatch</span>
+        <span class="ll-auditor-chip">
+            <span class="ll-auditor-label">Auditor</span>
+            <span class="ll-auditor-name">@auditorName</span>
+        </span>
+    </div>
+
+    @* ════════════════ COLLECTIVE (co-op): one shared chain ════════════════ *@
+    @if (!IsGroups)
+    {
+        var group = View.MyGroup;
+        if (group is not null)
+        {
+            var activeId = group.CurrentSubmitterId;
+            var isMyTurn = !isHostSpectator && myId == activeId && !isAuditor;
+            var pending = group.Pending;
+            var activeName = group.CurrentSubmitterName;
+
+            @if (timed)
+            {
+                <div class="ll-timer">
+                    <div class="ll-timer-total">
+                        <span class="ll-timer-label">Elapsed</span>
+                        <span class="ll-timer-value">@FormatElapsed(group.ElapsedThinkingTime)</span>
+                    </div>
+
+                    @if (group.ClockRunning && group.PhaseExpiresAtUtc is { } expires)
+                    {
+                        <CountdownClock EndTimeUtc="expires" Duration="perTurnClock" Context="countdown">
+                            @{
+                                var barWidth = 20;
+                                var filled = (int)Math.Ceiling(countdown.Fraction * barWidth);
+                                if (filled < 0) filled = 0;
+                                if (filled > barWidth) filled = barWidth;
+                                var bar = new string('█', filled) + new string('░', barWidth - filled);
+                                var seconds = (int)Math.Ceiling(countdown.RemainingSeconds);
+                            }
+                            <div class="ll-timer-bar @(seconds < 5 ? "ll-timer-urgent" : "")">
+                                <span class="ll-timer-mono">[@bar] @(seconds)s</span>
+                                <span class="ll-timer-caption">@activeName is forging the next link</span>
+                            </div>
+                        </CountdownClock>
+                    }
+                    else if (pending is not null)
+                    {
+                        <div class="ll-timer-bar ll-timer-paused">
+                            <span class="ll-timer-mono">⏸ PAUSED — auditing</span>
+                            <span class="ll-timer-caption">the clock resumes if the pair is rejected</span>
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (isMyTurn)
+            {
+                <div class="ll-panel ll-panel-turn">
+                    <p class="ll-turn-label">Your turn — build from</p>
+                    <div class="ll-carried">@group.CarriedWord</div>
+
+                    @if (pending is null)
+                    {
+                        <form class="ll-submit-row" @onsubmit="SubmitPair" @onsubmit:preventDefault="true">
+                            <input @key="_inputKey" type="text" class="ll-input"
+                                   placeholder="@($"a word that pairs with {group.CarriedWord}…")"
+                                   @oninput="OnWordInput" maxlength="40" autocomplete="off" />
+                            <button type="submit" class="ll-btn ll-btn-primary">Submit</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <div class="ll-pending-note">
+                            Proposed <strong>@pending.ProposedWord</strong> — waiting for the Auditor…
+                        </div>
+                    }
+                </div>
+            }
+            else if (isAuditor)
+            {
+                <div class="ll-panel ll-panel-auditor">
+                    <p class="ll-role-label">You are the Auditor</p>
+                    @if (pending is not null)
+                    {
+                        <div class="ll-proposal">
+                            <span class="ll-proposal-word">@group.CarriedWord</span>
+                            <span class="ll-proposal-arrow">→</span>
+                            <span class="ll-proposal-word ll-proposal-new">@pending.ProposedWord</span>
+                        </div>
+                        <p class="ll-proposal-by">from @pending.PlayerName</p>
+                        <div class="ll-decision-row">
+                            <button class="ll-btn ll-btn-approve" @onclick="Approve">✓ Approve</button>
+                            <button class="ll-btn ll-btn-reject" @onclick="Reject">✕ Reject</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="ll-waiting">Waiting for @activeName to submit a word…</p>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="ll-panel">
+                    <p class="ll-carried-label">Carried word</p>
+                    <div class="ll-carried ll-carried-sm">@group.CarriedWord</div>
+                    @if (pending is null)
+                    {
+                        <p class="ll-waiting">Waiting for @activeName to submit a word…</p>
+                    }
+                    else
+                    {
+                        <p class="ll-waiting">@activeName proposed <strong>@pending.ProposedWord</strong> — the Auditor is deciding…</p>
+                    }
+                </div>
+            }
+
+            <div class="ll-chain-card">
+                <h4 class="ll-chain-title">The Chain</h4>
+                @chainView(group)
+            </div>
+        }
+    }
+    @* ════════════════ GROUPS (competitive) ════════════════ *@
+    else
+    {
+        @if (isAuditor)
+        {
+            var auditing = View.AuditingGroup;
+            var waiting = View.AuditQueueLength;
+
+            <div class="ll-panel ll-panel-auditor">
+                <p class="ll-role-label">You are the Auditor</p>
+
+                @if (auditing is { Pending: { } sub })
+                {
+                    <div class="ll-audit-queue-head">
+                        <strong>@auditing.GroupName</strong> is up
+                        @if (waiting > 1)
+                        {
+                            <span class="ll-audit-waiting">· @(waiting - 1) more waiting</span>
+                        }
+                    </div>
+                    <div class="ll-proposal">
+                        <span class="ll-proposal-word">@auditing.CarriedWord</span>
+                        <span class="ll-proposal-arrow">→</span>
+                        <span class="ll-proposal-word ll-proposal-new">@sub.ProposedWord</span>
+                    </div>
+                    <p class="ll-proposal-by">from @sub.PlayerName</p>
+                    <div class="ll-decision-row">
+                        <button class="ll-btn ll-btn-approve" @onclick="Approve">✓ Approve</button>
+                        <button class="ll-btn ll-btn-reject" @onclick="Reject">✕ Reject</button>
+                    </div>
+                }
+                else
+                {
+                    <p class="ll-waiting">No submissions waiting — groups are thinking…</p>
+                }
+            </div>
+        }
+        else if (View.MyGroup is { } group)
+        {
+            var pending = group.Pending;
+            var activeId = group.CurrentSubmitterId;
+            var isMyTurn = myId == activeId;
+            var activeName = group.CurrentSubmitterName;
+
+            @if (timed)
+            {
+                <div class="ll-timer">
+                    <div class="ll-timer-total">
+                        <span class="ll-timer-label">@group.GroupName time</span>
+                        <span class="ll-timer-value">@FormatElapsed(group.ElapsedThinkingTime)</span>
+                    </div>
+                    @if (group.ClockRunning && group.PhaseExpiresAtUtc is { } expires)
+                    {
+                        <CountdownClock EndTimeUtc="expires" Duration="perTurnClock" Context="countdown">
+                            @{
+                                var seconds = (int)Math.Ceiling(countdown.RemainingSeconds);
+                            }
+                            <div class="ll-timer-bar @(seconds < 5 ? "ll-timer-urgent" : "")">
+                                <span class="ll-timer-mono">@(seconds)s</span>
+                                <span class="ll-timer-caption">@activeName is forging the next link</span>
+                            </div>
+                        </CountdownClock>
+                    }
+                    else if (pending is not null)
+                    {
+                        <div class="ll-timer-bar ll-timer-paused">
+                            <span class="ll-timer-mono">⏸ with the Auditor</span>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="ll-group-banner" style="--ll-route: var(--ll-route-@(group.ColorIndex % 6))">You're on <strong>@group.GroupName</strong></div>
+
+            @if (group.Finished)
+            {
+                <div class="ll-panel ll-panel-turn">
+                    <p class="ll-turn-label">🎉 @group.GroupName reached the destination!</p>
+                    <p class="ll-waiting">Waiting for the other groups to finish…</p>
+                </div>
+            }
+            else if (isMyTurn)
+            {
+                <div class="ll-panel ll-panel-turn">
+                    <p class="ll-turn-label">Your turn — build from</p>
+                    <div class="ll-carried">@group.CarriedWord</div>
+                    @if (pending is null)
+                    {
+                        <form class="ll-submit-row" @onsubmit="SubmitPair" @onsubmit:preventDefault="true">
+                            <input @key="_inputKey" type="text" class="ll-input"
+                                   placeholder="@($"a word that pairs with {group.CarriedWord}…")"
+                                   @oninput="OnWordInput" maxlength="40" autocomplete="off" />
+                            <button type="submit" class="ll-btn ll-btn-primary">Submit</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <div class="ll-pending-note">
+                            Proposed <strong>@pending.ProposedWord</strong> — waiting for the Auditor…
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="ll-panel">
+                    <p class="ll-carried-label">@group.GroupName carried word</p>
+                    <div class="ll-carried ll-carried-sm">@group.CarriedWord</div>
+                    @if (pending is null)
+                    {
+                        <p class="ll-waiting">Waiting for @activeName to submit…</p>
+                    }
+                    else
+                    {
+                        <p class="ll-waiting">@activeName proposed <strong>@pending.ProposedWord</strong> — awaiting the Auditor…</p>
+                    }
+                </div>
+            }
+
+            @if (View.Rivals.Count > 0)
+            {
+                <div class="ll-rivals">
+                    @foreach (var r in View.Rivals)
+                    {
+                        <div class="ll-rival-chip @(r.Finished ? "ll-rival-done" : "")" style="--ll-route: var(--ll-route-@(r.ColorIndex % 6))">
+                            <span class="ll-rival-name">@r.GroupName</span>
+                            <span class="ll-rival-stat">@r.GuessCount link@(r.GuessCount == 1 ? "" : "s")</span>
+                            @if (r.Finished)
+                            {
+                                <span class="ll-rival-flag">🏁</span>
+                            }
+                            else
+                            {
+                                <span class="ll-rival-carried">@r.CarriedWord</span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="ll-chain-card" style="--ll-route: var(--ll-route-@(group.ColorIndex % 6))">
+                <h4 class="ll-chain-title">@group.GroupName's Chain</h4>
+                @chainView(group)
+            </div>
+        }
+        else
+        {
+            <div class="ll-all-groups">
+                @foreach (var g in View.AllGroups)
+                {
+                    <div class="ll-chain-card" style="--ll-route: var(--ll-route-@(g.ColorIndex % 6))">
+                        <h4 class="ll-chain-title">
+                            @g.GroupName
+                            <span class="ll-chain-sub">@g.GuessCount link@(g.GuessCount == 1 ? "" : "s")@(g.Finished ? " · 🏁" : "")</span>
+                        </h4>
+                        @chainView(g)
+                    </div>
+                }
+            </div>
+        }
+    }
+
+    @* ── Host escape hatch: end a stuck/AFK round from wherever it stands (§10.3) ── *@
+    @if (myId == View.HostId)
+    {
+        <div class="ll-host-controls">
+            <button class="ll-btn ll-btn-end-round" @onclick="EndRound" title="Score the round from its current progress">
+                End round now
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public LinkedListView View { get; set; } = default!;
+
+    /// <summary>Sends a command to the hub; returns the reply (null on success, else an error).</summary>
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+
+    /// <summary>Surfaces a rejected submission / decision to the parent's transient toast.</summary>
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private bool IsGroups => View.Settings.PlayerStructure == PlayerStructure.Groups;
+
+    // Submitter input. The DOM owns the value (no value="@_word" binding) so parent re-renders
+    // mid-keystroke don't clobber in-flight text; _inputKey is bumped after a successful submit to
+    // force a clean input element.
+    private string _word = string.Empty;
+    private int _inputKey;
+
+    private void OnWordInput(ChangeEventArgs e)
+        => _word = e.Value?.ToString() ?? string.Empty;
+
+    private async Task SubmitPair()
+    {
+        if (string.IsNullOrWhiteSpace(_word)) return;
+        var payload = JsonSerializer.Serialize(new SubmitPairPayload(_word), LinkedListContractsJsonContext.Default.SubmitPairPayload);
+        var error = await Submit(LinkedListCommands.SubmitPair, payload);
+        if (!string.IsNullOrEmpty(error))
+        {
+            await OnError.InvokeAsync(error);
+        }
+        else
+        {
+            _word = string.Empty;
+            _inputKey++;
+        }
+    }
+
+    private async Task Approve() => await SendSimple(LinkedListCommands.Approve);
+    private async Task Reject() => await SendSimple(LinkedListCommands.Reject);
+    private async Task EndRound() => await SendSimple(LinkedListCommands.EndRound);
+
+    private async Task SendSimple(string command)
+    {
+        var error = await Submit(command, null);
+        if (!string.IsNullOrEmpty(error))
+            await OnError.InvokeAsync(error);
+    }
+
+    /// <summary>Formats banked thinking time as <c>m:ss</c> (or <c>h:mm:ss</c>).</summary>
+    private static string FormatElapsed(TimeSpan elapsed)
+        => elapsed >= TimeSpan.FromHours(1)
+            ? $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}"
+            : $"{elapsed.Minutes}:{elapsed.Seconds:00}";
+}

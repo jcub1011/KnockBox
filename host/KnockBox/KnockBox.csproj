@@ -123,6 +123,13 @@
     <ProjectReference Include="..\KnockBox.Tracery.Client\KnockBox.Tracery.Client.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
     <!--
+      Linked List browser UI (game #5 tri-split). Built transitively (also builds
+      KnockBox.LinkedList.Contracts) and staged into games/KnockBox.LinkedList/client/
+      via Directory.Client.targets; never linked into the host or the WASM client.
+    -->
+    <ProjectReference Include="..\KnockBox.LinkedList.Client\KnockBox.LinkedList.Client.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+    <!--
       Plugin projects are loaded at runtime, not linked at compile time.
       ReferenceOutputAssembly="false" keeps the host from taking a compile-time
       dependency on plugin types (preserving the runtime-discovery architecture);

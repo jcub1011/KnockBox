@@ -1,15 +1,17 @@
-@using KnockBox.LinkedList.Services.State.Games
+@*
+    The post-round scoreboard. Reads the projected view: LastRoundResult (Collective) or Standings
+    (Groups), and the now-public per-group chains in View.AllGroups. Host controls advance the match
+    via the hub (NextRound / EndMatch).
+*@
 
 @{
-    var myId = UserService.CurrentUser?.Id ?? Guid.Empty;
-    var isHost = GameState.Host.Id == myId;
-    var result = GameState.LastRoundResult;
-}
+    var myId = View.RecipientId;
+    var isHost = myId == View.HostId;
+    var result = View.LastRoundResult;
 
-@{
-    RenderFragment<ChainState> chainView = g =>
+    RenderFragment<GroupChainView> chainView = g =>
     @<div class="ll-chain">
-        <span class="ll-anchor ll-anchor-start">@GameState.StartWord</span>
+        <span class="ll-anchor ll-anchor-start">@View.StartWord</span>
         @foreach (var link in g.Chain)
         {
             <span class="ll-connector">─</span>
@@ -24,7 +26,7 @@
         }
         <span class="ll-connector @(g.DestinationReached ? "" : "ll-connector-pending")">─</span>
         <span class="ll-anchor ll-anchor-dest @(g.DestinationReached ? "ll-anchor-reached" : "")">
-            @GameState.DestinationWord
+            @View.DestinationWord
         </span>
     </div>;
 }
@@ -33,13 +35,15 @@
 
     @if (!IsGroups)
     {
-        @* ── Outcome banner ── *@
-        @if (GameState.DestinationReached)
+        var chain = View.AllGroups.FirstOrDefault();
+        bool reached = result?.DestinationReached ?? chain?.DestinationReached ?? false;
+
+        @if (reached)
         {
             <div class="ll-ro-banner ll-ro-success">
                 <span class="ll-ro-emoji">🔗</span>
                 <h3 class="ll-ro-headline">Chain complete!</h3>
-                <p class="ll-ro-sub">@GameState.StartWord ➜ @GameState.DestinationWord</p>
+                <p class="ll-ro-sub">@View.StartWord ➜ @View.DestinationWord</p>
             </div>
         }
         else
@@ -47,11 +51,10 @@
             <div class="ll-ro-banner ll-ro-stalled">
                 <span class="ll-ro-emoji">⛓️‍💥</span>
                 <h3 class="ll-ro-headline">Chain broke</h3>
-                <p class="ll-ro-sub">The chain didn't reach @GameState.DestinationWord this time.</p>
+                <p class="ll-ro-sub">The chain didn't reach @View.DestinationWord this time.</p>
             </div>
         }
 
-        @* ── Score for the active mode ── *@
         @if (result is not null)
         {
             <div class="ll-ro-score">
@@ -88,19 +91,20 @@
             </div>
         }
 
-        @* ── The final chain ── *@
-        <div class="ll-chain-card">
-            <h4 class="ll-chain-title">The Chain</h4>
-            @chainView(GameState.PrimaryGroup!)
-        </div>
+        @if (chain is not null)
+        {
+            <div class="ll-chain-card">
+                <h4 class="ll-chain-title">The Chain</h4>
+                @chainView(chain)
+            </div>
+        }
     }
     else
     {
-        @* ════════ GROUPS: standings + per-group chains (§8.2) ════════ *@
         <div class="ll-ro-banner ll-ro-success">
             <span class="ll-ro-emoji">🔗</span>
             <h3 class="ll-ro-headline">Round complete</h3>
-            <p class="ll-ro-sub">@GameState.StartWord ➜ @GameState.DestinationWord</p>
+            <p class="ll-ro-sub">@View.StartWord ➜ @View.DestinationWord</p>
         </div>
 
         <div class="ll-standings-card">
@@ -115,9 +119,9 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var s in Standings)
+                    @foreach (var s in View.Standings)
                     {
-                        <tr class="@(s.Rank == 1 ? "ll-standings-top" : "")" style="--ll-route: var(--ll-route-@(GameState.Groups.FindIndex(grp => grp.GroupId == s.GroupId) % 6))">
+                        <tr class="@(s.Rank == 1 ? "ll-standings-top" : "")" style="--ll-route: var(--ll-route-@(ColorIndexOf(s.GroupId) % 6))">
                             <td>@RankMedal(s.Rank)</td>
                             <td>
                                 @s.GroupName
@@ -139,11 +143,11 @@
             <p class="ll-ro-par">Ties on @(PrimaryIsTime ? "time" : "guesses") break by @(PrimaryIsTime ? "fewer guesses" : "less thinking time").</p>
         </div>
 
-        @foreach (var s in Standings)
+        @foreach (var s in View.Standings)
         {
-            var g = GroupOf(s.GroupId);
+            var g = ChainOf(s.GroupId);
             if (g is null) { continue; }
-            <div class="ll-chain-card" style="--ll-route: var(--ll-route-@(GameState.Groups.IndexOf(g) % 6))">
+            <div class="ll-chain-card" style="--ll-route: var(--ll-route-@(g.ColorIndex % 6))">
                 <h4 class="ll-chain-title">@RankMedal(s.Rank) @g.GroupName</h4>
                 @chainView(g)
             </div>
@@ -152,29 +156,28 @@
 
     @* ── Match progress + next Auditor ── *@
     <div class="ll-ro-progress">
-        <span class="ll-round-chip">Round @GameState.RoundNumber / @GameState.Settings.RoundsPerMatch</span>
+        <span class="ll-round-chip">Round @View.RoundNumber / @View.Settings.RoundsPerMatch</span>
         @if (!IsLastRound)
         {
-            <span class="ll-ro-next-auditor">Next Auditor: <strong>@NextAuditorName</strong></span>
+            <span class="ll-ro-next-auditor">Next Auditor: <strong>@View.NextAuditorName</strong></span>
         }
     </div>
 
-    @* ── Host controls: next round vs end match (§10) ── *@
     @if (isHost)
     {
         <div class="ll-ro-actions">
             @if (IsLastRound)
             {
-                <button class="ll-btn ll-btn-primary" @onclick="EndMatch" disabled="@_starting">
-                    @(_starting ? "Wrapping up…" : "View Results 🏆")
+                <button class="ll-btn ll-btn-primary" @onclick="EndMatch" disabled="@_busy">
+                    @(_busy ? "Wrapping up…" : "View Results 🏆")
                 </button>
             }
             else
             {
-                <button class="ll-btn ll-btn-primary" @onclick="NextRound" disabled="@_starting">
-                    @(_starting ? "Starting…" : "Next round")
+                <button class="ll-btn ll-btn-primary" @onclick="NextRound" disabled="@_busy">
+                    @(_busy ? "Starting…" : "Next round")
                 </button>
-                <button class="ll-btn ll-btn-ghost" @onclick="EndMatch" disabled="@_starting">
+                <button class="ll-btn ll-btn-ghost" @onclick="EndMatch" disabled="@_busy">
                     End match early
                 </button>
             }
@@ -189,3 +192,50 @@
         </p>
     }
 </div>
+
+@code {
+    [Parameter, EditorRequired] public LinkedListView View { get; set; } = default!;
+    [Parameter, EditorRequired] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private bool _busy;
+
+    private bool IsGroups => View.Settings.PlayerStructure == PlayerStructure.Groups;
+    private bool PrimaryIsTime => View.Settings.ScoringMode == ScoringMode.FastestTime;
+    private bool IsLastRound => View.RoundNumber >= View.Settings.RoundsPerMatch;
+
+    private GroupChainView? ChainOf(string groupId) => View.AllGroups.FirstOrDefault(g => g.GroupId == groupId);
+    private int ColorIndexOf(string groupId) => ChainOf(groupId)?.ColorIndex ?? 0;
+
+    private static string RankMedal(int rank) => rank switch
+    {
+        1 => "🥇",
+        2 => "🥈",
+        3 => "🥉",
+        _ => $"#{rank}",
+    };
+
+    private async Task NextRound() => await Advance(LinkedListCommands.NextRound);
+    private async Task EndMatch() => await Advance(LinkedListCommands.EndMatch);
+
+    private async Task Advance(string command)
+    {
+        if (_busy) return;
+        _busy = true;
+        try
+        {
+            var error = await Submit(command, null);
+            if (!string.IsNullOrEmpty(error))
+                await OnError.InvokeAsync(error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string FormatElapsed(TimeSpan elapsed)
+        => elapsed >= TimeSpan.FromHours(1)
+            ? $"{(int)elapsed.TotalHours}:{elapsed.Minutes:00}:{elapsed.Seconds:00}"
+            : $"{elapsed.Minutes}:{elapsed.Seconds:00}";
+}

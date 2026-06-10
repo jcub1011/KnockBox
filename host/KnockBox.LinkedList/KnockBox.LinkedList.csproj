@@ -18,10 +18,22 @@
       library plugin, which the host loads before any game plugin.
     -->
     <ProjectReference Include="..\KnockBox.WordService.Contracts\KnockBox.WordService.Contracts.csproj" />
+    <!-- Shared contract DTOs for the tri-split (the projected view, command payloads, and the
+         moved gameplay types: the chain/standing/superlative records + the scoring/structure/phase
+         enums). -->
+    <ProjectReference Include="..\KnockBox.LinkedList.Contracts\KnockBox.LinkedList.Contracts.csproj" />
+  </ItemGroup>
+
+  <!-- The Contracts DLL is a PRIVATE ALC dependency (not promoted to the default ALC). It must be
+       staged into games/KnockBox.LinkedList/ or the plugin's load context throws
+       FileNotFoundException and the loader silently skips the whole plugin (the tile vanishes). -->
+  <ItemGroup>
+    <PluginPrivateAssembly Include="$(TargetDir)KnockBox.LinkedList.Contracts.dll" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Microsoft.Extensions.Logging" />
+    <Using Include="KnockBox.LinkedList.Contracts" />
   </ItemGroup>
 
   <ItemGroup>
