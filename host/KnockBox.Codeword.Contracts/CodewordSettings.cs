@@ -1,13 +1,11 @@
-namespace KnockBox.Codeword;
+namespace KnockBox.Codeword.Contracts;
 
 /// <summary>
-/// The host-configurable match rules for a Codeword game. Held by
-/// <see cref="Services.State.Games.CodewordGameState.Settings"/> and mutated via
-/// <c>with</c> expressions inside the state's execute lock. Persisted to the
-/// host's browser localStorage by the lobby page so a host's preferred rules
-/// survive across sessions. Property-initializer form keeps it round-trippable
-/// by System.Text.Json (Web defaults) via the parameterless constructor + init
-/// setters.
+/// The host-configurable match rules for a Codeword game. Shared between the server
+/// (authoritative <c>state.Settings</c>) and the browser (the House Rules drawer renders
+/// + edits a copy, then sends it as the <c>update-settings</c> command payload, which the
+/// server deserializes straight back into this type). Property-initializer form keeps it
+/// round-trippable by System.Text.Json via the parameterless constructor + init setters.
 /// </summary>
 public sealed record CodewordSettings
 {
@@ -15,6 +13,7 @@ public sealed record CodewordSettings
     /// When <c>true</c>, the host is treated as a participant — included in
     /// role assignment, scoring, turn order, and the 4–8 participant count.
     /// Off by default, preserving the "host is the shared display" behavior.
+    /// Set by the lobby's deal buttons (not the House Rules drawer).
     /// </summary>
     public bool HostPlays { get; init; } = false;
 

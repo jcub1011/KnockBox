@@ -1,0 +1,80 @@
+@*
+    Continue-or-end-round decision — after an elimination, living players vote whether to play
+    another round or end the game now. A non-participating host spectates.
+*@
+
+@{
+    bool isHostSpectator = View.RecipientId == View.HostId && !View.HostIsParticipant;
+    int aliveCount = View.Players.Count(p => !p.IsEliminated);
+    int endVotes = View.EndGameVoteStatus.VotedToEnd.Count;
+    int castCount = View.Players.Count(p => !p.IsEliminated && p.ContinueOrEndVote.HasValue);
+    int continueVotes = castCount - endVotes;
+    int required = View.EndGameVoteStatus.RequiredVotes;
+    var lastElim = View.LastElimination;
+    var me = View.Players.FirstOrDefault(p => p.PlayerId == View.RecipientId);
+}
+
+<div class="ctc-vote-area">
+    <div class="ctc-vote-panel">
+        <h2 class="ctc-phase-title glitch" data-text="[ ROUND DECISION ]">[ ROUND DECISION ]</h2>
+
+        @if (lastElim is not null && !lastElim.WasTie)
+        {
+            <p class="ctc-waiting-text">
+                <strong>@lastElim.PlayerName</strong> was eliminated.
+                Continue with another round, or end the game now?
+            </p>
+        }
+        else
+        {
+            <p class="ctc-waiting-text">Continue with another round, or end the game now?</p>
+        }
+
+        <div class="ctc-vote-progress-bar">
+            END: @endVotes &nbsp;|&nbsp; CONTINUE: @continueVotes &nbsp;|&nbsp; PENDING: @(aliveCount - castCount)
+            &nbsp;(majority needs @required to end)
+        </div>
+
+        @if (isHostSpectator)
+        {
+            <p class="ctc-waiting-text">[ HOST: SPECTATING ]</p>
+        }
+        else if (me is null || me.IsEliminated)
+        {
+            <p class="ctc-waiting-text">You have been terminated and cannot vote.</p>
+        }
+        else
+        {
+            <div class="ctc-continue-end-buttons">
+                <button class="ctc-btn ctc-btn-primary @(me.ContinueOrEndVote == false ? "ctc-btn-selected" : "")"
+                        @onclick="() => Vote(false)">
+                    [ CONTINUE ]
+                </button>
+                <button class="ctc-btn ctc-btn-danger @(me.ContinueOrEndVote == true ? "ctc-btn-selected" : "")"
+                        @onclick="() => Vote(true)">
+                    [ END GAME ]
+                </button>
+            </div>
+
+            @if (me.ContinueOrEndVote is { } v)
+            {
+                <p class="ctc-waiting-text">
+                    Vote logged: <strong>@(v ? "END" : "CONTINUE")</strong>. Click again to rescind.
+                </p>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public CodewordView View { get; set; } = default!;
+    [Parameter] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private async Task Vote(bool voteToEnd)
+    {
+        var err = await Submit(CodewordCommands.ContinueOrEndRound,
+            JsonSerializer.Serialize(new ContinueOrEndPayload(voteToEnd), CodewordContractsJsonContext.Default.ContinueOrEndPayload));
+        if (err is not null) await OnError.InvokeAsync("Vote not accepted.");
+    }
+}

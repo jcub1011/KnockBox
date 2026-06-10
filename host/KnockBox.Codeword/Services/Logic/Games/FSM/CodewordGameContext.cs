@@ -290,7 +290,6 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM
             {
                 ps.HasSubmittedClue = false;
                 ps.CurrentClue = null;
-                ps.PendingClue = null;
                 ps.VoteTargetId = null;
                 ps.HasVoted = false;
                 ps.HasVotedToEndGame = false;

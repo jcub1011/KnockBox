@@ -15,10 +15,23 @@
   <ItemGroup>
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
     <ProjectReference Include="../../sdk/KnockBox.Tooling/KnockBox.Tooling.csproj" />
+    <ProjectReference Include="..\KnockBox.Codeword.Contracts\KnockBox.Codeword.Contracts.csproj" />
+  </ItemGroup>
+
+  <!--
+    The Contracts DLL is a private dependency loaded into this plugin's own ALC
+    (it is not promoted to the default ALC), so it must be staged into
+    games/KnockBox.Codeword/ alongside the plugin DLL. See Directory.Plugin.targets.
+  -->
+  <ItemGroup>
+    <PluginPrivateAssembly Include="$(TargetDir)KnockBox.Codeword.Contracts.dll" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Microsoft.Extensions.Logging" />
+    <!-- The phase/role enums, round-result records, and settings moved to the Contracts
+         assembly; a global using keeps the engine/state/FSM source resolving them unchanged. -->
+    <Using Include="KnockBox.Codeword.Contracts" />
   </ItemGroup>
 
   <ItemGroup>

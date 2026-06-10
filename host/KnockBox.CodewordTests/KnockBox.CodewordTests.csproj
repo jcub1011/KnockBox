@@ -14,11 +14,15 @@
 
   <ItemGroup>
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+    <!-- The phase/role enums, round-result records, and settings moved to the Contracts
+         assembly; a global using keeps the existing test source resolving them unchanged. -->
+    <Using Include="KnockBox.Codeword.Contracts" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
     <ProjectReference Include="..\KnockBox.Codeword\KnockBox.Codeword.csproj" />
+    <ProjectReference Include="..\KnockBox.Codeword.Contracts\KnockBox.Codeword.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,104 @@
+@*
+    Game-over scoreboard. Every player's role is revealed here (RevealedRole is populated for
+    all players at GameOver). The host (or a host who is also playing) gets the next-game /
+    return-to-lobby controls.
+*@
+
+@{
+    bool isHost = View.RecipientId == View.HostId;
+    bool isHostSpectator = isHost && !View.HostIsParticipant;
+    var winResult = View.WinResult;
+    bool isFinalGame = View.CurrentGameNumber >= View.Settings.TotalGames;
+    var rankedPlayers = View.Players
+        .OrderByDescending(p => CumulativeScore(p.PlayerId))
+        .ToList();
+    var myRole = View.MyRole;
+    bool isMissionSuccess = winResult?.WinningTeam is not null && myRole == winResult.WinningTeam;
+    string missionText = isHostSpectator
+        ? "[ MISSION COMPLETE ]"
+        : (isMissionSuccess ? "[ MISSION COMPLETE ]" : "[ MISSION FAILED ]");
+}
+
+<div class="ctc-gameover-area">
+    <div class="ctc-gameover-panel @(isHostSpectator ? "ctc-host-panel" : "")">
+        <h2 class="ctc-gameover-title glitch @(!isHostSpectator && !isMissionSuccess ? "ctc-gameover-title-failed" : "")"
+            data-text="@missionText">@missionText</h2>
+
+        @if (winResult is not null)
+        {
+            <div class="ctc-winner-announcement">
+                <span class="ctc-winner-role">@GetTeamName(winResult.WinningTeam) Wins!</span>
+                <p class="ctc-winner-reason">@winResult.Reason</p>
+            </div>
+        }
+
+        <p class="ctc-game-progress">Game @View.CurrentGameNumber of @View.Settings.TotalGames</p>
+
+        <div class="ctc-scoreboard">
+            <h3 class="ctc-section-title">[ FINAL SCOREBOARD ]</h3>
+            <div class="ctc-leaderboard">
+                @{ int rank = 1; }
+                @foreach (var ps in rankedPlayers)
+                {
+                    bool isMe = ps.PlayerId == View.RecipientId;
+                    int cumulativeScore = CumulativeScore(ps.PlayerId);
+                    bool isWinner = rank == 1;
+                    <div class="ctc-leaderboard-row @(isWinner ? "ctc-leaderboard-winner" : "") @(isMe ? "ctc-leaderboard-me" : "") @(ps.IsEliminated ? "ctc-leaderboard-eliminated" : "")">
+                        <span class="ctc-rank">@(rank == 1 ? "🥇" : rank == 2 ? "🥈" : rank == 3 ? "🥉" : $"#{rank}")</span>
+                        <span class="ctc-player-result-name">@ps.DisplayName</span>
+                        <span class="ctc-player-role ctc-role-@(ps.RevealedRole?.ToString().ToLowerInvariant())">@ps.RevealedRole</span>
+                        <span class="ctc-player-result-score">@cumulativeScore pts</span>
+                    </div>
+                    rank++;
+                }
+            </div>
+        </div>
+
+        <div class="ctc-scoring-breakdown">
+            <h3 class="ctc-section-title">[ THIS GAME ]</h3>
+            <div class="ctc-score-list">
+                @foreach (var ps in rankedPlayers)
+                {
+                    <div class="ctc-score-entry">
+                        <span class="ctc-score-player">@ps.DisplayName</span>
+                        <span class="ctc-score-value">@ps.Score pts</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (isHost)
+        {
+            <div class="ctc-gameover-actions">
+                @if (!isFinalGame)
+                {
+                    <button class="ctc-btn ctc-btn-primary" @onclick="StartNextGame">[ NEXT GAME ]</button>
+                }
+                <button class="ctc-btn ctc-btn-secondary" @onclick="ReturnToLobby">[ RETURN TO LOBBY ]</button>
+            </div>
+        }
+        else
+        {
+            <p class="ctc-waiting-text">Waiting for host...</p>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public CodewordView View { get; set; } = default!;
+    [Parameter] public Func<string, string?, Task> Submit { get; set; } = default!;
+
+    private int CumulativeScore(Guid playerId)
+        => View.GameScores.TryGetValue(playerId.ToString(), out var s) ? s : 0;
+
+    private static string GetTeamName(Role? team) => team switch
+    {
+        Role.Agent => "Agents",
+        Role.Insider => "Insiders",
+        Role.Informant => "Informant",
+        _ => "Unknown"
+    };
+
+    private Task StartNextGame() => Submit(CodewordCommands.StartNextGame, null);
+    private Task ReturnToLobby() => Submit(CodewordCommands.ReturnToLobby, null);
+}

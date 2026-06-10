@@ -137,50 +137,14 @@ namespace KnockBox.Codeword.Services.State.Games
         public readonly Dictionary<Guid, int> GameScores = [];
     }
 
-    #region Enums
-
-    public enum CodewordGamePhase
-    {
-        Setup,
-        CluePhase,
-        Discussion,
-        Voting,
-        Reveal,
-        ContinueOrEndRound,
-        GameOver
-    }
-
-    public enum Role
-    {
-        Agent,
-        Insider,
-        Informant
-    }
-
-    #endregion
-
     #region Records
 
-    /// <summary>A thematic group of 2+ words; 2 selected at runtime.</summary>
+    /// <summary>
+    /// A thematic group of 2+ words; 2 selected at runtime. Server-only word-bank data —
+    /// it never crosses the wire, so (unlike the round-result records) it stays here rather
+    /// than moving to <c>KnockBox.Codeword.Contracts</c>.
+    /// </summary>
     public record WordGroup(string[] Words);
-
-    /// <summary>A clue submitted by a player during the clue phase.</summary>
-    public record ClueEntry(Guid PlayerId, string PlayerName, string Clue);
-
-    /// <summary>A vote cast by a player during the voting phase.</summary>
-    public record VoteEntry(Guid VoterId, string VoterName, Guid TargetId, string TargetName);
-
-    /// <summary>The result of an elimination round.</summary>
-    public record EliminationResult(Guid PlayerId, string PlayerName, Role Role, bool WasTie);
-
-    /// <summary>The result of the Informant's word guess attempt.</summary>
-    public record InformantGuessResult(Guid PlayerId, string PlayerName, string GuessedWord, bool WasCorrect);
-
-    /// <summary>Evaluates whether the game is over and which team won.</summary>
-    public record WinConditionResult(bool GameOver, Role? WinningTeam, string Reason);
-
-    /// <summary>Tracks player votes to end the game early.</summary>
-    public record EndGameVoteStatus(HashSet<Guid> VotedToEnd, int RequiredVotes);
 
     #endregion
 }

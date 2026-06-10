@@ -1,0 +1,277 @@
+@implements IDisposable
+@*
+    Clue phase. Host spectator sees the transmission board; the active player types a clue.
+
+    The input is CLIENT-OWNED (no @bind / no value= attribute) so projections arriving mid-
+    keystroke (the server re-projects ~4 Hz while the clue timer runs) never clobber in-flight
+    text. The active player's browser also auto-submits its current draft just before the
+    server deadline (PhaseEndsAtUtc) — preserving the old "your half-typed word still counts"
+    behavior without the server keeping a per-keystroke buffer. A player who sent nothing by
+    the buzzer gets the server's "..." fallback.
+*@
+
+@{
+    bool isHostSpectator = View.RecipientId == View.HostId && !View.HostIsParticipant;
+    var me = View.Players.FirstOrDefault(p => p.PlayerId == View.RecipientId);
+    var activeId = View.CurrentPlayerId ?? Guid.Empty;
+    bool isMyTurn = !isHostSpectator && View.RecipientId == activeId && me is { IsEliminated: false, HasSubmittedClue: false };
+    var activePlayerName = View.Players.FirstOrDefault(p => p.PlayerId == activeId)?.DisplayName ?? "...";
+    var cluesByPlayer = View.CurrentRoundClues.ToDictionary(c => c.PlayerId, c => c.Clue);
+}
+
+@if (isHostSpectator)
+{
+    @* ══════ HOST SPECTATOR VIEW ══════ *@
+    <div class="ctc-clue-area">
+        <div class="ctc-clue-panel ctc-host-panel">
+            <h2 class="ctc-phase-title glitch" data-text="[ INTERCEPTING CLUES ]">[ INTERCEPTING CLUES ]</h2>
+
+            <div class="ctc-host-transmission-board">
+                <div class="ctc-board-header">
+                    <span class="ctc-board-label">[ TRANSMISSION QUEUE ]</span>
+                    <span class="ctc-board-cycle">CYCLE @(View.CurrentEliminationCycle + 1)</span>
+                </div>
+                <div class="ctc-board-queue">
+                    @foreach (var qps in View.Players)
+                    {
+                        bool isCurrent = qps.PlayerId == activeId;
+                        bool hasGone = qps.HasSubmittedClue;
+                        <div class="ctc-queue-slot @(isCurrent ? "ctc-queue-active" : "") @(hasGone ? "ctc-queue-done" : "") @(qps.IsEliminated ? "ctc-queue-eliminated" : "")">
+                            <span class="ctc-queue-name">@qps.DisplayName</span>
+                            @if (qps.IsEliminated)
+                            {
+                                <span class="ctc-queue-status ctc-queue-status-dead">COMPROMISED</span>
+                            }
+                            else if (hasGone)
+                            {
+                                <span class="ctc-queue-status ctc-queue-status-done">TRANSMITTED</span>
+                            }
+                            else if (isCurrent)
+                            {
+                                <span class="ctc-queue-status ctc-queue-status-live">LIVE</span>
+                            }
+                            else
+                            {
+                                <span class="ctc-queue-status">STANDBY</span>
+                            }
+                            @if (hasGone && cluesByPlayer.TryGetValue(qps.PlayerId, out var goneClue))
+                            {
+                                <span class="ctc-queue-clue">@goneClue</span>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="ctc-host-active-transmission">
+                <span class="ctc-host-active-label">[ ACTIVE CHANNEL ]</span>
+                <span class="ctc-host-active-name glitch" data-text="@activePlayerName.ToUpper()">@activePlayerName.ToUpper()</span>
+                <span class="ctc-host-active-status">TRANSMITTING<span class="ctc-blink-dots">...</span></span>
+            </div>
+
+            @RecentTransmissions()
+            @ArchivedIntel()
+        </div>
+    </div>
+}
+else
+{
+    @* ══════ PLAYER VIEW ══════ *@
+    <div class="ctc-clue-area @(isMyTurn ? "ctc-my-turn-active" : "")">
+        @{
+            bool isEliminated = me is null || me.IsEliminated;
+        }
+
+        <div class="ctc-clue-panel">
+            <h2 class="ctc-phase-title glitch" data-text="[ INTERCEPTING CLUES ]">[ INTERCEPTING CLUES ]</h2>
+
+            @if (View.MyRole is { } role)
+            {
+                @if (role != Role.Informant && !string.IsNullOrEmpty(View.MySecretWord))
+                {
+                    <div class="ctc-secret-word-banner">
+                        <span class="ctc-secret-word-label">Target Intel:</span>
+                        <span class="ctc-secret-word-value">@View.MySecretWord</span>
+                    </div>
+                }
+                else if (role == Role.Informant)
+                {
+                    <div class="ctc-secret-word-banner ctc-secret-word-banner-informant">
+                        <span class="ctc-secret-word-label">[ STATUS: COMPROMISED ]</span>
+                        <span class="ctc-secret-word-value glitch" data-text="INTEL: NULL">NULL</span>
+                    </div>
+                }
+            }
+
+            @if (isEliminated)
+            {
+                <div class="ctc-eliminated-banner">
+                    <span class="ctc-eliminated-icon"></span>
+                    <div class="ctc-eliminated-text">
+                        <h3>CONNECTION TERMINATED</h3>
+                        <p>You have been eliminated. Transmission capabilities disabled.</p>
+                    </div>
+                </div>
+            }
+
+            @if (isMyTurn)
+            {
+                <div class="ctc-turn-alert">
+                    <span class="ctc-turn-alert-text glitch" data-text="&gt;&gt;&gt; YOUR TURN &lt;&lt;&lt;">&gt;&gt;&gt; YOUR TURN &lt;&lt;&lt;</span>
+                    <span class="ctc-turn-alert-sub">TRANSMIT YOUR CLUE NOW</span>
+                </div>
+            }
+            else
+            {
+                <div class="ctc-turn-waiting-display">
+                    <span class="ctc-transmitting-icon">&#x2588;&#x2588;&#x2588;</span>
+                    <span class="ctc-turn-badge">Intercepting transmission from @activePlayerName...</span>
+                </div>
+            }
+
+            @if (isMyTurn)
+            {
+                <form class="ctc-clue-input-area" @onsubmit="SubmitClue" @onsubmit:preventDefault="true">
+                    @* No value="@_clueText": the DOM owns the value so mid-keystroke projections
+                       don't clobber in-flight input; @key bumps force a clean reset after submit. *@
+                    <input @key="_inputKey" type="text" class="ctc-clue-input"
+                           placeholder="Input sequence (max 50 chars)..."
+                           @oninput="OnClueInput" maxlength="50" />
+                    <button type="submit" class="ctc-btn ctc-btn-primary">[ TRANSMIT CLUE ]</button>
+                </form>
+            }
+            else if (!isEliminated)
+            {
+                <p class="ctc-waiting-text">[ AWAITING TRANSMISSION FROM @activePlayerName.ToUpper() ]</p>
+            }
+
+            @RecentTransmissions()
+            @ArchivedIntel()
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public CodewordView View { get; set; } = default!;
+    [Parameter] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private string _clueText = string.Empty;
+
+    // Bumped after a successful submit to recreate the input element, clearing its DOM value.
+    private int _inputKey;
+
+    // The deadline the auto-submit timer is currently armed for (so a re-render with the same
+    // deadline doesn't restart it). Null when not armed.
+    private DateTimeOffset? _armedDeadline;
+    private CancellationTokenSource? _timerCts;
+
+    private RenderFragment RecentTransmissions() =>@<text>
+        @if (View.CurrentRoundClues.Count > 0)
+        {
+            <div class="ctc-clue-history">
+                <h3 class="ctc-section-title">[ RECENT TRANSMISSIONS ]</h3>
+                <div class="ctc-clue-list">
+                    @foreach (var clue in View.CurrentRoundClues)
+                    {
+                        <div class="ctc-clue-entry typewriter-entry">
+                            <span class="ctc-clue-player">[@clue.PlayerName]:</span>
+                            <span class="ctc-clue-word">@clue.Clue</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </text>;
+
+    private RenderFragment ArchivedIntel() =>@<text>
+        @if (View.UsedClues.Count > 0)
+        {
+            <div class="ctc-used-clues">
+                <h3 class="ctc-section-title">[ ARCHIVED INTEL (REDACTED) ]</h3>
+                <div class="ctc-used-clue-list">
+                    @foreach (var entry in View.UsedClues)
+                    {
+                        <span class="ctc-used-clue-tag redacted-text">[@entry.Value]: @entry.Key</span>
+                    }
+                </div>
+            </div>
+        }
+    </text>;
+
+    private void OnClueInput(ChangeEventArgs e) => _clueText = e.Value?.ToString() ?? string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        bool isMyTurn = View.CurrentPlayerId == View.RecipientId
+            && View.Players.Any(p => p.PlayerId == View.RecipientId && !p.IsEliminated && !p.HasSubmittedClue);
+
+        if (isMyTurn && View.Settings.EnableTimers && View.PhaseEndsAtUtc is { } deadline)
+        {
+            if (deadline != _armedDeadline)
+            {
+                CancelTimer();
+                _armedDeadline = deadline;
+                _timerCts = new CancellationTokenSource();
+                _ = AutoSubmitWhenExpiringAsync(deadline, _timerCts.Token);
+            }
+        }
+        else
+        {
+            CancelTimer();
+            _armedDeadline = null;
+        }
+    }
+
+    private async Task SubmitClue()
+    {
+        var text = _clueText.Trim();
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        var error = await Submit(CodewordCommands.SubmitClue,
+            JsonSerializer.Serialize(new SubmitCluePayload(text), CodewordContractsJsonContext.Default.SubmitCluePayload));
+        if (error is not null)
+        {
+            await OnError.InvokeAsync("Clue not accepted. Try a different word.");
+        }
+        else
+        {
+            _clueText = string.Empty;
+            _inputKey++;
+        }
+    }
+
+    /// <summary>
+    /// Fires shortly before <paramref name="deadline"/> and submits the current draft if any.
+    /// An empty draft is left to the server's "..." fallback. Errors (e.g. the rare "already
+    /// submitted" race against the server buzzer) are swallowed — this is a courtesy submit.
+    /// </summary>
+    private async Task AutoSubmitWhenExpiringAsync(DateTimeOffset deadline, CancellationToken ct)
+    {
+        // 800ms margin so the client's submit lands before the server's ~4 Hz "..." tick.
+        var delay = deadline - DateTimeOffset.UtcNow - TimeSpan.FromMilliseconds(800);
+        try { if (delay > TimeSpan.Zero) await Task.Delay(delay, ct); }
+        catch (OperationCanceledException) { return; }
+
+        if (ct.IsCancellationRequested || string.IsNullOrWhiteSpace(_clueText)) return;
+
+        await InvokeAsync(async () =>
+        {
+            var text = _clueText.Trim();
+            if (string.IsNullOrWhiteSpace(text)) return;
+            await Submit(CodewordCommands.SubmitClue,
+                JsonSerializer.Serialize(new SubmitCluePayload(text), CodewordContractsJsonContext.Default.SubmitCluePayload));
+            _clueText = string.Empty;
+            _inputKey++;
+        });
+    }
+
+    private void CancelTimer()
+    {
+        _timerCts?.Cancel();
+        _timerCts?.Dispose();
+        _timerCts = null;
+    }
+
+    public void Dispose() => CancelTimer();
+}

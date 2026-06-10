@@ -1,0 +1,259 @@
+@*
+    Discussion phase — operatives review the clue dossiers and lock in their elimination
+    designations. Host spectator sees the full board + an override; players designate a target
+    and lock in, or vote to end the game / skip the remaining time.
+*@
+
+@{
+    bool isHostSpectator = View.RecipientId == View.HostId && !View.HostIsParticipant;
+    int aliveCount = View.Players.Count(p => !p.IsEliminated);
+    int lockedInCount = View.Players.Count(p => !p.IsEliminated && p.HasVoted);
+    var endVote = View.EndGameVoteStatus;
+    var skipVote = View.SkipTimeVoteStatus;
+    var me = View.Players.FirstOrDefault(p => p.PlayerId == View.RecipientId);
+}
+
+@if (isHostSpectator)
+{
+    @* ══════ HOST SPECTATOR VIEW ══════ *@
+    <div class="ctc-discussion-area">
+        <div class="ctc-discussion-panel ctc-host-panel">
+            <h2 class="ctc-phase-title glitch" data-text="[ INTEL ANALYSIS ]">[ INTEL ANALYSIS ]</h2>
+
+            <div class="ctc-host-dossier-grid">
+                <h3 class="ctc-section-title">[ OPERATIVE DOSSIERS ]</h3>
+                <div class="ctc-dossier-cards">
+                    @foreach (var ps in View.Players.OrderBy(p => p.DisplayName))
+                    {
+                        int lockedVotes = View.Players.Count(s => !s.IsEliminated && s.VoteTargetId == ps.PlayerId && s.HasVoted);
+                        <div class="ctc-dossier-card @(ps.IsEliminated ? "ctc-dossier-eliminated" : "") @(ps.HasVoted ? "ctc-dossier-voted" : "")">
+                            <div class="ctc-dossier-name">@ps.DisplayName</div>
+                            @if (ps.ClueHistory.Count > 0)
+                            {
+                                <div class="ctc-dossier-clues">
+                                    @foreach (var clue in ps.ClueHistory)
+                                    {
+                                        <span class="ctc-dossier-clue">@clue</span>
+                                    }
+                                </div>
+                            }
+                            @if (ps.IsEliminated)
+                            {
+                                <div class="ctc-dossier-status ctc-dossier-status-eliminated">COMPROMISED</div>
+                            }
+                            else if (ps.HasVoted)
+                            {
+                                <div class="ctc-dossier-status ctc-dossier-status-voted">VOTE LOCKED</div>
+                            }
+                            else
+                            {
+                                <div class="ctc-dossier-status ctc-dossier-status-active">ACTIVE</div>
+                            }
+                            @if (lockedVotes > 0)
+                            {
+                                <div class="ctc-dossier-votes">@lockedVotes DESIGNATION(S)</div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @{
+                var barWidth = 20;
+                var filled = aliveCount > 0 ? (int)Math.Ceiling((double)lockedInCount / aliveCount * barWidth) : 0;
+                var bar = new string('█', filled) + new string('░', barWidth - filled);
+            }
+            <div class="ctc-host-vote-progress">
+                <span class="ctc-host-vote-bar">[@bar]</span>
+                <span class="ctc-host-vote-count">@lockedInCount / @aliveCount VOTES LOCKED</span>
+            </div>
+
+            <div class="ctc-host-status-readouts">
+                <div class="ctc-host-readout">
+                    <span class="ctc-host-readout-label">TERMINATION VOTE:</span>
+                    <span class="ctc-host-readout-value">@endVote.VotedToEnd.Count / @endVote.RequiredVotes</span>
+                </div>
+                <div class="ctc-host-readout">
+                    <span class="ctc-host-readout-label">SKIP TIME VOTE:</span>
+                    <span class="ctc-host-readout-value">@skipVote.VotedToEnd.Count / @skipVote.RequiredVotes</span>
+                </div>
+            </div>
+
+            <div class="ctc-host-actions">
+                <button class="ctc-btn ctc-btn-primary" @onclick="AdvanceToVote">[ OVERRIDE PROTOCOL ]</button>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    @* ══════ PLAYER VIEW ══════ *@
+    <div class="ctc-discussion-area">
+        @{
+            bool hasVotedToEnd = me is { HasVotedToEndGame: true };
+            bool hasLockedIn = me is { HasVoted: true };
+        }
+
+        <div class="ctc-discussion-panel">
+            <h2 class="ctc-phase-title glitch" data-text="[ INTEL ANALYSIS ]">[ INTEL ANALYSIS ]</h2>
+
+            @if (View.MyRole is { } role && role != Role.Informant && !string.IsNullOrEmpty(View.MySecretWord))
+            {
+                <div class="ctc-secret-word-banner">
+                    <span class="ctc-secret-word-label">Target Intel:</span>
+                    <span class="ctc-secret-word-value">@View.MySecretWord</span>
+                </div>
+            }
+
+            @if (me is { IsEliminated: true })
+            {
+                <div class="ctc-eliminated-banner">
+                    <span class="ctc-eliminated-icon"></span>
+                    <div class="ctc-eliminated-text">
+                        <h3>CONNECTION TERMINATED</h3>
+                        <p>Transmission capabilities disabled.</p>
+                    </div>
+                </div>
+            }
+
+            <div class="ctc-discussion-players">
+                <h3 class="ctc-section-title">[ TARGET DESIGNATION ]</h3>
+                <div class="ctc-player-list">
+                    @foreach (var ps in View.Players.OrderBy(p => p.DisplayName))
+                    {
+                        if (me is null) continue;
+                        bool isMe = ps.PlayerId == View.RecipientId;
+                        string playerRowCss = "ctc-player-row "
+                            + (isMe ? "ctc-player-me" : string.Empty)
+                            + (ps.IsEliminated ? "ctc-player-eliminated" : string.Empty);
+                        string voteTargetName = ps.VoteTargetId is { } vtId ? NameOf(vtId) : "N/A";
+                        int lockedVotes = View.Players.Count(s => !s.IsEliminated && s.VoteTargetId == ps.PlayerId && s.HasVoted);
+                        bool selectable = !isMe && !ps.IsEliminated && !me.IsEliminated && !me.HasVoted;
+
+                        @if (selectable)
+                        {
+                            bool isSelected = me.VoteTargetId == ps.PlayerId;
+                            <button class="@playerRowCss @(isSelected ? "ctc-vote-target-selected" : "")" @onclick="() => SelectTarget(ps.PlayerId)">
+                                @PlayerRowContent(ps, lockedVotes, voteTargetName)
+                            </button>
+                        }
+                        else
+                        {
+                            <div class="@playerRowCss">
+                                @PlayerRowContent(ps, lockedVotes, voteTargetName)
+                            </div>
+                        }
+                    }
+                </div>
+
+                <div class="ctc-vote-progress-bar">@lockedInCount / @aliveCount votes locked in</div>
+
+                @if (hasLockedIn)
+                {
+                    <div class="ctc-vote-locked">
+                        <span class="ctc-lock-icon">[ LOCKED ]</span>
+                        <p class="ctc-waiting-text">Designation confirmed. Awaiting others...</p>
+                    </div>
+                }
+                else if (me is { IsEliminated: false })
+                {
+                    bool targetSelected = me.VoteTargetId is not null;
+                    <div class="ctc-vote-confirm">
+                        <button class="ctc-btn ctc-btn-danger ctc-btn-lg @(targetSelected ? "" : "ctc-lock-vote-disabled")"
+                                disabled="@(!targetSelected)" @onclick="ConfirmVote">
+                            [ LOCK-IN DESIGNATION ]
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <p class="ctc-waiting-text">You are compromised and cannot vote.</p>
+                }
+
+                <div class="ctc-discussion-actions">
+                    @if (me is { IsEliminated: false })
+                    {
+                        bool hasVotedToSkip = me.HasVotedToSkipTime;
+                        <div class="ctc-action-group">
+                            <div class="ctc-action-item">
+                                <button class="ctc-btn ctc-btn-warning" @onclick="VoteToEndGame"
+                                        title="@(hasVotedToEnd ? "Click to rescind your vote to end the game" : "Vote to end the game early")">
+                                    @(hasVotedToEnd ? "[ ABORT GAME END ]" : "[ END GAME ]")
+                                </button>
+                                <div class="ctc-vote-small-progress">@endVote.VotedToEnd.Count / @endVote.RequiredVotes required</div>
+                            </div>
+                            <div class="ctc-action-item">
+                                <button class="ctc-btn ctc-btn-secondary" @onclick="SkipRemainingTime"
+                                        title="@(hasVotedToSkip ? "Click to rescind your vote to skip time" : "Vote to skip the remaining discussion time")">
+                                    @(hasVotedToSkip ? "[ ABORT VOTE SKIP ]" : "[ SKIP VOTING ]")
+                                </button>
+                                <div class="ctc-vote-small-progress">@skipVote.VotedToEnd.Count / @skipVote.RequiredVotes required</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public CodewordView View { get; set; } = default!;
+    [Parameter] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private string NameOf(Guid id) => View.Players.FirstOrDefault(p => p.PlayerId == id)?.DisplayName ?? "N/A";
+
+    private RenderFragment PlayerRowContent(CodewordPlayerStateView ps, int lockedVotes, string voteTargetName) =>@<text>
+        <div class="ctc-player-row-row">
+            <span class="ctc-clue-player">@ps.DisplayName@(lockedVotes > 0 ? $" - Vote(s) {lockedVotes}" : "")</span>
+            @if (ps.IsEliminated)
+            {
+                <span class="ctc-status-badge ctc-status-eliminated">ELIMINATED</span>
+            }
+            else if (ps.HasVoted)
+            {
+                <span class="ctc-status-badge ctc-status-voted">VOTED &#x2192; @voteTargetName</span>
+            }
+        </div>
+        <div class="ctc-player-row-row">
+            <div class="ctc-clue-history-bubbles">
+                @foreach (var clue in ps.ClueHistory)
+                {
+                    <span class="ctc-clue-bubble">@clue</span>
+                }
+            </div>
+        </div>
+    </text>;
+
+    private async Task SelectTarget(Guid targetId)
+    {
+        var err = await Submit(CodewordCommands.CastVote,
+            JsonSerializer.Serialize(new VotePayload(targetId), CodewordContractsJsonContext.Default.VotePayload));
+        if (err is not null) await OnError.InvokeAsync("You cannot vote for that player.");
+    }
+
+    private async Task ConfirmVote()
+    {
+        var err = await Submit(CodewordCommands.LockInVote, null);
+        if (err is not null) await OnError.InvokeAsync("Please select a player before locking in.");
+    }
+
+    private async Task VoteToEndGame()
+    {
+        var err = await Submit(CodewordCommands.VoteEndGame, null);
+        if (err is not null) await OnError.InvokeAsync("Action not available right now.");
+    }
+
+    private async Task SkipRemainingTime()
+    {
+        var err = await Submit(CodewordCommands.SkipTime, null);
+        if (err is not null) await OnError.InvokeAsync("Action not available right now.");
+    }
+
+    private async Task AdvanceToVote()
+    {
+        var err = await Submit(CodewordCommands.AdvanceToVote, null);
+        if (err is not null) await OnError.InvokeAsync("Action not available right now.");
+    }
+}

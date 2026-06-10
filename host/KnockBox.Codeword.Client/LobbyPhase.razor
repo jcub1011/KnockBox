@@ -1,0 +1,225 @@
+@implements IDisposable
+@*
+    Lobby phase — roster, host start buttons, and the settings drawer, re-expressed against
+    the projected CodewordView. The host edits a local settings draft; each change is sent as
+    an `update-settings` command (the server is the source of truth). Client-side localStorage
+    persistence is deferred — a known regression, parity with CardCounter (no WASM client
+    settings-storage SDK yet); settings reset to defaults each lobby.
+*@
+
+<div class="ctc-lobby">
+    @{
+        bool amHost = View.RecipientId == View.HostId;
+        int joinedCount = View.Roster.Count(r => !r.IsHost);   // excludes host
+    }
+    @if (amHost)
+    {
+        <button class="ctc-settings-gear-btn" @onclick="ToggleSettings" title="Game Settings">⚙️</button>
+    }
+
+    <div class="ctc-lobby-table-container">
+        <div class="ctc-lobby-table">
+            <h2 class="ctc-lobby-title">WAITING FOR PLAYERS</h2>
+            <div class="ctc-lobby-players">
+                @foreach (var entry in View.Roster)
+                {
+                    bool isHost = entry.IsHost;
+                    bool isMe = entry.PlayerId == View.RecipientId;
+                    @if (isHost)
+                    {
+                        <div class="ctc-lobby-player @(isMe ? "ctc-lobby-player-me" : "")">
+                            <span class="ctc-player-avatar">👑</span>
+                            <span class="ctc-player-lobbyname">@entry.DisplayName</span>
+                            <span class="ctc-host-badge">HOST</span>
+                        </div>
+                    }
+                    else if (amHost)
+                    {
+                        <button class="ctc-lobby-player @(isMe ? "ctc-lobby-player-me" : "")"
+                                @onclick="() => KickPlayer(entry.PlayerId)" title="Click to kick player">
+                            <span class="ctc-player-avatar">🕵️</span>
+                            <span class="ctc-player-lobbyname">@entry.DisplayName</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="ctc-lobby-player @(isMe ? "ctc-lobby-player-me" : "")">
+                            <span class="ctc-player-avatar">🕵️</span>
+                            <span class="ctc-player-lobbyname">@entry.DisplayName</span>
+                        </div>
+                    }
+                }
+            </div>
+
+            <p class="ctc-lobby-player-count">@joinedCount / 8 players (need 4–8)</p>
+
+            @if (amHost)
+            {
+                bool canStartAsDisplay = joinedCount >= 4 && joinedCount <= 8;     // host = shared display
+                bool canStartAsPlayer = (joinedCount + 1) >= 4 && (joinedCount + 1) <= 8; // host counts
+                <button class="ctc-btn ctc-btn-primary ctc-btn-lg" @onclick="() => StartGame(false)"
+                        disabled="@(!canStartAsDisplay)"
+                        title="@(!canStartAsDisplay ? "Need 4–8 players to start" : "Start the game as a shared display")">
+                    🔍 START GAME
+                </button>
+                <button class="ctc-btn ctc-btn-secondary ctc-btn-lg" @onclick="() => StartGame(true)"
+                        disabled="@(!canStartAsPlayer)"
+                        title="@(!canStartAsPlayer ? "Need 3–7 other players to start as a player" : "Start the game and join as a player")">
+                    🕵️ START GAME AS PLAYER
+                </button>
+                @if (!canStartAsDisplay && !canStartAsPlayer)
+                {
+                    <p class="ctc-lobby-min-players">⚠️ Need 4–8 players to start</p>
+                }
+            }
+            else
+            {
+                <p class="ctc-waiting-text">Waiting for host to start...</p>
+            }
+        </div>
+    </div>
+
+    @if (amHost)
+    {
+        @if (SettingsOpen)
+        {
+            <div class="ctc-settings-backdrop" @onclick="ToggleSettings"></div>
+        }
+        <div class="ctc-settings-drawer @(SettingsOpen ? "ctc-settings-drawer-open" : "")">
+            <div class="ctc-settings-drawer-header">
+                <h3 class="ctc-config-title">⚙️ Game Settings</h3>
+                <button class="ctc-settings-close-btn" @onclick="ToggleSettings" title="Close settings">✕</button>
+            </div>
+            <div class="ctc-settings-drawer-body">
+
+                <h4 class="ctc-config-section-title">🎮 Gameplay</h4>
+                <div class="ctc-config-grid">
+                    <label class="ctc-config-label">
+                        Total Games:
+                        <input type="number" min="1" class="ctc-config-input"
+                               @bind:get="_draft.TotalGames" @bind:set="@(v => Set(_draft with { TotalGames = v }))" />
+                    </label>
+                </div>
+
+                <h4 class="ctc-config-section-title">⏱️ Timers</h4>
+                <div class="ctc-config-grid">
+                    <label class="ctc-config-label ctc-config-label-row">
+                        <span>Enable Timers:</span>
+                        <input type="checkbox" class="ctc-config-checkbox"
+                               @bind:get="_draft.EnableTimers" @bind:set="@(v => Set(_draft with { EnableTimers = v }))" />
+                    </label>
+                    <label class="ctc-config-label">
+                        Setup Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input"
+                               @bind:get="@(_draft.SetupPhaseTimeoutMs / 1000)" @bind:set="@(v => Set(_draft with { SetupPhaseTimeoutMs = v * 1000 }))" />
+                    </label>
+                    <label class="ctc-config-label">
+                        Clue Phase Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input"
+                               @bind:get="@(_draft.CluePhaseTimeoutMs / 1000)" @bind:set="@(v => Set(_draft with { CluePhaseTimeoutMs = v * 1000 }))" />
+                    </label>
+                    <label class="ctc-config-label">
+                        Discussion Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input"
+                               @bind:get="@(_draft.DiscussionPhaseTimeoutMs / 1000)" @bind:set="@(v => Set(_draft with { DiscussionPhaseTimeoutMs = v * 1000 }))" />
+                    </label>
+                    <label class="ctc-config-label">
+                        Vote Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input"
+                               @bind:get="@(_draft.VotePhaseTimeoutMs / 1000)" @bind:set="@(v => Set(_draft with { VotePhaseTimeoutMs = v * 1000 }))" />
+                    </label>
+                    <label class="ctc-config-label">
+                        Reveal Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input"
+                               @bind:get="@(_draft.RevealPhaseTimeoutMs / 1000)" @bind:set="@(v => Set(_draft with { RevealPhaseTimeoutMs = v * 1000 }))" />
+                    </label>
+                    <label class="ctc-config-label">
+                        Informant Guess Timeout (s):
+                        <input type="number" step="1" class="ctc-config-input"
+                               @bind:get="@(_draft.InformantGuessTimeoutMs / 1000)" @bind:set="@(v => Set(_draft with { InformantGuessTimeoutMs = v * 1000 }))" />
+                    </label>
+                </div>
+
+                <div class="ctc-settings-drawer-footer">
+                    <button type="button" class="ctc-btn @(_resetArmed ? "ctc-btn-danger" : "ctc-btn-secondary")"
+                            @onclick="ResetToDefaults">
+                        @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public CodewordView View { get; set; } = default!;
+    [Parameter] public Func<string, string?, Task> Submit { get; set; } = default!;
+
+    protected bool SettingsOpen { get; private set; }
+
+    // Local editable copy of the host's settings. Initialized from the projected view; each
+    // edit optimistically updates this and sends an update-settings command.
+    private CodewordSettings _draft = new();
+    private bool _initialized;
+
+    private bool _resetArmed;
+    private int _resetGeneration;
+    private CancellationTokenSource? _cts;
+
+    protected override void OnParametersSet()
+    {
+        // Seed the draft from the authoritative settings once, then let local edits drive it
+        // (the host is the only editor). Re-seed only before the first edit.
+        if (!_initialized)
+        {
+            _draft = View.Settings;
+            _initialized = true;
+        }
+    }
+
+    protected void ToggleSettings() => SettingsOpen = !SettingsOpen;
+
+    private Task Set(CodewordSettings updated)
+    {
+        _draft = updated;
+        return Submit(CodewordCommands.UpdateSettings,
+            JsonSerializer.Serialize(_draft, CodewordContractsJsonContext.Default.CodewordSettings));
+    }
+
+    protected void ResetToDefaults()
+    {
+        if (!_resetArmed)
+        {
+            _resetArmed = true;
+            _ = DisarmResetAfterDelay(++_resetGeneration);
+            return;
+        }
+        _resetArmed = false;
+        _resetGeneration++;
+        _ = Set(new CodewordSettings());
+    }
+
+    private async Task DisarmResetAfterDelay(int generation)
+    {
+        _cts ??= new CancellationTokenSource();
+        try { await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token); }
+        catch (OperationCanceledException) { return; }
+        if (generation != _resetGeneration) return;
+        _resetArmed = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task KickPlayer(Guid playerId)
+        => Submit(CodewordCommands.KickPlayer,
+            JsonSerializer.Serialize(new KickPayload(playerId), CodewordContractsJsonContext.Default.KickPayload));
+
+    private Task StartGame(bool hostAsPlayer)
+        => Submit(CodewordCommands.Start,
+            JsonSerializer.Serialize(new StartPayload(hostAsPlayer), CodewordContractsJsonContext.Default.StartPayload));
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

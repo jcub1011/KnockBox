@@ -1,11 +1,13 @@
-@using KnockBox.Core.Services.State.Users
-@using KnockBox.Codeword.Services.State.Games
+@*
+    Voting phase — each living player designates a target for termination. Host spectator sees
+    a live designation tracker; players pick a target and confirm.
+*@
 
 @{
-    var myId = UserService.CurrentUser?.Id ?? Guid.Empty;
-    var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
-    int aliveCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated);
-    int votedCount = GameState.GamePlayers.Values.Count(p => !p.IsEliminated && p.HasVoted);
+    bool isHostSpectator = View.RecipientId == View.HostId && !View.HostIsParticipant;
+    int aliveCount = View.Players.Count(p => !p.IsEliminated);
+    int votedCount = View.Players.Count(p => !p.IsEliminated && p.HasVoted);
+    var me = View.Players.FirstOrDefault(p => p.PlayerId == View.RecipientId);
 }
 
 @if (isHostSpectator)
@@ -15,31 +17,28 @@
         <div class="ctc-vote-panel ctc-host-panel">
             <h2 class="ctc-phase-title glitch" data-text="[ FINAL DESIGNATION ]">[ FINAL DESIGNATION ]</h2>
 
-            @* ── Vote Progress Bar ── *@
             @{
                 var barWidth = 20;
                 var filled = aliveCount > 0 ? (int)Math.Ceiling((double)votedCount / aliveCount * barWidth) : 0;
-                var empty = barWidth - filled;
-                var bar = new string('\u2588', filled) + new string('\u2591', empty);
+                var bar = new string('█', filled) + new string('░', barWidth - filled);
             }
             <div class="ctc-host-vote-progress">
                 <span class="ctc-host-vote-bar">[@bar]</span>
                 <span class="ctc-host-vote-count">@votedCount / @aliveCount VOTES LOGGED</span>
             </div>
 
-            @* ── Live Designation Tracker ── *@
             <div class="ctc-host-vote-tracker">
                 <h3 class="ctc-section-title">[ LIVE DESIGNATION TRACKER ]</h3>
                 <div class="ctc-vote-tracker-grid">
-                    @foreach (var target in GameState.GamePlayers.Values.Where(p => !p.IsEliminated).OrderBy(p => p.DisplayName))
+                    @foreach (var target in View.Players.Where(p => !p.IsEliminated).OrderBy(p => p.DisplayName))
                     {
-                        var votes = GameState.GamePlayers.Values.Count(p => !p.IsEliminated && p.HasVoted && p.VoteTargetId == target.PlayerId);
+                        var votes = View.Players.Count(p => !p.IsEliminated && p.HasVoted && p.VoteTargetId == target.PlayerId);
                         var maxVotes = aliveCount - 1;
                         var tFilled = maxVotes > 0 ? votes : 0;
                         var tEmpty = maxVotes > 0 ? maxVotes - votes : 0;
                         <div class="ctc-vote-tracker-row @(votes > 0 ? "ctc-vote-tracker-targeted" : "")">
                             <span class="ctc-vote-tracker-name">@target.DisplayName</span>
-                            <span class="ctc-vote-tracker-bar">@(new string('\u2588', tFilled))@(new string('\u2591', tEmpty))</span>
+                            <span class="ctc-vote-tracker-bar">@(new string('█', tFilled))@(new string('░', tEmpty))</span>
                             <span class="ctc-vote-tracker-count">@votes</span>
                         </div>
                     }
@@ -53,19 +52,13 @@ else
     @* ══════ PLAYER VIEW ══════ *@
     <div class="ctc-vote-area">
         @{
-            var myPlayer = GetMyPlayer();
-            bool hasVoted = myPlayer is not null && myPlayer.HasVoted;
-            var alivePlayers = GameState.GamePlayers.Values
-                .Where(p => !p.IsEliminated && p.PlayerId != myId)
-                .ToList();
+            bool hasVoted = me is { HasVoted: true };
         }
 
         <div class="ctc-vote-panel">
             <h2 class="ctc-phase-title glitch" data-text="[ FINAL DESIGNATION ]">[ FINAL DESIGNATION ]</h2>
 
-            <div class="ctc-vote-progress-bar">
-                @votedCount / @aliveCount votes logged
-            </div>
+            <div class="ctc-vote-progress-bar">@votedCount / @aliveCount votes logged</div>
 
             @if (hasVoted)
             {
@@ -74,10 +67,10 @@ else
                     <p class="ctc-waiting-text">Designation confirmed. Awaiting others...</p>
                 </div>
             }
-            else if (myPlayer is not null && !myPlayer.IsEliminated)
+            else if (me is { IsEliminated: false })
             {
                 <div class="ctc-vote-grid">
-                    @foreach (var target in alivePlayers)
+                    @foreach (var target in View.Players.Where(p => !p.IsEliminated && p.PlayerId != View.RecipientId))
                     {
                         bool isSelected = _selectedTargetId == target.PlayerId;
                         <button class="ctc-vote-target @(isSelected ? "ctc-vote-target-selected" : "")"
@@ -87,17 +80,13 @@ else
                     }
                 </div>
 
-                @if (_selectedTargetId is not null)
+                @if (_selectedTargetId is { } sel)
                 {
-                    var targetName = _selectedTargetId is { } vtId && GameState.GamePlayers.TryGetValue(vtId, out var tp) ? tp.DisplayName : "...";
+                    var targetName = View.Players.FirstOrDefault(p => p.PlayerId == sel)?.DisplayName ?? "...";
                     <div class="ctc-vote-confirm">
                         <p>Designate <strong>@targetName</strong> for termination?</p>
-                        <button class="ctc-btn ctc-btn-danger" @onclick="ConfirmVote">
-                            [ CONFIRM TERMINATION ]
-                        </button>
-                        <button class="ctc-btn ctc-btn-secondary" @onclick="CancelSelection">
-                            [ ABORT ]
-                        </button>
+                        <button class="ctc-btn ctc-btn-danger" @onclick="ConfirmVote">[ CONFIRM TERMINATION ]</button>
+                        <button class="ctc-btn ctc-btn-secondary" @onclick="CancelSelection">[ ABORT ]</button>
                     </div>
                 }
             }
@@ -107,4 +96,28 @@ else
             }
         </div>
     </div>
+}
+
+@code {
+    [Parameter] public CodewordView View { get; set; } = default!;
+    [Parameter] public Func<string, string?, Task<string?>> Submit { get; set; } = default!;
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private Guid? _selectedTargetId;
+
+    private void SelectTarget(Guid targetId) => _selectedTargetId = targetId;
+
+    private void CancelSelection() => _selectedTargetId = null;
+
+    private async Task ConfirmVote()
+    {
+        if (_selectedTargetId is not { } target) return;
+        var err = await Submit(CodewordCommands.CastVote,
+            JsonSerializer.Serialize(new VotePayload(target), CodewordContractsJsonContext.Default.VotePayload));
+        if (err is not null)
+        {
+            await OnError.InvokeAsync("You cannot vote for that player.");
+            _selectedTargetId = null;
+        }
+    }
 }

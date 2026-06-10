@@ -1,0 +1,53 @@
+@inject NavigationManager Nav
+@*
+    Codeword's custom header, WASM-safe. The server header used server-only services
+    (INavigationService, IGameSessionService) and the server RoomCodeButton, none of which a
+    .Client assembly may reference (KB1005). This version uses NavigationManager to leave and
+    the WASM RoomCodeButton (KnockBox.Core.Client) for full secure-link parity.
+*@
+
+<div class="ctc-header-container">
+    <div class="ctc-header-scanlines"></div>
+    <div class="ctc-header-vignette"></div>
+
+    <a class="ctc-header-brand" role="button" tabindex="0" @onclick="Leave" title="Click to return home">
+        <span class="ctc-header-prompt">&gt;</span>
+        <span class="ctc-header-text">CODEWORD</span>
+        <span class="ctc-header-caret"></span>
+    </a>
+
+    <div class="ctc-header-actions">
+        <RoomCodeButton Code="@(Code ?? string.Empty)"
+                        JoinUrl="@JoinUrl"
+                        ClassName="ctc-header-code"
+                        CoverClassName="ctc-header-code-cover"
+                        ValueClassName="ctc-header-code-value"
+                        CoverText="[ SECURE LINK ]" />
+        <button class="ctc-header-leave" @onclick="Leave" title="ABORT MISSION" aria-label="Abort Mission">
+            <span class="ctc-header-leave-text">ABORT</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+    </div>
+</div>
+
+@code {
+    /// <summary>The short, shareable lobby code (resolved from the hub by GameRoot).</summary>
+    [Parameter] public string? Code { get; set; }
+
+    /// <summary>
+    /// Invoked when the player leaves (brand or abort button). GameRoot wires this to the base
+    /// LeaveAsync, which tells the hub (closing the lobby if host) then navigates home.
+    /// </summary>
+    [Parameter] public EventCallback OnLeave { get; set; }
+
+    private string JoinUrl =>
+        string.IsNullOrEmpty(Code) ? "#" : $"{Nav.BaseUri}?join={Uri.EscapeDataString(Code)}";
+
+    private async Task Leave()
+    {
+        if (OnLeave.HasDelegate)
+            await OnLeave.InvokeAsync();
+        else
+            Nav.NavigateTo("/", forceLoad: true);
+    }
+}

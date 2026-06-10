@@ -285,10 +285,14 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
             Assert.IsFalse(result.IsSuccess);
         }
 
-        // ── PendingClue auto-submit tests ─────────────────────────────────────
+        // ── Timeout auto-submit ───────────────────────────────────────────────
+        // In the WASM model the clue input is client-owned (the server no longer keeps a
+        // per-keystroke PendingClue buffer). The active player's own browser auto-submits
+        // its draft just before the deadline; the server's Tick is the fallback for a player
+        // who sent nothing by the buzzer and always submits "...".
 
         [TestMethod]
-        public void Tick_WithPendingClue_AutoSubmitsPendingText()
+        public void Tick_OnTimeout_AutoSubmitsEllipsisForNonSubmittingPlayer()
         {
             _state.UpdateSettings(s => s with { EnableTimers = true });
             var clueState = new CluePhaseState();
@@ -296,33 +300,18 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
 
             Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var player = _context.GetPlayer(currentPlayer)!;
-            player.PendingClue = "my pending clue";
-
-            clueState.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
-
-            Assert.IsTrue(player.HasSubmittedClue);
-            Assert.AreEqual("my pending clue", player.CurrentClue);
-        }
-
-        [TestMethod]
-        public void Tick_WithEmptyPendingClue_FallsBackToEllipsis()
-        {
-            _state.UpdateSettings(s => s with { EnableTimers = true });
-            var clueState = new CluePhaseState();
-            clueState.OnEnter(_context);
-
-            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
-            var player = _context.GetPlayer(currentPlayer)!;
-            player.PendingClue = "   "; // whitespace-only
 
             clueState.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
 
             Assert.IsTrue(player.HasSubmittedClue);
             Assert.AreEqual("...", player.CurrentClue);
+            Assert.IsTrue(
+                _state.CurrentRoundClues.Any(c => c.PlayerId == currentPlayer && c.Clue == "..."),
+                "The timed-out player's auto-submitted clue must appear in the round's clue list.");
         }
 
         [TestMethod]
-        public void Tick_WithPendingClueMatchingSecretWord_FallsBackToEllipsis()
+        public void Tick_BeforeDeadline_DoesNotAutoSubmit()
         {
             _state.UpdateSettings(s => s with { EnableTimers = true });
             var clueState = new CluePhaseState();
@@ -330,48 +319,10 @@ namespace KnockBox.Codeword.Tests.Unit.Logic.Games.Codeword.States
 
             Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
             var player = _context.GetPlayer(currentPlayer)!;
-            player.PendingClue = player.SecretWord; // "Ocean"
 
-            clueState.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
+            clueState.Tick(_context, DateTimeOffset.UtcNow);
 
-            Assert.IsTrue(player.HasSubmittedClue);
-            Assert.AreEqual("...", player.CurrentClue);
-        }
-
-        [TestMethod]
-        public void Tick_WithPendingClueAlreadyUsed_FallsBackToEllipsis()
-        {
-            _state.UpdateSettings(s => s with { EnableTimers = true });
-            _state.UsedClues["wave"] = "SomePlayer";
-
-            var clueState = new CluePhaseState();
-            clueState.OnEnter(_context);
-
-            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
-            var player = _context.GetPlayer(currentPlayer)!;
-            player.PendingClue = "wave";
-
-            clueState.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
-
-            Assert.IsTrue(player.HasSubmittedClue);
-            Assert.AreEqual("...", player.CurrentClue);
-        }
-
-        [TestMethod]
-        public void Tick_WithNoPendingClue_FallsBackToEllipsis()
-        {
-            _state.UpdateSettings(s => s with { EnableTimers = true });
-            var clueState = new CluePhaseState();
-            clueState.OnEnter(_context);
-
-            Guid currentPlayer = _state.TurnManager.TurnOrder[_state.TurnManager.CurrentPlayerIndex];
-            var player = _context.GetPlayer(currentPlayer)!;
-            player.PendingClue = null;
-
-            clueState.Tick(_context, DateTimeOffset.UtcNow.AddMinutes(5));
-
-            Assert.IsTrue(player.HasSubmittedClue);
-            Assert.AreEqual("...", player.CurrentClue);
+            Assert.IsFalse(player.HasSubmittedClue);
         }
     }
 }

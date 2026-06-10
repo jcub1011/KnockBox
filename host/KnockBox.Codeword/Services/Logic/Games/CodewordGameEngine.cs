@@ -1,7 +1,11 @@
+using System.Text.Json;
+using KnockBox.Codeword.Contracts;
 using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Games.Shared.Projection;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Codeword.Services.Logic.Games.FSM;
 using KnockBox.Codeword.Services.Logic.Games.FSM.States;
+using KnockBox.Codeword.Services.Projection;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Codeword.Services.State.Games;
@@ -19,8 +23,136 @@ namespace KnockBox.Codeword.Services.Logic.Games
     public class CodewordGameEngine(
         IRandomNumberService randomNumberService,
         ILogger<CodewordGameEngine> logger,
-        ILogger<CodewordGameState> stateLogger) : AbstractGameEngine<CodewordGameState>(minPlayerCount: 4, maxPlayerCount: 8)
+        ILogger<CodewordGameState> stateLogger)
+        : AbstractGameEngine<CodewordGameState>(minPlayerCount: 4, maxPlayerCount: 8),
+          IGameStateProjector, IGameCommandHandler, IServerTickHandler
     {
+        private readonly CodewordStateProjector _projector = new();
+
+        // Match the hub's wire format: enums as strings, case-insensitive property
+        // names, so a client-serialized command payload deserializes here.
+        private static readonly JsonSerializerOptions CommandJsonOptions = new()
+        {
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
+            PropertyNameCaseInsensitive = true,
+        };
+
+        // ── Hub projection / command / tick surface ──────────────────────────
+
+        /// <summary>Per-recipient projection entry point used by the host's <c>GameViewCoordinator</c>.</summary>
+        public object? ProjectFor(AbstractGameState state, Guid recipientId)
+            => ((IGameStateProjector)_projector).ProjectFor(state, recipientId);
+
+        /// <summary>
+        /// Maps a hub command name to the same engine method a Razor page used to call
+        /// directly. Per-command authorization (host-only, active-player, turn order) lives
+        /// in the invoked methods / FSM states; host-only lobby commands are gated here.
+        /// </summary>
+        public async ValueTask<Result> HandleCommandAsync(
+            User caller, AbstractGameState state, string command, string? payloadJson, CancellationToken ct = default)
+        {
+            if (state is not CodewordGameState s)
+                return Result.FromError("Invalid game state for Codeword.");
+
+            return command switch
+            {
+                CodewordCommands.Start              => await StartFromPayload(caller, s, payloadJson, ct),
+                CodewordCommands.UpdateSettings     => UpdateSettingsFromPayload(caller, s, payloadJson),
+                CodewordCommands.KickPlayer         => KickFromPayload(caller, s, payloadJson),
+                CodewordCommands.SubmitClue         => SubmitClueFromPayload(caller, s, payloadJson),
+                CodewordCommands.CastVote           => CastVoteFromPayload(caller, s, payloadJson),
+                CodewordCommands.LockInVote         => LockInVote(caller, s),
+                CodewordCommands.InformantGuess     => InformantGuessFromPayload(caller, s, payloadJson),
+                CodewordCommands.AdvanceToVote      => AdvanceToVote(caller, s),
+                CodewordCommands.SkipTime           => SkipRemainingTime(caller, s),
+                CodewordCommands.VoteEndGame        => VoteToEndGame(caller, s),
+                CodewordCommands.ContinueOrEndRound => ContinueOrEndRoundFromPayload(caller, s, payloadJson),
+                CodewordCommands.StartNextGame      => StartNextGame(caller, s),
+                CodewordCommands.ReturnToLobby      => ReturnToLobby(caller, s),
+                _ => Result.FromError($"Unknown command [{command}].")
+            };
+        }
+
+        /// <summary>Server-owned clock entry point; drives the FSM's time-based transitions.</summary>
+        void IServerTickHandler.Tick(AbstractGameState state, DateTimeOffset now)
+        {
+            if (state is CodewordGameState s && s.Context is not null)
+                Tick(s.Context, now);
+        }
+
+        // ── Command payload adapters ─────────────────────────────────────────
+
+        private async Task<Result> StartFromPayload(User caller, CodewordGameState state, string? payloadJson, CancellationToken ct)
+        {
+            // The deal buttons choose whether the host plays; carry it into settings
+            // before the host-checked StartAsync runs StartAsyncCore (UpdateSettings also
+            // reflects HostPlays into HostIsParticipant so Participants is correct at start).
+            var payload = Deserialize<StartPayload>(payloadJson);
+            if (caller.Id == state.Host.Id)
+                state.UpdateSettings(cfg => cfg with { HostPlays = payload?.HostPlays ?? false });
+            return await StartAsync(caller, state, ct);
+        }
+
+        private Result UpdateSettingsFromPayload(User caller, CodewordGameState state, string? payloadJson)
+        {
+            // Host-only, and only meaningful before the game starts (the House Rules drawer is
+            // a lobby control). HostPlays is owned by the deal buttons, so it is preserved here.
+            if (caller.Id != state.Host.Id)
+                return Result.FromError("Only the host can change the settings.");
+            if (!state.IsJoinable)
+                return Result.FromError("Settings can only change before the game starts.");
+            if (Deserialize<CodewordSettings>(payloadJson) is not { } incoming)
+                return Result.FromError("Malformed settings payload.");
+            return state.UpdateSettings(cur => incoming with { HostPlays = cur.HostPlays });
+        }
+
+        private Result KickFromPayload(User caller, CodewordGameState state, string? payloadJson)
+        {
+            if (Deserialize<KickPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed kick payload.");
+
+            var target = state.Players.FirstOrDefault(e => e.User.Id == p.TargetId).User;
+            if (target is null)
+                return Result.FromError("Player is not in this lobby.");
+
+            return state.KickPlayer(caller, target);
+        }
+
+        private Result SubmitClueFromPayload(User caller, CodewordGameState state, string? payloadJson)
+        {
+            if (Deserialize<SubmitCluePayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed submit-clue payload.");
+            return SubmitClue(caller, state, p.Clue);
+        }
+
+        private Result CastVoteFromPayload(User caller, CodewordGameState state, string? payloadJson)
+        {
+            if (Deserialize<VotePayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed cast-vote payload.");
+            return CastVote(caller, state, p.TargetId);
+        }
+
+        private Result InformantGuessFromPayload(User caller, CodewordGameState state, string? payloadJson)
+        {
+            if (Deserialize<InformantGuessPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed informant-guess payload.");
+            return InformantGuess(caller, state, p.GuessedWord);
+        }
+
+        private Result ContinueOrEndRoundFromPayload(User caller, CodewordGameState state, string? payloadJson)
+        {
+            if (Deserialize<ContinueOrEndPayload>(payloadJson) is not { } p)
+                return Result.FromError("Malformed continue-or-end-round payload.");
+            return VoteContinueOrEndRound(caller, state, p.VoteToEnd);
+        }
+
+        private static T? Deserialize<T>(string? payloadJson)
+        {
+            if (string.IsNullOrEmpty(payloadJson)) return default;
+            try { return JsonSerializer.Deserialize<T>(payloadJson, CommandJsonOptions); }
+            catch (JsonException) { return default; }
+        }
+
         // ── AbstractGameEngine lifecycle ─────────────────────────────────────
 
         /// <summary>

@@ -1,0 +1,138 @@
+@inherits HubLobbyPageBase<CodewordView>
+@*
+    GameRoot — the runtime-loaded WASM UI entry point for Codeword. Inheriting
+    HubLobbyPageBase<CodewordView> opens the hub, joins the lobby, deserializes each
+    per-player projection into `View`, and disposes on teardown. It dispatches to the phase
+    components exactly as the old server CodewordLobby page did, passing the projected View
+    and a command-submit callback.
+
+    The header is rendered here as a bar above the CRT bezel (the old server header was a
+    separate host-injected bar above the page; on WASM MainLayout suppresses its own header,
+    so GameRoot owns the whole article).
+*@
+
+@* The game ships its own stylesheet from the server plugin's mounted wwwroot; a runtime-
+   loaded WASM component can't use HeadContent and the streamed .Client DLL has no scoped
+   bundle, so we link the plain (de-scoped) stylesheet here. *@
+<link rel="stylesheet" href="_content/KnockBox.Codeword/css/codeword.css" />
+
+<CodewordHeader Code="@LobbyCode" OnLeave="LeaveAsync" />
+
+<div class="ctc-crt-bezel ctc-root">
+    <div class="ctc-crt-screen @(View?.MyRole == Role.Informant ? "ctc-state-informant" : "")">
+        <div class="ctc-page">
+            @if (View is null)
+            {
+                <div class="ctc-loading">
+                    <span class="ctc-loading-icon">🔍</span>
+                    <span>[ ESTABLISHING SECURE LINK ]</span>
+                </div>
+            }
+            else
+            {
+                @if (View.PhaseEndsAtUtc is { } endsAt && View.PhaseDurationSeconds > 0)
+                {
+                    <CountdownClock EndTimeUtc="endsAt" Duration="TimeSpan.FromSeconds(View.PhaseDurationSeconds)" Context="countdown">
+                        @{
+                            var barWidth = 20;
+                            var filled = (int)Math.Ceiling(countdown.Fraction * barWidth);
+                            var bar = new string('█', filled) + new string('░', barWidth - filled);
+                            var seconds = (int)Math.Ceiling(countdown.RemainingSeconds);
+                        }
+                        <div class="ctc-timer-container">
+                            <div class="ctc-timer-bar @(seconds < 5 ? "ctc-timer-urgent" : "")">
+                                <span class="ctc-timer-text">[@bar] @(seconds)s</span>
+                            </div>
+                        </div>
+                    </CountdownClock>
+                }
+
+                @if (_errorMessage is not null)
+                {
+                    <div @key="_errorKey" class="ctc-error-toast">
+                        <span class="ctc-error-icon">⚠️</span>
+                        <span>@_errorMessage</span>
+                    </div>
+                }
+
+                @if (View.IsJoinable)
+                {
+                    <LobbyPhase View="View" Submit="Submit" />
+                }
+                else
+                {
+                    @switch (View.Phase)
+                    {
+                        case CodewordGamePhase.Setup:
+                            <SetupPhase View="View" />
+                            break;
+                        case CodewordGamePhase.CluePhase:
+                            <CluePhase View="View" Submit="Submit" OnError="ShowError" />
+                            break;
+                        case CodewordGamePhase.Discussion:
+                            <DiscussionPhase View="View" Submit="Submit" OnError="ShowError" />
+                            break;
+                        case CodewordGamePhase.Voting:
+                            <VotePhase View="View" Submit="Submit" OnError="ShowError" />
+                            break;
+                        case CodewordGamePhase.Reveal:
+                            <RevealPhase View="View" Submit="Submit" OnError="ShowError" />
+                            break;
+                        case CodewordGamePhase.ContinueOrEndRound:
+                            <ContinueOrEndRoundPhase View="View" Submit="Submit" OnError="ShowError" />
+                            break;
+                        case CodewordGamePhase.GameOver:
+                            <GameOverPhase View="View" Submit="Submit" />
+                            break;
+                    }
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>The lobby code from the room URL, supplied by the WASM host page.</summary>
+    [Parameter] public string Code { get; set; } = "";
+
+    /// <summary>The player's chosen display name, propagated from the home page.</summary>
+    [Parameter] public string? PlayerName { get; set; }
+
+    protected override string RouteIdentifier => "codeword";
+    protected override string LobbyUri => $"room/codeword/{Code}";
+    protected override string DisplayName => string.IsNullOrWhiteSpace(PlayerName) ? "Player" : PlayerName!;
+
+    public GameRoot()
+        : base(new SourceGenProjectionDeserializer<CodewordView>(
+            CodewordContractsJsonContext.Default.CodewordView))
+    {
+    }
+
+    // Returns the server's error message (null on success). Error-aware phase components read
+    // it to surface a toast; phases that don't care bind it to a Func<...,Task> (covariant).
+    private Task<string?> Submit(string command, string? payload) => SubmitCommandAsync(command, payload);
+
+    // ── Transient error toast (mirrors the old CodewordLobby) ──────────────────
+    private string? _errorMessage;
+    private int _errorKey;
+
+    private void ShowError(string message)
+    {
+        _errorMessage = message;
+        _errorKey++;
+        int capturedKey = _errorKey;
+        StateHasChanged();
+        _ = DismissErrorAsync(capturedKey);
+    }
+
+    private async Task DismissErrorAsync(int capturedKey)
+    {
+        try { await Task.Delay(TimeSpan.FromSeconds(3), ComponentDetached); }
+        catch (OperationCanceledException) { return; }
+        if (_errorKey == capturedKey)
+        {
+            _errorMessage = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+}

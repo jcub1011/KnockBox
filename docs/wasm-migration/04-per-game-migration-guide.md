@@ -5,9 +5,20 @@ model to the WASM tri-split. **DiceSimulator is the reference implementation** �
 doubt, copy what `host/KnockBox.DiceSimulator{,.Contracts,.Client}` does.
 
 > **Status:** DiceSimulator (game #1), CardCounter (game #2), AlphaChain (game #3), Tracery
-> (game #4), LinkedList (game #5), Spardle (game #6), and Operator (game #7) are migrated and the
-> shared infrastructure is proven. (Two dead games — HiddenAgenda, the old Phase-0 spike vehicle, and
-> the TaskMaster stub — were deleted rather than migrated, dropping the first-party count to ten.)
+> (game #4), LinkedList (game #5), Spardle (game #6), Operator (game #7), and Codeword (game #8) are
+> migrated and the shared infrastructure is proven. (Two dead games — HiddenAgenda, the old Phase-0
+> spike vehicle, and the TaskMaster stub — were deleted rather than migrated, dropping the first-party
+> count to ten.)
+> Game #8 was a secret-bearing **timed FSM** (7 phases) — it migrated the host-circuit tick to
+> `IServerTickHandler` (the CardCounter/Operator pattern) and put the recipient's own secret on the wire
+> as **top-level `MyRole`/`MySecretWord`** rather than per-player nullable fields (the hidden word pair
+> never crosses, and can't be reconstructed since each view carries only one player's word). It also
+> retired a **server-side per-keystroke buffer**: the old clue auto-submit read `PendingClue` (a
+> documented lock-bypass) on timeout. With client-owned input the server can't see keystrokes, so the
+> active player's browser now **auto-submits its own draft ~800 ms before the projected `PhaseEndsAtUtc`**
+> and the server's `Tick` only fills `"..."` for a player who sent nothing (covers disconnects) — the
+> `PendingClue` field + lock-bypass write are gone. A per-player **`ClueHistory`** (public — every clue
+> is broadcast) and an eliminated/at-game-over **`RevealedRole`** were added to the player-view DTO.
 > Game #6 added the reusable **generic plugin file-upload endpoint** (`IGameUploadHandler` +
 > `POST /api/games/upload`). Game #7 was the first `IServerTickHandler` migration since #2/#3, and
 > introduced the **affordance-projection** pattern for an interactive card-selection UI: rather than

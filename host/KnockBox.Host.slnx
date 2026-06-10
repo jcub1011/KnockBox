@@ -19,6 +19,8 @@
   <Project Path="KnockBox.CardCounter.Client/KnockBox.CardCounter.Client.csproj" />
   <Project Path="KnockBox.CardCounterTests/KnockBox.CardCounterTests.csproj" />
   <Project Path="KnockBox.Codeword/KnockBox.Codeword.csproj" />
+  <Project Path="KnockBox.Codeword.Contracts/KnockBox.Codeword.Contracts.csproj" />
+  <Project Path="KnockBox.Codeword.Client/KnockBox.Codeword.Client.csproj" />
   <Project Path="KnockBox.CodewordTests/KnockBox.CodewordTests.csproj" />
   <Project Path="KnockBox.DiceSimulator/KnockBox.DiceSimulator.csproj" />
   <Project Path="KnockBox.DiceSimulator.Contracts/KnockBox.DiceSimulator.Contracts.csproj" />

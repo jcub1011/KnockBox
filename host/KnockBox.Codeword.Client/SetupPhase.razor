@@ -1,9 +1,11 @@
-@using KnockBox.Core.Services.State.Users
-@using KnockBox.Codeword.Services.State.Games
+@*
+    Setup phase — the role/word briefing. The recipient's own role + secret word come from
+    the projected view's top-level MyRole / MySecretWord (the only secret on the wire); the
+    host spectator (a non-participating host) sees only a "roles assigned" status.
+*@
 
 @{
-    var myId = UserService.CurrentUser?.Id ?? Guid.Empty;
-    var isHostSpectator = GameState.Host.Id == myId && !GameState.HostIsParticipant;
+    bool isHostSpectator = View.RecipientId == View.HostId && !View.HostIsParticipant;
 }
 
 @if (isHostSpectator)
@@ -27,12 +29,9 @@ else
     <div class="ctc-setup-area">
         <div class="ctc-setup-panel">
             <h2 class="ctc-setup-title glitch" data-text="[ CLASSIFIED INTEL ]">[ CLASSIFIED INTEL ]</h2>
-            @{
-                var myPlayer = GetMyPlayer();
-            }
-            @if (myPlayer is not null)
+            @if (View.MyRole is { } role)
             {
-                @if (myPlayer.Role == Role.Informant)
+                @if (role == Role.Informant)
                 {
                     <div class="ctc-word-card ctc-word-card-informant">
                         <span class="ctc-word-value glitch" data-text="NO INTEL">NO INTEL</span>
@@ -42,7 +41,7 @@ else
                 else
                 {
                     <div class="ctc-word-card">
-                        <span class="ctc-word-value">@myPlayer.SecretWord</span>
+                        <span class="ctc-word-value">@View.MySecretWord</span>
                         <span class="ctc-word-hint">Keep this secret. Issue clues to identify your allies.</span>
                     </div>
                 }
@@ -56,3 +55,6 @@ else
     </div>
 }
 
+@code {
+    [Parameter] public CodewordView View { get; set; } = default!;
+}

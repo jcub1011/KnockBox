@@ -1,8 +1,25 @@
+/*
+  De-scoped Codeword stylesheet for the WASM tri-split. Built from the old scoped
+  CodewordLobby.razor.css + CodewordHeader.razor.css (Blazor per-element scoping is gone
+  because StaticWebAssetsEnabled=false produces no .styles.css bundle and a runtime-loaded
+  WASM component can't use <HeadContent>). GameRoot links this directly.
+
+  Transforms applied when de-scoping:
+   - Blazor's `::deep` combinator is STRIPPED. `::deep` is an isolation-only pseudo the Blazor
+     build rewrites into an attribute selector; served as raw CSS it is an INVALID selector, so
+     the browser drops every `::deep` rule. With no scope boundary the bare `.ctc-*` selector is
+     what we want, so `::deep ` is simply removed. (The parent page used it to pierce into the
+     child phase components.)
+   - The single :root block is scoped to the game + header roots so the variable redefinitions
+     (notably --font-mono) don't leak app-wide on WASM routes.
+  Every selector is .ctc-* prefixed (no bare element selectors), so de-scoping is otherwise safe.
+*/
+
 /* ── Page layout ──────────────────────────────────────────────────────────── */
 
 /* ── SPY THEME OVERRIDES ── */
 
-:root {
+.ctc-root, .ctc-header-container {
     --spy-crt-color: #32cd32;
     --spy-dread-color: #e74c3c;
     --font-mono: 'Share Tech Mono', monospace;
@@ -70,7 +87,7 @@
 }
 
 /* Glitch Text Effect - REFINED & SUBTLE */
-::deep .glitch {
+.glitch {
     position: relative;
     color: white;
     display: inline-block;
@@ -78,7 +95,7 @@
 }
 
 /* Remove text doubling pseudo-elements */
-::deep .glitch::before, ::deep .glitch::after {
+.glitch::before, .glitch::after {
     display: none !important;
 }
 
@@ -91,19 +108,19 @@
 }
 
 /* Redacted Text */
-::deep .redacted-text {
+.redacted-text {
     background-color: #000;
     color: #000;
     transition: color 0.2s, background-color 0.2s;
     user-select: none;
 }
-::deep .redacted-text:hover {
+.redacted-text:hover {
     color: #32cd32;
     background-color: transparent;
 }
 
 /* Typewriter Entry - FIXED TRAILING SPACES */
-::deep .typewriter-entry .ctc-clue-word {
+.typewriter-entry .ctc-clue-word {
     display: inline-block;
     width: fit-content;
     max-width: 0;
@@ -136,7 +153,7 @@
 
 /* ── Secret Word Banner ── */
 
-::deep .ctc-secret-word-banner {
+.ctc-secret-word-banner {
     background: linear-gradient(90deg, #0f380f, #1a4d1a);
     padding: 10px 20px;
     border-radius: 4px; /* More brutalist/terminal look */
@@ -149,20 +166,20 @@
     box-shadow: 0 0 10px rgba(50, 205, 50, 0.3);
 }
 
-::deep .ctc-secret-word-banner-informant {
+.ctc-secret-word-banner-informant {
     background: #9e0000 !important;
     border-color: #ff4757 !important;
     box-shadow: 0 0 20px rgba(158, 0, 0, 0.6) !important;
 }
 
-::deep .ctc-secret-word-label {
+.ctc-secret-word-label {
     font-size: 0.9rem;
     font-weight: 700;
     text-transform: uppercase;
     color: rgba(255,255,255,0.8);
 }
 
-::deep .ctc-secret-word-value {
+.ctc-secret-word-value {
     font-size: 1.4rem;
     font-weight: 900;
     color: #fff;
@@ -171,14 +188,14 @@
 
 /* ── Clue History Bubbles ── */
 
-::deep .ctc-clue-history-bubbles {
+.ctc-clue-history-bubbles {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
     flex: 1;
 }
 
-::deep .ctc-clue-bubble {
+.ctc-clue-bubble {
     background: rgba(167,139,250,0.15);
     border: 1px solid rgba(167,139,250,0.3);
     border-radius: 16px;
@@ -190,7 +207,7 @@
 
 /* ── Voting Section ── */
 
-::deep .ctc-voting-section {
+.ctc-voting-section {
     margin-top: 10px;
     padding-top: 20px;
     border-top: 2px solid rgba(255,255,255,0.1);
@@ -199,7 +216,7 @@
     gap: 12px;
 }
 
-::deep .ctc-selection-check {
+.ctc-selection-check {
     position: absolute;
     top: -8px;
     right: -8px;
@@ -207,11 +224,11 @@
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
 }
 
-::deep .ctc-vote-target {
+.ctc-vote-target {
     position: relative;
 }
 
-::deep .ctc-vote-locked {
+.ctc-vote-locked {
     text-align: center;
     padding: 15px;
     background: rgba(0,0,0,0.2);
@@ -220,41 +237,41 @@
 
 /* ── Actions ── */
 
-::deep .ctc-discussion-actions {
+.ctc-discussion-actions {
     display: flex;
     flex-direction: column;
     gap: 15px;
     margin-top: 10px;
 }
 
-::deep .ctc-action-group {
+.ctc-action-group {
     display: flex;
     gap: 12px;
     justify-content: center;
     flex-wrap: wrap;
 }
 
-::deep .ctc-action-item {
+.ctc-action-item {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
 }
 
-::deep .ctc-vote-small-progress {
+.ctc-vote-small-progress {
     font-size: 0.75rem;
     color: rgba(255,255,255,0.4);
     font-weight: 600;
 }
 
-::deep .ctc-host-actions {
+.ctc-host-actions {
     display: flex;
     justify-content: center;
     border-top: 1px solid rgba(255,255,255,0.05);
     padding-top: 15px;
 }
 
-::deep .ctc-vote-to-end-progress {
+.ctc-vote-to-end-progress {
     font-size: 0.8rem;
     color: rgba(255,255,255,0.4);
     text-align: center;
@@ -262,7 +279,7 @@
 
 /* ── Eliminated Banner ── */
 
-::deep .ctc-eliminated-banner {
+.ctc-eliminated-banner {
     background: rgba(45, 45, 45, 0.9);
     border: 2px solid #e74c3c;
     border-radius: 12px;
@@ -274,12 +291,12 @@
     box-shadow: 0 4px 20px rgba(0,0,0,0.4);
 }
 
-::deep .ctc-eliminated-icon {
+.ctc-eliminated-icon {
     font-size: 2.5rem;
     filter: drop-shadow(0 0 8px rgba(231, 76, 60, 0.5));
 }
 
-::deep .ctc-eliminated-text h3 {
+.ctc-eliminated-text h3 {
     margin: 0;
     color: #e74c3c;
     font-size: 1.1rem;
@@ -287,7 +304,7 @@
     letter-spacing: 1px;
 }
 
-::deep .ctc-eliminated-text p {
+.ctc-eliminated-text p {
     margin: 4px 0 0 0;
     color: rgba(255,255,255,0.7);
     font-size: 0.9rem;
@@ -295,7 +312,7 @@
 
 /* ── Public Votes Tally ── */
 
-::deep .ctc-public-votes {
+.ctc-public-votes {
     margin-top: 20px;
     padding-top: 20px;
     border-top: 1px solid rgba(255,255,255,0.1);
@@ -395,14 +412,14 @@
 
 /* ── Shared utility styles ─────────────────────────────────────────────── */
 
-::deep .ctc-waiting-text {
+.ctc-waiting-text {
     color: rgba(255,255,255,0.6);
     font-style: italic;
     font-size: 0.95rem;
     margin: 0;
 }
 
-::deep .ctc-phase-title {
+.ctc-phase-title {
     font-size: 1.6rem;
     font-weight: 900;
     color: #a78bfa;
@@ -412,7 +429,7 @@
     text-align: center;
 }
 
-::deep .ctc-section-title {
+.ctc-section-title {
     font-size: 1rem;
     font-weight: 700;
     color: rgba(255,255,255,0.7);
@@ -423,7 +440,7 @@
 
 /* ── Buttons (Terminal Style) ─────────────────────────────────────────────── */
 
-::deep .ctc-btn {
+.ctc-btn {
     font-family: var(--font-mono);
     font-size: 0.9rem;
     font-weight: 700;
@@ -442,84 +459,84 @@
     transition: background 0.1s, color 0.1s;
 }
 
-::deep .ctc-btn:hover:not(:disabled) {
+.ctc-btn:hover:not(:disabled) {
     background: #32cd32;
     color: #000;
 }
 
-::deep .ctc-btn:active:not(:disabled) {
+.ctc-btn:active:not(:disabled) {
     background: #28a428;
     color: #000;
 }
 
-::deep .ctc-btn:disabled {
+.ctc-btn:disabled {
     opacity: 0.35;
     cursor: not-allowed;
     border-color: rgba(50, 205, 50, 0.3);
     color: rgba(50, 205, 50, 0.3);
 }
 
-::deep .ctc-btn-primary {
+.ctc-btn-primary {
     border-color: #a78bfa;
     color: #a78bfa;
 }
-::deep .ctc-btn-primary:hover:not(:disabled) {
+.ctc-btn-primary:hover:not(:disabled) {
     background: #a78bfa;
     color: #000;
 }
-::deep .ctc-btn-primary:active:not(:disabled) {
+.ctc-btn-primary:active:not(:disabled) {
     background: #8b6fe0;
     color: #000;
 }
 
-::deep .ctc-btn-secondary {
+.ctc-btn-secondary {
     border-color: rgba(255, 255, 255, 0.4);
     color: rgba(255, 255, 255, 0.6);
 }
-::deep .ctc-btn-secondary:hover:not(:disabled) {
+.ctc-btn-secondary:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.6);
     color: #000;
 }
-::deep .ctc-btn-secondary:active:not(:disabled) {
+.ctc-btn-secondary:active:not(:disabled) {
     background: rgba(255, 255, 255, 0.4);
     color: #000;
 }
 
-::deep .ctc-btn-danger {
+.ctc-btn-danger {
     border-color: #e74c3c;
     color: #e74c3c;
 }
-::deep .ctc-btn-danger:hover:not(:disabled) {
+.ctc-btn-danger:hover:not(:disabled) {
     background: #e74c3c;
     color: #000;
 }
-::deep .ctc-btn-danger:active:not(:disabled) {
+.ctc-btn-danger:active:not(:disabled) {
     background: #c0392b;
     color: #000;
 }
 
-::deep .ctc-btn-warning {
+.ctc-btn-warning {
     border-color: #e67e22;
     color: #e67e22;
 }
-::deep .ctc-btn-warning:hover:not(:disabled) {
+.ctc-btn-warning:hover:not(:disabled) {
     background: #e67e22;
     color: #000;
 }
-::deep .ctc-btn-warning:active:not(:disabled) {
+.ctc-btn-warning:active:not(:disabled) {
     background: #cf6d17;
     color: #000;
 }
 
-::deep .ctc-btn-lg { font-size: 1.1rem; padding: 12px 28px; }
+.ctc-btn-lg { font-size: 1.1rem; padding: 12px 28px; }
 
 /* Selected state mirrors the :active fill so a logged vote reads at a glance. */
-::deep .ctc-btn.ctc-btn-selected.ctc-btn-primary { background: #a78bfa; color: #000; }
-::deep .ctc-btn.ctc-btn-selected.ctc-btn-secondary { background: rgba(255, 255, 255, 0.6); color: #000; }
-::deep .ctc-btn.ctc-btn-selected.ctc-btn-danger { background: #e74c3c; color: #000; }
-::deep .ctc-btn.ctc-btn-selected.ctc-btn-warning { background: #e67e22; color: #000; }
+.ctc-btn.ctc-btn-selected.ctc-btn-primary { background: #a78bfa; color: #000; }
+.ctc-btn.ctc-btn-selected.ctc-btn-secondary { background: rgba(255, 255, 255, 0.6); color: #000; }
+.ctc-btn.ctc-btn-selected.ctc-btn-danger { background: #e74c3c; color: #000; }
+.ctc-btn.ctc-btn-selected.ctc-btn-warning { background: #e67e22; color: #000; }
 
-::deep .ctc-continue-end-buttons {
+.ctc-continue-end-buttons {
     display: flex;
     flex-wrap: wrap;
     gap: 16px;
@@ -529,7 +546,7 @@
 
 /* ── Lobby ────────────────────────────────────────────────────────────────── */
 
-::deep .ctc-lobby {
+.ctc-lobby {
     flex: 1;
     display: flex;
     align-items: center;
@@ -538,7 +555,7 @@
     padding: 24px;
 }
 
-::deep .ctc-settings-gear-btn {
+.ctc-settings-gear-btn {
     position: absolute;
     top: 16px;
     right: 16px;
@@ -550,13 +567,13 @@
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
 }
 
-::deep .ctc-lobby-table-container {
+.ctc-lobby-table-container {
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-::deep .ctc-lobby-table {
+.ctc-lobby-table {
     background: rgba(0,0,0,0.4);
     border: 3px solid #a78bfa;
     border-radius: 24px;
@@ -570,7 +587,7 @@
     align-items: center;
 }
 
-::deep .ctc-lobby-title {
+.ctc-lobby-title {
     font-size: 1.4rem;
     font-weight: 900;
     color: #a78bfa;
@@ -579,14 +596,14 @@
     margin: 0;
 }
 
-::deep .ctc-lobby-players {
+.ctc-lobby-players {
     width: 100%;
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-::deep .ctc-lobby-player {
+.ctc-lobby-player {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -602,31 +619,31 @@
     cursor: default;
 }
 
-::deep button.ctc-lobby-player {
+button.ctc-lobby-player {
     cursor: pointer;
     transition: border-color 0.2s, background 0.2s;
 }
 
-::deep button.ctc-lobby-player:hover {
+button.ctc-lobby-player:hover {
     border-color: #e74c3c;
     background: rgba(231, 76, 60, 0.1);
 }
 
-::deep .ctc-lobby-player-me {
+.ctc-lobby-player-me {
     border-color: #a78bfa;
     background: rgba(167,139,250,0.08);
 }
 
-::deep .ctc-player-avatar {
+.ctc-player-avatar {
     font-size: 1.3rem;
 }
 
-::deep .ctc-player-lobbyname {
+.ctc-player-lobbyname {
     flex: 1;
     font-weight: 700;
 }
 
-::deep .ctc-host-badge {
+.ctc-host-badge {
     background: #a78bfa;
     color: #000;
     font-size: 0.7rem;
@@ -637,13 +654,13 @@
     letter-spacing: 1px;
 }
 
-::deep .ctc-lobby-player-count {
+.ctc-lobby-player-count {
     color: rgba(255,255,255,0.5);
     font-size: 0.85rem;
     margin: 0;
 }
 
-::deep .ctc-lobby-min-players {
+.ctc-lobby-min-players {
     color: #e67e22;
     font-size: 0.85rem;
     margin: 4px 0 0 0;
@@ -651,14 +668,14 @@
 
 /* ── Settings Drawer ── */
 
-::deep .ctc-settings-backdrop {
+.ctc-settings-backdrop {
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,0.4);
     z-index: 199;
 }
 
-::deep .ctc-settings-drawer {
+.ctc-settings-drawer {
     position: fixed;
     top: 0;
     right: 0;
@@ -676,11 +693,11 @@
     overflow-y: auto;
 }
 
-::deep .ctc-settings-drawer-open {
+.ctc-settings-drawer-open {
     transform: translateX(0);
 }
 
-::deep .ctc-settings-drawer-header {
+.ctc-settings-drawer-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -688,14 +705,14 @@
     border-bottom: 2px solid rgba(255,255,255,0.1);
 }
 
-::deep .ctc-config-title {
+.ctc-config-title {
     font-size: 1.1rem;
     font-weight: 900;
     color: #a78bfa;
     margin: 0;
 }
 
-::deep .ctc-settings-close-btn {
+.ctc-settings-close-btn {
     background: none;
     border: none;
     color: rgba(255,255,255,0.6);
@@ -703,20 +720,20 @@
     cursor: pointer;
 }
 
-::deep .ctc-settings-drawer-body {
+.ctc-settings-drawer-body {
     padding: 16px 20px;
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
-::deep .ctc-settings-drawer-footer {
+.ctc-settings-drawer-footer {
     margin-top: 4px;
     padding-top: 12px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-::deep .ctc-config-section-title {
+.ctc-config-section-title {
     font-size: 0.85rem;
     font-weight: 800;
     color: #a78bfa;
@@ -725,13 +742,13 @@
     margin: 0;
 }
 
-::deep .ctc-config-grid {
+.ctc-config-grid {
     display: grid;
     grid-template-columns: 1fr;
     gap: 10px;
 }
 
-::deep .ctc-config-label {
+.ctc-config-label {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -739,13 +756,13 @@
     color: rgba(255,255,255,0.7);
 }
 
-::deep .ctc-config-label-row {
+.ctc-config-label-row {
     flex-direction: row;
     align-items: center;
     gap: 8px;
 }
 
-::deep .ctc-config-input {
+.ctc-config-input {
     background: rgba(255,255,255,0.08);
     border: 2px solid rgba(255,255,255,0.15);
     border-radius: 6px;
@@ -757,7 +774,7 @@
     box-sizing: border-box;
 }
 
-::deep .ctc-config-checkbox {
+.ctc-config-checkbox {
     width: 18px;
     height: 18px;
     accent-color: #a78bfa;
@@ -765,7 +782,7 @@
 
 /* ── Setup Phase ──────────────────────────────────────────────────────────── */
 
-::deep .ctc-setup-area {
+.ctc-setup-area {
     flex: 1;
     display: flex;
     align-items: center;
@@ -773,7 +790,7 @@
     padding: 24px;
 }
 
-::deep .ctc-setup-panel {
+.ctc-setup-panel {
     background: rgba(0,0,0,0.4);
     border: 3px solid #a78bfa;
     border-radius: 16px;
@@ -788,7 +805,7 @@
     text-align: center;
 }
 
-::deep .ctc-setup-title {
+.ctc-setup-title {
     font-size: 1.4rem;
     font-weight: 900;
     color: #a78bfa;
@@ -797,7 +814,7 @@
     margin: 0;
 }
 
-::deep .ctc-word-card {
+.ctc-word-card {
     background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
     border: 3px solid #fff;
     border-radius: 16px;
@@ -809,24 +826,24 @@
     align-items: center;
 }
 
-::deep .ctc-word-card-informant {
+.ctc-word-card-informant {
     background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
     box-shadow: 0 8px 32px rgba(231,76,60,0.4);
 }
 
-::deep .ctc-word-value {
+.ctc-word-value {
     font-size: 2.4rem;
     font-weight: 900;
     color: #fff;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
 }
 
-::deep .ctc-word-hint {
+.ctc-word-hint {
     font-size: 0.85rem;
     color: rgba(255,255,255,0.8);
 }
 
-::deep .ctc-setup-auto-advance {
+.ctc-setup-auto-advance {
     color: rgba(255,255,255,0.4);
     font-size: 0.85rem;
     font-style: italic;
@@ -835,7 +852,7 @@
 
 /* ── Clue Phase ───────────────────────────────────────────────────────────── */
 
-::deep .ctc-clue-area {
+.ctc-clue-area {
     flex: 1;
     display: flex;
     align-items: flex-start;
@@ -843,7 +860,7 @@
     padding: 24px;
 }
 
-::deep .ctc-clue-panel {
+.ctc-clue-panel {
     background: rgba(0,0,0,0.4);
     border: 3px solid rgba(255,255,255,0.1);
     border-radius: 16px;
@@ -855,11 +872,11 @@
     gap: 20px;
 }
 
-::deep .ctc-turn-indicator {
+.ctc-turn-indicator {
     text-align: center;
 }
 
-::deep .ctc-turn-badge {
+.ctc-turn-badge {
     display: inline-block;
     background: rgba(255,255,255,0.1);
     border: 2px solid rgba(255,255,255,0.2);
@@ -869,7 +886,7 @@
     font-size: 1rem;
 }
 
-::deep .ctc-turn-you {
+.ctc-turn-you {
     background: rgba(15,56,15,0.2);
     border-color: #7c3aed;
     color: #a78bfa;
@@ -881,14 +898,14 @@
     100% { box-shadow: 0 0 20px rgba(15,56,15,0.3); }
 }
 
-::deep .ctc-clue-input-area {
+.ctc-clue-input-area {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
     align-items: center;
 }
 
-::deep .ctc-clue-input {
+.ctc-clue-input {
     flex: 1;
     background: rgba(255,255,255,0.08);
     border: 2px solid rgba(255,255,255,0.2);
@@ -899,25 +916,25 @@
     font-family: var(--font-primary);
 }
 
-::deep .ctc-clue-input:focus {
+.ctc-clue-input:focus {
     outline: none;
     border-color: #a78bfa;
 }
 
-::deep .ctc-clue-history,
-::deep .ctc-used-clues {
+.ctc-clue-history,
+.ctc-used-clues {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-::deep .ctc-clue-list {
+.ctc-clue-list {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-::deep .ctc-clue-entry {
+.ctc-clue-entry {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -927,30 +944,30 @@
     padding: 8px 14px;
 }
 
-::deep .ctc-clue-entry-lg {
+.ctc-clue-entry-lg {
     padding: 12px 18px;
     font-size: 1.05rem;
 }
 
-::deep .ctc-clue-player {
+.ctc-clue-player {
     font-weight: 700;
     color: #a78bfa;
     min-width: 80px;
     font-size: 16px;
 }
 
-::deep .ctc-clue-word {
+.ctc-clue-word {
     font-weight: 600;
     color: #fff;
 }
 
-::deep .ctc-used-clue-list {
+.ctc-used-clue-list {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
 }
 
-::deep .ctc-used-clue-tag {
+.ctc-used-clue-tag {
     background: rgba(255,255,255,0.08);
     border: 1px solid rgba(255,255,255,0.15);
     border-radius: 20px;
@@ -961,7 +978,7 @@
 
 /* ── Discussion Phase ─────────────────────────────────────────────────────── */
 
-::deep .ctc-discussion-area {
+.ctc-discussion-area {
     flex: 1;
     display: flex;
     align-items: flex-start;
@@ -969,7 +986,7 @@
     padding: 24px;
 }
 
-::deep .ctc-discussion-panel {
+.ctc-discussion-panel {
     background: rgba(0,0,0,0.4);
     border: 3px solid rgba(255,255,255,0.1);
     border-radius: 16px;
@@ -981,20 +998,20 @@
     gap: 20px;
 }
 
-::deep .ctc-discussion-clues,
-::deep .ctc-discussion-players {
+.ctc-discussion-clues,
+.ctc-discussion-players {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-::deep .ctc-player-list {
+.ctc-player-list {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-::deep .ctc-player-row {
+.ctc-player-row {
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -1005,60 +1022,60 @@
     transition: all ease 0.2s;
 }
 
-::deep button.ctc-player-row:hover {
+button.ctc-player-row:hover {
     cursor: pointer;
     border-color: white;
 }
 
-::deep .ctc-player-row-row {
+.ctc-player-row-row {
     display: flex;
     gap: 12px;
 }
 
-::deep .ctc-player-me {
+.ctc-player-me {
     border-color: #a78bfa;
     background: rgba(167,139,250,0.08);
 }
 
-::deep .ctc-player-eliminated {
+.ctc-player-eliminated {
     opacity: 0.6;
     border-color: rgba(231, 76, 60, 0.2);
     background: rgba(231, 76, 60, 0.05);
 }
 
-::deep .ctc-player-eliminated .ctc-clue-player {
+.ctc-player-eliminated .ctc-clue-player {
     color: #e74c3c;
     text-decoration: line-through;
     text-decoration-thickness: 2px;
 }
 
-::deep .ctc-status-voted {
+.ctc-status-voted {
     background: rgba(46, 204, 113, 0.2);
     color: #2ecc71;
 }
 
-::deep .ctc-player-name {
+.ctc-player-name {
     flex: 1;
     font-weight: 700;
 }
 
-::deep .ctc-status-badge {
+.ctc-status-badge {
     font-size: 0.75rem;
     font-weight: 700;
     padding: 2px 8px;
     border-radius: 6px;
 }
 
-::deep .ctc-status-unknown {
+.ctc-status-unknown {
     font-size: 1rem;
 }
 
-::deep .ctc-status-eliminated {
+.ctc-status-eliminated {
     background: rgba(231,76,60,0.2);
     color: #e74c3c;
 }
 
-::deep .ctc-end-game-vote {
+.ctc-end-game-vote {
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -1067,14 +1084,14 @@
     border-top: 1px solid rgba(255,255,255,0.1);
 }
 
-::deep .ctc-vote-progress {
+.ctc-vote-progress {
     font-size: 0.85rem;
     color: rgba(255,255,255,0.6);
 }
 
 /* ── Vote Phase ───────────────────────────────────────────────────────────── */
 
-::deep .ctc-vote-area {
+.ctc-vote-area {
     flex: 1;
     display: flex;
     align-items: flex-start;
@@ -1082,7 +1099,7 @@
     padding: 24px;
 }
 
-::deep .ctc-vote-panel {
+.ctc-vote-panel {
     background: rgba(0,0,0,0.4);
     border: 3px solid rgba(255,255,255,0.1);
     border-radius: 16px;
@@ -1095,7 +1112,7 @@
     align-items: center;
 }
 
-::deep .ctc-vote-progress-bar {
+.ctc-vote-progress-bar {
     background: rgba(255,255,255,0.08);
     border: 1px solid rgba(255,255,255,0.15);
     border-radius: 8px;
@@ -1105,14 +1122,14 @@
     color: rgba(255,255,255,0.7);
 }
 
-::deep .ctc-vote-grid {
+.ctc-vote-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 10px;
     width: 100%;
 }
 
-::deep .ctc-vote-target {
+.ctc-vote-target {
     background: rgba(255,255,255,0.06);
     border: 2px solid rgba(255,255,255,0.15);
     border-radius: 10px;
@@ -1126,23 +1143,23 @@
     text-align: center;
 }
 
-::deep .ctc-vote-target:hover {
+.ctc-vote-target:hover {
     border-color: #a78bfa;
     background: rgba(167,139,250,0.1);
 }
 
-::deep .ctc-vote-target-selected {
+.ctc-vote-target-selected {
     border-color: #e74c3c;
     border-width: 3px;
     background: rgba(231,76,60,0.15);
     box-shadow: 0 0 12px rgba(231,76,60,0.3);
 }
 
-::deep .ctc-vote-target-name {
+.ctc-vote-target-name {
     display: block;
 }
 
-::deep .ctc-vote-confirm {
+.ctc-vote-confirm {
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -1153,7 +1170,7 @@
     text-align: center;
 }
 
-::deep .ctc-vote-waiting {
+.ctc-vote-waiting {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1161,18 +1178,18 @@
     padding: 24px;
 }
 
-::deep .ctc-lock-icon {
+.ctc-lock-icon {
     font-size: 2rem;
 }
 
-::deep .ctc-lock-vote-disabled {
+.ctc-lock-vote-disabled {
     opacity: 0.5;
     
 }
 
 /* ── Reveal Phase ─────────────────────────────────────────────────────────── */
 
-::deep .ctc-reveal-area {
+.ctc-reveal-area {
     flex: 1;
     display: flex;
     align-items: flex-start;
@@ -1180,7 +1197,7 @@
     padding: 24px;
 }
 
-::deep .ctc-reveal-panel {
+.ctc-reveal-panel {
     background: rgba(0,0,0,0.4);
     border: 3px solid rgba(255,255,255,0.1);
     border-radius: 16px;
@@ -1193,7 +1210,7 @@
     align-items: center;
 }
 
-::deep .ctc-reveal-result {
+.ctc-reveal-result {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1204,26 +1221,26 @@
     text-align: center;
 }
 
-::deep .ctc-reveal-eliminated {
+.ctc-reveal-eliminated {
     background: rgba(231,76,60,0.1);
     border: 2px solid rgba(231,76,60,0.3);
 }
 
-::deep .ctc-reveal-tie {
+.ctc-reveal-tie {
     background: rgba(255,255,255,0.05);
     border: 2px solid rgba(255,255,255,0.15);
 }
 
-::deep .ctc-reveal-icon {
+.ctc-reveal-icon {
     font-size: 2rem;
 }
 
-::deep .ctc-reveal-text {
+.ctc-reveal-text {
     font-size: 1.1rem;
     margin: 0;
 }
 
-::deep .ctc-informant-guess {
+.ctc-informant-guess {
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -1235,14 +1252,14 @@
     border-radius: 12px;
 }
 
-::deep .ctc-hint-text {
+.ctc-hint-text {
     font-size: 0.9rem;
     color: rgba(255,255,255,0.7);
     margin: 0;
     text-align: center;
 }
 
-::deep .ctc-informant-waiting {
+.ctc-informant-waiting {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1250,43 +1267,43 @@
     padding: 20px;
 }
 
-::deep .ctc-informant-result {
+.ctc-informant-result {
     padding: 16px;
     border-radius: 10px;
     width: 100%;
     text-align: center;
 }
 
-::deep .ctc-informant-result p {
+.ctc-informant-result p {
     margin: 0;
 }
 
-::deep .ctc-guess-correct {
+.ctc-guess-correct {
     background: rgba(46,204,113,0.15);
     border: 2px solid rgba(46,204,113,0.3);
     color: #2ecc71;
 }
 
-::deep .ctc-guess-wrong {
+.ctc-guess-wrong {
     background: rgba(231,76,60,0.1);
     border: 2px solid rgba(231,76,60,0.3);
     color: #e74c3c;
 }
 
-::deep .ctc-vote-tally {
+.ctc-vote-tally {
     width: 100%;
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-::deep .ctc-tally-list {
+.ctc-tally-list {
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-::deep .ctc-tally-entry {
+.ctc-tally-entry {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1296,23 +1313,23 @@
     border-radius: 6px;
 }
 
-::deep .ctc-tally-voter {
+.ctc-tally-voter {
     font-weight: 600;
     color: rgba(255,255,255,0.8);
 }
 
-::deep .ctc-tally-arrow {
+.ctc-tally-arrow {
     color: rgba(255,255,255,0.3);
 }
 
-::deep .ctc-tally-target {
+.ctc-tally-target {
     font-weight: 700;
     color: #e74c3c;
 }
 
 /* ── Game Over Phase ──────────────────────────────────────────────────────── */
 
-::deep .ctc-gameover-area {
+.ctc-gameover-area {
     flex: 1;
     display: flex;
     align-items: center;
@@ -1320,7 +1337,7 @@
     padding: 24px;
 }
 
-::deep .ctc-gameover-panel {
+.ctc-gameover-panel {
     background: rgba(0,0,0,0.5);
     border: 3px solid #a78bfa;
     border-radius: 16px;
@@ -1334,7 +1351,7 @@
     align-items: center;
 }
 
-::deep .ctc-gameover-title {
+.ctc-gameover-title {
     font-size: 2.2rem;
     font-weight: 900;
     color: #a78bfa;
@@ -1344,50 +1361,50 @@
     margin: 0;
 }
 
-::deep .ctc-gameover-title-failed {
+.ctc-gameover-title-failed {
     color: #e74c3c;
 }
 
-::deep .ctc-winner-announcement {
+.ctc-winner-announcement {
     text-align: center;
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-::deep .ctc-winner-role {
+.ctc-winner-role {
     font-size: 1.4rem;
     font-weight: 900;
     color: #f7d547;
 }
 
-::deep .ctc-winner-reason {
+.ctc-winner-reason {
     font-size: 0.9rem;
     color: rgba(255,255,255,0.6);
     margin: 0;
 }
 
-::deep .ctc-game-progress {
+.ctc-game-progress {
     font-size: 0.9rem;
     color: rgba(255,255,255,0.5);
     margin: 0;
 }
 
-::deep .ctc-scoreboard {
+.ctc-scoreboard {
     width: 100%;
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-::deep .ctc-leaderboard {
+.ctc-leaderboard {
     width: 100%;
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-::deep .ctc-leaderboard-row {
+.ctc-leaderboard-row {
     display: flex;
     align-items: center;
     flex-direction: row;
@@ -1399,43 +1416,43 @@
     transition: background 0.2s;
 }
 
-::deep .ctc-leaderboard-winner {
+.ctc-leaderboard-winner {
     background: rgba(247,213,71,0.12);
     border-color: #f7d547;
     box-shadow: 0 0 16px rgba(247,213,71,0.25);
 }
 
-::deep .ctc-leaderboard-me {
+.ctc-leaderboard-me {
     border-color: #a78bfa;
     background: rgba(167,139,250,0.08);
 }
 
-::deep .ctc-leaderboard-eliminated {
+.ctc-leaderboard-eliminated {
     opacity: 0.6;
 }
 
-::deep .ctc-leaderboard-eliminated .ctc-player-result-name,
-::deep .ctc-leaderboard-eliminated .ctc-player-result-score,
-::deep .ctc-leaderboard-eliminated .ctc-rank {
+.ctc-leaderboard-eliminated .ctc-player-result-name,
+.ctc-leaderboard-eliminated .ctc-player-result-score,
+.ctc-leaderboard-eliminated .ctc-rank {
     color: #e74c3c !important;
     text-decoration: line-through;
     text-decoration-thickness: 2px;
 }
 
-::deep .ctc-rank {
+.ctc-rank {
     font-size: 1.4rem;
     min-width: 32px;
     text-align: center;
 }
 
-::deep .ctc-player-result-name {
+.ctc-player-result-name {
     flex: 1;
     font-weight: 800;
     font-size: 1rem;
     color: #fff;
 }
 
-::deep .ctc-player-role {
+.ctc-player-role {
     font-size: 0.75rem;
     font-weight: 700;
     padding: 2px 8px;
@@ -1443,42 +1460,42 @@
     text-transform: uppercase;
 }
 
-::deep .ctc-role-agent {
+.ctc-role-agent {
     background: rgba(46,204,113,0.2);
     color: #2ecc71;
 }
 
-::deep .ctc-role-insider {
+.ctc-role-insider {
     background: rgba(52,152,219,0.2);
     color: #3498db;
 }
 
-::deep .ctc-role-informant {
+.ctc-role-informant {
     background: rgba(231,76,60,0.2);
     color: #e74c3c;
 }
 
-::deep .ctc-player-result-score {
+.ctc-player-result-score {
     font-family: var(--font-mono);
     font-weight: 900;
     font-size: 1.1rem;
     color: #a78bfa;
 }
 
-::deep .ctc-scoring-breakdown {
+.ctc-scoring-breakdown {
     width: 100%;
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-::deep .ctc-score-list {
+.ctc-score-list {
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-::deep .ctc-score-entry {
+.ctc-score-entry {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1487,18 +1504,18 @@
     border-radius: 6px;
 }
 
-::deep .ctc-score-player {
+.ctc-score-player {
     font-weight: 600;
     color: rgba(255,255,255,0.8);
 }
 
-::deep .ctc-score-value {
+.ctc-score-value {
     font-family: var(--font-mono);
     font-weight: 700;
     color: #a78bfa;
 }
 
-::deep .ctc-gameover-actions {
+.ctc-gameover-actions {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
@@ -1509,7 +1526,7 @@
    PLAYER TURN CLARITY
    ══════════════════════════════════════════════════════════════════════════════ */
 
-::deep .ctc-my-turn-active .ctc-clue-panel {
+.ctc-my-turn-active .ctc-clue-panel {
     border-color: #32cd32;
     box-shadow:
         0 0 30px rgba(50, 205, 50, 0.3),
@@ -1528,7 +1545,7 @@
     }
 }
 
-::deep .ctc-turn-alert {
+.ctc-turn-alert {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1537,7 +1554,7 @@
     text-align: center;
 }
 
-::deep .ctc-turn-alert-text {
+.ctc-turn-alert-text {
     font-family: var(--font-mono);
     font-size: 1.8rem;
     font-weight: 900;
@@ -1547,7 +1564,7 @@
     text-transform: uppercase;
 }
 
-::deep .ctc-turn-alert-sub {
+.ctc-turn-alert-sub {
     font-family: var(--font-mono);
     font-size: 0.9rem;
     color: rgba(50, 205, 50, 0.7);
@@ -1555,7 +1572,7 @@
     text-transform: uppercase;
 }
 
-::deep .ctc-turn-waiting-display {
+.ctc-turn-waiting-display {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1564,7 +1581,7 @@
     text-align: center;
 }
 
-::deep .ctc-transmitting-icon {
+.ctc-transmitting-icon {
     font-family: var(--font-mono);
     color: #32cd32;
     font-size: 0.8rem;
@@ -1580,7 +1597,7 @@
    HOST PANEL WIDTH OVERRIDE
    ══════════════════════════════════════════════════════════════════════════════ */
 
-::deep .ctc-host-panel {
+.ctc-host-panel {
     max-width: 900px;
 }
 
@@ -1588,7 +1605,7 @@
    HOST SETUP PHASE
    ══════════════════════════════════════════════════════════════════════════════ */
 
-::deep .ctc-host-setup-briefing {
+.ctc-host-setup-briefing {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1596,7 +1613,7 @@
     padding: 32px;
 }
 
-::deep .ctc-host-setup-status {
+.ctc-host-setup-status {
     font-family: var(--font-mono);
     font-size: 1.8rem;
     font-weight: 900;
@@ -1605,7 +1622,7 @@
     letter-spacing: 2px;
 }
 
-::deep .ctc-host-setup-sub {
+.ctc-host-setup-sub {
     font-family: var(--font-mono);
     font-size: 1rem;
     color: #a78bfa;
@@ -1613,7 +1630,7 @@
     text-transform: uppercase;
 }
 
-::deep .ctc-host-setup-desc {
+.ctc-host-setup-desc {
     font-family: var(--font-mono);
     font-size: 0.9rem;
     color: rgba(255, 255, 255, 0.5);
@@ -1624,7 +1641,7 @@
    HOST CLUE PHASE -- TRANSMISSION BOARD
    ══════════════════════════════════════════════════════════════════════════════ */
 
-::deep .ctc-host-transmission-board {
+.ctc-host-transmission-board {
     background: rgba(0, 20, 0, 0.4);
     border: 2px dashed rgba(50, 205, 50, 0.4);
     border-radius: 8px;
@@ -1634,13 +1651,13 @@
     gap: 12px;
 }
 
-::deep .ctc-board-header {
+.ctc-board-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-::deep .ctc-board-label {
+.ctc-board-label {
     font-family: var(--font-mono);
     font-size: 0.85rem;
     font-weight: 700;
@@ -1649,7 +1666,7 @@
     text-transform: uppercase;
 }
 
-::deep .ctc-board-cycle {
+.ctc-board-cycle {
     font-family: var(--font-mono);
     font-size: 0.75rem;
     font-weight: 700;
@@ -1660,13 +1677,13 @@
     letter-spacing: 1px;
 }
 
-::deep .ctc-board-queue {
+.ctc-board-queue {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
 }
 
-::deep .ctc-queue-slot {
+.ctc-queue-slot {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 6px;
@@ -1679,33 +1696,33 @@
     transition: all 0.3s ease;
 }
 
-::deep .ctc-queue-active {
+.ctc-queue-active {
     border-color: #32cd32;
     background: rgba(50, 205, 50, 0.1);
     box-shadow: 0 0 15px rgba(50, 205, 50, 0.25);
 }
 
-::deep .ctc-queue-done {
+.ctc-queue-done {
     opacity: 0.6;
 }
 
-::deep .ctc-queue-eliminated {
+.ctc-queue-eliminated {
     opacity: 0.3;
     border-color: rgba(231, 76, 60, 0.3);
 }
 
-::deep .ctc-queue-name {
+.ctc-queue-name {
     font-size: 0.9rem;
     font-weight: 700;
     color: #fff;
     text-transform: uppercase;
 }
 
-::deep .ctc-queue-active .ctc-queue-name {
+.ctc-queue-active .ctc-queue-name {
     color: #32cd32;
 }
 
-::deep .ctc-queue-status {
+.ctc-queue-status {
     font-size: 0.65rem;
     font-weight: 700;
     color: rgba(255, 255, 255, 0.4);
@@ -1713,20 +1730,20 @@
     text-transform: uppercase;
 }
 
-::deep .ctc-queue-status-live {
+.ctc-queue-status-live {
     color: #32cd32;
     animation: ctc-blink-blocks 1s step-end infinite;
 }
 
-::deep .ctc-queue-status-done {
+.ctc-queue-status-done {
     color: #a78bfa;
 }
 
-::deep .ctc-queue-status-dead {
+.ctc-queue-status-dead {
     color: #e74c3c;
 }
 
-::deep .ctc-queue-clue {
+.ctc-queue-clue {
     font-size: 0.8rem;
     color: #a78bfa;
     font-style: italic;
@@ -1734,7 +1751,7 @@
 
 /* ── Host Active Transmission ── */
 
-::deep .ctc-host-active-transmission {
+.ctc-host-active-transmission {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1745,7 +1762,7 @@
     background: rgba(0, 20, 0, 0.3);
 }
 
-::deep .ctc-host-active-label {
+.ctc-host-active-label {
     font-family: var(--font-mono);
     font-size: 0.8rem;
     color: rgba(50, 205, 50, 0.6);
@@ -1753,7 +1770,7 @@
     text-transform: uppercase;
 }
 
-::deep .ctc-host-active-name {
+.ctc-host-active-name {
     font-family: var(--font-mono);
     font-size: 2.4rem;
     font-weight: 900;
@@ -1762,29 +1779,29 @@
     letter-spacing: 3px;
 }
 
-::deep .ctc-host-active-status {
+.ctc-host-active-status {
     font-family: var(--font-mono);
     font-size: 0.85rem;
     color: rgba(50, 205, 50, 0.7);
     letter-spacing: 2px;
 }
 
-::deep .ctc-blink-dots {
+.ctc-blink-dots {
     animation: ctc-blink-blocks 1.5s step-end infinite;
 }
 
 /* ── Host Clue Entry (larger for TV) ── */
 
-::deep .ctc-clue-entry-host {
+.ctc-clue-entry-host {
     padding: 12px 18px;
     font-size: 1.1rem;
 }
 
-::deep .ctc-clue-entry-host .ctc-clue-player {
+.ctc-clue-entry-host .ctc-clue-player {
     font-size: 1.1rem;
 }
 
-::deep .ctc-clue-entry-host .ctc-clue-word {
+.ctc-clue-entry-host .ctc-clue-word {
     font-size: 1.1rem;
 }
 
@@ -1792,20 +1809,20 @@
    HOST DISCUSSION PHASE -- DOSSIER GRID
    ══════════════════════════════════════════════════════════════════════════════ */
 
-::deep .ctc-host-dossier-grid {
+.ctc-host-dossier-grid {
     width: 100%;
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 
-::deep .ctc-dossier-cards {
+.ctc-dossier-cards {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 10px;
 }
 
-::deep .ctc-dossier-card {
+.ctc-dossier-card {
     background: rgba(0, 10, 0, 0.5);
     border: 1px solid rgba(50, 205, 50, 0.25);
     border-radius: 8px;
@@ -1817,16 +1834,16 @@
     transition: border-color 0.3s ease;
 }
 
-::deep .ctc-dossier-eliminated {
+.ctc-dossier-eliminated {
     border-color: rgba(231, 76, 60, 0.3);
     opacity: 0.5;
 }
 
-::deep .ctc-dossier-voted {
+.ctc-dossier-voted {
     border-color: rgba(46, 204, 113, 0.4);
 }
 
-::deep .ctc-dossier-name {
+.ctc-dossier-name {
     font-size: 1.1rem;
     font-weight: 900;
     color: #32cd32;
@@ -1834,18 +1851,18 @@
     letter-spacing: 1px;
 }
 
-::deep .ctc-dossier-eliminated .ctc-dossier-name {
+.ctc-dossier-eliminated .ctc-dossier-name {
     color: #e74c3c;
     text-decoration: line-through;
 }
 
-::deep .ctc-dossier-clues {
+.ctc-dossier-clues {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
 }
 
-::deep .ctc-dossier-clue {
+.ctc-dossier-clue {
     background: rgba(167, 139, 250, 0.12);
     border: 1px solid rgba(167, 139, 250, 0.25);
     border-radius: 4px;
@@ -1854,7 +1871,7 @@
     color: rgba(255, 255, 255, 0.8);
 }
 
-::deep .ctc-dossier-status {
+.ctc-dossier-status {
     font-size: 0.65rem;
     font-weight: 700;
     letter-spacing: 1px;
@@ -1864,22 +1881,22 @@
     width: fit-content;
 }
 
-::deep .ctc-dossier-status-eliminated {
+.ctc-dossier-status-eliminated {
     color: #e74c3c;
     background: rgba(231, 76, 60, 0.15);
 }
 
-::deep .ctc-dossier-status-voted {
+.ctc-dossier-status-voted {
     color: #2ecc71;
     background: rgba(46, 204, 113, 0.15);
 }
 
-::deep .ctc-dossier-status-active {
+.ctc-dossier-status-active {
     color: #32cd32;
     background: rgba(50, 205, 50, 0.1);
 }
 
-::deep .ctc-dossier-votes {
+.ctc-dossier-votes {
     font-size: 0.7rem;
     font-weight: 700;
     color: #e74c3c;
@@ -1888,7 +1905,7 @@
 
 /* ── Host Vote Progress (ASCII bar) ── */
 
-::deep .ctc-host-vote-progress {
+.ctc-host-vote-progress {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1896,7 +1913,7 @@
     padding: 12px;
 }
 
-::deep .ctc-host-vote-bar {
+.ctc-host-vote-bar {
     font-family: var(--font-mono);
     font-size: 1.2rem;
     color: #32cd32;
@@ -1904,7 +1921,7 @@
     letter-spacing: 1px;
 }
 
-::deep .ctc-host-vote-count {
+.ctc-host-vote-count {
     font-family: var(--font-mono);
     font-size: 0.85rem;
     color: rgba(255, 255, 255, 0.6);
@@ -1913,14 +1930,14 @@
 
 /* ── Host Status Readouts ── */
 
-::deep .ctc-host-status-readouts {
+.ctc-host-status-readouts {
     display: flex;
     gap: 20px;
     justify-content: center;
     flex-wrap: wrap;
 }
 
-::deep .ctc-host-readout {
+.ctc-host-readout {
     display: flex;
     gap: 8px;
     align-items: center;
@@ -1928,12 +1945,12 @@
     font-size: 0.8rem;
 }
 
-::deep .ctc-host-readout-label {
+.ctc-host-readout-label {
     color: rgba(255, 255, 255, 0.4);
     letter-spacing: 1px;
 }
 
-::deep .ctc-host-readout-value {
+.ctc-host-readout-value {
     color: #a78bfa;
     font-weight: 700;
 }
@@ -1942,20 +1959,20 @@
    HOST VOTE PHASE -- LIVE DESIGNATION TRACKER
    ══════════════════════════════════════════════════════════════════════════════ */
 
-::deep .ctc-host-vote-tracker {
+.ctc-host-vote-tracker {
     width: 100%;
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
-::deep .ctc-vote-tracker-grid {
+.ctc-vote-tracker-grid {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-::deep .ctc-vote-tracker-row {
+.ctc-vote-tracker-row {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -1967,12 +1984,12 @@
     transition: all 0.3s ease;
 }
 
-::deep .ctc-vote-tracker-targeted {
+.ctc-vote-tracker-targeted {
     border-color: rgba(231, 76, 60, 0.3);
     background: rgba(231, 76, 60, 0.05);
 }
 
-::deep .ctc-vote-tracker-name {
+.ctc-vote-tracker-name {
     min-width: 120px;
     font-size: 1rem;
     font-weight: 700;
@@ -1980,7 +1997,7 @@
     text-transform: uppercase;
 }
 
-::deep .ctc-vote-tracker-bar {
+.ctc-vote-tracker-bar {
     flex: 1;
     font-size: 1.2rem;
     color: #e74c3c;
@@ -1988,7 +2005,7 @@
     text-shadow: 0 0 6px rgba(231, 76, 60, 0.3);
 }
 
-::deep .ctc-vote-tracker-count {
+.ctc-vote-tracker-count {
     font-size: 1.2rem;
     font-weight: 900;
     color: #e74c3c;
@@ -2000,7 +2017,7 @@
    HOST REVEAL PHASE -- DRAMATIC DISPLAY
    ══════════════════════════════════════════════════════════════════════════════ */
 
-::deep .ctc-host-reveal-dramatic {
+.ctc-host-reveal-dramatic {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -2009,7 +2026,7 @@
     width: 100%;
 }
 
-::deep .ctc-ascii-border {
+.ctc-ascii-border {
     font-family: var(--font-mono);
     font-size: 1rem;
     color: #32cd32;
@@ -2020,12 +2037,12 @@
     white-space: pre;
 }
 
-::deep .ctc-ascii-border-red {
+.ctc-ascii-border-red {
     color: #e74c3c;
     text-shadow: 0 0 10px rgba(231, 76, 60, 0.4);
 }
 
-::deep .ctc-host-reveal-name {
+.ctc-host-reveal-name {
     font-family: var(--font-mono);
     font-size: 3rem;
     font-weight: 900;
@@ -2035,12 +2052,12 @@
     text-transform: uppercase;
 }
 
-::deep .ctc-host-reveal-tie-text {
+.ctc-host-reveal-tie-text {
     color: rgba(255, 255, 255, 0.7);
     text-shadow: none;
 }
 
-::deep .ctc-host-reveal-status {
+.ctc-host-reveal-status {
     font-family: var(--font-mono);
     font-size: 1rem;
     font-weight: 700;
@@ -2049,11 +2066,11 @@
     text-transform: uppercase;
 }
 
-::deep .ctc-host-reveal-tie-status {
+.ctc-host-reveal-tie-status {
     color: rgba(255, 255, 255, 0.5);
 }
 
-::deep .ctc-tally-entry-host {
+.ctc-tally-entry-host {
     padding: 8px 16px;
     font-size: 1rem;
 }
@@ -2062,7 +2079,7 @@
    HOST GAME OVER PHASE
    ══════════════════════════════════════════════════════════════════════════════ */
 
-::deep .ctc-host-gameover-title {
+.ctc-host-gameover-title {
     font-family: var(--font-mono);
     font-size: 2.4rem;
     font-weight: 900;
@@ -2073,14 +2090,14 @@
     margin: 0;
 }
 
-::deep .ctc-host-winner-announcement {
+.ctc-host-winner-announcement {
     text-align: center;
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-::deep .ctc-host-winner-role {
+.ctc-host-winner-role {
     font-family: var(--font-mono);
     font-size: 2rem;
     font-weight: 900;
@@ -2090,16 +2107,16 @@
     text-transform: uppercase;
 }
 
-::deep .ctc-host-scoreboard-row {
+.ctc-host-scoreboard-row {
     padding: 14px 20px;
     font-size: 1.05rem;
 }
 
-::deep .ctc-host-scoreboard-row .ctc-player-result-name {
+.ctc-host-scoreboard-row .ctc-player-result-name {
     font-size: 1.1rem;
 }
 
-::deep .ctc-host-scoreboard-row .ctc-player-result-score {
+.ctc-host-scoreboard-row .ctc-player-result-score {
     font-size: 1.2rem;
 }
 
@@ -2108,32 +2125,197 @@
    ══════════════════════════════════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
-    ::deep .ctc-host-panel {
+    .ctc-host-panel {
         max-width: 100%;
         padding: 20px;
     }
 
-    ::deep .ctc-dossier-cards {
+    .ctc-dossier-cards {
         grid-template-columns: 1fr;
     }
 
-    ::deep .ctc-host-active-name {
+    .ctc-host-active-name {
         font-size: 1.6rem;
     }
 
-    ::deep .ctc-host-reveal-name {
+    .ctc-host-reveal-name {
         font-size: 2rem;
     }
 
-    ::deep .ctc-host-gameover-title {
+    .ctc-host-gameover-title {
         font-size: 1.6rem;
     }
 
-    ::deep .ctc-host-winner-role {
+    .ctc-host-winner-role {
         font-size: 1.4rem;
     }
 
-    ::deep .ctc-turn-alert-text {
+    .ctc-turn-alert-text {
         font-size: 1.4rem;
     }
 }
+
+/* ── Header (from the old scoped CodewordHeader.razor.css) ── */
+.ctc-header-container {
+    --ctc-lavender: #a78bfa;
+    --ctc-lavender-soft: rgba(167, 139, 250, 0.55);
+    --ctc-lavender-dim: rgba(167, 139, 250, 0.3);
+    --ctc-lavender-faint: rgba(167, 139, 250, 0.15);
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 54px;
+    background: #0f0f1a;
+    border-bottom: 1px solid var(--ctc-lavender-dim);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    position: relative;
+    overflow: hidden;
+    z-index: 1000;
+    flex: 1;
+}
+
+.ctc-header-scanlines {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%);
+    background-size: 100% 2px;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.ctc-header-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, transparent 40%, rgba(0, 0, 0, 0.4) 100%);
+    pointer-events: none;
+    z-index: 2;
+}
+
+.ctc-header-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    position: relative;
+    z-index: 3;
+}
+
+.ctc-header-prompt {
+    color: var(--ctc-lavender);
+    font-weight: 900;
+    font-size: 1.2rem;
+    font-family: 'Share Tech Mono', monospace;
+}
+
+.ctc-header-text {
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-shadow: 0 0 8px var(--ctc-lavender-soft);
+    font-family: 'Share Tech Mono', monospace;
+}
+
+.ctc-header-caret {
+    width: 8px;
+    height: 16px;
+    background: var(--ctc-lavender);
+    box-shadow: 0 0 6px var(--ctc-lavender-soft);
+    animation: ctc-blink 1s steps(1) infinite;
+}
+
+@keyframes ctc-blink {
+    0%, 49%   { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+.ctc-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+    z-index: 3;
+}
+
+.ctc-header-actions .ctc-header-code {
+    background: rgba(167, 139, 250, 0.05);
+    border: 1px solid var(--ctc-lavender-dim);
+    border-radius: 4px;
+    padding: 4px 12px;
+    color: var(--ctc-lavender);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 140px;
+    text-align: center;
+}
+
+.ctc-header-actions .ctc-header-code:hover {
+    background: var(--ctc-lavender-faint);
+    border-color: var(--ctc-lavender-soft);
+    box-shadow: 0 0 10px var(--ctc-lavender-dim);
+}
+
+.ctc-header-actions .ctc-header-code-cover,
+.ctc-header-actions .ctc-header-code-value {
+    grid-area: 1 / 1;
+    transition: opacity 0.2s ease;
+}
+
+.ctc-header-actions .ctc-header-code-value {
+    opacity: 0;
+    pointer-events: none;
+    letter-spacing: 2px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 0 5px var(--ctc-lavender-soft);
+}
+
+.ctc-header-actions .ctc-header-code.revealed .ctc-header-code-cover {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.ctc-header-actions .ctc-header-code.revealed .ctc-header-code-value {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.ctc-header-leave {
+    background: transparent;
+    border: 1px solid #ef4444;
+    border-radius: 4px;
+    padding: 4px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ef4444;
+    cursor: pointer;
+    font-family: 'Share Tech Mono', monospace;
+    font-weight: 700;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+
+.ctc-header-leave:hover {
+    background: rgba(239, 68, 68, 0.1);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+    color: #f87171;
+    border-color: #f87171;
+}
+
+@media (max-width: 600px) {
+    .ctc-header-leave-text {
+        display: none;
+    }
+}
+
+/* ── WASM layout: GameRoot owns the whole article (header bar + CRT bezel). MainLayout sets
+   article.wasm-game { overflow: hidden }, so the header stays pinned (flex-shrink:0) and the
+   bezel fills the remaining height; the internal .ctc-page (overflow-y:auto) scrolls. ── */
+.ctc-header-container { flex-shrink: 0; }
+.ctc-crt-bezel { flex: 1 1 auto; min-height: 0; }

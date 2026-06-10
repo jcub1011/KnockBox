@@ -107,12 +107,15 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             if (!context.State.Settings.EnableTimers)
                 return null;
 
-            // Auto-submit for the timed-out player. Use pending clue text if valid, otherwise "...".
+            // Auto-submit "..." for any player who never submitted by the deadline. In the
+            // WASM model the clue input is client-owned (the server no longer sees keystrokes),
+            // so the active player's own browser auto-submits its draft just before this server
+            // deadline; "..." is the fallback for a disconnected/idle player who sent nothing.
             Guid? currentPlayerId = context.State.TurnManager.CurrentPlayer;
             var player = currentPlayerId is { } cpId ? context.GetPlayer(cpId) : null;
             if (player is not null && !player.HasSubmittedClue)
             {
-                string clue = ResolvePendingClue(context, player);
+                const string clue = "...";
                 player.HasSubmittedClue = true;
                 player.CurrentClue = clue;
                 player.ClueHistory.Add(clue);
@@ -140,25 +143,6 @@ namespace KnockBox.Codeword.Services.Logic.Games.FSM.States
             => _expiresAt - now;
 
         // ── Private helpers ───────────────────────────────────────────────────
-
-        /// <summary>
-        /// Returns the player's pending clue text if valid, otherwise "...".
-        /// Validates: non-empty, ≤50 chars, not the secret word, not previously used.
-        /// </summary>
-        private static string ResolvePendingClue(CodewordGameContext context, CodewordPlayerState player)
-        {
-            string? pending = player.PendingClue?.Trim();
-            if (string.IsNullOrWhiteSpace(pending))
-                return "...";
-            if (pending.Length > 50)
-                return "...";
-            if (player.SecretWord is not null &&
-                string.Equals(pending, player.SecretWord, StringComparison.OrdinalIgnoreCase))
-                return "...";
-            if (context.State.UsedClues.ContainsKey(pending))
-                return "...";
-            return pending;
-        }
 
         /// <summary>
         /// Advances <see cref="CodewordGameState.TurnManager.CurrentPlayerIndex"/>
