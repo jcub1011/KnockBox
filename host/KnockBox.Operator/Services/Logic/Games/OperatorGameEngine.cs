@@ -1,14 +1,20 @@
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Operator.Models;
 using KnockBox.Operator.Services.Logic.FSM;
+using KnockBox.Operator.Services.Logic.FSM.Commands;
+using KnockBox.Operator.Services.Projection;
 using KnockBox.Operator.Services.State;
 using KnockBox.Core.Services.Logic.Games.Engines.Shared;
 using KnockBox.Core.Services.Logic.RandomGeneration;
 using KnockBox.Core.Services.State.Games.Shared;
+using KnockBox.Core.Services.State.Games.Shared.Projection;
 using KnockBox.Core.Services.State.Users;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -18,8 +24,139 @@ public class OperatorGameEngine(
     ILogger<OperatorGameEngine> logger,
     ILogger<OperatorGameState> stateLogger,
     IRandomNumberService randomNumberService)
-    : AbstractGameEngine<OperatorGameState>(minPlayerCount: 2, maxPlayerCount: int.MaxValue)
+    : AbstractGameEngine<OperatorGameState>(minPlayerCount: 2, maxPlayerCount: int.MaxValue),
+      IGameStateProjector,
+      IGameCommandHandler,
+      IServerTickHandler
 {
+    private readonly OperatorStateProjector _projector = new();
+
+    // Match the hub's wire format: enums as strings, case-insensitive property names,
+    // so a client-serialized command payload deserializes here.
+    private static readonly JsonSerializerOptions CommandJsonOptions = new()
+    {
+        Converters = { new JsonStringEnumConverter() },
+        PropertyNameCaseInsensitive = true,
+    };
+
+    // ── Hub projection / command / tick surface ──────────────────────────────
+
+    /// <summary>Per-recipient projection entry point used by the host's <c>GameViewCoordinator</c>.</summary>
+    public object? ProjectFor(AbstractGameState state, Guid recipientId)
+        => ((IGameStateProjector)_projector).ProjectFor(state, recipientId);
+
+    /// <summary>Server-owned clock entry point; drives the FSM's time-based transitions.</summary>
+    void IServerTickHandler.Tick(AbstractGameState state, DateTimeOffset now)
+    {
+        if (state is OperatorGameState s && s.Context is not null)
+            Tick(s.Context, now);
+    }
+
+    /// <summary>
+    /// Maps a hub command name to the same engine path a Razor page used to call directly.
+    /// Player commands carry the server-resolved <paramref name="caller"/>'s id into the
+    /// FSM command (the client can't spoof another player); per-command player gating
+    /// (whose turn / reaction target) lives in the FSM states. Host-only commands are
+    /// gated here.
+    /// </summary>
+    public async ValueTask<Result> HandleCommandAsync(
+        User caller, AbstractGameState state, string command, string? payloadJson, CancellationToken ct = default)
+    {
+        if (state is not OperatorGameState s)
+            return Result.FromError("Invalid game state for Operator.");
+
+        return command switch
+        {
+            OperatorCommands.Start             => await StartFromPayload(caller, s, payloadJson, ct),
+            OperatorCommands.SubmitSetupChoice => await SetupChoiceFromPayload(caller, s, payloadJson),
+            OperatorCommands.PlayCards         => await PlayCardsFromPayload(caller, s, payloadJson),
+            OperatorCommands.EndTurn           => await ExecuteCommandAsync(s, new EndTurnCommand(caller.Id)),
+            OperatorCommands.SkipTurn          => await ExecuteCommandAsync(s, new SkipTurnCommand(caller.Id)),
+            OperatorCommands.PlayReaction      => await PlayReactionFromPayload(caller, s, payloadJson),
+            OperatorCommands.PassReaction      => await ExecuteCommandAsync(s, new PassReactionCommand(caller.Id)),
+            OperatorCommands.RedirectHotPotato => await RedirectFromPayload(caller, s, payloadJson),
+            OperatorCommands.UpdateSettings    => UpdateSettingsFromPayload(caller, s, payloadJson),
+            OperatorCommands.KickPlayer        => KickFromPayload(caller, s, payloadJson),
+            OperatorCommands.ReturnToLobby     => ReturnToLobby(caller, s),
+            _ => Result.FromError($"Unknown command [{command}].")
+        };
+    }
+
+    // ── Command payload adapters ─────────────────────────────────────────────
+
+    private async Task<Result> StartFromPayload(User caller, OperatorGameState state, string? payloadJson, CancellationToken ct)
+    {
+        // The start buttons choose whether the host plays; carry it into settings before
+        // the host-checked StartAsync runs StartAsyncCore (mirrors CardCounter).
+        var payload = Deserialize<StartPayload>(payloadJson);
+        if (caller.Id == state.Host.Id)
+            state.UpdateSettings(cfg => cfg with { HostPlays = payload?.HostPlays ?? false });
+        return await StartAsync(caller, state, ct);
+    }
+
+    private async Task<Result> SetupChoiceFromPayload(User caller, OperatorGameState state, string? payloadJson)
+    {
+        if (Deserialize<SetupChoicePayload>(payloadJson) is not { } p)
+            return Result.FromError("Malformed setup-choice payload.");
+        // The actual ± value is server-held; the wire carries only the sign.
+        decimal choice = p.IsNegative ? state.Settings.InitialPointsNegative : state.Settings.InitialPointsPositive;
+        return await ExecuteCommandAsync(state, new SubmitSetupChoiceCommand(caller.Id, choice));
+    }
+
+    private async Task<Result> PlayCardsFromPayload(User caller, OperatorGameState state, string? payloadJson)
+    {
+        if (Deserialize<PlayCardsPayload>(payloadJson) is not { } p)
+            return Result.FromError("Malformed play-cards payload.");
+        return await ExecuteCommandAsync(state, new PlayCardsCommand(caller.Id, [.. p.CardIds], p.TargetPlayerId));
+    }
+
+    private async Task<Result> PlayReactionFromPayload(User caller, OperatorGameState state, string? payloadJson)
+    {
+        if (Deserialize<PlayReactionPayload>(payloadJson) is not { } p)
+            return Result.FromError("Malformed reaction payload.");
+        return await ExecuteCommandAsync(state, new PlayReactionCommand(caller.Id, p.ShieldCardId));
+    }
+
+    private async Task<Result> RedirectFromPayload(User caller, OperatorGameState state, string? payloadJson)
+    {
+        if (Deserialize<RedirectPayload>(payloadJson) is not { } p)
+            return Result.FromError("Malformed redirect payload.");
+        return await ExecuteCommandAsync(state, new RedirectHotPotatoCommand(caller.Id, p.HotPotatoCardId, p.NewTargetPlayerId));
+    }
+
+    private Result UpdateSettingsFromPayload(User caller, OperatorGameState state, string? payloadJson)
+    {
+        // Host-only, and only meaningful before the game starts (the settings drawer is a
+        // lobby control). HostPlays is owned by the start buttons, so it (and every other
+        // non-surfaced field) is preserved by OperatorSettingsMapping.Apply.
+        if (caller.Id != state.Host.Id)
+            return Result.FromError("Only the host can change the settings.");
+        if (!state.IsJoinable)
+            return Result.FromError("Settings can only change before the game starts.");
+        if (Deserialize<OperatorSettingsView>(payloadJson) is not { } view)
+            return Result.FromError("Malformed settings payload.");
+        return state.UpdateSettings(cur => OperatorSettingsMapping.Apply(cur, view));
+    }
+
+    private Result KickFromPayload(User caller, OperatorGameState state, string? payloadJson)
+    {
+        if (Deserialize<KickPayload>(payloadJson) is not { } p)
+            return Result.FromError("Malformed kick payload.");
+
+        var target = state.Players.FirstOrDefault(e => e.User.Id == p.PlayerId).User;
+        if (target is null)
+            return Result.FromError("Player is not in this lobby.");
+
+        return state.KickPlayer(caller, target);
+    }
+
+    private static T? Deserialize<T>(string? payloadJson)
+    {
+        if (string.IsNullOrEmpty(payloadJson)) return default;
+        try { return JsonSerializer.Deserialize<T>(payloadJson, CommandJsonOptions); }
+        catch (JsonException) { return default; }
+    }
+
     /// <summary>
     /// Operator counts the host as a participant when <see cref="OperatorSettings.HostPlays"/>
     /// is on, so readiness is gated on <see cref="AbstractGameState.Participants"/>.<c>Length</c>

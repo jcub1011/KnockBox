@@ -10,8 +10,6 @@ namespace KnockBox.PlatformTests.Unit;
 public sealed class WasmRouteTableTests
 {
     [TestMethod]
-    [DataRow("spike/wasm")]
-    [DataRow("spike/wasm/abc-def")]
     [DataRow("shell")]
     [DataRow("shell/anything")]
     [DataRow("room/dice-simulator/abc")]   // migrated game #1
@@ -20,6 +18,7 @@ public sealed class WasmRouteTableTests
     [DataRow("room/tracery/abc")]          // migrated game #4
     [DataRow("room/linked-list/abc")]      // migrated game #5
     [DataRow("room/spardle/abc")]          // migrated game #6
+    [DataRow("room/operator/abc")]         // migrated game #7
     public void IsWasmRoute_True_ForWasmPrefixes(string rel)
         => Assert.IsTrue(WasmRouteTable.IsWasmRoute(rel));
 
@@ -33,7 +32,7 @@ public sealed class WasmRouteTableTests
         => Assert.IsFalse(WasmRouteTable.IsWasmRoute(rel));
 
     [TestMethod]
-    [DataRow("SPIKE/WASM")]
+    [DataRow("ROOM/SPARDLE/abc")]
     [DataRow("Shell")]
     public void IsWasmRoute_IsCaseInsensitive(string rel)
         => Assert.IsTrue(WasmRouteTable.IsWasmRoute(rel));

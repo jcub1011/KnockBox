@@ -1,0 +1,646 @@
+@implements IDisposable
+@*
+    Main play UI + the card-selection state machine. Ported from the server PlayPhase, but
+    the card affordances (playability, valid targets, pairings) are pre-computed on each
+    projected CardView rather than evaluated by a client-side rules engine. The selection
+    logic ("operator selected → disable non-operators", "action with pairings selected →
+    enable only its PairableCardIds", "a player is targetable iff its id is in the selected
+    card's ValidTargetPlayerIds") is pure combinatorics over those fields + local selection.
+
+    Selection state is client-owned and reset only when View.CurrentPlayerId or View.Phase
+    changes (compared to a stored previous value) — never on the View reference, so an
+    opponent's projection can't wipe a half-built selection.
+*@
+
+<div class="op-play-phase">
+<div class="op-game-board">
+    @{
+        var me = View.MyHand is null ? null : View.Players.FirstOrDefault(p => p.UserId == View.RecipientId);
+        var hand = View.MyHand ?? (IReadOnlyList<CardView>)[];
+    }
+
+    @* Mobile-only compact info bar *@
+    <div class="op-mobile-info-bar">
+        <div class="op-mobile-deck-badges">
+            <div class="op-deck-badge" @onclick="() => _showDiscardHistory = true">
+                <span class="op-badge-label">DECK</span>
+                <span class="op-badge-count">@View.DeckCount</span>
+            </div>
+            <div class="op-discard-badge" @onclick="() => _showDiscardHistory = true">
+                <span class="op-badge-label">DISC</span>
+                <span class="op-badge-count">@View.DiscardPile.Count</span>
+            </div>
+        </div>
+    </div>
+
+    @* Opponents *@
+    <div class="op-opponents-grid">
+        @foreach (var p in View.Players.Where(p => p.UserId != View.RecipientId))
+        {
+            <OperatorPlayerInfo Name="@p.DisplayName"
+                                Score="@p.CurrentPoints"
+                                ActiveOperator="@p.ActiveOperator"
+                                HandSize="@p.HandCount"
+                                IsActive="@(View.CurrentPlayerId == p.UserId)"
+                                IsAudited="@p.IsAudited"
+                                IsDivideBroken="@p.IsDivideBroken"
+                                IsBeingStolenFrom="@p.IsBeingStolenFrom"
+                                IsTargetable="@IsPlayerTargetable(p.UserId)"
+                                IsTargeted="@(_targetPlayerId == p.UserId)"
+                                OnClick="@(() => SelectTarget(p.UserId))" />
+        }
+    </div>
+
+    @* Blocked Animation for Attacker *@
+    @if (View.LastBlockedActionMessage != null && View.BlockedAttackerId == View.RecipientId)
+    {
+        <div @key="View.LastBlockedActionMessage" class="op-blocked-banner">
+            <div class="op-blocked-icon">&#x1F6E1;&#xFE0F;</div>
+            <div class="op-blocked-text">@View.LastBlockedActionMessage</div>
+        </div>
+    }
+
+    @* Deck & Discard *@
+    <div class="op-deck-area">
+        <div class="op-deck-stack-container">
+            <div class="op-deck-label">DECK</div>
+            @if (View.DeckCount > 0)
+            {
+                <div class="op-deck-stack">
+                    @if (View.DeckCount > 2)
+                    {
+                        <div class="op-deck-card op-deck-card-3"></div>
+                    }
+                    @if (View.DeckCount > 1)
+                    {
+                        <div class="op-deck-card op-deck-card-2"></div>
+                    }
+                    <div class="op-deck-card op-deck-card-1"></div>
+                </div>
+            }
+            else
+            {
+                <div class="op-deck-empty">EMPTY</div>
+            }
+            <div class="op-deck-count">@View.DeckCount</div>
+        </div>
+
+        <div class="op-discard-stack-container" @onclick="() => _showDiscardHistory = true">
+            <div class="op-deck-label">DISCARD</div>
+            @if (View.DiscardPile.Count > 0)
+            {
+                var topCard = View.DiscardPile[^1];
+                <div class="op-discard-card">
+                    <div class="op-card-mini">
+                        <div class="op-card-mini-icon">@topCard.Icon</div>
+                        <div class="op-card-mini-name">@topCard.TooltipName</div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="op-deck-empty">EMPTY</div>
+            }
+            <div class="op-deck-count">@View.DiscardPile.Count</div>
+        </div>
+    </div>
+
+    @if (_showDiscardHistory)
+    {
+        <div class="op-history-modal-overlay" @onclick="() => _showDiscardHistory = false">
+            <div class="op-history-modal" @onclick:stopPropagation>
+                <div class="op-history-header">
+                    <h3>GAME HISTORY</h3>
+                    <button class="op-history-close" @onclick="() => _showDiscardHistory = false">&times;</button>
+                </div>
+                <div class="op-history-content">
+                    @if (View.ActionLog.Count == 0 && View.DiscardPile.Count == 0)
+                    {
+                        <p class="op-history-empty">No history yet.</p>
+                    }
+                    else
+                    {
+                        @foreach (var entry in View.ActionLog.Reverse())
+                        {
+                            <div class="op-history-entry">
+                                <span class="op-history-msg">@entry.Message</span>
+                                <span class="op-history-time">@OperatorTime.Relative(entry.Timestamp)</span>
+                            </div>
+                        }
+
+                        <div class="op-history-divider">Discarded Cards (Most Recent First)</div>
+                        @foreach (var card in View.DiscardPile.Reverse())
+                        {
+                            <div class="op-history-card-item">
+                                <span class="op-history-card-icon">@card.Icon</span>
+                                <span class="op-history-card-name">@card.TooltipName</span>
+                                <span class="op-history-card-desc">@card.TooltipDescription</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (me != null)
+    {
+        <div class="op-self-status">
+            <div class="op-self-score-section">
+                <div class="op-self-score-label">YOUR SCORE</div>
+                <div class="op-self-score-value @(_selfScoreChanged ? "op-score-animating" : "")">
+                    @me.CurrentPoints.ToString("F1")
+                </div>
+                @if (_selfScoreChanged && _scoreDelta.HasValue)
+                {
+                    <div @key="_scoreDeltaKey" class="op-score-delta @(_scoreDelta.Value >= 0 ? "op-delta-positive" : "op-delta-negative")">
+                        @(_scoreDelta.Value >= 0 ? "+" : "")@_scoreDelta.Value.ToString("F1")
+                    </div>
+                }
+            </div>
+
+            <div class="op-self-operator-section">
+                <div class="op-active-operator-label">YOUR OPERATOR</div>
+                <div class="op-operator-display-container">
+                    @if (_selfOpChanged && _prevDisplayOp.HasValue)
+                    {
+                        <div class="op-old-operator-symbol">@_prevDisplayOp.Value.ToSymbol()</div>
+                        <div class="op-operator-arrow">&#x2192;</div>
+                    }
+                    <div class="op-active-operator-symbol @(_selfOpChanged ? "op-op-animating" : "") @(me.IsAudited ? "holo-effect" : "")">
+                        @me.ActiveOperator.ToSymbol()
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+</div>
+
+@* Controls & Hand *@
+<div class="op-bottom-tray">
+    <div class="op-controls">
+        @if (IsMyTurn)
+        {
+            @if (ConcatenatedValue != null)
+            {
+                <div class="op-concat-preview">@ConcatenatedValue</div>
+            }
+
+            @if (ShowSubmit)
+            {
+                <button class="op-btn op-btn-primary op-btn-lg" @onclick="PlaySelected">
+                    SUBMIT
+                </button>
+            }
+
+            @if (_pendingActionCardId != null || _selectedNumberIds.Count > 0 || _selectedOperatorId != null || _waitingForTarget)
+            {
+                <button class="op-btn op-btn-secondary" @onclick="CancelSelection">
+                    CANCEL
+                </button>
+            }
+
+            @if (NeedsTargetSelection && CanTargetSelf)
+            {
+                <button class="op-btn op-btn-secondary" @onclick="() => SelectTarget(View.RecipientId)">
+                    TARGET SELF
+                </button>
+            }
+
+            @if (SelectionHint != null)
+            {
+                <div class="op-section-title">@SelectionHint</div>
+            }
+            else if (!ShowSubmit && _pendingActionCardId == null && _selectedOperatorId == null && !_waitingForTarget)
+            {
+                @if (CanSkip())
+                {
+                    <button class="op-btn op-btn-secondary" @onclick="SkipTurn">
+                        SKIP TURN
+                    </button>
+                }
+
+                <button class="op-btn op-btn-secondary" @onclick="EndTurn" disabled="@(!CanEndTurn())">
+                    END TURN
+                </button>
+
+                <div class="op-section-title">Select a card to play</div>
+            }
+        }
+        else
+        {
+            <div class="op-waiting-text">
+                Waiting for @(View.Players.FirstOrDefault(p => p.UserId == View.CurrentPlayerId)?.DisplayName ?? "another player")...
+            </div>
+        }
+    </div>
+
+    @if (View.MyHand != null)
+    {
+        <OperatorHand Hand="@View.MyHand"
+                      SelectedCards="@SelectedCardIds"
+                      DisabledCards="@DisabledCardIds"
+                      NewCardIds="@_newCardIds"
+                      OnCardToggled="ToggleCard" />
+    }
+</div>
+</div>
+
+@code {
+    [Parameter] public OperatorView View { get; set; } = default!;
+    [Parameter] public Func<string, string?, Task> Submit { get; set; } = default!;
+    [Parameter] public EventCallback<string> OnError { get; set; }
+    [Parameter] public bool IsReadOnly { get; set; }
+
+    // ── Client-owned selection state ───────────────────────────────────────────
+    private Guid? _pendingActionCardId;
+    private Guid? _selectedOperatorId;
+    private readonly List<Guid> _selectedNumberIds = [];
+    private Guid? _targetPlayerId;
+    private bool _waitingForTarget;
+    private bool _showDiscardHistory;
+
+    // Reset selection when the turn owner or phase changes (not on every projection).
+    private Guid? _lastKnownPlayerId;
+    private OperatorGamePhase? _lastKnownPhase;
+    private bool _lastKnownInitialized;
+
+    // ── Self score / operator change animations ───────────────────────────────
+    private decimal? _prevSelfScore;
+    private bool _selfScoreChanged;
+    private decimal? _scoreDelta;
+    private int _scoreDeltaKey;
+    private CardOperator? _prevSelfOp;
+    private bool _selfOpChanged;
+    private CardOperator? _prevDisplayOp;
+    private CancellationTokenSource _cts = new();
+
+    // ── New-card detection (drives OperatorHand's entry stagger) ───────────────
+    private HashSet<Guid> _prevHandIds = new();
+    private HashSet<Guid> _newCardIds = new();
+    private bool _handBaselineSet;
+
+    private CardView? MyCard(Guid id) => View.MyHand?.FirstOrDefault(c => c.Id == id);
+
+    protected bool IsMyTurn => !IsReadOnly && View.IsMyTurn;
+
+    protected override void OnParametersSet()
+    {
+        // Reset transient selection only when the turn owner or phase changes.
+        var currentPlayerId = View.CurrentPlayerId;
+        var currentPhase = View.Phase;
+        if (!_lastKnownInitialized || currentPlayerId != _lastKnownPlayerId || currentPhase != _lastKnownPhase)
+        {
+            _lastKnownInitialized = true;
+            _lastKnownPlayerId = currentPlayerId;
+            _lastKnownPhase = currentPhase;
+            ClearSelection();
+        }
+
+        // New-card detection: ids present now but not in the previous hand. Skip the very
+        // first observation so the initial deal doesn't all animate as "new".
+        var currentIds = (View.MyHand ?? []).Select(c => c.Id).ToHashSet();
+        if (_handBaselineSet)
+            _newCardIds = currentIds.Where(id => !_prevHandIds.Contains(id)).ToHashSet();
+        else
+        {
+            _newCardIds = new();
+            _handBaselineSet = true;
+        }
+        _prevHandIds = currentIds;
+
+        // Self score / operator change toasts.
+        var me = View.Players.FirstOrDefault(p => p.UserId == View.RecipientId);
+        if (me != null)
+        {
+            if (_prevSelfScore.HasValue && _prevSelfScore.Value != me.CurrentPoints)
+            {
+                _scoreDelta = me.CurrentPoints - _prevSelfScore.Value;
+                _scoreDeltaKey++;
+                _selfScoreChanged = true;
+                var token = _cts.Token;
+                _ = Task.Delay(2000, token).ContinueWith(_ =>
+                {
+                    if (!token.IsCancellationRequested)
+                    {
+                        _selfScoreChanged = false;
+                        _scoreDelta = null;
+                        InvokeAsync(StateHasChanged);
+                    }
+                }, token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
+            }
+            _prevSelfScore = me.CurrentPoints;
+
+            if (_prevSelfOp.HasValue && _prevSelfOp.Value != me.ActiveOperator)
+            {
+                _prevDisplayOp = _prevSelfOp.Value;
+                _selfOpChanged = true;
+                var token = _cts.Token;
+                _ = Task.Delay(2000, token).ContinueWith(_ =>
+                {
+                    if (!token.IsCancellationRequested)
+                    {
+                        _selfOpChanged = false;
+                        _prevDisplayOp = null;
+                        InvokeAsync(StateHasChanged);
+                    }
+                }, token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
+            }
+            _prevSelfOp = me.ActiveOperator;
+        }
+    }
+
+    // ── Card-kind affordance helpers (over the projected CardView) ─────────────
+    private static bool ActionNeedsNumbers(CardView card) => card.PairableCardIds.Count > 0;
+    private static bool ActionNeedsTarget(CardView card) => card.ValidTargetPlayerIds.Count > 0;
+
+    protected HashSet<Guid> SelectedCardIds
+    {
+        get
+        {
+            var ids = new HashSet<Guid>(_selectedNumberIds);
+            if (_pendingActionCardId != null) ids.Add(_pendingActionCardId.Value);
+            if (_selectedOperatorId != null) ids.Add(_selectedOperatorId.Value);
+            return ids;
+        }
+    }
+
+    protected bool ShowSubmit
+    {
+        get
+        {
+            var pending = _pendingActionCardId is { } id ? MyCard(id) : null;
+            bool pendingNeedsTarget = pending != null && ActionNeedsTarget(pending);
+            bool pendingNeedsNumbers = pending != null && ActionNeedsNumbers(pending);
+
+            return (_selectedNumberIds.Count > 0 && (pending == null || !pendingNeedsTarget || _targetPlayerId != null))
+                || (_selectedOperatorId != null && _targetPlayerId != null)
+                || (pending != null && !pendingNeedsNumbers && (!pendingNeedsTarget || _targetPlayerId != null));
+        }
+    }
+
+    protected bool NeedsTargetSelection
+    {
+        get
+        {
+            var pending = _pendingActionCardId is { } id ? MyCard(id) : null;
+            return _waitingForTarget
+                || (pending != null && ActionNeedsTarget(pending) && _targetPlayerId == null)
+                || (_selectedOperatorId != null && _targetPlayerId == null);
+        }
+    }
+
+    protected HashSet<Guid> DisabledCardIds
+    {
+        get
+        {
+            var hand = View.MyHand;
+            if (hand == null || !IsMyTurn)
+                return hand?.Select(c => c.Id).ToHashSet() ?? [];
+
+            var disabled = new HashSet<Guid>();
+
+            // Waiting for target — disable all hand cards.
+            if (_waitingForTarget)
+            {
+                foreach (var c in hand) disabled.Add(c.Id);
+                return disabled;
+            }
+
+            // Operator selected — disable everything except the selected operator.
+            if (_selectedOperatorId != null)
+            {
+                foreach (var c in hand.Where(c => c.Id != _selectedOperatorId.Value))
+                    disabled.Add(c.Id);
+                return disabled;
+            }
+
+            // Action pending — only its pairable numbers + the action itself stay enabled.
+            if (_pendingActionCardId is { } pendingId)
+            {
+                var pending = MyCard(pendingId);
+                var pairings = pending?.PairableCardIds ?? (IReadOnlyList<Guid>)[];
+                foreach (var c in hand.Where(c => !pairings.Contains(c.Id) && c.Id != pendingId))
+                    disabled.Add(c.Id);
+                return disabled;
+            }
+
+            // Numbers selected, no action — numbers + actions that pair with a selected number.
+            if (_selectedNumberIds.Count > 0)
+            {
+                foreach (var c in hand)
+                {
+                    if (c.Type == CardType.Number) continue;
+                    if (c.Type == CardType.Action && c.PairableCardIds.Any(pid => _selectedNumberIds.Contains(pid))) continue;
+                    disabled.Add(c.Id);
+                }
+                return disabled;
+            }
+
+            // No selection — use pre-computed playability.
+            foreach (var c in hand)
+                if (!c.IsPlayable) disabled.Add(c.Id);
+
+            return disabled;
+        }
+    }
+
+    protected string? SelectionHint
+    {
+        get
+        {
+            var pending = _pendingActionCardId is { } id ? MyCard(id) : null;
+            if (_waitingForTarget)
+                return $"Select target for {(pending?.TooltipName ?? "action")}";
+            if (_selectedOperatorId != null && _targetPlayerId == null)
+                return "Select target";
+
+            if (pending != null)
+            {
+                bool needsNumbers = ActionNeedsNumbers(pending);
+                bool needsTarget = ActionNeedsTarget(pending);
+                bool hasNumbers = _selectedNumberIds.Count > 0;
+                bool hasTarget = _targetPlayerId != null;
+
+                if (needsNumbers && needsTarget && (!hasNumbers || !hasTarget))
+                    return "Select target & numbers";
+                if (needsNumbers && !hasNumbers)
+                    return "Select numbers";
+                if (needsTarget && !hasTarget)
+                    return "Select target";
+            }
+            return null;
+        }
+    }
+
+    protected string? ConcatenatedValue
+    {
+        get
+        {
+            if (_selectedNumberIds.Count < 2) return null;
+            decimal val = 0;
+            foreach (var id in _selectedNumberIds)
+            {
+                var card = MyCard(id);
+                if (card?.NumberValue is { } nv)
+                    val = val * 10 + nv;
+            }
+            return $"= {val:G}";
+        }
+    }
+
+    protected bool IsPlayerTargetable(Guid targetPlayerId)
+    {
+        if (!IsMyTurn) return false;
+        var card = GetSelectedTargetableCard();
+        return card != null && card.ValidTargetPlayerIds.Contains(targetPlayerId);
+    }
+
+    private CardView? GetSelectedTargetableCard()
+    {
+        if (_pendingActionCardId is { } pid)
+        {
+            var pending = MyCard(pid);
+            if (pending != null && ActionNeedsTarget(pending)) return pending;
+        }
+        if (_selectedOperatorId is { } oid)
+        {
+            var op = MyCard(oid);
+            if (op != null && ActionNeedsTarget(op)) return op;
+        }
+        return null;
+    }
+
+    protected bool CanTargetSelf
+    {
+        get
+        {
+            var card = GetSelectedTargetableCard();
+            return card != null && card.ValidTargetPlayerIds.Contains(View.RecipientId);
+        }
+    }
+
+    protected void ToggleCard(Guid cardId)
+    {
+        if (!IsMyTurn) return;
+        var card = MyCard(cardId);
+        if (card == null) return;
+
+        switch (card.Type)
+        {
+            case CardType.Number:
+                if (_waitingForTarget) return;
+                if (_selectedNumberIds.Contains(card.Id)) _selectedNumberIds.Remove(card.Id);
+                else _selectedNumberIds.Add(card.Id);
+                break;
+
+            case CardType.Operator:
+                _selectedOperatorId = _selectedOperatorId == card.Id ? null : card.Id;
+                break;
+
+            case CardType.Action:
+                HandleActionClick(card);
+                break;
+        }
+    }
+
+    private void HandleActionClick(CardView card)
+    {
+        // Shield is a reaction-only card; it isn't played from the play controls.
+        if (card.Action == CardAction.Shield) return;
+
+        if (_pendingActionCardId == card.Id)
+        {
+            _pendingActionCardId = null;
+            _waitingForTarget = false;
+            return;
+        }
+
+        _pendingActionCardId = card.Id;
+
+        if (ActionNeedsNumbers(card))
+        {
+            _waitingForTarget = false;
+            if (!ActionNeedsTarget(card)) _targetPlayerId = null;
+        }
+        else if (ActionNeedsTarget(card))
+        {
+            _waitingForTarget = _targetPlayerId == null;
+        }
+        else
+        {
+            _waitingForTarget = false;
+            _targetPlayerId = null;
+        }
+    }
+
+    protected void SelectTarget(Guid playerId)
+    {
+        if (!IsMyTurn) return;
+
+        // Block target selection for self-only / no-target actions.
+        var pending = _pendingActionCardId is { } id ? MyCard(id) : null;
+        if (pending != null && !ActionNeedsTarget(pending)) return;
+
+        if (!IsPlayerTargetable(playerId)) return;
+
+        _targetPlayerId = _targetPlayerId == playerId ? null : playerId;
+        if (_waitingForTarget && _targetPlayerId != null) _waitingForTarget = false;
+        StateHasChanged();
+    }
+
+    protected async Task PlaySelected()
+    {
+        if (!IsMyTurn) return;
+
+        var cardIds = new List<Guid>(_selectedNumberIds);
+        if (_pendingActionCardId != null) cardIds.Add(_pendingActionCardId.Value);
+        if (_selectedOperatorId != null) cardIds.Add(_selectedOperatorId.Value);
+        if (cardIds.Count == 0) return;
+
+        var targetId = _targetPlayerId;
+        ClearSelection();
+        await Submit(OperatorCommands.PlayCards,
+            JsonSerializer.Serialize(new PlayCardsPayload(cardIds.ToArray(), targetId),
+                OperatorContractsJsonContext.Default.PlayCardsPayload));
+    }
+
+    private void ClearSelection()
+    {
+        _pendingActionCardId = null;
+        _selectedOperatorId = null;
+        _selectedNumberIds.Clear();
+        _targetPlayerId = null;
+        _waitingForTarget = false;
+    }
+
+    protected void CancelSelection()
+    {
+        ClearSelection();
+        StateHasChanged();
+    }
+
+    protected Task SkipTurn() => IsMyTurn ? Submit(OperatorCommands.SkipTurn, null) : Task.CompletedTask;
+
+    protected bool CanSkip()
+    {
+        if (!IsMyTurn || View.MyHand == null) return false;
+        return !View.MyHand.Any(c => c.IsPlayable);
+    }
+
+    protected bool CanEndTurn()
+    {
+        if (!IsMyTurn || View.MyHand == null) return false;
+        return View.HasPlayedCardThisTurn && View.MyHand.Count <= 5;
+    }
+
+    protected Task EndTurn()
+        => (IsMyTurn && CanEndTurn()) ? Submit(OperatorCommands.EndTurn, null) : Task.CompletedTask;
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The repo is split into two solutions (new SLNX format):
 - `sdk/KnockBox.Sdk.slnx` — the SDK NuGet packages (`KnockBox.Core`, `KnockBox.Platform`, `KnockBox.Plugins.Analyzer`, `KnockBox.Templates`, and `KnockBox.Tooling` — optional utility/extension helpers for game authors) plus their test projects (`KnockBox.CoreTests`, `KnockBox.PlatformTests`, `KnockBox.Plugins.AnalyzerTests`).
-- `host/KnockBox.Host.slnx` — the `KnockBox` host app, its tests, the twelve first-party game plugins (AlphaChain, CardCounter, Codeword, DiceSimulator, DndMapper, DrawnToDress, HiddenAgenda, LinkedList, Operator, Spardle, TaskMaster, Tracery), and the WordService library plugin (`KnockBox.WordService` + `KnockBox.WordService.Contracts`), all with their tests.
+- `host/KnockBox.Host.slnx` — the `KnockBox` host app, its tests, the ten first-party game plugins (AlphaChain, CardCounter, Codeword, DiceSimulator, DndMapper, DrawnToDress, LinkedList, Operator, Spardle, Tracery), and the WordService library plugin (`KnockBox.WordService` + `KnockBox.WordService.Contracts`), all with their tests.
 
 Target framework is `net10.0`.
 

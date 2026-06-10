@@ -520,4 +520,4 @@ Building the host transitively builds your plugin and stages it into `host/Knock
 
 - [`host/KnockBox/Specs/knockbox-platform-architecture.md`](host/KnockBox/Specs/knockbox-platform-architecture.md) — the authoritative architecture reference (ALC isolation, session lifecycle, DI order, lobby routing).
 - [`CLAUDE.md`](CLAUDE.md) — build/test commands and additional contributor notes.
-- Existing plugins under `host/` (`KnockBox.CardCounter`, `KnockBox.Codeword`, `KnockBox.DiceSimulator`, `KnockBox.DndMapper`, `KnockBox.DrawnToDress`, `KnockBox.HiddenAgenda`, `KnockBox.Operator`, `KnockBox.Spardle`, `KnockBox.TaskMaster`) — concrete examples of the patterns above at varying complexity. `host/KnockBox.DiceSimulator` is the simplest starting reference.
+- Existing plugins under `host/` (`KnockBox.AlphaChain`, `KnockBox.CardCounter`, `KnockBox.Codeword`, `KnockBox.DiceSimulator`, `KnockBox.DndMapper`, `KnockBox.DrawnToDress`, `KnockBox.LinkedList`, `KnockBox.Operator`, `KnockBox.Spardle`, `KnockBox.Tracery`) — concrete examples of the patterns above at varying complexity. `host/KnockBox.DiceSimulator` is the simplest starting reference.

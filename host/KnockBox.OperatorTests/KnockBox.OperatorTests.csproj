@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\KnockBox.Operator\KnockBox.Operator.csproj" />
+    <ProjectReference Include="..\KnockBox.Operator.Contracts\KnockBox.Operator.Contracts.csproj" />
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
   </ItemGroup>
 

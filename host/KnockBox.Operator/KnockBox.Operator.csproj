@@ -11,10 +11,25 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\sdk\KnockBox.Core\KnockBox.Core.csproj" />
     <ProjectReference Include="../../sdk/KnockBox.Tooling/KnockBox.Tooling.csproj" />
+    <ProjectReference Include="..\KnockBox.Operator.Contracts\KnockBox.Operator.Contracts.csproj" />
+  </ItemGroup>
+
+  <!--
+    The Contracts DLL is a private dependency loaded into this plugin's own ALC
+    (it is not promoted to the default ALC), so it must be staged into
+    games/KnockBox.Operator/ alongside the plugin DLL. See Directory.Plugin.targets.
+  -->
+  <ItemGroup>
+    <PluginPrivateAssembly Include="$(TargetDir)KnockBox.Operator.Contracts.dll" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Microsoft.Extensions.Logging" />
+    <!-- The card/operator/action/phase enums moved to the Contracts assembly (same
+         KnockBox.Operator.Models namespace); the view DTOs + commands live in
+         KnockBox.Operator.Contracts. A global using keeps engine/state/FSM/projector
+         source resolving them unchanged. -->
+    <Using Include="KnockBox.Operator.Contracts" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,8 +1,6 @@
 using KnockBox.Core.Plugins;
-using KnockBox.Operator.Components;
 using KnockBox.Operator.Services.Logic.Games;
 using KnockBox.Operator.Services.Storage;
-using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.Operator
 {
@@ -16,11 +14,5 @@ namespace KnockBox.Operator
             registration.AddGameEngine<OperatorGameEngine>();
             registration.AddScoped<OperatorStorage, OperatorStorage>();
         }
-
-        public RenderFragment? GetCustomHeader() => builder =>
-        {
-            builder.OpenComponent<OperatorHeader>(0);
-            builder.CloseComponent();
-        };
     }
 }

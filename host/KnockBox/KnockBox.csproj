@@ -85,14 +85,6 @@
     -->
     <ProjectReference Include="..\KnockBox.Client\KnockBox.Client.csproj" />
     <!--
-      Out-of-build-graph spike UI assembly. ReferenceOutputAssembly="false" so the
-      host (and the client) never link it; it is staged as bytes into
-      games/KnockBox.HiddenAgenda/client/ and streamed to the browser at runtime.
-      Referenced only so the host build transitively builds + stages it.
-    -->
-    <ProjectReference Include="..\KnockBox.SpikePlugin.Client\KnockBox.SpikePlugin.Client.csproj"
-                      ReferenceOutputAssembly="false" Private="false" />
-    <!--
       Dice Simulator browser UI (the first true tri-split game). Same
       ReferenceOutputAssembly="false" Private="false" pattern as a server plugin:
       built transitively (which also builds KnockBox.DiceSimulator.Contracts) and
@@ -137,6 +129,13 @@
     <ProjectReference Include="..\KnockBox.Spardle.Client\KnockBox.Spardle.Client.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
     <!--
+      Operator browser UI (game #7 tri-split). Built transitively (also builds
+      KnockBox.Operator.Contracts) and staged into games/KnockBox.Operator/client/
+      via Directory.Client.targets; never linked into the host or the WASM client.
+    -->
+    <ProjectReference Include="..\KnockBox.Operator.Client\KnockBox.Operator.Client.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+    <!--
       Plugin projects are loaded at runtime, not linked at compile time.
       ReferenceOutputAssembly="false" keeps the host from taking a compile-time
       dependency on plugin types (preserving the runtime-discovery architecture);
@@ -154,10 +153,6 @@
     <ProjectReference Include="..\KnockBox.DrawnToDress\KnockBox.DrawnToDress.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\KnockBox.Operator\KnockBox.Operator.csproj"
-                      ReferenceOutputAssembly="false" Private="false" />
-    <ProjectReference Include="..\KnockBox.HiddenAgenda\KnockBox.HiddenAgenda.csproj"
-                      ReferenceOutputAssembly="false" Private="false" />
-    <ProjectReference Include="..\KnockBox.TaskMaster\KnockBox.TaskMaster.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
     <ProjectReference Include="..\KnockBox.Spardle\KnockBox.Spardle.csproj"
                       ReferenceOutputAssembly="false" Private="false" />

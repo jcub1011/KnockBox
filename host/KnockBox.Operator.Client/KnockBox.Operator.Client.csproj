@@ -1,0 +1,36 @@
+<!--
+  Browser UI for Operator — a Razor Class Library downloaded into the player's
+  browser at runtime and rendered by the WASM client (never referenced by it at build
+  time).
+
+  It references ONLY KnockBox.Operator.Contracts (the shared DTOs) and
+  KnockBox.Core.Client (the WASM-safe SDK). Analyzer rule KB1005 forbids referencing
+  KnockBox.Core / KnockBox.Platform / the server plugin; KB1006 enforces the hub view
+  type comes from a *.Contracts assembly; KB1008 flags server System.IO. Those gated
+  analyzers are wired by Directory.Client.targets (KnockBoxPluginKind=client).
+-->
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- The DLL is streamed and loaded via LoadFromStream; we don't need the RCL
+         static-web-assets pipeline. -->
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\sdk\KnockBox.Core.Client\KnockBox.Core.Client.csproj" />
+    <ProjectReference Include="..\KnockBox.Operator.Contracts\KnockBox.Operator.Contracts.csproj" />
+  </ItemGroup>
+
+  <!-- Stage the contracts DLL alongside the UI DLL (with build-time SHA-256) into
+       games/KnockBox.Operator/client/ via the shared client-staging targets. -->
+  <ItemGroup>
+    <ClientContractAssembly Include="$(TargetDir)KnockBox.Operator.Contracts.dll" />
+  </ItemGroup>
+
+  <Import Project="..\Directory.Client.targets" />
+
+</Project>

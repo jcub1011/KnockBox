@@ -498,7 +498,7 @@ public class MyGameGameState : AbstractGameState
 
 Razor pages then write via `state.UpdateSettings(s => s with { Rounds = 7 })`. See `host/KnockBox.Codeword/Services/State/Games/CodewordGameState.cs` and `host/KnockBox.Codeword/Pages/LobbyPhase.razor.cs` for the full pattern, including localStorage persistence.
 
-> **Legacy:** `IConfigurableGameState<TConfig>` (with a mutable `Config { get; set; }` property) is the older shape used by CardCounter, HiddenAgenda, and DrawnToDress. It still works but lets callers bypass the Execute lock — new games should prefer the immutable-settings shape above.
+> **Legacy:** `IConfigurableGameState<TConfig>` (with a mutable `Config { get; set; }` property) is the older shape used by CardCounter and DrawnToDress. It still works but lets callers bypass the Execute lock — new games should prefer the immutable-settings shape above.
 
 ### FSM-driven state
 

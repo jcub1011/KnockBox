@@ -1,0 +1,14 @@
+@*
+    Draw phase — transient "dealing" splash, re-expressed against the projected
+    OperatorView (no per-player data needed).
+*@
+
+<div class="op-loading">
+    <span class="op-loading-icon">🎴</span>
+    <h2 class="op-phase-title">DRAWING CARDS...</h2>
+    <p class="op-waiting-text">The next round is about to start.</p>
+</div>
+
+@code {
+    [Parameter] public OperatorView View { get; set; } = default!;
+}

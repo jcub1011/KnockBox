@@ -1,0 +1,99 @@
+@*
+    Game-over phase — host winner pedestal vs player leaderboard, re-expressed against the
+    projected OperatorView. Ranking is pre-computed server-side into View.Standings
+    (ordered, with Rank + IsWinner), so the client renders it directly rather than
+    re-sorting balances.
+*@
+
+@{
+    var standings = View.Standings;
+}
+
+@if (View.IsHostObserver)
+{
+    @* ── Host: Winner Pedestal Layout ── *@
+    <div class="op-game-over host-view">
+        <div class="op-confetti-layer c1"></div>
+        <div class="op-confetti-layer c2"></div>
+        <div class="op-confetti-layer c3"></div>
+
+        <h1 class="op-phase-title">GAME OVER</h1>
+
+        @if (standings.Count > 0)
+        {
+            var winner = standings[0];
+
+            <div class="op-winner-pedestal holo-effect">
+                <span class="op-winner-label">WINNER</span>
+                <span class="op-winner-name">@winner.DisplayName</span>
+                <span class="op-winner-score">@winner.FinalPoints.ToString("F1")</span>
+                <span class="op-winner-turns">@View.TurnCount turns played</span>
+            </div>
+
+            @if (standings.Count > 1)
+            {
+                <div class="op-runner-up-row">
+                    @for (int i = 1; i < standings.Count; i++)
+                    {
+                        var entry = standings[i];
+                        <div class="op-runner-up" style="--ri: @(i - 1)">
+                            <span class="op-runner-rank">#@(i + 1)</span>
+                            <span class="op-runner-name">@entry.DisplayName</span>
+                            <span class="op-runner-score">@entry.FinalPoints.ToString("F1")</span>
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        <div class="op-game-over-actions">
+            <button class="op-btn op-btn-primary op-btn-lg" @onclick="ReturnToLobby">
+                RETURN TO LOBBY
+            </button>
+        </div>
+    </div>
+}
+else
+{
+    @* ── Player: Leaderboard ── *@
+    <div class="op-game-over">
+        <h1 class="op-phase-title">GAME OVER</h1>
+
+        <div class="op-leaderboard">
+            @for (int i = 0; i < standings.Count; i++)
+            {
+                var entry = standings[i];
+                var isWinner = entry.IsWinner;
+
+                <div class="op-leaderboard-entry @(isWinner ? "winner" : "")">
+                    <span class="op-entry-rank">#@(i + 1)</span>
+                    <span class="op-entry-name">@entry.DisplayName</span>
+                    <div class="op-entry-score-col">
+                        <span class="op-entry-score">@entry.FinalPoints.ToString("F1")</span>
+                        @if (isWinner) { <span class="op-host-badge">WINNER</span> }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="op-game-over-actions">
+            @if (View.IsHost)
+            {
+                <button class="op-btn op-btn-primary op-btn-lg" @onclick="ReturnToLobby">
+                    RETURN TO LOBBY
+                </button>
+            }
+            else
+            {
+                <span class="op-waiting-text">Waiting for host…</span>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public OperatorView View { get; set; } = default!;
+    [Parameter] public Func<string, string?, Task> Submit { get; set; } = default!;
+
+    private Task ReturnToLobby() => Submit(OperatorCommands.ReturnToLobby, null);
+}

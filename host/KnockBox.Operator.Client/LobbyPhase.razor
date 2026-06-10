@@ -1,0 +1,211 @@
+@implements IDisposable
+@*
+    Lobby phase — roster, kick, START GAME / START AS PLAYER buttons, and the settings
+    drawer, re-expressed against the projected OperatorView. The host edits a local
+    settings draft; each change is sent as an `update-settings` command (the server is the
+    source of truth). Client-side localStorage persistence is deferred (no WASM client
+    storage SDK yet), matching CardCounter.Client.
+*@
+
+<div class="op-lobby">
+    @{
+        bool amHost = View.IsHost;
+        int joinedCount = View.Roster.Count;
+        int playableIfHostPlays = joinedCount + 1;
+    }
+    @if (amHost)
+    {
+        <button class="op-settings-gear-btn" @onclick="ToggleSettings" title="Game Settings">
+            ⚙️
+        </button>
+    }
+
+    <div class="op-lobby-table-container">
+        <div class="op-lobby-table">
+            <h2 class="op-lobby-title">Operator Lobby</h2>
+
+            <div class="op-lobby-players">
+                @foreach (var entry in View.Roster)
+                {
+                    var isMe = entry.PlayerId == View.RecipientId;
+                    var isHost = entry.IsHost;
+
+                    <div class="op-lobby-player @(isMe ? "op-lobby-player-me" : "")">
+                        <span class="op-player-lobbyname">@entry.DisplayName</span>
+                        @if (isHost)
+                        {
+                            <span class="op-host-badge">HOST</span>
+                        }
+
+                        @if (amHost && !isHost)
+                        {
+                            <button class="op-btn op-btn-danger op-btn-sm" @onclick="() => KickPlayer(entry.PlayerId)" title="Kick Player">
+                                ✕
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <p class="op-lobby-player-count">@joinedCount players</p>
+
+            @if (amHost)
+            {
+                <button class="op-btn op-btn-primary op-btn-lg"
+                        disabled="@(joinedCount < MinPlayerCount)"
+                        @onclick="() => StartGame(false)">
+                    START GAME
+                </button>
+                <button class="op-btn op-btn-primary op-btn-lg"
+                        disabled="@(playableIfHostPlays < MinPlayerCount)"
+                        @onclick="() => StartGame(true)">
+                    START GAME AS PLAYER
+                </button>
+                @if (playableIfHostPlays < MinPlayerCount)
+                {
+                    <p class="op-waiting-text">⚠️ Need at least @MinPlayerCount players (or @(MinPlayerCount - 1) plus the host)</p>
+                }
+                else if (joinedCount < MinPlayerCount)
+                {
+                    <p class="op-waiting-text">⚠️ Need @MinPlayerCount players to start, or start as a player to join in</p>
+                }
+            }
+            else
+            {
+                <div class="op-lobby-waiting">
+                    <p class="op-waiting-text">Waiting for host to start...</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (amHostCached && SettingsOpen)
+{
+    <div class="op-settings-backdrop" @onclick="ToggleSettings"></div>
+    <div class="op-settings-drawer @(SettingsOpen ? "op-settings-drawer-open" : "")">
+        <div class="op-settings-drawer-header">
+            <h3 class="op-config-section-title">⚙️ Game Settings</h3>
+            <button class="op-btn op-btn-sm" @onclick="ToggleSettings">✕</button>
+        </div>
+
+        <div class="op-settings-drawer-body">
+            <div class="op-config-grid">
+                <label class="op-config-label op-config-label-row">
+                    <span>Enable Timers</span>
+                    <input type="checkbox" @bind:get="_draft.TimersEnabled" @bind:set="@(v => Set(_draft with { TimersEnabled = v }))" />
+                </label>
+
+                @if (_draft.TimersEnabled)
+                {
+                    <label class="op-config-label">
+                        Setup Timeout (s)
+                        <input type="number" class="op-config-input" min="5" max="300"
+                               @bind:get="_draft.SetupPhaseSeconds" @bind:set="@(v => Set(_draft with { SetupPhaseSeconds = v }))" />
+                    </label>
+                    <label class="op-config-label">
+                        Play Timeout (s)
+                        <input type="number" class="op-config-input" min="5" max="300"
+                               @bind:get="_draft.PlayPhaseSeconds" @bind:set="@(v => Set(_draft with { PlayPhaseSeconds = v }))" />
+                    </label>
+                    <label class="op-config-label">
+                        Reaction Timeout (s)
+                        <input type="number" class="op-config-input" min="5" max="300"
+                               @bind:get="_draft.ReactionPhaseSeconds" @bind:set="@(v => Set(_draft with { ReactionPhaseSeconds = v }))" />
+                    </label>
+                }
+
+                <label class="op-config-label op-config-label-row">
+                    <span>Flip Win Condition</span>
+                    <input type="checkbox" @bind:get="_draft.FlipWinCondition" @bind:set="@(v => Set(_draft with { FlipWinCondition = v }))" />
+                </label>
+            </div>
+
+            <div class="op-settings-drawer-footer">
+                <button type="button" class="op-btn @(_resetArmed ? "op-btn-danger" : "op-btn-secondary")"
+                        @onclick="ResetToDefaults">
+                    @(_resetArmed ? "⚠ Click again to confirm" : "↺ Reset to Defaults")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public OperatorView View { get; set; } = default!;
+    [Parameter] public Func<string, string?, Task> Submit { get; set; } = default!;
+
+    // The server gated the lobby on OperatorGameEngine.MinPlayerCount (2). The view carries
+    // no engine handle, so mirror the constant the engine was constructed with.
+    private const int MinPlayerCount = 2;
+
+    protected bool SettingsOpen { get; private set; }
+
+    // Local editable copy of the host's settings. Seeded once from the projected view;
+    // each edit optimistically updates this and sends an update-settings command.
+    private OperatorSettingsView _draft = new();
+    private bool _initialized;
+    private bool amHostCached;
+
+    private bool _resetArmed;
+    private int _resetGeneration;
+    private CancellationTokenSource? _cts;
+
+    protected override void OnParametersSet()
+    {
+        amHostCached = View.IsHost;
+        // Seed the draft from the authoritative settings once, then let local edits drive it
+        // (the host is the only editor). Re-seed only before the first edit.
+        if (!_initialized)
+        {
+            _draft = View.Settings;
+            _initialized = true;
+        }
+    }
+
+    protected void ToggleSettings() => SettingsOpen = !SettingsOpen;
+
+    private Task Set(OperatorSettingsView updated)
+    {
+        _draft = updated;
+        return Submit(OperatorCommands.UpdateSettings,
+            JsonSerializer.Serialize(_draft, OperatorContractsJsonContext.Default.OperatorSettingsView));
+    }
+
+    protected void ResetToDefaults()
+    {
+        if (!_resetArmed)
+        {
+            _resetArmed = true;
+            _ = DisarmResetAfterDelay(++_resetGeneration);
+            return;
+        }
+        _resetArmed = false;
+        _resetGeneration++;
+        _ = Set(new OperatorSettingsView());
+    }
+
+    private async Task DisarmResetAfterDelay(int generation)
+    {
+        _cts ??= new CancellationTokenSource();
+        try { await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token); }
+        catch (OperationCanceledException) { return; }
+        if (generation != _resetGeneration) return;
+        _resetArmed = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task KickPlayer(Guid playerId)
+        => Submit(OperatorCommands.KickPlayer,
+            JsonSerializer.Serialize(new KickPayload(playerId), OperatorContractsJsonContext.Default.KickPayload));
+
+    private Task StartGame(bool hostPlays)
+        => Submit(OperatorCommands.Start,
+            JsonSerializer.Serialize(new StartPayload(hostPlays), OperatorContractsJsonContext.Default.StartPayload));
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

@@ -17,22 +17,23 @@ The solution is split into the host project, a shared core library, one class li
 | `KnockBox.Platform` | Class Library (SDK NuGet) | Hosting SDK: `AddKnockBoxPlatform` / `UseKnockBoxPlatform`, `LobbyService`, `SessionServiceProvider`, home/error pages, default plugin-context wiring, static-asset mounting |
 | `KnockBox.Plugins.Analyzer` | netstandard2.0 Roslyn analyzer (SDK NuGet) | Build-time lints KB1001-KB1004 flagging filesystem / network / process / env sandbox-escaping APIs in plugin projects |
 | `KnockBox.Templates` | `dotnet new` template pack (SDK NuGet) | `knockbox-game` template: scaffolds a plugin RCL + DevHost + tests with `plugin.json` and analyzer reference pre-wired |
-| `KnockBox.CardCounter` | Class Library (game plugin) | Card Counter game logic, state, Razor pages |
+| `KnockBox.AlphaChain` | Class Library (game plugin) | Alpha Chain game logic, state, runtime WASM UI (tri-split) |
+| `KnockBox.CardCounter` | Class Library (game plugin) | Card Counter game logic, state, runtime WASM UI (tri-split) |
 | `KnockBox.Codeword` | Class Library (game plugin) | Codeword game logic, state, Razor pages |
-| `KnockBox.DiceSimulator` | Class Library (game plugin) | Dice Simulator game logic, state, Razor pages |
+| `KnockBox.DiceSimulator` | Class Library (game plugin) | Dice Simulator game logic, state, runtime WASM UI (tri-split) |
 | `KnockBox.DndMapper` | Class Library (game plugin) | DnD Mapper game logic, state, Razor pages |
 | `KnockBox.DrawnToDress` | Class Library (game plugin) | Drawn To Dress game logic, state, Razor pages |
-| `KnockBox.HiddenAgenda` | Class Library (game plugin) | Hidden Agenda game logic, state, Razor pages |
+| `KnockBox.LinkedList` | Class Library (game plugin) | Linked List game logic, state, runtime WASM UI (tri-split) |
 | `KnockBox.Operator` | Class Library (game plugin) | Operator game logic, state, Razor pages |
-| `KnockBox.Spardle` | Class Library (game plugin) | Spardle game logic, state, Razor pages |
-| `KnockBox.TaskMaster` | Class Library (game plugin) | TaskMaster game logic, state, Razor pages |
+| `KnockBox.Spardle` | Class Library (game plugin) | Spardle game logic, state, runtime WASM UI (tri-split) |
+| `KnockBox.Tracery` | Class Library (game plugin) | Tracery game logic, state, runtime WASM UI (tri-split) |
 | `KnockBox.CoreTests` | MSTest | Unit tests for `KnockBox.Core` |
 | `KnockBox.PlatformTests` | MSTest | Unit tests for `KnockBox.Platform` |
 | `KnockBox.Plugins.AnalyzerTests` | MSTest | Analyzer rule tests (custom Roslyn harness) |
 | `KnockBox.{Game}Tests` | MSTest | One per first-party plugin — unit and integration tests for that game |
 | `KnockBoxTests` | MSTest | Integration tests for the main `KnockBox` project (repository layer, etc.) |
 
-The repository ships **nine first-party game plugins**: CardCounter, Codeword, DiceSimulator, DndMapper, DrawnToDress, HiddenAgenda, Operator, Spardle, TaskMaster.
+The repository ships **ten first-party game plugins**: AlphaChain, CardCounter, Codeword, DiceSimulator, DndMapper, DrawnToDress, LinkedList, Operator, Spardle, Tracery.
 
 **`KnockBox` references only `KnockBox.Core`.** Game projects are *not* referenced at compile time — they are loaded at runtime from the `games/` subdirectory alongside the host's binaries (see **Plugin System**). Every game project references `KnockBox.Core` only. Adding, removing, or renaming a game never requires a change to `KnockBox` or to any other game.
 

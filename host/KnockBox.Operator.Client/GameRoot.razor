@@ -1,0 +1,144 @@
+@inherits HubLobbyPageBase<OperatorView>
+@*
+    GameRoot — the runtime-loaded WASM UI entry point for Operator. Inheriting
+    HubLobbyPageBase<OperatorView> opens the hub, joins the lobby, deserializes each
+    per-player projection into `View`, and disposes on teardown. It dispatches to the
+    phase components exactly as the old server OperatorLobby page did, passing the
+    projected View and a command-submit callback. The host-observer / shared-display vs
+    player fork mirrors OperatorLobby.razor.cs's routing.
+*@
+
+@* HeadContent is unavailable to a runtime-loaded WASM component; link the fonts +
+   the de-scoped stylesheet (served from the server plugin's mounted wwwroot) into the
+   body. The server page loaded these in <HeadContent>, which does not ship to WASM. *@
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@500;700&display=swap" />
+<link rel="stylesheet" href="_content/KnockBox.Operator/css/operator.css" />
+
+<OperatorHeader Code="@LobbyCode" OnLeave="LeaveAsync" />
+
+<div class="op-root">
+@if (View is null)
+{
+    <div class="op-loading">
+        <span class="op-loading-icon">🧮</span>
+        <span>Loading room...</span>
+    </div>
+}
+else
+{
+    <div class="op-page">
+
+        @* ── Error toast ── *@
+        @if (_errorMessage is not null)
+        {
+            <div @key="_errorKey" class="op-error-toast">
+                <span class="op-error-icon">⚠️</span>
+                <span>@_errorMessage</span>
+            </div>
+        }
+
+        @if (View.IsJoinable)
+        {
+            <LobbyPhase View="View" Submit="Submit" />
+        }
+        else if (View.IsHostObserver)
+        {
+            @* Host shared-display routing — only when the host is not playing. *@
+            @switch (View.Phase)
+            {
+                case OperatorGamePhase.Setup:
+                    <SetupPhase View="View" Submit="Submit" />
+                    break;
+                case OperatorGamePhase.GameOver:
+                    <GameOverPhase View="View" Submit="Submit" />
+                    break;
+                default:
+                    <SpectatorView View="View" />
+                    break;
+            }
+        }
+        else
+        {
+            @* Player routing *@
+            @switch (View.Phase)
+            {
+                case OperatorGamePhase.Setup:
+                    <SetupPhase View="View" Submit="Submit" />
+                    break;
+                case OperatorGamePhase.Play:
+                    <PlayPhase View="View" Submit="Submit" OnError="ShowError" />
+                    break;
+                case OperatorGamePhase.Reaction:
+                    <PlayPhase View="View" Submit="Submit" OnError="ShowError" IsReadOnly="true" />
+                    <ReactionPhase View="View" Submit="Submit" OnError="ShowError" />
+                    break;
+                case OperatorGamePhase.Draw:
+                    <DrawPhase View="View" />
+                    break;
+                case OperatorGamePhase.GameOver:
+                    <GameOverPhase View="View" Submit="Submit" />
+                    break;
+            }
+        }
+
+        <OperatorTimer View="View" />
+    </div>
+}
+</div>
+
+@code {
+    /// <summary>The lobby code from the room URL, supplied by the WASM host page.</summary>
+    [Parameter] public string Code { get; set; } = "";
+
+    /// <summary>The player's chosen display name, propagated from the home page.</summary>
+    [Parameter] public string? PlayerName { get; set; }
+
+    protected override string RouteIdentifier => "operator";
+    protected override string LobbyUri => $"room/operator/{Code}";
+    protected override string DisplayName => string.IsNullOrWhiteSpace(PlayerName) ? "Player" : PlayerName!;
+
+    public GameRoot()
+        : base(new SourceGenProjectionDeserializer<OperatorView>(
+            OperatorContractsJsonContext.Default.OperatorView))
+    {
+    }
+
+    private Task Submit(string command, string? payload) => SubmitCommandAsync(command, payload);
+
+    // ── Error toast state (mirrors OperatorLobby.razor.cs) ─────────────────────
+    private string? _errorMessage;
+    private int _errorKey;
+    private CancellationTokenSource? _errorCts;
+
+    private static readonly TimeSpan ErrorToastDuration = TimeSpan.FromSeconds(3);
+
+    private void ShowError(string message)
+    {
+        _errorMessage = message;
+        _errorKey++;
+        int capturedKey = _errorKey;
+        StateHasChanged();
+        _ = ClearErrorAfterDelay(capturedKey);
+    }
+
+    private async Task ClearErrorAfterDelay(int capturedKey)
+    {
+        _errorCts?.Cancel();
+        _errorCts?.Dispose();
+        _errorCts = CancellationTokenSource.CreateLinkedTokenSource(ComponentDetached);
+        try { await Task.Delay(ErrorToastDuration, _errorCts.Token); }
+        catch (OperationCanceledException) { return; }
+        if (_errorKey != capturedKey) return;
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    protected override async ValueTask DisposeAsyncCore()
+    {
+        _errorCts?.Cancel();
+        _errorCts?.Dispose();
+        await base.DisposeAsyncCore();
+    }
+}

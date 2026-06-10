@@ -1,0 +1,42 @@
+@*
+    Phase countdown. Ported from the server OperatorTimer (which read the FSM's remaining
+    time): the server now projects the deadline as View.PhaseExpiresAtUtc and the WASM
+    CountdownClock counts it down in the browser. The total duration for the ring fraction
+    is the matching settings value for the current phase.
+*@
+
+@if (View.PhaseExpiresAtUtc is { } endTime)
+{
+    var duration = GetTotalDuration();
+
+    <CountdownClock EndTimeUtc="endTime" Duration="duration" Context="countdown">
+        @{
+            var seconds = (int)Math.Ceiling(countdown.RemainingSeconds);
+            var dashOffset = Circumference * (1 - countdown.Fraction);
+        }
+        <div class="op-timer-container">
+            <div class="op-timer-card @(seconds < 5 ? "op-timer-urgent" : "")">
+                <svg class="op-timer-ring" viewBox="0 0 60 60">
+                    <circle class="op-timer-ring-bg" cx="30" cy="30" r="26" />
+                    <circle class="op-timer-ring-fill" cx="30" cy="30" r="26"
+                            style="stroke-dashoffset: @dashOffset.ToString("F2")" />
+                </svg>
+                <span class="op-timer-text">@seconds</span>
+            </div>
+        </div>
+    </CountdownClock>
+}
+
+@code {
+    [Parameter] public OperatorView View { get; set; } = default!;
+
+    private const double Circumference = 2 * Math.PI * 26; // ~163.36
+
+    private TimeSpan GetTotalDuration() => View.Phase switch
+    {
+        OperatorGamePhase.Setup => TimeSpan.FromSeconds(View.Settings.SetupPhaseSeconds),
+        OperatorGamePhase.Play => TimeSpan.FromSeconds(View.Settings.PlayPhaseSeconds),
+        OperatorGamePhase.Reaction => TimeSpan.FromSeconds(View.Settings.ReactionPhaseSeconds),
+        _ => TimeSpan.FromSeconds(30)
+    };
+}

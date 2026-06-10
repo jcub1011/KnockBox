@@ -3,50 +3,10 @@ using KnockBox.Operator.Services.Logic.FSM;
 
 namespace KnockBox.Operator.Models;
 
-public enum CardType
-{
-    Number,
-    Operator,
-    Action
-}
-
-public enum CardOperator
-{
-    None,
-    Add,
-    Subtract,
-    Multiply,
-    Divide
-}
-
-public enum CardAction
-{
-    None,
-    Shield,
-    LiabilityTransfer,
-    CookTheBooks,
-    Comp,
-    Steal,
-    HotPotato,
-    FlashFlood,
-    HostileTakeover,
-    Audit,
-    MarketCrash,
-    Surcharge,
-    BlueShell
-}
-
-public static class CardOperatorExtensions
-{
-    public static string ToSymbol(this CardOperator op) => op switch
-    {
-        CardOperator.Add => "+",
-        CardOperator.Subtract => "-",
-        CardOperator.Multiply => "\u00d7",
-        CardOperator.Divide => "\u00f7",
-        _ => "?"
-    };
-}
+// The card/operator/action/phase enums and CardOperatorExtensions now live in
+// KnockBox.Operator.Contracts (same KnockBox.Operator.Models namespace) so the wire
+// binds identical CLR types. The behaviour-bearing interfaces + abstract Card stay here
+// (they reference the server-only OperatorGameContext).
 
 public interface ITargetableCard
 {

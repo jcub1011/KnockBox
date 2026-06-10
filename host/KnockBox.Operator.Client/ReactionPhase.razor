@@ -1,0 +1,158 @@
+@*
+    Reaction overlay. Ported from the server ReactionPhase, but driven entirely by the
+    projection: View.PendingAction (attacker / card / targets / description) and
+    View.MyReactionOptions (shield card ids + the optional Hot Potato redirect). The server
+    inspected the hand + pending command to find reaction cards; here those are pre-computed.
+
+    Targeting model:
+      - MyReactionOptions != null  → I'm a current target who hasn't acted → show actions.
+      - else my player.IsReactionTarget → I was a target and have already reacted → waiting.
+      - else → I'm not a target → generic "waiting for reaction".
+*@
+
+<div class="op-reaction-overlay">
+    <div class="op-reaction-backdrop"></div>
+    <div class="op-reaction-panel">
+        @{
+            var me = View.Players.FirstOrDefault(p => p.UserId == View.RecipientId);
+            var options = View.MyReactionOptions;
+            var pending = View.PendingAction;
+            bool isTargeted = options is not null;
+            bool hasReacted = !isTargeted && me is { IsReactionTarget: true };
+        }
+        @if (isTargeted)
+        {
+            <div class="op-reaction-alert-icon">&#x26A0;&#xFE0F;</div>
+            <h2 class="op-reaction-title">YOU ARE BEING TARGETED!</h2>
+            <p class="op-reaction-subtitle">
+                <strong>@(pending?.AttackerName ?? "Someone")</strong> played <strong>@(pending?.Description ?? "an action")</strong> against you!
+            </p>
+
+            @if (pending?.Card is { } pendingCard)
+            {
+                <div class="op-reaction-card-desc">
+                    @pendingCard.TooltipDescription
+                </div>
+            }
+
+            <div class="op-reaction-player-status">
+                <div class="op-status-item">
+                    <span class="op-status-label">YOUR SCORE:</span>
+                    <span class="op-status-value">@(me?.CurrentPoints.ToString("F1") ?? "0.0")</span>
+                </div>
+                <div class="op-status-item">
+                    <span class="op-status-label">YOUR OPERATOR:</span>
+                    <span class="op-status-value">@((me?.ActiveOperator ?? CardOperator.Add).ToSymbol())</span>
+                </div>
+            </div>
+
+            @if (options!.ShieldCardIds.Count > 0 || (options.HotPotatoRedirectCardId is not null && options.ValidRedirectTargetIds.Count > 0))
+            {
+                <div class="op-reaction-actions">
+                    @if (options.ShieldCardIds.Count > 0)
+                    {
+                        <div class="op-reaction-action-btn shield-btn" @onclick="() => PlayShield(options.ShieldCardIds[0])">
+                            <div class="op-reaction-action-icon">&#x1F6E1;&#xFE0F;</div>
+                            <div class="op-reaction-action-label">USE SHIELD</div>
+                        </div>
+                    }
+                    @if (options.HotPotatoRedirectCardId is not null && options.ValidRedirectTargetIds.Count > 0)
+                    {
+                        <div class="op-reaction-action-btn redirect-btn" @onclick="() => StartRedirect(options.HotPotatoRedirectCardId!.Value)">
+                            <div class="op-reaction-action-icon">&#x1F954;</div>
+                            <div class="op-reaction-action-label">REDIRECT</div>
+                        </div>
+                    }
+                </div>
+
+                @if (_redirectingWithCardId != null)
+                {
+                    <div class="op-redirect-section">
+                        <p class="op-waiting-text">Select a player to redirect Hot Potato to:</p>
+                        <div class="op-redirect-players">
+                            @foreach (var targetId in options.ValidRedirectTargetIds)
+                            {
+                                var targetPlayer = View.Players.FirstOrDefault(p => p.UserId == targetId);
+                                <button class="op-redirect-player-btn" @onclick="() => RedirectHotPotato(targetId)">
+                                    @(targetPlayer?.DisplayName ?? "Player")
+                                </button>
+                            }
+                        </div>
+                        <button class="op-btn op-btn-secondary" @onclick="CancelRedirect">CANCEL</button>
+                    </div>
+                }
+
+                <div class="op-reaction-pass">
+                    <button class="op-btn op-btn-danger" @onclick="Pass">TAKE THE HIT (PASS)</button>
+                </div>
+            }
+            else
+            {
+                <div class="op-no-shields">
+                    <p class="op-waiting-text">You have no reaction cards available.</p>
+                    <button class="op-btn op-btn-primary" @onclick="Pass">CONTINUE</button>
+                </div>
+            }
+        }
+        else if (hasReacted)
+        {
+            <div class="op-reaction-waiting-content">
+                <h2 class="op-reaction-title" style="font-size: 1.2rem;">Waiting for others...</h2>
+                <p class="op-reaction-subtitle">
+                    You have responded. Waiting for other players to react.
+                </p>
+            </div>
+        }
+        else
+        {
+            <div class="op-reaction-waiting-content">
+                <h2 class="op-reaction-title" style="font-size: 1.2rem;">Waiting for reaction...</h2>
+                <p class="op-reaction-subtitle">
+                    @{
+                        var targetNames = pending is null
+                            ? new List<string>()
+                            : View.Players
+                                .Where(p => pending.TargetPlayerIds.Contains(p.UserId) && p.IsReactionTarget)
+                                .Select(p => p.DisplayName)
+                                .ToList();
+                    }
+                    @if (targetNames.Count > 0)
+                    {
+                        <text>Waiting for <strong>@(string.Join(", ", targetNames))</strong> to respond.</text>
+                    }
+                    else
+                    {
+                        <text>Waiting for the targeted player(s) to respond.</text>
+                    }
+                </p>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public OperatorView View { get; set; } = default!;
+    [Parameter] public Func<string, string?, Task> Submit { get; set; } = default!;
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private Guid? _redirectingWithCardId;
+
+    private Task PlayShield(Guid cardId)
+        => Submit(OperatorCommands.PlayReaction,
+            JsonSerializer.Serialize(new PlayReactionPayload(cardId), OperatorContractsJsonContext.Default.PlayReactionPayload));
+
+    private Task Pass() => Submit(OperatorCommands.PassReaction, null);
+
+    private void StartRedirect(Guid hotPotatoCardId) => _redirectingWithCardId = hotPotatoCardId;
+
+    private void CancelRedirect() => _redirectingWithCardId = null;
+
+    private Task RedirectHotPotato(Guid targetPlayerId)
+    {
+        if (_redirectingWithCardId is not { } cardId) return Task.CompletedTask;
+        var task = Submit(OperatorCommands.RedirectHotPotato,
+            JsonSerializer.Serialize(new RedirectPayload(cardId, targetPlayerId), OperatorContractsJsonContext.Default.RedirectPayload));
+        _redirectingWithCardId = null;
+        return task;
+    }
+}

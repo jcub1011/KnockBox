@@ -4,8 +4,18 @@ A step-by-step, footgun-aware recipe for migrating a game plugin from the Blazor
 model to the WASM tri-split. **DiceSimulator is the reference implementation** — when in
 doubt, copy what `host/KnockBox.DiceSimulator{,.Contracts,.Client}` does.
 
-> **Status:** DiceSimulator (game #1), CardCounter (game #2), AlphaChain (game #3), and Tracery
-> (game #4) are migrated and the shared infrastructure is proven. Game #2 added the **server-owned
+> **Status:** DiceSimulator (game #1), CardCounter (game #2), AlphaChain (game #3), Tracery
+> (game #4), LinkedList (game #5), Spardle (game #6), and Operator (game #7) are migrated and the
+> shared infrastructure is proven. (Two dead games — HiddenAgenda, the old Phase-0 spike vehicle, and
+> the TaskMaster stub — were deleted rather than migrated, dropping the first-party count to ten.)
+> Game #6 added the reusable **generic plugin file-upload endpoint** (`IGameUploadHandler` +
+> `POST /api/games/upload`). Game #7 was the first `IServerTickHandler` migration since #2/#3, and
+> introduced the **affordance-projection** pattern for an interactive card-selection UI: rather than
+> ship the rules engine to the client (forbidden by KB1005), the projector pre-computes each of the
+> recipient's own cards' play affordances (`IsPlayable`, valid target ids, pairable card ids) onto the
+> wire `CardView`, and the WASM UI runs only the pure card-type selection combinatorics on top — the
+> same "flatten server capability into DTOs" idea as #3, applied to per-card playability/targeting.
+> Game #2 added the **server-owned
 > tick loop** (timed games) and a **WASM `CountdownClock`** — both now reusable. Game #3 proved the
 > pattern at scale: a full FSM, ~40 modifier cards **flattened by the projector into wire DTOs** (the
 > card capability interfaces stay server-side), and **client-owned JS-interop word input** — and
@@ -112,11 +122,11 @@ public sealed class {Game}StateProjector
 ```
 - **Default-deny is the security boundary.** Build the view field-by-field. Copy a secret
   field **only** when the entry being projected belongs to `recipientId` (see
-  `HiddenAgendaProjector` for the secret-bearing pattern). KB1007 enforces the view is a
+  `CardCounterStateProjector` for the secret-bearing pattern). KB1007 enforces the view is a
   Contracts type, not server state.
 - Runs under the read lock the coordinator holds — read snapshot-returning members only.
 
-**Engine** implements both interfaces (mirror `HiddenAgendaGameEngine` /
+**Engine** implements both interfaces (mirror `CardCounterGameEngine` /
 `DiceSimulatorGameEngine`):
 ```csharp
 public class {Game}GameEngine(...)

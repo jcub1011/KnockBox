@@ -1,0 +1,93 @@
+@*
+    Setup phase — host shared-display grid (players selecting a starting score) vs the
+    player's positive/negative choice, re-expressed against the projected OperatorView.
+
+    The exact ± starting values are projected (View.SetupPositivePoints / SetupNegativePoints)
+    so the choice buttons label themselves; the sign is carried in SetupChoicePayload.
+    "Has submitted" is derived from a player's projected CurrentPoints being non-zero
+    (the server seeds 0 until a choice is locked).
+*@
+
+<div class="op-setup">
+    @if (View.IsHostObserver)
+    {
+        int totalPlayers = View.Players.Count;
+        int scoresSubmitted = View.Players.Count(p => p.CurrentPoints != 0m);
+
+        <h2 class="op-phase-title">PLAYERS SELECTING STARTING SCORE</h2>
+
+        <div class="op-setup-host-grid">
+            @for (int i = 0; i < View.Players.Count; i++)
+            {
+                var p = View.Players[i];
+                var hasSubmitted = p.CurrentPoints != 0m;
+                var isPositive = p.CurrentPoints > 0;
+
+                <div class="op-setup-slot @(hasSubmitted ? "ready" : "")" style="--i: @i">
+                    <div class="op-setup-slot-avatar @(hasSubmitted ? (isPositive ? "avatar-positive" : "avatar-negative") : "")">
+                        @(string.IsNullOrEmpty(p.DisplayName) ? "?" : p.DisplayName[0].ToString().ToUpper())
+                    </div>
+                    <span class="op-setup-slot-name">@p.DisplayName</span>
+                    @if (hasSubmitted)
+                    {
+                        <span class="op-setup-slot-score @(isPositive ? "score-positive" : "score-negative")">
+                            @(isPositive ? "+" : "")@p.CurrentPoints.ToString("F1")
+                        </span>
+                        <span class="op-setup-slot-check">&#10003;</span>
+                    }
+                    else
+                    {
+                        <span class="op-setup-slot-score score-pending">---</span>
+                        <span class="op-setup-slot-waiting">...</span>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="op-setup-progress">
+            <div class="op-setup-progress-dots">
+                @for (int i = 0; i < totalPlayers; i++)
+                {
+                    <span class="op-setup-dot @(i < scoresSubmitted ? "filled" : "")"></span>
+                }
+            </div>
+            <span class="op-setup-progress-text">@scoresSubmitted / @totalPlayers READY</span>
+        </div>
+    }
+    else
+    {
+        <h2 class="op-phase-title">CHOOSE YOUR STARTING SCORE</h2>
+
+        <div class="op-setup-choices">
+            <div class="op-choice-btn op-choice-positive" @onclick="() => SubmitChoice(false)">
+                <span class="op-choice-value">+@View.SetupPositivePoints.ToString("0.##")</span>
+            </div>
+
+            <div class="op-choice-btn op-choice-negative" @onclick="() => SubmitChoice(true)">
+                <span class="op-choice-value">@View.SetupNegativePoints.ToString("0.##")</span>
+            </div>
+        </div>
+
+        @if (HasChosen())
+        {
+            <div class="op-waiting-section">
+                <p class="op-waiting-text">Choice locked! Waiting for others...</p>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public OperatorView View { get; set; } = default!;
+    [Parameter] public Func<string, string?, Task> Submit { get; set; } = default!;
+
+    private Task SubmitChoice(bool isNegative)
+        => Submit(OperatorCommands.SubmitSetupChoice,
+            JsonSerializer.Serialize(new SetupChoicePayload(isNegative), OperatorContractsJsonContext.Default.SetupChoicePayload));
+
+    private bool HasChosen()
+    {
+        var me = View.Players.FirstOrDefault(p => p.UserId == View.RecipientId);
+        return me is not null && me.CurrentPoints != 0m;
+    }
+}
