@@ -28,11 +28,10 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
             ModifierId.Unknown, "Mul", "", ScoreFold.Multiplicative, static _ => true, (_, _) => factor);
 
         private static EngineEvaluationContext Ctx(string word, IReadOnlyList<IModifierCard> bay)
-            => new(word, Array.Empty<char>(), new[] { new AlphaChainPlayerState { UserId = Guid.NewGuid() } })
+            => new EngineEvaluationContext(word, Array.Empty<char>(), new[] { new AlphaChainPlayerState { UserId = Guid.NewGuid() } })
             {
-                Bay = bay,
                 PlayerIndex = 0,
-            };
+            }.WithBay(bay);
 
         [TestMethod]
         public void Glass_MagnifiesImmediateAdditiveNeighbor()

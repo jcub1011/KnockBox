@@ -3,7 +3,7 @@ using KnockBox.HiddenAgenda.Services.State.Games.Data;
 using KnockBox.HiddenAgenda.Services.Logic.Games;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
-using KnockBox.Core.Services.Storage.ClientStorage;
+using KnockBox.HiddenAgenda.Services.Storage;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.HiddenAgenda.Pages
@@ -15,7 +15,7 @@ namespace KnockBox.HiddenAgenda.Pages
         [Parameter, EditorRequired] public IUserService UserService { get; set; } = default!;
         [Parameter, EditorRequired] public string RoomCode { get; set; } = default!;
 
-        [Inject] protected ILocalStorageService LocalStorage { get; set; } = default!;
+        [Inject] protected HiddenAgendaStorage Storage { get; set; } = default!;
         [Inject] protected ILogger<LobbyPhase> Logger { get; set; } = default!;
 
         private bool IsHost => UserService.CurrentUser?.Id == GameState.Host.Id;
@@ -101,7 +101,7 @@ namespace KnockBox.HiddenAgenda.Pages
 
         private async Task LoadSettingsAsync()
         {
-            var savedResult = await LocalStorage.GetAsync<HiddenAgendaSettings>("hidden-agenda", "settings", _cts.Token);
+            var savedResult = await Storage.Local.GetAsync<HiddenAgendaSettings>("settings", "value", _cts.Token);
             // A failed or canceled read is a non-success result that simply falls through to
             // the built-in defaults. If the host already edited a setting while the load was in
             // flight, the user's edit wins — the saved snapshot would clobber it.
@@ -128,7 +128,7 @@ namespace KnockBox.HiddenAgenda.Pages
             {
                 try { await prior; } catch { /* prior failure already logged */ }
             }
-            var saveResult = await LocalStorage.SetAsync("hidden-agenda", "settings", settings, ct);
+            var saveResult = await Storage.Local.SetAsync("settings", "value", settings, ct);
             // Cancellation is silently ignored; a genuine storage failure is logged.
             if (saveResult.TryGetFailure(out var saveError))
                 Logger.LogError("Error saving Hidden Agenda settings: {Error}", saveError.InternalMessage);

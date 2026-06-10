@@ -12,9 +12,11 @@ namespace KnockBox.DndMapperTests.Helpers
     /// </summary>
     internal sealed class TestPluginContext : IPluginContext
     {
-        public TestPluginContext(IPluginStorage storage, IPluginManifest? manifest = null)
+        // Storage is optional: the library service only reads Manifest.RouteIdentifier
+        // from the context, so route-only tests can omit it.
+        public TestPluginContext(IPluginStorage? storage = null, IPluginManifest? manifest = null)
         {
-            Storage = storage;
+            Storage = storage!;
             Manifest = manifest ?? new TestPluginManifest();
         }
 

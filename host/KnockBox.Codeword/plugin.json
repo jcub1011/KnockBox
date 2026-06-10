@@ -6,5 +6,7 @@
   "version": "1.0.0",
   "entryAssembly": "KnockBox.Codeword",
   "capabilities": [],
-  "tileAsset": "tile.svg"
+  "tileAsset": "tile.svg",
+  "backgroundColor": "#0f0f1a",
+  "fontColor": "#ffffff"
 }

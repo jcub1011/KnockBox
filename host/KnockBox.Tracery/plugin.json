@@ -5,6 +5,8 @@
   "routeIdentifier": "tracery",
   "version": "1.0.0",
   "entryAssembly": "KnockBox.Tracery",
+  "backgroundColor": "#16131d",
+  "fontColor": "#ece3d0",
   "capabilities": [],
   "workInProgress": false,
   "tileAsset": "tile.svg"

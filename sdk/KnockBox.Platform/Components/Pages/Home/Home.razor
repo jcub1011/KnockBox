@@ -49,11 +49,12 @@
         </div>
     </form>
 
-    <div class="games-section">
-        <h2 class="games-heading">Host a Game</h2>
-        <div class="game-grid">
-            @foreach (var module in VisibleGameModules)
-            {
+    <div class="home-main">
+        <div class="games-section">
+            <h2 class="games-heading">Host a Game</h2>
+            <div class="game-grid">
+                @foreach (var module in VisibleGameModules)
+                {
                 <button class="game-tile @(module.Manifest.WorkInProgress ? "is-wip" : null)"
                         aria-label="@module.Manifest.Name"
                         disabled="@(!CanJoinOrCreate)"
@@ -81,8 +82,13 @@
                              draggable="false" />
                     }
                 </button>
-            }
+                }
+            </div>
         </div>
+
+        <aside class="home-playlog">
+            <PlayLogPanel />
+        </aside>
     </div>
 
     @if (_errorMessage is not null)

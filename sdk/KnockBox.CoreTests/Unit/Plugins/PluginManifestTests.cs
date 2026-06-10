@@ -46,6 +46,83 @@ public sealed class PluginManifestTests
         Assert.AreEqual(0, manifest.Capabilities.Count);
     }
 
+    // ─── TryParse — play-log theme colors ───────────────────────────────────
+
+    [TestMethod]
+    public void TryParse_NoColors_DefaultsToNull()
+    {
+        using var stream = StreamFor(ValidManifest);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.IsNull(manifest.BackgroundColor);
+        Assert.IsNull(manifest.FontColor);
+    }
+
+    [TestMethod]
+    public void TryParse_ValidHexColors_AreParsed()
+    {
+        using var stream = StreamFor("""
+            {
+                "schemaVersion": 1,
+                "name": "Fixture",
+                "description": "d",
+                "routeIdentifier": "fixture",
+                "version": "1.0.0",
+                "entryAssembly": "Fixture.Assembly",
+                "backgroundColor": "#06080f",
+                "fontColor": "#fff"
+            }
+            """);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetSuccess(out var manifest));
+        Assert.AreEqual("#06080f", manifest.BackgroundColor);
+        Assert.AreEqual("#fff", manifest.FontColor);
+    }
+
+    [TestMethod]
+    public void TryParse_InvalidHexColor_Fails()
+    {
+        using var stream = StreamFor("""
+            {
+                "schemaVersion": 1,
+                "name": "Fixture",
+                "description": "d",
+                "routeIdentifier": "fixture",
+                "version": "1.0.0",
+                "entryAssembly": "Fixture.Assembly",
+                "backgroundColor": "navy"
+            }
+            """);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetFailure(out _), "A non-hex color must fail the parse.");
+    }
+
+    [TestMethod]
+    public void TryParse_NonStringColor_Fails()
+    {
+        using var stream = StreamFor("""
+            {
+                "schemaVersion": 1,
+                "name": "Fixture",
+                "description": "d",
+                "routeIdentifier": "fixture",
+                "version": "1.0.0",
+                "entryAssembly": "Fixture.Assembly",
+                "fontColor": 1234
+            }
+            """);
+
+        var result = PluginManifest.TryParse(stream);
+
+        Assert.IsTrue(result.TryGetFailure(out _), "A non-string color must fail the parse.");
+    }
+
     [TestMethod]
     public void TryParse_ManifestWithoutCapabilitiesProperty_SucceedsWithEmptyCapabilities()
     {

@@ -14,6 +14,8 @@ namespace KnockBox.AlphaChain.Pages.Bench
     {
         public bool IsValidWord(ReadOnlySpan<char> word)
         {
+            // The engine normalizes (trims + lower-cases) the raw submission before it reaches the word
+            // list, so an all-lower-case a–z check is sufficient here; mixed-case/whitespace never arrives.
             if (word.Length == 0) return false;
             foreach (var c in word)
                 if (c is < 'a' or > 'z') return false;

@@ -1,6 +1,7 @@
 using KnockBox.Core.Plugins;
 using KnockBox.DrawnToDress.Components;
 using KnockBox.DrawnToDress.Services.Logic.Games;
+using KnockBox.DrawnToDress.Services.Storage;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.DrawnToDress
@@ -11,7 +12,10 @@ namespace KnockBox.DrawnToDress
             PluginManifest.FromEmbeddedResourceOrThrow(typeof(DrawnToDressModule).Assembly);
 
         public void RegisterServices(IPluginRegistration registration)
-            => registration.AddGameEngine<DrawnToDressGameEngine>();
+        {
+            registration.AddGameEngine<DrawnToDressGameEngine>();
+            registration.AddScoped<DrawnToDressStorage, DrawnToDressStorage>();
+        }
 
         public RenderFragment? GetCustomHeader() => builder =>
         {

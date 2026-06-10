@@ -326,15 +326,37 @@
     color: rgba(244, 236, 228, 0.35);
 }
 
+/* ── Main two-column area (games grid + play-log rail) ──────────────────── */
+
+/* Desktop: games grid (wide, primary) on the left, a narrower play-log rail on
+   the right. Collapses to a single column below 900px (see Responsive) so the
+   rail stacks beneath the games. */
+.home-main {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 28%, 360px);
+    gap: 24px;
+    align-items: start;
+}
+
 /* ── Games Section ──────────────────────────────────────────────────────── */
 
 .games-section {
     position: relative;
     z-index: 1;
     width: 100%;
-    max-width: 960px;
-    margin: 0 auto;
+    min-width: 0;
     animation: fade-in-up 0.7s ease-out 0.75s both;
+}
+
+.home-playlog {
+    min-width: 0;
+    animation: fade-in-up 0.7s ease-out 0.85s both;
+    padding-bottom: 1rem;
 }
 
 .games-heading {
@@ -543,6 +565,20 @@
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 
+/* Below 900px the two-column split would squeeze the games grid, so collapse to
+   a single column — the play-log rail stacks beneath the games (source order). */
+@media (max-width: 900px) {
+    .home-main {
+        grid-template-columns: 1fr;
+        gap: 28px;
+        max-width: 960px;
+    }
+
+    .home-playlog {
+        max-height: 100%;
+    }
+}
+
 @media (max-width: 600px) {
     .join-section {
         flex-direction: column;
@@ -596,6 +632,7 @@
     }
 
     .games-section,
+    .home-playlog,
     .join-section,
     .hero-tagline {
         animation: none;

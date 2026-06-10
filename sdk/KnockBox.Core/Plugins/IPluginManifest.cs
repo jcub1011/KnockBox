@@ -95,6 +95,21 @@ public interface IPluginManifest
     IReadOnlyList<string> ExportedContracts => Array.Empty<string>();
 
     /// <summary>
+    /// Optional CSS color (hex, e.g. <c>"#06080f"</c>) the host uses as the
+    /// background of this game's entries in the home-page play log, so the log
+    /// echoes the game's own palette. <c>null</c> falls back to the default card
+    /// background.
+    /// </summary>
+    string? BackgroundColor => null;
+
+    /// <summary>
+    /// Optional CSS color (hex, e.g. <c>"#eaf2ff"</c>) the host uses as the text
+    /// color of this game's entries in the home-page play log. <c>null</c> falls
+    /// back to the default text colors.
+    /// </summary>
+    string? FontColor => null;
+
+    /// <summary>
     /// Returns <c>true</c> if <paramref name="capability"/> was declared in this
     /// manifest.
     /// </summary>

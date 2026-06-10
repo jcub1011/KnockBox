@@ -1,7 +1,9 @@
 using KnockBox.Core.Components.Shared;
+using KnockBox.Core.Services.State.PlayLog;
 using KnockBox.DiceSimulator.Services.Logic.Games;
 using KnockBox.DiceSimulator.Services.State.Games;
 using KnockBox.DiceSimulator.Services.State.Games.Data;
+using KnockBox.DiceSimulator.Services.State.Games.PlayLog;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
@@ -44,6 +46,18 @@ namespace KnockBox.DiceSimulator.Pages
         protected void ClearHistory()
         {
             GameEngine.ClearHistory(UserService.CurrentUser!, GameState);
+        }
+
+        protected override GameLog? BuildOnLeavePlayLog()
+        {
+            // Dice Simulator is an open-ended sandbox with no terminal phase: nothing
+            // happened if no dice were ever rolled, so skip the log entirely.
+            if (GameState.RollHistory.Count == 0)
+                return null;
+
+            return GameLog.Create(
+                "dice-simulator",
+                DiceSimulatorPlayLogMetadata.Build(GameState, UserService.CurrentUser?.Id));
         }
 
         protected async Task ExportCsv()

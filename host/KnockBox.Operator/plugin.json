@@ -6,5 +6,7 @@
   "version": "1.0.0",
   "entryAssembly": "KnockBox.Operator",
   "capabilities": [],
-  "tileAsset": "tile.svg"
+  "tileAsset": "tile.svg",
+  "backgroundColor": "#0f0505",
+  "fontColor": "#ffffff"
 }

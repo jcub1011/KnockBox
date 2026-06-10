@@ -45,7 +45,6 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
                 banned is { } b ? new[] { b } : Array.Empty<char>(),
                 new[] { player })
             {
-                Bay = bay,
                 Services = services,
                 PlayerIndex = 0,
                 RemainingShotClockDuration = remaining,
@@ -55,7 +54,7 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
                     : wordHistory.Select(w => new AlphaChainSubmission(
                         default, default, "", w, 0, false, 0,
                         new ScoreBreakdown(w, w.Length, [], 0, false, 0))).ToImmutableList(),
-            };
+            }.WithBay(bay);
         }
 
         // A stub room-state provider: card state now lives in services, so the evaluator tests inject

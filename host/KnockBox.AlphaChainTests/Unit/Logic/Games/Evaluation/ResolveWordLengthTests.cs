@@ -22,15 +22,13 @@ namespace KnockBox.AlphaChain.Tests.Unit.Logic.Games.Evaluation
         private static IModifierCard Vanilla() => Card(ModifierId.Vanilla);
         private static IModifierCard Glass() => Card(ModifierId.MagnifyingGlass);
 
-        // Mirrors production: the EffectMagnifier is built from the same ordered bay, so a Magnifying
-        // Glass's magnification flows into the cards it targets exactly as it would at scoring time.
+        // Mirrors production: WithBay builds the EffectMagnifier from the same ordered bay, so a
+        // Magnifying Glass's magnification flows into the cards it targets exactly as it would at scoring time.
         private static EngineEvaluationContext Ctx(string word, IReadOnlyList<IModifierCard> bay)
-            => new(word, Array.Empty<char>(), new[] { new AlphaChainPlayerState { UserId = Guid.NewGuid() } })
+            => new EngineEvaluationContext(word, Array.Empty<char>(), new[] { new AlphaChainPlayerState { UserId = Guid.NewGuid() } })
             {
-                Bay = bay,
                 PlayerIndex = 0,
-                EffectMagnifier = EffectMagnifier.ForBay(bay),
-            };
+            }.WithBay(bay);
 
         [TestMethod]
         public void NoModifier_PerceivesTheRealWordLength()

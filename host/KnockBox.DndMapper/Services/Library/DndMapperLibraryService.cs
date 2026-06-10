@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text.Json;
+using KnockBox.Core.Plugins;
 using KnockBox.Core.Primitives.Returns;
 using KnockBox.Core.Services.State.Users;
 using KnockBox.Core.Services.Storage.IndexedDb;
@@ -50,7 +51,7 @@ namespace KnockBox.DndMapper.Services.Library
         // those sizes anyway.
         private const int MaxImageLongEdgePxCap = 8192;
 
-        private readonly IIndexedDbService _indexedDb;
+        private readonly ScopedIndexedDbService _indexedDb;
         private readonly DndMapperGameEngine _engine;
         private readonly IJSRuntime _jsRuntime;
         private readonly Lazy<Task<IJSObjectReference>> _imageDimsModule;
@@ -123,12 +124,17 @@ namespace KnockBox.DndMapper.Services.Library
         private readonly HashSet<string> _migratedSlots = new();
 
         public DndMapperLibraryService(
+            IPluginContext context,
             IIndexedDbService indexedDb,
             DndMapperGameEngine engine,
             IJSRuntime jsRuntime,
             ILogger<DndMapperLibraryService> logger)
         {
-            _indexedDb = indexedDb;
+            ArgumentNullException.ThrowIfNull(context);
+            // Route-scope the IndexedDB access so this plugin's database can't
+            // collide with (or be enumerated/deleted by) another plugin. The
+            // legacy unscoped database is migrated once in OpenWithRecoveryAsync.
+            _indexedDb = new ScopedIndexedDbService(indexedDb, context.Manifest.RouteIdentifier);
             _engine = engine;
             _jsRuntime = jsRuntime;
             _logger = logger;
@@ -246,6 +252,20 @@ namespace KnockBox.DndMapper.Services.Library
         /// </summary>
         private async ValueTask<ValueResult<IIndexedDatabase>> OpenWithRecoveryAsync(CancellationToken ct)
         {
+            // One-time import of the pre-scoping (unprefixed) "KnockBox.DndMapper"
+            // database into this plugin's route-scoped namespace. No-op on a
+            // fresh install (legacy DB absent) and once already migrated (the
+            // legacy DB is deleted after a successful copy). Failures are logged
+            // and non-fatal — a fresh, empty scoped library is still usable.
+            var migrateResult = await _indexedDb.MigrateLegacyDatabaseAsync(
+                DndMapperLibrarySchema.DatabaseName, DndMapperLibrarySchema.Create(), ct);
+            if (migrateResult.TryGetFailure(out var migErr))
+            {
+                _logger.LogWarning(
+                    "DnD Mapper legacy IndexedDB migration failed (continuing with scoped database): {Error}",
+                    migErr.Message);
+            }
+
             var openResult = await _indexedDb.OpenAsync(DndMapperLibrarySchema.Create(), ct);
             if (!openResult.TryGetSuccess(out var db))
             {

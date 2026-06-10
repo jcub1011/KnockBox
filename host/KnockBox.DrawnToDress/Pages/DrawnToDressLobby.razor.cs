@@ -1,125 +1,64 @@
 using KnockBox.Core.Components.Shared;
-using KnockBox.Core.Services.State.Shared;
+using KnockBox.Core.Services.State.PlayLog;
 using KnockBox.DrawnToDress.Services.Logic.Games;
-using KnockBox.Core.Services.Navigation;
 using KnockBox.DrawnToDress.Services.State.Games;
-using KnockBox.Core.Services.State.Games.Shared;
-using KnockBox.Core.Services.State.Users;
-using KnockBox.DrawnToDress.Services.Logic.Games.FSM;
+using KnockBox.DrawnToDress.Services.State.Games.PlayLog;
 using Microsoft.AspNetCore.Components;
-using System.Diagnostics.CodeAnalysis;
 
 namespace KnockBox.DrawnToDress.Pages
 {
-    public partial class DrawnToDressLobby : DisposableComponent
+    public partial class DrawnToDressLobby : LobbyPageBase<DrawnToDressGameState>
     {
+        /// <summary>Stable game id for the play log; must match the plugin's route identifier.</summary>
+        private const string RouteIdentifier = "drawn-to-dress";
+
         [Inject] protected DrawnToDressGameEngine GameEngine { get; set; } = default!;
-
-        [Inject] protected IGameSessionService GameSessionService { get; set; } = default!;
-
-        [Inject] protected INavigationService NavigationService { get; set; } = default!;
-
-        [Inject] protected IUserService UserService { get; set; } = default!;
-
-        [Inject] protected ITickService TickService { get; set; } = default!;
-
-        [Inject] protected ILogger<DrawnToDressLobby> Logger { get; set; } = default!;
-
-        [Parameter] public string ObfuscatedRoomCode { get; set; } = default!;
 
         private DtdAriaAnnouncer? _announcer;
         private GamePhase? _lastAnnouncedPhase;
 
-        private IDisposable? _stateSubscription;
-        private IDisposable? _stateDisposedSubscription;
-        private IDisposable? _tickSubscription;
-
-        protected override async Task OnInitializedAsync()
+        /// <summary>
+        /// Records one play-log entry per user once the match reaches the terminal
+        /// <see cref="GamePhase.Results"/> display phase (entered by
+        /// <see cref="Services.Logic.Games.FSM.States.FinalResultsDisplayState"/>). Returns
+        /// <c>null</c> while the game is still in progress so the base hook logs exactly the
+        /// first terminal result.
+        /// </summary>
+        protected override GameLog? BuildEndOfGamePlayLog()
         {
-            if (UserService.CurrentUser is null)
-                await UserService.InitializeCurrentUserAsync(ComponentDetached);
+            if (GameState.Phase != GamePhase.Results)
+                return null;
 
-            if (!GameSessionService.TryGetCurrentSession(out var session))
-            {
-                Logger.LogWarning("User [{userId}] attempted to enter room [{code}] without a session set.",
-                    UserService.CurrentUser?.Id.ToString() ?? "Unknown", ObfuscatedRoomCode);
-                NavigationService.ToHome();
-                return;
-            }
-
-            if (!TryExtractObfuscatedRoomCode(session.LobbyRegistration.Uri, out var roomCode))
-            {
-                Logger.LogError("User [{userId}] attempted to enter room [{code}] but their session registration uri [{uri}] could not be parsed.",
-                    UserService.CurrentUser?.Id.ToString() ?? "Unknown", ObfuscatedRoomCode, session.LobbyRegistration.Uri);
-                NavigationService.ToHome();
-                return;
-            }
-
-            if (roomCode.Trim() != ObfuscatedRoomCode)
-            {
-                Logger.LogError("User [{userId}] attempted to enter room [{code}] but their session registration uri [{uri}] does not match.",
-                    UserService.CurrentUser?.Id.ToString() ?? "Unknown", ObfuscatedRoomCode, session.LobbyRegistration.Uri);
-                NavigationService.ToHome();
-                return;
-            }
-
-            GameState = (DrawnToDressGameState)session.LobbyRegistration.State;
-
-            if (GameState.IsDisposed)
-            {
-                NavigationService.ToHome();
-                return;
-            }
-
-            _stateDisposedSubscription = GameState.SubscribeStateDisposed(HandleStateDisposed);
-            _stateSubscription = GameState.StateChangedEventManager.Subscribe(async () =>
-            {
-                await InvokeAsync(() =>
-                {
-                    AnnouncePhaseChangeIfNeeded();
-                    StateHasChanged();
-                });
-            });
-
-            // Register with the server-side tick service. Only the host drives FSM ticks to
-            // avoid redundant lock contention from every client. The tick service runs
-            // independently of any Blazor circuit, so the game continues even if the host
-            // disconnects and a new host is promoted.
-            if (IsHost())
-            {
-                var tickResult = TickService.RegisterTickCallback(() =>
-                {
-                    if (GameState?.Context is not null)
-                        GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
-                }, tickInterval: TickService.TicksPerSecond); // once per second
-
-                if (tickResult.TryGetSuccess(out var sub))
-                    _tickSubscription = sub;
-                else
-                    Logger.LogError("Failed to register tick callback: {Error}", tickResult.Error);
-            }
-
-            await base.OnInitializedAsync();
+            return GameLog.Create(
+                RouteIdentifier,
+                DrawnToDressPlayLogMetadata.Build(GameState, UserService.CurrentUser?.Id));
         }
 
-        private bool IsHost() => UserService.CurrentUser?.Id == GameState?.Host?.Id;
-
-        protected override void OnAfterRender(bool firstRender)
+        /// <summary>
+        /// Host-only tick that drives the FSM clock so timed phases advance even when the
+        /// host's circuit is the only one connected.
+        /// </summary>
+        protected override bool TryGetHostTick(out Action action, out int tickInterval)
         {
-            if (GameState is not null && GameState.IsKicked(UserService.CurrentUser!))
+            action = () =>
             {
-                GameSessionService.LeaveCurrentSession(navigateHome: true);
-            }
-
-            base.OnAfterRender(firstRender);
+                if (GameState?.Context is not null)
+                    GameEngine.Tick(GameState.Context, DateTimeOffset.UtcNow);
+            };
+            tickInterval = TickService.TicksPerSecond; // once per second
+            return true;
         }
 
-        private void HandleStateDisposed()
+        /// <summary>
+        /// Re-renders on every state change and announces phase transitions to assistive
+        /// technology via the ARIA live region.
+        /// </summary>
+        protected override async ValueTask OnStateChangedAsync()
         {
-            InvokeAsync(() =>
+            await InvokeAsync(() =>
             {
-                GameSessionService.LeaveCurrentSession(navigateHome: false);
-                NavigationService.ToHome();
+                AnnouncePhaseChangeIfNeeded();
+                StateHasChanged();
             });
         }
 
@@ -147,25 +86,5 @@ namespace KnockBox.DrawnToDress.Pages
                 _announcer.Announce($"Phase changed to {phaseName}");
             }
         }
-
-        public override void Dispose()
-        {
-            _tickSubscription?.Dispose();
-            _stateDisposedSubscription?.Dispose();
-            _stateSubscription?.Dispose();
-            base.Dispose();
-        }
-
-        private static bool TryExtractObfuscatedRoomCode(string uri, [NotNullWhen(true)] out string? obfuscatedRoomCode)
-        {
-            obfuscatedRoomCode = null;
-            var split = uri.Trim().Trim('/').Split('/');
-            if (split.Length <= 0) return false;
-            obfuscatedRoomCode = split[^1];
-            return true;
-        }
-
-        protected DrawnToDressGameState GameState { get; set; } = default!;
     }
 }
-

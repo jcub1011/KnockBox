@@ -20,7 +20,9 @@ public sealed partial record PluginManifest(
     string? TileAsset = null,
     bool WorkInProgress = false,
     PluginKind Kind = PluginKind.Game,
-    IReadOnlyList<string>? ExportedContracts = null) : IPluginManifest
+    IReadOnlyList<string>? ExportedContracts = null,
+    string? BackgroundColor = null,
+    string? FontColor = null) : IPluginManifest
 {
     /// <inheritdoc/>
     public IReadOnlyList<string> ExportedContracts { get; init; } =
@@ -45,6 +47,9 @@ public sealed partial record PluginManifest(
 
     [GeneratedRegex(@"^[A-Za-z0-9._-]+$")]
     private static partial Regex ExportedContractNamePattern();
+
+    [GeneratedRegex(@"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")]
+    private static partial Regex HexColorPattern();
 
     private static readonly FrozenDictionary<string, PluginCapability> CapabilityByName =
         new Dictionary<string, PluginCapability>(StringComparer.OrdinalIgnoreCase)
@@ -237,6 +242,11 @@ public sealed partial record PluginManifest(
                 tileAsset = validatedTileAsset;
             }
 
+            if (!TryReadHexColor(root, "backgroundColor", out var backgroundColor, out var bgColorError))
+                return ValueResult<PluginManifest>.FromError(bgColorError);
+            if (!TryReadHexColor(root, "fontColor", out var fontColor, out var fontColorError))
+                return ValueResult<PluginManifest>.FromError(fontColorError);
+
             bool workInProgress = false;
             if (root.TryGetProperty("workInProgress", out var wipElement)
                 && wipElement.ValueKind != JsonValueKind.Null)
@@ -356,7 +366,9 @@ public sealed partial record PluginManifest(
                 TileAsset: tileAsset,
                 WorkInProgress: workInProgress,
                 Kind: kind,
-                ExportedContracts: exportedContracts);
+                ExportedContracts: exportedContracts,
+                BackgroundColor: backgroundColor,
+                FontColor: fontColor);
 
             return ValueResult<PluginManifest>.FromValue(manifest);
         }
@@ -403,6 +415,41 @@ public sealed partial record PluginManifest(
 
         normalized = raw;
         error = string.Empty;
+        return true;
+    }
+
+    /// <summary>
+    /// Reads an optional hex-color manifest field. Absent or JSON <c>null</c> →
+    /// <paramref name="color"/> is <c>null</c> and the read succeeds. A present
+    /// value must be a non-string-rejecting, hex CSS color (<c>#rgb</c>,
+    /// <c>#rgba</c>, <c>#rrggbb</c>, or <c>#rrggbbaa</c>); anything else fails the
+    /// parse so authoring mistakes surface at manifest-load time.
+    /// </summary>
+    private static bool TryReadHexColor(JsonElement root, string propertyName, out string? color, out string error)
+    {
+        color = null;
+        error = string.Empty;
+
+        if (!root.TryGetProperty(propertyName, out var element)
+            || element.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        if (element.ValueKind != JsonValueKind.String)
+        {
+            error = $"plugin.json '{propertyName}' must be a string.";
+            return false;
+        }
+
+        var raw = element.GetString()!;
+        if (!HexColorPattern().IsMatch(raw))
+        {
+            error = $"plugin.json '{propertyName}' [{raw}] must be a hex color like '#06080f' or '#fff'.";
+            return false;
+        }
+
+        color = raw;
         return true;
     }
 

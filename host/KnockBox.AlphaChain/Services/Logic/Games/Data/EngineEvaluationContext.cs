@@ -30,8 +30,13 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data
         /// The current player's ordered Engine Bay (left → right pipeline order) — the cards being
         /// evaluated this submission. Capability walks (consonant/vowel checkers, multiplier-scale
         /// providers, …) traverse this for the current player. Empty for an ad-hoc/display context.
+        /// <para>
+        /// Set only through <see cref="WithBay"/> (private init), so a bay can never be attached without
+        /// its matching <see cref="EffectMagnifier"/> — the two are kept in lock-step by construction
+        /// rather than by every caller remembering to build the magnifier.
+        /// </para>
         /// </summary>
-        public IReadOnlyList<IModifierCard> Bay { get; init; } = [];
+        public IReadOnlyList<IModifierCard> Bay { get; private init; } = [];
 
         /// <summary>
         /// Plugin-internal service locator for engine-level operations cards need during their hooks

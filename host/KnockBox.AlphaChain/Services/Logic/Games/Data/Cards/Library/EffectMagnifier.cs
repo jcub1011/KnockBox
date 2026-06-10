@@ -47,6 +47,9 @@ namespace KnockBox.AlphaChain.Services.Logic.Games.Data.Cards.Library
         public EffectMagnifier(IReadOnlyList<IModifierCard> bay)
         {
             _bay = bay;
+            // Keyed by reference identity: each bay holds distinct factory-created card instances, so a
+            // card maps to its own slot. The same instance appearing twice in one bay would collapse to
+            // its last index — an invariant the engine upholds by never sharing a card instance across slots.
             _indexOf = new Dictionary<IModifierCard, int>(ReferenceEqualityComparer.Instance);
             for (int i = 0; i < bay.Count; i++)
                 _indexOf[bay[i]] = i;

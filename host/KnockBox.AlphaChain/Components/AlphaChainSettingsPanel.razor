@@ -2,8 +2,8 @@
 @using KnockBox.AlphaChain.Services.Logic.Games.Data
 @using KnockBox.AlphaChain.Services.State.Games
 @using KnockBox.Core.Primitives.Returns
-@using KnockBox.Core.Services.Storage.ClientStorage
-@inject ILocalStorageService LocalStorage
+@using KnockBox.AlphaChain.Services.Storage
+@inject AlphaChainStorage Storage
 @inject ILogger<AlphaChainSettingsPanel> Logger
 @implements IAsyncDisposable
 
@@ -258,7 +258,7 @@
     private async Task LoadSettingsAsync()
     {
         // A failed or canceled read falls through to the built-in defaults.
-        var savedResult = await LocalStorage.GetAsync<AlphaChainSettings>("alpha-chain", "settings", _cts.Token);
+        var savedResult = await Storage.Local.GetAsync<AlphaChainSettings>("settings", "value", _cts.Token);
         if (savedResult.TryGetSuccess(out var saved) && saved is not null && !_userHasEdited)
         {
             // HostPlays is a start-time choice, never a saved preference — clear any legacy
@@ -287,7 +287,7 @@
         {
             try { await prior; } catch { /* prior failure already logged */ }
         }
-        var saveResult = await LocalStorage.SetAsync("alpha-chain", "settings", settings, ct);
+        var saveResult = await Storage.Local.SetAsync("settings", "value", settings, ct);
         if (saveResult.TryGetFailure(out var saveError))
             Logger.LogError("Error saving Alpha Chain settings: {Error}", saveError.InternalMessage);
     }

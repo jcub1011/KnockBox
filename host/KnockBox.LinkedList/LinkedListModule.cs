@@ -2,6 +2,7 @@ using KnockBox.Core.Plugins;
 using KnockBox.LinkedList.Components;
 using KnockBox.LinkedList.Services.Logic;
 using KnockBox.LinkedList.Services.Logic.Games;
+using KnockBox.LinkedList.Services.Storage;
 using Microsoft.AspNetCore.Components;
 
 namespace KnockBox.LinkedList
@@ -15,6 +16,7 @@ namespace KnockBox.LinkedList
         {
             registration.AddSingleton<WordSource, WordSource>();
             registration.AddGameEngine<LinkedListGameEngine>();
+            registration.AddScoped<LinkedListStorage, LinkedListStorage>();
         }
 
         public RenderFragment? GetCustomHeader() => builder =>

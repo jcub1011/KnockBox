@@ -20,7 +20,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
         {
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService();
-            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library = new DndMapperLibraryService(new TestPluginContext(),db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
 
             Assert.IsTrue(engine.CreateMapAsync(state, host, "Forest").TryGetSuccess(out var mapA));
@@ -43,7 +43,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
         {
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService();
-            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library = new DndMapperLibraryService(new TestPluginContext(),db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
 
             Assert.IsTrue(engine.CreateMapAsync(state, host, "A").TryGetSuccess(out var mapA));
@@ -90,7 +90,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
         {
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService();
-            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library = new DndMapperLibraryService(new TestPluginContext(),db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
 
             Assert.IsTrue(engine.CreateMapAsync(state, host, "Keep").TryGetSuccess(out var keepId));
@@ -146,7 +146,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
                 [slotId] = legacy,
             };
 
-            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library = new DndMapperLibraryService(new TestPluginContext(),db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
 
             // Trigger migration via LoadSlotAsync.
@@ -178,7 +178,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService();
             var logger = new CapturingLogger<DndMapperLibraryService>();
-            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, logger);
+            await using var library = new DndMapperLibraryService(new TestPluginContext(),db, engine, NullJsRuntime.Instance, logger);
             Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
 
             // Build a populated slot, then manually delete one map shard to
@@ -193,7 +193,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
 
             // Detach + re-attach with a fresh state so LoadSlotAsync runs cold.
             var (engine2, state2, host2, _) = EngineTestFactory.Build();
-            await using var library2 = new DndMapperLibraryService(db, engine2, NullJsRuntime.Instance, logger);
+            await using var library2 = new DndMapperLibraryService(new TestPluginContext(),db, engine2, NullJsRuntime.Instance, logger);
             Assert.IsTrue((await library2.AttachAsync(state2, host2)).IsSuccess);
 
             Assert.IsTrue((await library2.LoadSlotAsync(slotId)).IsSuccess);
@@ -213,7 +213,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
         {
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService();
-            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library = new DndMapperLibraryService(new TestPluginContext(),db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
 
             Assert.IsTrue(engine.CreateMapAsync(state, host, "M1").TryGetSuccess(out var m1));
@@ -250,7 +250,7 @@ namespace KnockBox.DndMapperTests.Unit.Services.Library
             // from IDB so a future load doesn't resurrect it.
             var (engine, state, host, _) = EngineTestFactory.Build();
             var db = new FakeIndexedDbService();
-            await using var library = new DndMapperLibraryService(db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
+            await using var library = new DndMapperLibraryService(new TestPluginContext(),db, engine, NullJsRuntime.Instance, NullLogger<DndMapperLibraryService>.Instance);
             Assert.IsTrue((await library.AttachAsync(state, host)).IsSuccess);
 
             Assert.IsTrue(engine.CreateMapAsync(state, host, "Keep").TryGetSuccess(out var keep));
